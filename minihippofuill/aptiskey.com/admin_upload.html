@@ -639,8 +639,18 @@
     </script>
     
     <!-- Admin Upload JS -->
-    <script src="js/admin_upload.js"></script>
+    <!-- Load v2 first to ensure it's the one used -->
     <script src="js/admin_upload_v2.js"></script>
+    <script src="js/admin_upload.js"></script>
+    <!-- Override with v2 again to ensure it takes precedence -->
+    <script>
+        // Ensure uploadLessonToGitHub from v2 is used
+        if (window.uploadLessonToGitHub && typeof window.uploadLessonToGitHub === 'function') {
+            console.log('uploadLessonToGitHub function is available from admin_upload_v2.js');
+        } else {
+            console.error('uploadLessonToGitHub function not found!');
+        }
+    </script>
 </body>
 </html>
 

@@ -726,8 +726,9 @@ async function uploadLessonToGitHub() {
     }
 }
 
-// Make function globally accessible
+// Make function globally accessible - Override any existing function
 window.uploadLessonToGitHub = uploadLessonToGitHub;
+console.log('uploadLessonToGitHub function from admin_upload_v2.js has been registered');
 
 function generatePart1JS() {
     if (questionSets[1].length === 0) {
