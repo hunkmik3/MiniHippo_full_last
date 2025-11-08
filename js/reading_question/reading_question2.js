@@ -2,13 +2,9 @@
 // ////////////// DANH SÁCH CÂU HỎI PART 2 & 3 ///////////////
 // ===============================================================================================================
 
-// sadasd - Topic: ádasdad
+// ádsad - Topic: ádsad
 const question2Content_1 = [
-    'ád',
-    'ádasdasdasd',
-    'dsasadsa',
-    'sadsadas',
-    'sadsad',
+    'ádadasdasd',
 ];
 
 const questionSets = [
@@ -16,7 +12,7 @@ const questionSets = [
 ];
 
 const questheader1 = {
-    question2Content_1: "ádasdad",
+    question2Content_1: "ádsad",
 };
 
 function getQuestHeaders(obj) {
