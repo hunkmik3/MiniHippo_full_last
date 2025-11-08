@@ -361,7 +361,10 @@ async function saveLessonMetadata(part, filePath, metadata, lessonId) {
   } else {
     // Always insert new record (don't check for existing)
     // This allows multiple lessons with different file paths
+    // Note: If UNIQUE(part, file_path) constraint exists, this will fail if file_path is duplicate
     lessonData.created_at = new Date().toISOString();
+    
+    console.log('Attempting to insert new lesson with file_path:', filePath);
     
     const insertResponse = await fetch(
       `${supabaseUrl}/rest/v1/lessons`,
@@ -381,11 +384,56 @@ async function saveLessonMetadata(part, filePath, metadata, lessonId) {
       const errorData = await insertResponse.json();
       console.error('Failed to insert lesson:', errorData);
       console.error('Lesson data:', lessonData);
+      console.error('Response status:', insertResponse.status);
+      console.error('Response headers:', Object.fromEntries(insertResponse.headers.entries()));
+      
+      // Check if it's a unique constraint violation
+      if (insertResponse.status === 409 || errorData.message?.includes('unique') || errorData.message?.includes('duplicate')) {
+        console.warn('Unique constraint violation - trying to update instead');
+        // Try to find and update existing record
+        const findResponse = await fetch(
+          `${supabaseUrl}/rest/v1/lessons?part=eq.${part}&file_path=eq.${encodeURIComponent(filePath)}&select=id`,
+          {
+            headers: {
+              'apikey': supabaseServiceKey,
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
+        if (findResponse.ok) {
+          const existing = await findResponse.json();
+          if (existing && existing.length > 0) {
+            // Update existing record
+            const updateResponse = await fetch(
+              `${supabaseUrl}/rest/v1/lessons?id=eq.${existing[0].id}`,
+              {
+                method: 'PATCH',
+                headers: {
+                  'apikey': supabaseServiceKey,
+                  'Authorization': `Bearer ${supabaseServiceKey}`,
+                  'Content-Type': 'application/json',
+                  'Prefer': 'return=representation'
+                },
+                body: JSON.stringify(lessonData)
+              }
+            );
+            
+            if (updateResponse.ok) {
+              const updated = await updateResponse.json();
+              console.log('Lesson updated (due to unique constraint):', updated);
+              return updated;
+            }
+          }
+        }
+      }
+      
       throw new Error(`Failed to insert lesson: ${errorData.message || 'Unknown error'}`);
     }
     
     const inserted = await insertResponse.json();
-    console.log('Lesson inserted:', inserted);
+    console.log('Lesson inserted successfully:', inserted);
     return inserted;
   }
 }
