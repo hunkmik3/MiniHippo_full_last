@@ -1,0 +1,680 @@
+/* ============================================
+   Mini Hippo - Lesson Pages UI/UX Stylesheet
+   Modern Design for Learning Pages
+   ============================================ */
+
+:root {
+  /* Lesson-specific colors */
+  --lesson-bg: #f8fafc;
+  --lesson-card-bg: #ffffff;
+  --lesson-border: #e2e8f0;
+  --lesson-primary: #2563eb;
+  --lesson-success: #10b981;
+  --lesson-error: #ef4444;
+  --lesson-warning: #f59e0b;
+  --lesson-text: #1e293b;
+  --lesson-text-light: #64748b;
+}
+
+/* ============================================
+   Header Improvements (for key pages)
+   ============================================ */
+
+.header {
+  background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border-bottom: none;
+  padding: 1rem 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  backdrop-filter: blur(10px);
+  animation: slideDown 0.3s ease-out;
+}
+
+/* Ensure all text in header is white with good contrast */
+.header,
+.header *,
+.header a,
+.header span,
+.header i,
+.header div {
+  color: #ffffff !important;
+}
+
+.header a:hover {
+  color: #e0e7ff !important;
+  opacity: 0.9;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.header a {
+  transition: all 0.2s ease;
+}
+
+.header a:hover {
+  opacity: 0.9;
+  transform: translateX(-2px);
+}
+
+.header .fw-bold {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #ffffff !important;
+}
+
+/* ============================================
+   Countdown Timer Highlight
+   ============================================ */
+
+.countdown,
+#countdownTimer {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  color: #1e293b !important;
+  font-weight: 700 !important;
+  font-size: 1.5rem !important;
+  padding: 0.5rem 1.25rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+  text-shadow: none;
+  display: inline-block;
+  animation: pulse-glow 2s ease-in-out infinite;
+  border: 2px solid #ffffff;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1), 0 0 0 0 rgba(251, 191, 36, 0.7);
+  }
+  50% {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1), 0 0 0 8px rgba(251, 191, 36, 0);
+  }
+}
+
+/* Time remaining label */
+.time-remaining-label {
+  color: #ffffff !important;
+  font-weight: 600;
+  margin-right: 0.75rem;
+}
+
+/* Question step indicator */
+#question_step {
+  background: rgba(255, 255, 255, 0.15);
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff !important;
+  font-weight: 600;
+}
+
+/* ============================================
+   Container & Content Improvements
+   ============================================ */
+
+.container {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+.container.mt-5,
+.container.mt-4 {
+  background: var(--lesson-card-bg);
+  border-radius: 0.75rem;
+  padding: 2rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  margin-bottom: 2rem;
+  border: 1px solid var(--lesson-border);
+  transition: all 0.3s ease;
+}
+
+.container.mt-5:hover,
+.container.mt-4:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px);
+}
+
+/* ============================================
+   Typography Improvements
+   ============================================ */
+
+h1, h2, h3, h4, h5 {
+  color: var(--lesson-text);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-bottom: 1rem;
+}
+
+h1.text-center {
+  background: linear-gradient(135deg, var(--lesson-primary) 0%, #0ea5e9 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-size: 2.5rem;
+  margin-bottom: 2rem;
+}
+
+h2 {
+  font-size: 1.75rem;
+  position: relative;
+  padding-bottom: 0.5rem;
+}
+
+h2::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 60px;
+  height: 3px;
+  background: linear-gradient(90deg, var(--lesson-primary), #0ea5e9);
+  border-radius: 2px;
+}
+
+h5 {
+  color: var(--lesson-text-light);
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+/* ============================================
+   Form & Question Improvements
+   ============================================ */
+
+form {
+  background: var(--lesson-card-bg);
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--lesson-border);
+}
+
+.form-control,
+.form-select {
+  border-radius: 0.5rem;
+  border: 2px solid var(--lesson-border);
+  padding: 0.75rem 1rem;
+  transition: all 0.2s ease;
+  font-size: 1rem;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--lesson-primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  outline: none;
+}
+
+.form-label {
+  font-weight: 500;
+  color: var(--lesson-text);
+  margin-bottom: 0.5rem;
+}
+
+/* ============================================
+   Table Improvements
+   ============================================ */
+
+.table {
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.table thead {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+}
+
+.table thead th {
+  color: white;
+  font-weight: 600;
+  padding: 1rem;
+  text-transform: uppercase;
+  font-size: 0.875rem;
+  letter-spacing: 0.05em;
+  border: none;
+}
+
+.table tbody tr {
+  transition: all 0.2s ease;
+  border-bottom: 1px solid var(--lesson-border);
+}
+
+.table tbody tr:hover {
+  background-color: #f8fafc;
+  transform: scale(1.01);
+}
+
+.table tbody td {
+  padding: 1rem;
+  vertical-align: middle;
+}
+
+.table-bordered {
+  border: 1px solid var(--lesson-border);
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+  background-color: #f8fafc;
+}
+
+/* Result indicators */
+.table tbody tr td:last-child {
+  font-weight: 600;
+}
+
+/* ============================================
+   Button Improvements for Lessons
+   ============================================ */
+
+.btn-outline-primary {
+  border: 2px solid var(--lesson-primary);
+  color: var(--lesson-primary);
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  background: transparent;
+}
+
+.btn-outline-primary:hover {
+  background: var(--lesson-primary);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.3);
+}
+
+.btn-outline-primary.btn-active {
+  background: var(--lesson-primary);
+  color: white;
+  box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.3);
+}
+
+.btn-primary,
+.btn-success,
+.btn-danger,
+.btn-warning,
+.btn-info {
+  border-radius: 0.75rem;
+  padding: 0.875rem 1.5rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary::before,
+.btn-success::before,
+.btn-danger::before,
+.btn-warning::before,
+.btn-info::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.btn-primary:hover::before,
+.btn-success:hover::before,
+.btn-danger:hover::before,
+.btn-warning:hover::before,
+.btn-info:hover::before {
+  width: 300px;
+  height: 300px;
+}
+
+.btn-primary:hover,
+.btn-success:hover,
+.btn-danger:hover,
+.btn-warning:hover,
+.btn-info:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--lesson-primary) 0%, #1d4ed8 100%);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, var(--lesson-success) 0%, #059669 100%);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, var(--lesson-error) 0%, #dc2626 100%);
+}
+
+.btn-warning {
+  background: linear-gradient(135deg, var(--lesson-warning) 0%, #d97706 100%);
+}
+
+.btn-info {
+  background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+}
+
+/* ============================================
+   Score Display
+   ============================================ */
+
+.text-primary {
+  color: var(--lesson-primary) !important;
+  font-weight: 600;
+  font-size: 1.25rem;
+}
+
+#totalScore,
+#scoreClassification {
+  background: linear-gradient(135deg, var(--lesson-primary) 0%, #0ea5e9 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 700;
+  margin: 1rem 0;
+}
+
+/* ============================================
+   Navigation Buttons (Question Navigation)
+   ============================================ */
+
+#result_navigation {
+  background: var(--lesson-card-bg);
+  padding: 2rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+  animation: fadeInUp 0.5s ease-out;
+}
+
+#result_navigation .d-flex {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+/* ============================================
+   Drag & Drop Improvements
+   ============================================ */
+
+.slot {
+  border: 2px dashed var(--lesson-border);
+  border-radius: 0.5rem;
+  min-height: 60px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background-color: var(--lesson-card-bg);
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.slot:hover {
+  border-color: var(--lesson-primary);
+  background-color: #f0f9ff;
+}
+
+.slot.drag-over {
+  border-color: var(--lesson-primary);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.1) 0%, rgba(14, 165, 233, 0.1) 100%);
+  transform: scale(1.02);
+  box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+}
+
+.draggable-item {
+  cursor: grab;
+  padding: 0.75rem 1rem;
+  background: white;
+  border: 2px solid var(--lesson-border);
+  border-radius: 0.5rem;
+  margin: 0.5rem;
+  transition: all 0.2s ease;
+  display: inline-block;
+}
+
+/* Cards Container for Reading Question 2 & 3 - Single column layout */
+#cardsContainer {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+#cardsContainer .card,
+#cardsContainer .draggable-item {
+  width: 100% !important;
+  max-width: 100% !important;
+  display: block !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  margin-bottom: 0.75rem !important;
+}
+
+.draggable-item:hover {
+  border-color: var(--lesson-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.draggable-item:active {
+  cursor: grabbing;
+  transform: scale(0.98);
+}
+
+/* ============================================
+   Result Container
+   ============================================ */
+
+#resultContainer_question1,
+#resultContainer_question2,
+#resultContainer_question3,
+#resultContainer_question4,
+#resultContainer_question5,
+#resultContainer_question6 {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+/* ============================================
+   Question Info Section
+   ============================================ */
+
+#questionInfo {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  margin-bottom: 1.5rem;
+  border-left: 4px solid var(--lesson-primary);
+}
+
+/* ============================================
+   Practice Page Buttons (Part 1, Part 2, etc.)
+   ============================================ */
+
+.col-md-3.mb-4 {
+  animation: fadeInUp 0.6s ease-out;
+  animation-fill-mode: both;
+}
+
+.col-md-3.mb-4:nth-child(1) { animation-delay: 0.1s; }
+.col-md-3.mb-4:nth-child(2) { animation-delay: 0.2s; }
+.col-md-3.mb-4:nth-child(3) { animation-delay: 0.3s; }
+.col-md-3.mb-4:nth-child(4) { animation-delay: 0.4s; }
+
+.col-md-3.mb-4 .btn {
+  min-height: 120px;
+  flex-direction: column;
+  gap: 0.75rem;
+  border-radius: 1rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.col-md-3.mb-4 .btn .bi {
+  font-size: 2.5rem;
+  transition: transform 0.3s ease;
+}
+
+.col-md-3.mb-4 .btn:hover .bi {
+  transform: scale(1.15) rotate(5deg);
+}
+
+/* ============================================
+   Footer Improvements
+   ============================================ */
+
+.footer {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
+  border-top: none;
+  padding: 1rem 1.5rem;
+}
+
+.footer .btn {
+  border-radius: 0.5rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.footer .btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+}
+
+/* ============================================
+   Responsive Improvements
+   ============================================ */
+
+@media (max-width: 768px) {
+  .container.mt-5,
+  .container.mt-4 {
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  h1.text-center {
+    font-size: 2rem;
+  }
+
+  .table {
+    font-size: 0.875rem;
+  }
+
+  .table thead th,
+  .table tbody td {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .col-md-3.mb-4 .btn {
+    min-height: 100px;
+    font-size: 1rem;
+  }
+
+  .col-md-3.mb-4 .btn .bi {
+    font-size: 2rem;
+  }
+}
+
+/* ============================================
+   Loading States
+   ============================================ */
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.loading {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ============================================
+   Focus States (Accessibility)
+   ============================================ */
+
+.btn:focus-visible,
+.form-control:focus-visible,
+.form-select:focus-visible {
+  outline: 2px solid var(--lesson-primary);
+  outline-offset: 2px;
+}
+
+/* ============================================
+   Smooth Transitions
+   ============================================ */
+
+* {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+/* ============================================
+   Card-like Containers
+   ============================================ */
+
+.container-fluid {
+  background: var(--lesson-bg);
+  min-height: auto;
+  padding: 1rem 0;
+}
+
+#content-wrapper {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0;
+}
+
+/* Remove excessive whitespace */
+.app-main {
+  min-height: auto;
+}
+
+.app-content-header {
+  padding: 1rem 0;
+  margin-bottom: 0;
+}
+
+.container.my-4 {
+  margin-top: 1rem !important;
+  margin-bottom: 1rem !important;
+  padding: 1.5rem;
+}
+
+/* ============================================
+   Question Step Indicator
+   ============================================ */
+
+#question_step {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  backdrop-filter: blur(10px);
+}
+

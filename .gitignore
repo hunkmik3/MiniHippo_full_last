@@ -1,0 +1,35 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Node modules (nếu có)
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build files
+dist/
+build/
+
+# HTTrack cache files
+hts-cache/
+hts-log.txt
+*.whtt
+
+# Temporary files
+*.tmp
+*.temp
+
