@@ -610,11 +610,15 @@ async function uploadLessonToGitHub() {
     let filePath;
     const editingLessonId = window.editingLessonId;
     
+    console.log('Upload - editingLessonId:', editingLessonId);
+    console.log('Upload - editingLessonFilePath:', window.editingLessonFilePath);
+    
     if (editingLessonId && window.editingLessonFilePath) {
         // Use existing file path if editing
         filePath = window.editingLessonFilePath;
+        console.log('Using existing file path for editing:', filePath);
     } else {
-        // Create new file with lesson ID
+        // Create new file with lesson ID - ALWAYS create unique path
         const basePaths = {
             1: 'js/reading_question/reading_question1',
             2: 'js/reading_question/reading_question2',
@@ -631,6 +635,7 @@ async function uploadLessonToGitHub() {
         // Generate unique lesson ID (timestamp-based)
         const lessonId = Date.now();
         filePath = `${basePath}_lesson_${lessonId}.js`;
+        console.log('Generated new unique file path:', filePath);
     }
     
     // Get title for commit message (use first set's title or default)
@@ -650,6 +655,19 @@ async function uploadLessonToGitHub() {
     }
     
     try {
+        // Log the data being sent
+        const uploadData = {
+            filePath: filePath,
+            content: jsCode.substring(0, 100) + '...', // Log first 100 chars only
+            message: commitMessage,
+            append: false,
+            lessonId: editingLessonId || null,
+            title: lessonTitle,
+            topic: firstSet && firstSet.data && firstSet.data.topic ? firstSet.data.topic : ''
+        };
+        console.log('Uploading with data:', uploadData);
+        console.log('Full filePath:', filePath);
+        
         // Send POST request to API
         const response = await fetch('/api/upload-lesson', {
             method: 'POST',
