@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { filePath, content, message, append } = req.body;
+    const { filePath, content, message, append, lessonId, title, topic } = req.body;
 
     // Validate required fields
     if (!filePath || !content || !message) {
@@ -27,16 +27,33 @@ export default async function handler(req, res) {
     }
 
     // Validate file path (prevent directory traversal)
-    const allowedPaths = [
-      'js/reading_question/reading_question1.js',
-      'js/reading_question/reading_question2.js',
-      'js/reading_question/reading_question4.js',
-      'js/reading_question/reading_question5.js'
+    // Allow both fixed paths and custom paths with lesson ID
+    const allowedBasePaths = [
+      'js/reading_question/reading_question1',
+      'js/reading_question/reading_question2',
+      'js/reading_question/reading_question4',
+      'js/reading_question/reading_question5'
     ];
-
-    if (!allowedPaths.includes(filePath)) {
+    
+    // Check if file path matches allowed pattern
+    const isValidPath = allowedBasePaths.some(basePath => {
+      // Allow exact match (reading_question1.js)
+      if (filePath === `${basePath}.js`) return true;
+      // Allow custom paths with lesson ID (reading_question1_lesson_xxx.js)
+      if (filePath.startsWith(`${basePath}_lesson_`) && filePath.endsWith('.js')) return true;
+      return false;
+    });
+    
+    if (!isValidPath) {
       return res.status(400).json({ 
-        error: 'Invalid file path. Allowed paths: ' + allowedPaths.join(', ') 
+        error: 'Invalid file path. Must be one of: ' + allowedBasePaths.map(p => `${p}.js`).join(', ') + ' or custom path with _lesson_ prefix'
+      });
+    }
+    
+    // Prevent directory traversal
+    if (filePath.includes('..') || filePath.includes('//')) {
+      return res.status(400).json({ 
+        error: 'Invalid file path: directory traversal detected' 
       });
     }
 
@@ -108,7 +125,15 @@ export default async function handler(req, res) {
       const metadata = extractMetadataFromJS(content, part);
       
       if (metadata && part) {
-        await saveLessonMetadata(part, filePath, metadata);
+        // Use provided title/topic if available, otherwise use extracted metadata
+        const finalTitle = title || metadata.title;
+        const finalTopic = topic || metadata.topics.join(', ') || metadata.title;
+        
+        await saveLessonMetadata(part, filePath, {
+          ...metadata,
+          title: finalTitle,
+          topic: finalTopic
+        }, lessonId);
       }
     } catch (metadataError) {
       // Log error but don't fail the upload
@@ -193,7 +218,7 @@ function extractMetadataFromJS(jsCode, part) {
 }
 
 // Helper function to save lesson metadata to Supabase
-async function saveLessonMetadata(part, filePath, metadata) {
+async function saveLessonMetadata(part, filePath, metadata, lessonId) {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
   
@@ -201,33 +226,19 @@ async function saveLessonMetadata(part, filePath, metadata) {
     return; // Supabase not configured, skip
   }
   
-  // Check if lesson already exists
-  const checkResponse = await fetch(
-    `${supabaseUrl}/rest/v1/lessons?part=eq.${part}&file_path=eq.${filePath}&select=id`,
-    {
-      headers: {
-        'apikey': supabaseServiceKey,
-        'Authorization': `Bearer ${supabaseServiceKey}`,
-        'Content-Type': 'application/json'
-      }
-    }
-  );
-  
-  const existing = await checkResponse.json();
-  
   const lessonData = {
     part: part,
     file_path: filePath,
     title: metadata.title,
-    topic: metadata.topics.join(', ') || metadata.title,
+    topic: metadata.topic || metadata.topics.join(', ') || metadata.title,
     num_sets: metadata.num_sets,
     updated_at: new Date().toISOString()
   };
   
-  if (existing && existing.length > 0) {
-    // Update existing record
+  if (lessonId) {
+    // Update existing record by ID
     await fetch(
-      `${supabaseUrl}/rest/v1/lessons?id=eq.${existing[0].id}`,
+      `${supabaseUrl}/rest/v1/lessons?id=eq.${lessonId}`,
       {
         method: 'PATCH',
         headers: {
@@ -239,21 +250,51 @@ async function saveLessonMetadata(part, filePath, metadata) {
       }
     );
   } else {
-    // Insert new record
-    lessonData.created_at = new Date().toISOString();
-    await fetch(
-      `${supabaseUrl}/rest/v1/lessons`,
+    // Check if lesson with same file_path exists
+    const checkResponse = await fetch(
+      `${supabaseUrl}/rest/v1/lessons?part=eq.${part}&file_path=eq.${filePath}&select=id`,
       {
-        method: 'POST',
         headers: {
           'apikey': supabaseServiceKey,
           'Authorization': `Bearer ${supabaseServiceKey}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation'
-        },
-        body: JSON.stringify(lessonData)
+          'Content-Type': 'application/json'
+        }
       }
     );
+    
+    const existing = await checkResponse.json();
+    
+    if (existing && existing.length > 0) {
+      // Update existing record
+      await fetch(
+        `${supabaseUrl}/rest/v1/lessons?id=eq.${existing[0].id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'apikey': supabaseServiceKey,
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(lessonData)
+        }
+      );
+    } else {
+      // Insert new record
+      lessonData.created_at = new Date().toISOString();
+      await fetch(
+        `${supabaseUrl}/rest/v1/lessons`,
+        {
+          method: 'POST',
+          headers: {
+            'apikey': supabaseServiceKey,
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify(lessonData)
+        }
+      );
+    }
   }
 }
 

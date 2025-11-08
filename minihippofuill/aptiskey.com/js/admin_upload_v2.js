@@ -21,15 +21,67 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(function() {
         console.log('Admin upload v2 initialized');
         
-        // Render empty sets for all parts
-        renderQuestionSets(1);
-        renderQuestionSets(2);
-        renderQuestionSets(4);
-        renderQuestionSets(5);
+        // Check if editing existing lesson
+        const urlParams = new URLSearchParams(window.location.search);
+        const editLessonId = urlParams.get('edit');
+        const editPart = urlParams.get('part');
+        
+        if (editLessonId && editPart) {
+            // Load existing lesson
+            loadExistingLesson(editLessonId, parseInt(editPart));
+        } else {
+            // Render empty sets for all parts
+            renderQuestionSets(1);
+            renderQuestionSets(2);
+            renderQuestionSets(4);
+            renderQuestionSets(5);
+        }
         
         console.log('All question sets rendered');
     }, 100);
 });
+
+// Load existing lesson for editing
+async function loadExistingLesson(lessonId, part) {
+    try {
+        // Show loading state
+        const banner = document.getElementById('edit-mode-banner');
+        if (banner) {
+            banner.style.display = 'block';
+        }
+        
+        // Fetch lesson data
+        const response = await fetch(`/api/lessons/get?id=${lessonId}`);
+        const result = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to load lesson');
+        }
+        
+        const lesson = result.lesson;
+        
+        // Store editing state
+        window.editingLessonId = lessonId;
+        window.editingLessonFilePath = lesson.file_path;
+        
+        // Switch to correct part
+        if (typeof switchPart === 'function') {
+            switchPart(part);
+        }
+        
+        // Note: To fully load the lesson, we would need to:
+        // 1. Fetch the JS file from GitHub
+        // 2. Parse the JS code to extract question sets
+        // 3. Load into form
+        
+        // For now, just show a message
+        alert(`Đang chỉnh sửa bài học: ${lesson.title || lesson.topic}\n\nLưu ý: Bạn cần nhập lại dữ liệu. Tính năng tự động load từ file sẽ được thêm sau.`);
+        
+    } catch (error) {
+        console.error('Error loading lesson:', error);
+        alert('Lỗi khi tải bài học: ' + error.message);
+    }
+}
 
 // Override switchPart to also render question sets
 (function() {
@@ -554,23 +606,40 @@ async function uploadLessonToGitHub() {
         return;
     }
     
-    // Determine file path based on part
-    const filePaths = {
-        1: 'js/reading_question/reading_question1.js',
-        2: 'js/reading_question/reading_question2.js',
-        4: 'js/reading_question/reading_question4.js',
-        5: 'js/reading_question/reading_question5.js'
-    };
+    // Determine file path based on part and whether editing existing lesson
+    let filePath;
+    const editingLessonId = window.editingLessonId;
     
-    const filePath = filePaths[currentPart];
-    if (!filePath) {
-        alert('Part không hợp lệ.');
-        return;
+    if (editingLessonId && window.editingLessonFilePath) {
+        // Use existing file path if editing
+        filePath = window.editingLessonFilePath;
+    } else {
+        // Create new file with lesson ID
+        const basePaths = {
+            1: 'js/reading_question/reading_question1',
+            2: 'js/reading_question/reading_question2',
+            4: 'js/reading_question/reading_question4',
+            5: 'js/reading_question/reading_question5'
+        };
+        
+        const basePath = basePaths[currentPart];
+        if (!basePath) {
+            alert('Part không hợp lệ.');
+            return;
+        }
+        
+        // Generate unique lesson ID (timestamp-based)
+        const lessonId = Date.now();
+        filePath = `${basePath}_lesson_${lessonId}.js`;
     }
     
-    // Get number of sets for commit message
+    // Get title for commit message (use first set's title or default)
+    const firstSet = questionSets[currentPart][0];
+    const lessonTitle = firstSet && firstSet.title ? firstSet.title : `Part ${currentPart} Lesson`;
     const numSets = questionSets[currentPart].length;
-    const commitMessage = `Add/Update ${numSets} lesson set(s) for Part ${currentPart}`;
+    const commitMessage = editingLessonId 
+        ? `Update lesson: ${lessonTitle} (${numSets} sets)`
+        : `Add new lesson: ${lessonTitle} (${numSets} sets)`;
     
     // Show loading state
     const uploadButton = document.getElementById('upload-github-btn');
@@ -591,7 +660,10 @@ async function uploadLessonToGitHub() {
                 filePath: filePath,
                 content: jsCode,
                 message: commitMessage,
-                append: false
+                append: false,
+                lessonId: editingLessonId || null,
+                title: lessonTitle,
+                topic: firstSet && firstSet.data && firstSet.data.topic ? firstSet.data.topic : ''
             })
         });
         
@@ -604,11 +676,24 @@ async function uploadLessonToGitHub() {
         // Success
         alert(`Upload thành công!\n\nCommit: ${result.commitUrl}\nFile: ${result.fileUrl}`);
         
+        // Clear editing state
+        if (editingLessonId) {
+            window.editingLessonId = null;
+            window.editingLessonFilePath = null;
+            const banner = document.getElementById('edit-mode-banner');
+            if (banner) banner.style.display = 'none';
+        }
+        
         // Optionally open commit URL in new tab
         if (result.commitUrl) {
             if (confirm('Bạn có muốn mở commit trên GitHub không?')) {
                 window.open(result.commitUrl, '_blank');
             }
+        }
+        
+        // Optionally redirect to lessons management
+        if (confirm('Bạn có muốn chuyển đến trang quản lý bài học không?')) {
+            window.location.href = 'admin_lessons.html';
         }
         
     } catch (error) {

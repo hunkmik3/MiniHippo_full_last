@@ -250,7 +250,18 @@
         
         <!-- Action Buttons - Always Visible -->
         <div id="action-buttons-section" class="form-section" style="display: block !important; visibility: visible !important; position: sticky; top: 0; z-index: 1000; background: white; padding: 1.5rem; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 2rem; border: 2px solid #2563eb;">
-            <h4 class="mb-3 fw-bold"><i class="bi bi-tools me-2"></i>Công cụ</h4>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="mb-0 fw-bold"><i class="bi bi-tools me-2"></i>Công cụ</h4>
+                <div>
+                    <a href="admin_lessons.html" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-arrow-left me-2"></i>Quản lý bài học
+                    </a>
+                </div>
+            </div>
+            <div id="edit-mode-banner" class="alert alert-info mb-3" style="display: none;">
+                <i class="bi bi-info-circle me-2"></i>
+                <strong>Chế độ chỉnh sửa:</strong> Bạn đang chỉnh sửa bài học. Thay đổi sẽ được lưu khi upload.
+            </div>
             <div class="d-flex gap-3 flex-wrap">
                 <button type="button" class="btn btn-primary btn-lg" onclick="previewQuestionSets()">
                     <i class="bi bi-list-ul me-2"></i>Danh sách bộ đề
