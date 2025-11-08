@@ -2,27 +2,13 @@
 // ////////////// DANH SÁCH CÂU HỎI PART 1 ///////////////
 // ===============================================================================================================
 
-// dsadsa
+// fdsfsdf
 const questions1_1 = [
-    { questionStart: "sadasd", answerOptions: ["ádasdad"], questionEnd: "sadasd", correctAnswer: "ádasdasd" },
-    { questionStart: "sadasd", answerOptions: ["ádasd"], questionEnd: "ádasd", correctAnswer: "ádasdad" },
-];
-
-// đâsd
-const questions1_2 = [
-    { questionStart: "sadasdasd", answerOptions: ["asdasdsad"], questionEnd: "ádasd", correctAnswer: "sadsadasd" },
-    { questionStart: "sadasd", answerOptions: ["ádada"], questionEnd: "ádasdasd", correctAnswer: "adasdsad" },
-    { questionStart: "sadasd", answerOptions: ["ádasd"], questionEnd: "ádasdasd", correctAnswer: "adadsasd" },
-];
-
-// Bộ đề 3
-const questions1_3 = [
+    { questionStart: "sdfsdf", answerOptions: ["sdfsdfs", "sdf", "sdfsd", "fsdf"], questionEnd: "sdfsdf", correctAnswer: "sdfsdf" },
 ];
 
 const questionsArrays = [
     questions1_1,
-    questions1_2,
-    questions1_3,
 ];
 
 document.addEventListener('DOMContentLoaded', function() {
