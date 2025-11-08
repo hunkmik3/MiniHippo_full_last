@@ -2,10 +2,9 @@
 // ////////////// DANH SÁCH CÂU HỎI PART 1 ///////////////
 // ===============================================================================================================
 
-// sadasdsad
+// ádsad
 const questions1_1 = [
-    { questionStart: "qsdasd", answerOptions: ["ádasdsad"], questionEnd: "ádasd", correctAnswer: "ád" },
-    { questionStart: "sad", answerOptions: ["ád"], questionEnd: "ád", correctAnswer: "sad" },
+    { questionStart: "sadsad", answerOptions: ["sadasd", "sad", "sadsa", "d"], questionEnd: "ádsadsad", correctAnswer: "sadasdasdasd" },
 ];
 
 const questionsArrays = [
