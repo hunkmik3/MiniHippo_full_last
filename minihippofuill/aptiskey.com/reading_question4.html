@@ -12,7 +12,12 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="css/readingkey.css" rel="stylesheet">
     <link href="css/lesson-ui.css" rel="stylesheet">
-    <script src="js/reading_question/reading_question4.js"></script>
+    <script>
+        // Load JS file with cache-busting to ensure latest version
+        const script = document.createElement('script');
+        script.src = 'js/reading_question/reading_question4.js?v=' + Date.now();
+        document.head.appendChild(script);
+    </script>
 
     <!-- jQuery CDN -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
