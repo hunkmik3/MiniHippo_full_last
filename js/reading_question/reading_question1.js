@@ -2,10 +2,10 @@
 // ////////////// DANH SÁCH CÂU HỎI PART 1 ///////////////
 // ===============================================================================================================
 
-// ưqewqe
+// ádasdasdasda
 const questions1_1 = [
-    { questionStart: "qưewqewq", answerOptions: ["ewqeqwewqeqwe"], questionEnd: "eqwewqe", correctAnswer: "qưeqw" },
-    { questionStart: "ưqewqeq", answerOptions: ["eqweqwe"], questionEnd: "ưeqweqw", correctAnswer: "eqwewq" },
+    { questionStart: "sdsadsad", answerOptions: ["ádasdasdasdsadsad"], questionEnd: "ádsadsad", correctAnswer: "sadsad" },
+    { questionStart: "sadasdsa", answerOptions: ["đasaádasd", "ádsa", "dá", "dá", "đá"], questionEnd: "dsadsad", correctAnswer: "sadsadasd" },
 ];
 
 const questionsArrays = [
