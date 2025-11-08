@@ -127,17 +127,22 @@ export default async function handler(req, res) {
       if (metadata && part) {
         // Use provided title/topic if available, otherwise use extracted metadata
         const finalTitle = title || metadata.title;
-        const finalTopic = topic || metadata.topics.join(', ') || metadata.title;
+        const finalTopic = topic || (metadata.topics && metadata.topics.length > 0 ? metadata.topics.join(', ') : '') || metadata.title;
         
-        await saveLessonMetadata(part, filePath, {
+        const result = await saveLessonMetadata(part, filePath, {
           ...metadata,
           title: finalTitle,
           topic: finalTopic
         }, lessonId);
+        
+        console.log('Metadata saved successfully:', result);
+      } else {
+        console.warn('Could not extract metadata: part=', part, 'metadata=', metadata);
       }
     } catch (metadataError) {
       // Log error but don't fail the upload
       console.error('Failed to save metadata:', metadataError);
+      console.error('Error stack:', metadataError.stack);
     }
 
     // Return success response
@@ -178,32 +183,122 @@ function extractPartFromFilePath(filePath) {
 // Helper function to extract metadata from JS code
 function extractMetadataFromJS(jsCode, part) {
   try {
-    // Extract number of sets
+    // Extract number of sets based on part
     let numSets = 0;
-    const setsMatch = jsCode.match(/const\s+options\s*=\s*\[/);
-    if (setsMatch) {
-      // Count array elements (rough estimate)
-      const arrayMatch = jsCode.match(/const\s+options\s*=\s*\[([^\]]*)\]/s);
-      if (arrayMatch) {
-        numSets = (arrayMatch[1].match(/options_\d+/g) || []).length;
-      }
-    }
-    
-    // Extract topics
     let topics = [];
-    if (part === 5) {
-      const topicMatch = jsCode.match(/const\s+topic_name\s*=\s*\{([^}]+)\}/s);
-      if (topicMatch) {
-        const topicLines = topicMatch[1].match(/topic_\d+:\s*"([^"]+)"/g) || [];
-        topics = topicLines.map(line => line.match(/"([^"]+)"/)[1]);
+    let title = `Part ${part} Lesson`;
+    
+    switch(part) {
+      case 1:
+        // Part 1: Count questionsArrays or questions1_X
+        const part1Match = jsCode.match(/const\s+questionsArrays\s*=\s*\[/);
+        if (part1Match) {
+          const arrayMatch = jsCode.match(/const\s+questionsArrays\s*=\s*\[([^\]]*)\]/s);
+          if (arrayMatch) {
+            numSets = (arrayMatch[1].match(/questions1_\d+/g) || []).length;
+          }
+        }
+        // Try to extract title from comments
+        const part1TitleMatch = jsCode.match(/\/\/\s*(.+?)\n/);
+        if (part1TitleMatch) {
+          title = part1TitleMatch[1].trim() || title;
+        }
+        break;
+        
+      case 2:
+        // Part 2: Count questionSets or question2Content_X
+        const part2Match = jsCode.match(/const\s+questionSets\s*=\s*\[/);
+        if (part2Match) {
+          const arrayMatch = jsCode.match(/const\s+questionSets\s*=\s*\[([^\]]*)\]/s);
+          if (arrayMatch) {
+            numSets = (arrayMatch[1].match(/question2Content_\d+/g) || []).length;
+          }
+        }
+        // Extract topics from questheader1
+        const questheaderMatch = jsCode.match(/const\s+questheader1\s*=\s*\{([^}]+)\}/s);
+        if (questheaderMatch) {
+          const topicLines = questheaderMatch[1].match(/question2Content_\d+:\s*"([^"]+)"/g) || [];
+          topics = topicLines.map(line => {
+            const match = line.match(/"([^"]+)"/);
+            return match ? match[1] : '';
+          }).filter(t => t);
+        }
+        if (topics.length > 0) {
+          title = topics[0];
+        }
+        break;
+        
+      case 4:
+        // Part 4: Count question4Content array
+        const part4Match = jsCode.match(/const\s+question4Content\s*=\s*\[/);
+        if (part4Match) {
+          const arrayMatch = jsCode.match(/const\s+question4Content\s*=\s*\[([^\]]*)\]/s);
+          if (arrayMatch) {
+            numSets = (arrayMatch[1].match(/question4Content_\d+/g) || []).length;
+          }
+        }
+        // Extract topics from question4Topic1
+        const topic4Match = jsCode.match(/const\s+question4Topic1\s*=\s*\{([^}]+)\}/s);
+        if (topic4Match) {
+          const topicLines = topic4Match[1].match(/topic\d+:\s*"([^"]+)"/g) || [];
+          topics = topicLines.map(line => {
+            const match = line.match(/"([^"]+)"/);
+            return match ? match[1] : '';
+          }).filter(t => t);
+        }
+        if (topics.length > 0) {
+          title = topics[0];
+        }
+        break;
+        
+      case 5:
+        // Part 5: Count options array
+        const part5Match = jsCode.match(/const\s+options\s*=\s*\[/);
+        if (part5Match) {
+          const arrayMatch = jsCode.match(/const\s+options\s*=\s*\[([^\]]*)\]/s);
+          if (arrayMatch) {
+            numSets = (arrayMatch[1].match(/options_\d+/g) || []).length;
+          }
+        }
+        // Extract topics from topic_name
+        const topic5Match = jsCode.match(/const\s+topic_name\s*=\s*\{([^}]+)\}/s);
+        if (topic5Match) {
+          const topicLines = topic5Match[1].match(/topic_\d+:\s*"([^"]+)"/g) || [];
+          topics = topicLines.map(line => {
+            const match = line.match(/"([^"]+)"/);
+            return match ? match[1] : '';
+          }).filter(t => t);
+        }
+        if (topics.length > 0) {
+          title = topics[0];
+        }
+        break;
+    }
+    
+    // Fallback: if numSets is still 0, try to count by pattern matching
+    if (numSets === 0) {
+      // Try to count any pattern like _X where X is a number
+      const allMatches = jsCode.match(/_\d+\s*[,=]/g) || [];
+      if (allMatches.length > 0) {
+        // Get unique numbers
+        const uniqueNumbers = new Set();
+        allMatches.forEach(match => {
+          const numMatch = match.match(/_(\d+)/);
+          if (numMatch) {
+            uniqueNumbers.add(numMatch[1]);
+          }
+        });
+        numSets = uniqueNumbers.size;
       }
     }
     
-    // Get first topic as title
-    const title = topics.length > 0 ? topics[0] : `Part ${part} Lesson`;
+    // Ensure at least 1 set
+    if (numSets === 0) {
+      numSets = 1;
+    }
     
     return {
-      num_sets: numSets || 1,
+      num_sets: numSets,
       topics: topics,
       title: title
     };
@@ -223,78 +318,75 @@ async function saveLessonMetadata(part, filePath, metadata, lessonId) {
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
   
   if (!supabaseUrl || !supabaseServiceKey) {
-    return; // Supabase not configured, skip
+    console.warn('Supabase not configured, skipping metadata save');
+    return null; // Supabase not configured, skip
   }
   
   const lessonData = {
     part: part,
     file_path: filePath,
-    title: metadata.title,
-    topic: metadata.topic || metadata.topics.join(', ') || metadata.title,
-    num_sets: metadata.num_sets,
+    title: metadata.title || `Part ${part} Lesson`,
+    topic: metadata.topic || (metadata.topics && metadata.topics.length > 0 ? metadata.topics.join(', ') : '') || metadata.title || `Part ${part} Lesson`,
+    num_sets: metadata.num_sets || 1,
     updated_at: new Date().toISOString()
   };
   
+  console.log('Saving lesson metadata:', lessonData);
+  
   if (lessonId) {
     // Update existing record by ID
-    await fetch(
+    const updateResponse = await fetch(
       `${supabaseUrl}/rest/v1/lessons?id=eq.${lessonId}`,
       {
         method: 'PATCH',
         headers: {
           'apikey': supabaseServiceKey,
           'Authorization': `Bearer ${supabaseServiceKey}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
         },
         body: JSON.stringify(lessonData)
       }
     );
+    
+    if (!updateResponse.ok) {
+      const errorData = await updateResponse.json();
+      console.error('Failed to update lesson:', errorData);
+      throw new Error(`Failed to update lesson: ${errorData.message || 'Unknown error'}`);
+    }
+    
+    const updated = await updateResponse.json();
+    console.log('Lesson updated:', updated);
+    return updated;
   } else {
-    // Check if lesson with same file_path exists
-    const checkResponse = await fetch(
-      `${supabaseUrl}/rest/v1/lessons?part=eq.${part}&file_path=eq.${filePath}&select=id`,
+    // Always insert new record (don't check for existing)
+    // This allows multiple lessons with different file paths
+    lessonData.created_at = new Date().toISOString();
+    
+    const insertResponse = await fetch(
+      `${supabaseUrl}/rest/v1/lessons`,
       {
+        method: 'POST',
         headers: {
           'apikey': supabaseServiceKey,
           'Authorization': `Bearer ${supabaseServiceKey}`,
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify(lessonData)
       }
     );
     
-    const existing = await checkResponse.json();
-    
-    if (existing && existing.length > 0) {
-      // Update existing record
-      await fetch(
-        `${supabaseUrl}/rest/v1/lessons?id=eq.${existing[0].id}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'apikey': supabaseServiceKey,
-            'Authorization': `Bearer ${supabaseServiceKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(lessonData)
-        }
-      );
-    } else {
-      // Insert new record
-      lessonData.created_at = new Date().toISOString();
-      await fetch(
-        `${supabaseUrl}/rest/v1/lessons`,
-        {
-          method: 'POST',
-          headers: {
-            'apikey': supabaseServiceKey,
-            'Authorization': `Bearer ${supabaseServiceKey}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=representation'
-          },
-          body: JSON.stringify(lessonData)
-        }
-      );
+    if (!insertResponse.ok) {
+      const errorData = await insertResponse.json();
+      console.error('Failed to insert lesson:', errorData);
+      console.error('Lesson data:', lessonData);
+      throw new Error(`Failed to insert lesson: ${errorData.message || 'Unknown error'}`);
     }
+    
+    const inserted = await insertResponse.json();
+    console.log('Lesson inserted:', inserted);
+    return inserted;
   }
 }
 
