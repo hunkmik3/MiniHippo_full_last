@@ -2,8 +2,10 @@
 // ////////////// DANH SÁCH CÂU HỎI PART 1 ///////////////
 // ===============================================================================================================
 
-// Bộ đề 1
+// dsadsa
 const questions1_1 = [
+    { questionStart: "sadasd", answerOptions: ["ádasdad"], questionEnd: "sadasd", correctAnswer: "ádasdasd" },
+    { questionStart: "sadasd", answerOptions: ["ádasd"], questionEnd: "ádasd", correctAnswer: "ádasdad" },
 ];
 
 // đâsd
