@@ -1,0 +1,223 @@
+// ===============================================================================================================
+// ////////////// DANH SÁCH CÂU HỎI PART 2 & 3 ///////////////
+// ===============================================================================================================
+
+// sdfsdfsds - Topic: sdfsdfsdfds
+const question2Content_1 = [
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+];
+
+const questionSets = [
+    question2Content_1,
+];
+
+window.questionSets = questionSets;
+
+const questheader1 = {
+    question2Content_1: "sdfsdfsdfds",
+};
+
+function getQuestHeaders(obj) {
+    return Object.values(obj);
+}
+
+const questheader = getQuestHeaders(questheader1);
+window.questionSets = questionSets;
+window.questheader = questheader;
+
+let currentSetIndex = 0;
+let correctAnswersQuestion2 = [];
+
+function shuffleQuestions(questions) {
+  for (let i = questions.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [questions[i], questions[j]] = [questions[j], questions[i]];
+  }
+  return questions;
+}
+
+function initSortable() {
+  const cardsContainer = document.getElementById('cardsContainer');
+  if (cardsContainer && typeof Sortable !== 'undefined') {
+    // Filter out first item (index 0) from being draggable
+    new Sortable(cardsContainer, {
+      animation: 150,
+      filter: ':first-child',
+      preventOnFilter: false
+    });
+  }
+}
+
+function renderQuestion2(questionlist) {
+  correctAnswersQuestion2 = [];
+  questionlist.forEach(item => { correctAnswersQuestion2.push(item); });
+  // Keep first sentence fixed at index 0, shuffle the rest
+  const firstSentence = questionlist[0];
+  const restSentences = questionlist.slice(1);
+  const shuffledRest = shuffleQuestions([...restSentences]);
+  const shuffledQuestionlist = [firstSentence, ...shuffledRest];
+  const cardsContainer = document.getElementById('cardsContainer');
+  if (cardsContainer) {
+    cardsContainer.innerHTML = '';
+    shuffledQuestionlist.forEach((text, index) => {
+      const cardDiv = document.createElement('div');
+      if (index === 0) {
+        // First sentence: fixed, not draggable, with checkmark and highlight
+        cardDiv.classList.add('card', 'mb-2');
+        cardDiv.style.backgroundColor = '#e3f2fd';
+        cardDiv.style.border = '2px solid #1976d2';
+        cardDiv.style.cursor = 'default';
+        const cardBody = document.createElement('div');
+        cardBody.classList.add('card-body', 'd-flex', 'align-items-center');
+        const checkIcon = document.createElement('i');
+        checkIcon.classList.add('bi', 'bi-check-circle-fill', 'text-success', 'me-2');
+        checkIcon.style.fontSize = '1.2rem';
+        cardBody.appendChild(checkIcon);
+        const textSpan = document.createElement('span');
+        textSpan.innerText = text;
+        cardBody.appendChild(textSpan);
+        cardDiv.appendChild(cardBody);
+      } else {
+        // Other sentences: draggable
+        cardDiv.classList.add('card', 'mb-2', 'draggable-item');
+        cardDiv.setAttribute('draggable', 'true');
+        cardDiv.id = 'item' + (index + 1);
+        const cardBody = document.createElement('div');
+        cardBody.classList.add('card-body', 'd-flex', 'align-items-center');
+        const dragIcon = document.createElement('i');
+        dragIcon.classList.add('bi', 'bi-grip-vertical', 'me-2', 'text-muted');
+        dragIcon.style.fontSize = '1.2rem';
+        cardBody.appendChild(dragIcon);
+        const textSpan = document.createElement('span');
+        textSpan.innerText = text;
+        cardBody.appendChild(textSpan);
+        cardDiv.appendChild(cardBody);
+      }
+      cardsContainer.appendChild(cardDiv);
+    });
+    initSortable();
+  }
+  const headerEl = document.getElementById('html_questheader');
+  if (headerEl) headerEl.textContent = 'Reading Question 2 & 3 ( ' + (currentSetIndex + 1) + ' / ' + questheader.length + ' )';
+  const topicEl = document.getElementById('question2_topic');
+  if (topicEl) topicEl.textContent = 'Topic: ' + questheader[currentSetIndex];
+}
+// Expose renderQuestion2 to window
+window.renderQuestion2 = renderQuestion2;
+
+// User answers array
+const userAnswersQuestion2 = [];
+let question2Score = 0;
+
+// Check result button handler
+document.getElementById('checkResultButton').addEventListener('click', function() {
+  userAnswersQuestion2.length = 0;
+  const cardsContainer = document.getElementById('cardsContainer');
+  // Get all cards including the first one (which is not draggable)
+  const cards = cardsContainer.querySelectorAll('.card');
+  cards.forEach((card) => {
+    // Get text content, removing icon text if present
+    const cardBody = card.querySelector('.card-body');
+    if (cardBody) {
+      const textSpan = cardBody.querySelector('span');
+      const selectedAnswer = textSpan ? textSpan.textContent.trim() : cardBody.textContent.trim().replace(/^[✓\s]*/, '').trim();
+      userAnswersQuestion2.push(selectedAnswer || "(không chọn)");
+    } else {
+      const selectedAnswer = card.textContent.trim() || "(không chọn)";
+      userAnswersQuestion2.push(selectedAnswer);
+    }
+  });
+  const answers = [];
+  const correctAnswers = [];
+  correctAnswersQuestion2.forEach((correctAnswer, index) => {
+    const selectedAnswer = userAnswersQuestion2[index] || "(không chọn)";
+    answers.push(selectedAnswer);
+    correctAnswers.push(correctAnswer);
+  });
+  question2Score = displayComparisonResultsQuestion2(answers, correctAnswers);
+  const resultModal = new bootstrap.Modal(document.getElementById('resultModal'));
+  resultModal.show();
+});
+
+// Display comparison results function
+function displayComparisonResultsQuestion2(userAnswers, correctAnswers) {
+  const comparisonBody = document.getElementById('comparisonTableBody');
+  const totalScoreElement = document.getElementById('totalScore');
+  comparisonBody.innerHTML = '';
+  let score = 0;
+  userAnswers.forEach((userAnswer, index) => {
+    const tr = document.createElement('tr');
+    const userAnswerTd = document.createElement('td');
+    userAnswerTd.innerHTML = '<span class="' + (userAnswer === correctAnswers[index] ? 'correct' : 'incorrect') + '">' + userAnswer + '</span>';
+    tr.appendChild(userAnswerTd);
+    const correctAnswerTd = document.createElement('td');
+    correctAnswerTd.innerHTML = '<span class="correct">' + correctAnswers[index] + '</span>';
+    tr.appendChild(correctAnswerTd);
+    if (userAnswer === correctAnswers[index]) score++;
+    comparisonBody.appendChild(tr);
+  });
+  totalScoreElement.innerHTML = '<strong>Your score: ' + score + ' / ' + correctAnswers.length + '</strong>';
+  return score;
+}
+
+// Next button handler
+document.getElementById('nextButton').addEventListener('click', function() {
+  if (currentSetIndex < questionSets.length - 1) {
+    currentSetIndex++;
+    renderQuestion2(questionSets[currentSetIndex]);
+    if (currentSetIndex === questionSets.length - 1) {
+      document.getElementById('nextButton').textContent = "The end";
+    }
+  }
+});
+
+// Back button handler
+document.getElementById('backButton').addEventListener('click', function() {
+  if (currentSetIndex > 0) {
+    currentSetIndex--;
+    renderQuestion2(questionSets[currentSetIndex]);
+    if (currentSetIndex !== questionSets.length - 1) {
+      document.getElementById('nextButton').textContent = "Next";
+    }
+  }
+});
+
+// Initialize on load
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() {
+    if (questionSets && questionSets.length > 0) renderQuestion2(questionSets[0]);
+  });
+} else {
+  if (questionSets && questionSets.length > 0) renderQuestion2(questionSets[0]);
+}
+
+
+/* MINI_HIPPO_LESSON_DATA_START
+{
+  "version": 1,
+  "lessonType": "reading",
+  "part": "2",
+  "sets": [
+    {
+      "id": 1,
+      "title": "sdfsdfsds",
+      "data": {
+        "topic": "sdfsdfsdfds",
+        "sentences": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6"
+        ]
+      }
+    }
+  ]
+}
+MINI_HIPPO_LESSON_DATA_END */
