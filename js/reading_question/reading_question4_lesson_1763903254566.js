@@ -22,20 +22,42 @@ const question4Content_1 = [
 
 const correctAnswersQuestion4_1 = ['A', 'B', 'C', 'D', 'A', 'B', 'C'];
 
+const question4Text_2 = [
+    "Who enjoys playing with their children?",
+    "Who enjoys playing with their children?",
+    "Who enjoys playing with their children?",
+    "Who enjoys playing with their children?",
+    "Who enjoys playing with their children?",
+];
+
+const question4Content_2 = [
+    { question: "Who enjoys playing with their children?", id: "question4_q1", options: ["", "A", "B", "C", "D"], answer: "C" },
+    { question: "Who enjoys playing with their children?", id: "question4_q2", options: ["", "A", "B", "C", "D"], answer: "B" },
+    { question: "Who enjoys playing with their children?", id: "question4_q3", options: ["", "A", "B", "C", "D"], answer: "D" },
+    { question: "Who enjoys playing with their children?", id: "question4_q4", options: ["", "A", "B", "C", "D"], answer: "C" },
+    { question: "Who enjoys playing with their children?", id: "question4_q5", options: ["", "A", "B", "C", "D"], answer: "C" },
+];
+
+const correctAnswersQuestion4_2 = ['C', 'B', 'D', 'C', 'C'];
+
 const question4Text = [
   question4Text_1,
+  question4Text_2,
 ];
 
 const question4Content = [
   question4Content_1,
+  question4Content_2,
 ];
 
 const correctAnswersQuestion4 = [
   correctAnswersQuestion4_1,
+  correctAnswersQuestion4_2,
 ];
 
 const question4Topic1 = {
   topic1: "Games from childhood",
+  topic2: "Who enjoys playing with their children?",
 };
 
 function getQuestHeaders(obj) {
@@ -324,6 +346,77 @@ if (document.readyState === 'loading') {
               "D"
             ],
             "correctAnswer": "B"
+          },
+          {
+            "question": "Who enjoys playing with their children?",
+            "options": [
+              "",
+              "A",
+              "B",
+              "C",
+              "D"
+            ],
+            "correctAnswer": "C"
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "title": "Who enjoys playing with their children?",
+      "data": {
+        "topic": "Who enjoys playing with their children?",
+        "texts": [
+          "Who enjoys playing with their children?",
+          "Who enjoys playing with their children?",
+          "Who enjoys playing with their children?",
+          "Who enjoys playing with their children?",
+          "Who enjoys playing with their children?"
+        ],
+        "questions": [
+          {
+            "question": "Who enjoys playing with their children?",
+            "options": [
+              "",
+              "A",
+              "B",
+              "C",
+              "D"
+            ],
+            "correctAnswer": "C"
+          },
+          {
+            "question": "Who enjoys playing with their children?",
+            "options": [
+              "",
+              "A",
+              "B",
+              "C",
+              "D"
+            ],
+            "correctAnswer": "B"
+          },
+          {
+            "question": "Who enjoys playing with their children?",
+            "options": [
+              "",
+              "A",
+              "B",
+              "C",
+              "D"
+            ],
+            "correctAnswer": "D"
+          },
+          {
+            "question": "Who enjoys playing with their children?",
+            "options": [
+              "",
+              "A",
+              "B",
+              "C",
+              "D"
+            ],
+            "correctAnswer": "C"
           },
           {
             "question": "Who enjoys playing with their children?",
