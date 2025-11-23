@@ -58,9 +58,37 @@ function renderQuestion4(index) {
   const row = container.querySelector('.row');
   const leftColumn = row.querySelector('.col-md-7');
   leftColumn.innerHTML = '';
-  question4Text[index].forEach(text => {
+  question4Text[index].forEach((text, textIndex) => {
     const p = document.createElement('p');
-    p.innerHTML = text;
+    let formattedText = text || '';
+    
+    // First paragraph (introduction) - make it bold
+    if (textIndex === 0) {
+      // If not already wrapped in strong tags, wrap the entire text
+      if (!formattedText.includes('<strong>')) {
+        formattedText = '<strong>' + formattedText + '</strong>';
+      }
+    } else {
+      // Other paragraphs (A, B, C, D) - make the letter bold
+      // Check if text starts with A:, B:, C:, or D:
+      const letterMatch = formattedText.match(/^([A-D]):\s*(.*)$/);
+      if (letterMatch) {
+        const letter = letterMatch[1];
+        const restOfText = letterMatch[2];
+        // If not already wrapped in strong tags, wrap the letter
+        if (!formattedText.includes('<strong>' + letter + ':</strong>')) {
+          formattedText = '<strong>' + letter + ':</strong> ' + restOfText;
+        }
+      } else if (!formattedText.includes('<strong>')) {
+        // If text doesn't start with A-D: but has no strong tags, try to find and wrap first letter
+        const firstLetterMatch = formattedText.match(/^([A-D]):/);
+        if (firstLetterMatch) {
+          formattedText = formattedText.replace(/^([A-D]):/, '<strong>$1:</strong>');
+        }
+      }
+    }
+    
+    p.innerHTML = formattedText;
     leftColumn.appendChild(p);
   });
   const rightColumn = row.querySelector('.col-md-5');
@@ -215,7 +243,7 @@ if (document.readyState === 'loading') {
   "sets": [
     {
       "id": 1,
-      "title": "Reading Question 4",
+      "title": "test",
       "data": {
         "topic": "Games from childhood",
         "texts": [
