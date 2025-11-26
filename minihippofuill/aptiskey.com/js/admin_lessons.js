@@ -37,9 +37,13 @@ function getAdminAuthHeaders() {
     };
 }
 
-// Load all lessons on page load
+// Load all lessons on page load (only if on admin_lessons.html)
+// For admin_upload.html, lessons will be loaded when the module is selected
 document.addEventListener('DOMContentLoaded', function() {
-    loadAllLessons();
+    // Only auto-load if we're on admin_lessons.html
+    if (window.location.pathname.includes('admin_lessons.html')) {
+        loadAllLessons();
+    }
 });
 
 // Load lessons for all parts
