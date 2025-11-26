@@ -2736,9 +2736,12 @@
             
             // If selecting lessons-management-module, load lessons
             if (module === 'lessons-management-module') {
-                if (typeof loadAllLessons === 'function') {
-                    loadAllLessons();
-                }
+                // Wait a bit for the module to be visible
+                setTimeout(() => {
+                    if (typeof loadAllLessons === 'function') {
+                        loadAllLessons();
+                    }
+                }, 200);
             }
             
             // If selecting single-part-module, ensure the current part form is visible
