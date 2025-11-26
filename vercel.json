@@ -21,6 +21,11 @@
     }
   ],
   "cleanUrls": false,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "functions": {
+    "minihippofuill/aptiskey.com/api/**/*.js": {
+      "maxDuration": 60
+    }
+  }
 }
 
