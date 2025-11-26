@@ -17,6 +17,14 @@ var part4Questions = window.part4Questions;
 var part5Options = window.part5Options;
 var part5Paragraphs = window.part5Paragraphs;
 
+// Initialize questionSets storage if not exists
+window.questionSets = window.questionSets || {
+    1: [],
+    2: [],
+    4: [],
+    5: []
+};
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     // Part selector event listeners
@@ -28,7 +36,17 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize with Part 1
     switchPart(1);
-    addPart1Question();
+    // Add initial question to the direct input form
+    const part1Container = document.getElementById('part1-questions-container');
+    if (part1Container && part1Container.children.length === 0) {
+        addPart1Question();
+    }
+    
+    // Initialize Part 2 with 1 sentence
+    const part2Container = document.getElementById('part2-sentences-container');
+    if (part2Container && part2Container.children.length === 0) {
+        addPart2Sentence();
+    }
     
     // Initialize Part 4 with 7 questions
     for (let i = 0; i < 7; i++) {
@@ -65,6 +83,39 @@ function switchPart(part) {
     const radio = document.getElementById(`part${part}`);
     if (radio) {
         radio.checked = true;
+    }
+    
+    // Initialize form fields if empty
+    if (part === 1) {
+        const part1Container = document.getElementById('part1-questions-container');
+        if (part1Container && part1Container.children.length === 0) {
+            addPart1Question();
+        }
+    } else if (part === 2) {
+        const part2Container = document.getElementById('part2-sentences-container');
+        if (part2Container && part2Container.children.length === 0) {
+            addPart2Sentence();
+        }
+    } else if (part === 4) {
+        const part4Container = document.getElementById('part4-questions-container');
+        if (part4Container && part4Container.children.length === 0) {
+            for (let i = 0; i < 7; i++) {
+                addPart4Question();
+            }
+        }
+    } else if (part === 5) {
+        const part5OptionsContainer = document.getElementById('part5-options-container');
+        const part5ParagraphsContainer = document.getElementById('part5-paragraphs-container');
+        if (part5OptionsContainer && part5OptionsContainer.children.length === 0) {
+            for (let i = 0; i < 7; i++) {
+                addPart5Option();
+            }
+        }
+        if (part5ParagraphsContainer && part5ParagraphsContainer.children.length === 0) {
+            for (let i = 0; i < 7; i++) {
+                addPart5Paragraph();
+            }
+        }
     }
     
     // Always ensure action buttons section is visible
@@ -651,5 +702,260 @@ function clearForm() {
         
         document.getElementById('preview-section').style.display = 'none';
     }
+}
+
+// ============================================
+// Save Question Sets Functions
+// ============================================
+
+function savePart1Set() {
+    const titleInput = document.getElementById('part1-title-input');
+    const title = titleInput ? titleInput.value.trim() : '';
+    
+    // Collect questions from the direct input form
+    const questions = [];
+    document.querySelectorAll('#part1-questions-container .question-item').forEach((item, index) => {
+        const questionStart = item.querySelector('.part1-questionStart').value.trim();
+        const questionEnd = item.querySelector('.part1-questionEnd').value.trim();
+        const correctAnswer = item.querySelector('.part1-correctAnswer').value.trim();
+        const answerOptionsText = item.querySelector('.part1-answerOptions').value.trim();
+        const answerOptions = answerOptionsText.split('\n').filter(opt => opt.trim() !== '');
+        
+        if (questionStart || questionEnd || correctAnswer) {
+            questions.push({
+                questionStart,
+                answerOptions,
+                questionEnd,
+                correctAnswer
+            });
+        }
+    });
+    
+    if (questions.length === 0) {
+        alert('Vui lòng nhập ít nhất một câu hỏi!');
+        return;
+    }
+    
+    // Create new set
+    const newSet = {
+        id: window.questionSets[1].length + 1,
+        title: title || `Bộ đề ${window.questionSets[1].length + 1}`,
+        data: {
+            part: 1,
+            title: title || 'Reading Question 1',
+            questions: questions
+        }
+    };
+    
+    // Add to storage
+    window.questionSets[1].push(newSet);
+    
+    // Clear form
+    if (titleInput) titleInput.value = '';
+    document.getElementById('part1-questions-container').innerHTML = '';
+    part1Questions = [];
+    addPart1Question();
+    
+    // Render sets (if function exists)
+    if (typeof renderQuestionSets === 'function') {
+        renderQuestionSets(1);
+    }
+    
+    alert('Đã lưu bộ đề thành công!');
+}
+
+function savePart2Set() {
+    const titleInput = document.getElementById('part2-title-input');
+    const topicInput = document.getElementById('part2-topic-input');
+    const title = titleInput ? titleInput.value.trim() : '';
+    const topic = topicInput ? topicInput.value.trim() : '';
+    
+    // Collect sentences
+    const sentences = [];
+    document.querySelectorAll('#part2-sentences-container .question-item').forEach(item => {
+        const sentence = item.querySelector('.part2-sentence').value.trim();
+        if (sentence) {
+            sentences.push(sentence);
+        }
+    });
+    
+    if (sentences.length === 0) {
+        alert('Vui lòng nhập ít nhất một câu văn!');
+        return;
+    }
+    
+    // Create new set
+    const newSet = {
+        id: window.questionSets[2].length + 1,
+        title: title || `Bộ đề ${window.questionSets[2].length + 1}`,
+        data: {
+            part: 2,
+            title: title || 'Reading Question 2 & 3',
+            topic: topic,
+            sentences: sentences
+        }
+    };
+    
+    // Add to storage
+    window.questionSets[2].push(newSet);
+    
+    // Clear form
+    if (titleInput) titleInput.value = '';
+    if (topicInput) topicInput.value = '';
+    document.getElementById('part2-sentences-container').innerHTML = '';
+    part2Sentences = [];
+    addPart2Sentence();
+    
+    // Render sets (if function exists)
+    if (typeof renderQuestionSets === 'function') {
+        renderQuestionSets(2);
+    }
+    
+    alert('Đã lưu bộ đề thành công!');
+}
+
+function savePart4Set() {
+    const titleInput = document.getElementById('part4-title-input');
+    const topicInput = document.getElementById('part4-topic-input');
+    const title = titleInput ? titleInput.value.trim() : '';
+    const topic = topicInput ? topicInput.value.trim() : '';
+    
+    // Collect questions
+    const questions = [];
+    document.querySelectorAll('#part4-questions-container .question-item').forEach(item => {
+        const question = item.querySelector('.part4-question').value.trim();
+        const correctAnswer = item.querySelector('.part4-correctAnswer').value.trim();
+        if (question || correctAnswer) {
+            questions.push({
+                question,
+                options: ['', 'A', 'B', 'C', 'D'],
+                correctAnswer
+            });
+        }
+    });
+    
+    // Collect texts
+    const textIntro = document.getElementById('part4-text-intro-input') ? document.getElementById('part4-text-intro-input').value.trim() : '';
+    const textA = document.getElementById('part4-text-a-input') ? document.getElementById('part4-text-a-input').value.trim() : '';
+    const textB = document.getElementById('part4-text-b-input') ? document.getElementById('part4-text-b-input').value.trim() : '';
+    const textC = document.getElementById('part4-text-c-input') ? document.getElementById('part4-text-c-input').value.trim() : '';
+    const textD = document.getElementById('part4-text-d-input') ? document.getElementById('part4-text-d-input').value.trim() : '';
+    
+    if (questions.length === 0) {
+        alert('Vui lòng nhập ít nhất một câu hỏi!');
+        return;
+    }
+    
+    // Create new set
+    const newSet = {
+        id: window.questionSets[4].length + 1,
+        title: title || `Bộ đề ${window.questionSets[4].length + 1}`,
+        data: {
+            part: 4,
+            title: title || 'Reading Question 4',
+            topic: topic,
+            texts: [textIntro, textA, textB, textC, textD],
+            questions: questions
+        }
+    };
+    
+    // Add to storage
+    window.questionSets[4].push(newSet);
+    
+    // Clear form
+    if (titleInput) titleInput.value = '';
+    if (topicInput) topicInput.value = '';
+    if (document.getElementById('part4-text-intro-input')) document.getElementById('part4-text-intro-input').value = '';
+    if (document.getElementById('part4-text-a-input')) document.getElementById('part4-text-a-input').value = '';
+    if (document.getElementById('part4-text-b-input')) document.getElementById('part4-text-b-input').value = '';
+    if (document.getElementById('part4-text-c-input')) document.getElementById('part4-text-c-input').value = '';
+    if (document.getElementById('part4-text-d-input')) document.getElementById('part4-text-d-input').value = '';
+    document.getElementById('part4-questions-container').innerHTML = '';
+    part4Questions = [];
+    for (let i = 0; i < 7; i++) {
+        addPart4Question();
+    }
+    
+    // Render sets (if function exists)
+    if (typeof renderQuestionSets === 'function') {
+        renderQuestionSets(4);
+    }
+    
+    alert('Đã lưu bộ đề thành công!');
+}
+
+function savePart5Set() {
+    const titleInput = document.getElementById('part5-title-input');
+    const topicInput = document.getElementById('part5-topic-input');
+    const keywordInput = document.getElementById('part5-keyword-input');
+    const meoInput = document.getElementById('part5-meo-input');
+    const title = titleInput ? titleInput.value.trim() : '';
+    const topic = topicInput ? topicInput.value.trim() : '';
+    const keyword = keywordInput ? keywordInput.value.trim() : '';
+    const meo = meoInput ? meoInput.value.trim() : '';
+    
+    // Collect options
+    const options = [];
+    document.querySelectorAll('#part5-options-container .question-item').forEach(item => {
+        const option = item.querySelector('.part5-option').value.trim();
+        if (option) {
+            options.push(option);
+        }
+    });
+    
+    // Collect paragraphs
+    const paragraphs = [];
+    document.querySelectorAll('#part5-paragraphs-container .question-item').forEach(item => {
+        const paragraph = item.querySelector('.part5-paragraph').value.trim();
+        if (paragraph) {
+            paragraphs.push(paragraph);
+        }
+    });
+    
+    if (options.length === 0 || paragraphs.length === 0) {
+        alert('Vui lòng nhập ít nhất một option và một đoạn văn!');
+        return;
+    }
+    
+    // Create new set
+    const newSet = {
+        id: window.questionSets[5].length + 1,
+        title: title || `Bộ đề ${window.questionSets[5].length + 1}`,
+        data: {
+            part: 5,
+            title: title || 'Reading Question 5',
+            topic: topic,
+            options: ['', ...options], // First option is always empty
+            paragraphs: paragraphs,
+            tips: {
+                keyword: keyword,
+                meo: meo
+            }
+        }
+    };
+    
+    // Add to storage
+    window.questionSets[5].push(newSet);
+    
+    // Clear form
+    if (titleInput) titleInput.value = '';
+    if (topicInput) topicInput.value = '';
+    if (keywordInput) keywordInput.value = '';
+    if (meoInput) meoInput.value = '';
+    document.getElementById('part5-options-container').innerHTML = '';
+    document.getElementById('part5-paragraphs-container').innerHTML = '';
+    part5Options = [];
+    part5Paragraphs = [];
+    for (let i = 0; i < 7; i++) {
+        addPart5Option();
+        addPart5Paragraph();
+    }
+    
+    // Render sets (if function exists)
+    if (typeof renderQuestionSets === 'function') {
+        renderQuestionSets(5);
+    }
+    
+    alert('Đã lưu bộ đề thành công!');
 }
 

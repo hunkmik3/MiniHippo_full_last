@@ -84,7 +84,7 @@ async function logout() {
     clearAuth();
     
     // Redirect to login
-    window.location.href = 'login.html';
+    window.location.href = '/login.html';
 }
 
 // Clear authentication data
@@ -101,7 +101,7 @@ async function requireAuth() {
     if (!isAuthenticated) {
         // Don't redirect if already on login page
         if (!window.location.pathname.includes('login.html')) {
-            window.location.href = 'login.html';
+            window.location.href = '/login.html';
         }
         return false;
     }
@@ -125,7 +125,7 @@ async function requireAdmin() {
     
     if (!isAdmin()) {
         alert('Bạn không có quyền truy cập trang này.');
-        window.location.href = 'home.html';
+        window.location.href = '/home.html';
         return false;
     }
     

@@ -37,7 +37,7 @@ Sau khi deploy xong, kiểm tra:
 
 ## Đã sửa:
 
-✅ Sửa tất cả đường dẫn CDN từ relative (`../cdn.jsdelivr.net`) sang absolute (`https://cdn.jsdelivr.net`)
+✅ Sửa tất cả đường dẫn CDN từ relative (`https://cdn.jsdelivr.net`) sang absolute (`https://cdn.jsdelivr.net`)
 ✅ Sửa đường dẫn Bootstrap CSS và JS
 ✅ Sửa đường dẫn Bootstrap Icons
 ✅ Sửa đường dẫn SortableJS

@@ -53,41 +53,73 @@ function renderLessonsList(part, lessons) {
 // Create a lesson card element
 function createLessonCard(part, lesson) {
     const cardDiv = document.createElement('div');
-    cardDiv.className = 'lesson-card mb-2';
+    cardDiv.className = 'lesson-card mb-1';
     
     // Determine which page to link to
+    // Support both string and number for backward compatibility
     const pageMap = {
-        1: 'reading_question1.html',
+        '1': 'reading_question1.html',
+        '2': 'reading_question2.html',
+        '4': 'reading_question4.html',
+        '5': 'reading_question5.html',
+        1: 'reading_question1.html', // Backward compatibility
         2: 'reading_question2.html',
         4: 'reading_question4.html',
         5: 'reading_question5.html'
     };
     
-    const pageUrl = pageMap[part] || 'reading_question1.html';
+    const pageUrl = pageMap[part] || pageMap[String(part)] || 'reading_question1.html';
     
-    // Create button/link
+    // Map part to button style (matching Part buttons)
+    const partStyleMap = {
+        '1': { btnClass: 'btn-primary', icon: 'bi-book-fill' },
+        '2': { btnClass: 'btn-info', icon: 'bi-puzzle-fill' },
+        '4': { btnClass: 'btn-warning', icon: 'bi-clipboard-check' },
+        '5': { btnClass: 'btn-success', icon: 'bi-lightbulb-fill' },
+        1: { btnClass: 'btn-primary', icon: 'bi-book-fill' },
+        2: { btnClass: 'btn-info', icon: 'bi-puzzle-fill' },
+        4: { btnClass: 'btn-warning', icon: 'bi-clipboard-check' },
+        5: { btnClass: 'btn-success', icon: 'bi-lightbulb-fill' }
+    };
+    
+    const style = partStyleMap[part] || partStyleMap[String(part)] || { btnClass: 'btn-primary', icon: 'bi-book-fill' };
+    
+    // Create button/link matching Part button style
     const link = document.createElement('a');
-    link.href = pageUrl;
-    link.className = 'btn btn-outline-primary btn-sm w-100 text-start';
+    link.href = `${pageUrl}?lesson=${lesson.id}`;
+    link.className = `btn ${style.btnClass} btn-lg w-100 mb-1 d-flex align-items-center justify-content-center text-decoration-none`;
     link.style.textDecoration = 'none';
+    link.style.padding = '0.75rem';
     
-    // Card content
+    // Create icon
+    const icon = document.createElement('i');
+    icon.className = `${style.icon} me-2`;
+    icon.style.fontSize = '1.5rem';
+    
+    // Card content - flex layout with title and badge
     const contentDiv = document.createElement('div');
-    contentDiv.className = 'd-flex justify-content-between align-items-center';
+    contentDiv.className = 'd-flex flex-column align-items-start flex-grow-1';
+    contentDiv.style.minWidth = 0; // Allow text truncation
     
     const titleSpan = document.createElement('span');
     titleSpan.textContent = lesson.title || lesson.topic || `Bài học ${part}`;
-    titleSpan.style.flex = '1';
     titleSpan.style.overflow = 'hidden';
     titleSpan.style.textOverflow = 'ellipsis';
     titleSpan.style.whiteSpace = 'nowrap';
+    titleSpan.style.width = '100%';
+    titleSpan.style.fontSize = '1rem';
+    titleSpan.style.fontWeight = '500';
     
     const badgeSpan = document.createElement('small');
-    badgeSpan.className = 'badge bg-secondary ms-2';
+    badgeSpan.className = 'text-white-50 mt-1';
+    badgeSpan.style.fontSize = '0.875rem';
+    badgeSpan.style.opacity = '0.9';
     badgeSpan.textContent = `${lesson.num_sets || 1} sets`;
     
     contentDiv.appendChild(titleSpan);
     contentDiv.appendChild(badgeSpan);
+    
+    link.appendChild(icon);
     link.appendChild(contentDiv);
     cardDiv.appendChild(link);
     
@@ -95,8 +127,9 @@ function createLessonCard(part, lesson) {
 }
 
 // Load lessons for all parts
+// Use string values to match TEXT column type in database
 function loadAllLessons() {
-    const parts = [1, 2, 4, 5];
+    const parts = ['1', '2', '4', '5'];
     parts.forEach(part => {
         loadUploadedLessons(part);
     });

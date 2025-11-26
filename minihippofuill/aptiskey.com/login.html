@@ -173,7 +173,7 @@
                 }
                 
                 // Redirect to home page
-                window.location.href = 'home.html';
+                window.location.href = '/home.html';
                 
             } catch (error) {
                 // Show error message
@@ -191,7 +191,7 @@
             // Verify token
             checkAuth().then(isValid => {
                 if (isValid) {
-                    window.location.href = 'home.html';
+                    window.location.href = '/home.html';
                 }
             });
         }

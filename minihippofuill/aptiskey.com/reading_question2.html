@@ -6,13 +6,493 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Thêm thẻ này -->
-    <title>Aptis reading keys</title>
+    <title>Mini Hippo - Reading Practice</title>
     <link rel="icon" href="images/favicon.ico" type="image/x-icon">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="css/readingkey.css" rel="stylesheet">
     <link href="css/lesson-ui.css" rel="stylesheet">
-    <script src="js/reading_question/reading_question2.js" defer></script>
+    <style>
+        /* Hide content initially when loading lesson script */
+        body.lesson-loading #question2 {
+            opacity: 0;
+            pointer-events: none;
+        }
+        body.lesson-loading #question2 * {
+            visibility: hidden;
+        }
+        #question2.lesson-loading {
+            opacity: 0;
+            pointer-events: none;
+        }
+        #question2.lesson-loading * {
+            visibility: hidden;
+        }
+        
+        /* Loading indicator styles */
+        #lesson-loading-indicator {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
+            background: white;
+            padding: 30px 50px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            text-align: center;
+            display: none;
+        }
+        
+        body.lesson-loading #lesson-loading-indicator {
+            display: block;
+        }
+        
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            font-size: 18px;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        /* SortableJS styles */
+        .sortable-ghost {
+            opacity: 0.4;
+            background: #e3f2fd !important;
+        }
+        
+        .sortable-chosen {
+            cursor: grabbing !important;
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .draggable-item {
+            cursor: grab;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .draggable-item:active {
+            cursor: grabbing;
+        }
+    </style>
+    <script>
+        // Check for lesson parameter and add inline style to hide content immediately
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('lesson')) {
+                const style = document.createElement('style');
+                style.id = 'lesson-loading-style';
+                style.textContent = '#question2 { opacity: 0 !important; pointer-events: none !important; } #question2 * { visibility: hidden !important; }';
+                document.head.appendChild(style);
+                window._lessonLoadingStyle = style;
+                if (document.body) {
+                    document.body.classList.add('lesson-loading');
+                } else {
+                    document.addEventListener('DOMContentLoaded', function() {
+                        document.body.classList.add('lesson-loading');
+                    });
+                }
+            }
+        })();
+    </script>
+    <script>
+        // Dynamic JS loading based on lesson ID parameter
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const lessonId = urlParams.get('lesson');
+            const part = 2;
+            let lessonScriptLoaded = false;
+            
+            function setLoadingState(isLoading) {
+                if (document.body) {
+                    if (isLoading) {
+                        document.body.classList.add('lesson-loading');
+                    } else {
+                        document.body.classList.remove('lesson-loading');
+                    }
+                }
+                const questionContainer = document.getElementById('question2');
+                if (questionContainer) {
+                    if (isLoading) {
+                        questionContainer.classList.add('lesson-loading');
+                    } else {
+                        questionContainer.classList.remove('lesson-loading');
+                    }
+                }
+                if (!isLoading) {
+                    const loadingStyle = document.getElementById('lesson-loading-style');
+                    if (loadingStyle) loadingStyle.remove();
+                    if (window._lessonLoadingStyle && window._lessonLoadingStyle.parentNode) {
+                        window._lessonLoadingStyle.remove();
+                    }
+                }
+            }
+            
+            async function loadLessonScript() {
+                setLoadingState(true);
+                // If no lesson ID, try to load latest uploaded lesson
+                if (!lessonId) {
+                    console.log('No lesson parameter - trying to load latest uploaded lesson');
+                    try {
+                        const listResponse = await fetch(`/api/lessons/list?part=2`);
+                        const listResult = await listResponse.json();
+                        if (listResult.success && listResult.lessons && listResult.lessons.length > 0) {
+                            const latestLesson = listResult.lessons[0]; // First one is latest (ordered by created_at.desc)
+                            console.log('Found latest lesson, loading:', latestLesson.id);
+                            // Redirect to same page with lesson ID
+                            window.location.href = `${window.location.pathname}?lesson=${latestLesson.id}`;
+                            return;
+                        } else {
+                            console.log('No uploaded lessons found - loading default/original lesson');
+                            loadDefaultScript();
+                            return;
+                        }
+                    } catch (error) {
+                        console.error('Error fetching latest lesson:', error);
+                        console.log('Falling back to default/original lesson');
+                    loadDefaultScript();
+                        return;
+                    }
+                }
+                
+                // Only proceed with lesson loading if lessonId exists
+                try {
+                    const response = await fetch(`/api/lessons/get?id=${lessonId}`);
+                    const result = await response.json();
+                    
+                    if (response.ok && result.lesson) {
+                        const lesson = result.lesson;
+                        const scriptResponse = await fetch(`/api/lessons/get-script-url?filePath=${encodeURIComponent(lesson.file_path)}`);
+                        const scriptResult = await scriptResponse.json();
+                        
+                        // Fetch script content and execute directly (handles DOMContentLoaded issue)
+                        const scriptPath = `/api/lessons/get-script?filePath=${encodeURIComponent(lesson.file_path)}&v=${new Date().getTime()}`;
+                        console.log('Fetching script content from API proxy:', scriptPath);
+                        
+                        try {
+                            const fetchResponse = await fetch(scriptPath);
+                            if (!fetchResponse.ok) {
+                                throw new Error(`Failed to fetch script: ${fetchResponse.status}`);
+                            }
+                            
+                            const scriptContent = await fetchResponse.text();
+                            console.log('Script content fetched, executing...');
+                            
+                            // Replace DOMContentLoaded with immediate execution if DOM is ready
+                            let modifiedContent = scriptContent;
+                            if (document.readyState !== 'loading') {
+                                console.log('DOM already ready, replacing DOMContentLoaded with immediate execution');
+                                modifiedContent = scriptContent.replace(
+                                    /document\.addEventListener\(['"]DOMContentLoaded['"],\s*function\(\)\s*\{/g,
+                                    '(function() {'
+                                );
+                                const lastMatch = modifiedContent.lastIndexOf('});');
+                                if (lastMatch !== -1 && modifiedContent !== scriptContent) {
+                                    modifiedContent = modifiedContent.substring(0, lastMatch) + '})();' + modifiedContent.substring(lastMatch + 3);
+                                }
+                            } else {
+                                console.log('DOM still loading, keeping DOMContentLoaded listener');
+                            }
+                            
+                            const scriptElement = document.createElement('script');
+                            scriptElement.textContent = modifiedContent;
+                            document.head.appendChild(scriptElement);
+                            
+                            // After script execution, manually call renderQuestion2 if it exists
+                            setTimeout(function() {
+                                function checkAndRender() {
+                                    // Check in both global and window scope
+                                    const qSets = window.questionSets || (typeof questionSets !== 'undefined' ? questionSets : null);
+                                    const renderFn = window.renderQuestion2 || (typeof renderQuestion2 !== 'undefined' ? renderQuestion2 : null);
+                                    
+                                    console.log('Checking for questionSets:', {
+                                        windowQuestionSets: typeof window.questionSets,
+                                        questionSets: typeof questionSets,
+                                        windowRenderQuestion2: typeof window.renderQuestion2,
+                                        renderQuestion2: typeof renderQuestion2,
+                                        qSetsLength: qSets ? qSets.length : 'N/A'
+                                    });
+                                    
+                                    if (qSets && qSets.length > 0 && renderFn) {
+                                        console.log('Found questionSets and renderQuestion2, calling render...');
+                                        try {
+                                            renderFn(qSets[0]);
+                                            console.log('Question 2 rendered successfully');
+                                            setLoadingState(false);
+                                            const loadingIndicator = document.getElementById('lesson-loading-indicator');
+                                            if (loadingIndicator) loadingIndicator.style.display = 'none';
+                                            lessonScriptLoaded = true;
+                                            // Start countdown after lesson is loaded
+                                            if (window.startCountdown) {
+                                                window.startCountdown();
+                                            }
+                                            return true;
+                                        } catch (error) {
+                                            console.error('Error calling renderQuestion2:', error);
+                                        }
+                                    }
+                                    return false;
+                                }
+                                
+                                // Try multiple times with increasing delays
+                                let attempts = 0;
+                                const maxAttempts = 30;
+                                
+                                function tryRender() {
+                                    attempts++;
+                                    console.log(`Attempt ${attempts} to find and render questionSets...`);
+                                    
+                                    if (checkAndRender()) {
+                                        // Success, already handled in checkAndRender
+                                    } else if (attempts < maxAttempts) {
+                                        setTimeout(tryRender, 150);
+                                    } else {
+                                        console.error('Failed to render questionSets after', maxAttempts, 'attempts');
+                                        console.log('Available globals:', Object.keys(window).filter(k => k.includes('question') || k.includes('2')));
+                                        setLoadingState(false);
+                                        const loadingIndicator = document.getElementById('lesson-loading-indicator');
+                                        if (loadingIndicator) loadingIndicator.style.display = 'none';
+                                        lessonScriptLoaded = true;
+                                    }
+                                }
+                                
+                                tryRender();
+                            }, 200);
+                            
+                            console.log('Lesson script executed successfully');
+                            return;
+                        } catch (error) {
+                            console.error('Failed to fetch/execute script from API proxy:', error);
+                            if (scriptResponse.ok && scriptResult.scriptUrl) {
+                                const rawScript = document.createElement('script');
+                                rawScript.src = scriptResult.scriptUrl + '?v=' + new Date().getTime();
+                                rawScript.defer = true;
+                                rawScript.onerror = function() {
+                                    const localPath = lesson.file_path;
+                                    const localScript = document.createElement('script');
+                                    localScript.src = (localPath.startsWith('js/') ? localPath : 'js/' + localPath) + '?v=' + new Date().getTime();
+                                    localScript.defer = true;
+                                    localScript.onerror = function() {
+                                        loadDefaultScript();
+                                    };
+                                    document.head.appendChild(localScript);
+                                };
+                                document.head.appendChild(rawScript);
+                                return;
+                            } else {
+                                loadDefaultScript();
+                                return;
+                            }
+                        }
+                    } else {
+                        // Lesson not found, fallback to default
+                        console.log('Lesson not found, loading default script');
+                        loadDefaultScript();
+                    }
+                } catch (error) {
+                    console.error('Error loading lesson:', error);
+                    // Fallback to default script on error
+                    console.log('Error loading lesson, loading default script');
+                    loadDefaultScript();
+                }
+            }
+            
+            function loadDefaultScript() {
+                console.log('loadDefaultScript called, DOM readyState:', document.readyState);
+                const scriptUrl = 'js/reading_question/reading_question2.js?v=' + new Date().getTime();
+                
+                // Always fetch and execute directly to handle DOMContentLoaded issue
+                // This ensures script executes even if DOM is already ready
+                console.log('Fetching script content directly');
+                fetch(scriptUrl)
+                    .then(response => {
+                        console.log('Fetch response status:', response.status);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.text();
+                    })
+                        .then(scriptContent => {
+                            console.log('Script content fetched, length:', scriptContent.length);
+                            
+                            // Wait for DOM to be ready before executing script
+                            function executeScript() {
+                                // Check if required containers exist
+                                const cardsContainer = document.getElementById('cardsContainer');
+                                if (!cardsContainer) {
+                                    console.log('Container not ready yet, waiting...');
+                                    setTimeout(executeScript, 50);
+                                    return;
+                                }
+                                
+                                console.log('Container found, executing script');
+                                let modifiedContent = scriptContent;
+                                
+                                // Replace DOMContentLoaded - just remove the listener, keep code in global scope
+                                if (modifiedContent.includes('DOMContentLoaded')) {
+                                    // Remove the DOMContentLoaded wrapper but keep the code
+                                    modifiedContent = modifiedContent.replace(
+                                        /document\.addEventListener\(['"]DOMContentLoaded['"],\s*function\(\)\s*\{/g,
+                                        '' // Remove the listener, code will execute in global scope
+                                    );
+                                    // Remove the closing }); for DOMContentLoaded
+                                    const lastClosingBrace = modifiedContent.lastIndexOf('});');
+                                    if (lastClosingBrace !== -1) {
+                                        modifiedContent = modifiedContent.substring(0, lastClosingBrace) + modifiedContent.substring(lastClosingBrace + 3);
+                                    }
+                                    console.log('Removed DOMContentLoaded wrapper');
+                                }
+                                
+                                // Remove window.onload and replace with direct call
+                                if (modifiedContent.includes('window.onload')) {
+                                    // Remove window.onload assignment
+                                    modifiedContent = modifiedContent.replace(
+                                        /window\.onload\s*=\s*function\(\)\s*\{[\s\S]*?\};/g,
+                                        ''
+                                    );
+                                    console.log('Removed window.onload');
+                                }
+                                
+                                const scriptElement = document.createElement('script');
+                                scriptElement.textContent = modifiedContent;
+                                
+                                // Add error handler
+                                scriptElement.onerror = function(error) {
+                                    console.error('Error executing script:', error);
+                                };
+                                
+                                document.head.appendChild(scriptElement);
+                                console.log('Default script executed successfully');
+                                
+                                // After script executes (inline scripts execute synchronously), manually call renderQuestion2
+                                // Use setTimeout to ensure script has finished executing and variables are available
+                                setTimeout(function() {
+                                    console.log('Checking for renderQuestion2 and question2Content_1...');
+                                    console.log('renderQuestion2 type:', typeof renderQuestion2);
+                                    console.log('question2Content_1 type:', typeof question2Content_1);
+                                    
+                                    if (typeof renderQuestion2 === 'function' && typeof question2Content_1 !== 'undefined') {
+                                        const container = document.getElementById('cardsContainer');
+                                        if (container && container.children.length === 0) {
+                                            console.log('Container empty, calling renderQuestion2 manually');
+                                            try {
+                                                renderQuestion2(question2Content_1);
+                                                console.log('renderQuestion2 called successfully');
+                                                // Start countdown after lesson is loaded
+                                                if (window.startCountdown) {
+                                                    window.startCountdown();
+                                                }
+                                            } catch (error) {
+                                                console.error('Error calling renderQuestion2:', error);
+                                            }
+                                        } else if (container && container.children.length > 0) {
+                                            console.log('Content already rendered, children:', container.children.length);
+                                        } else {
+                                            console.warn('Container not found');
+                                        }
+                                    } else {
+                                        console.warn('renderQuestion2 or question2Content_1 not available yet');
+                                        console.log('Available globals:', Object.keys(window).filter(k => k.includes('question') || k.includes('render')));
+                                        
+                                        // Try again after a longer delay
+                                        setTimeout(function() {
+                                            console.log('Retry: Checking again...');
+                                            console.log('renderQuestion2 type:', typeof renderQuestion2);
+                                            console.log('question2Content_1 type:', typeof question2Content_1);
+                                            
+                                            if (typeof renderQuestion2 === 'function' && typeof question2Content_1 !== 'undefined') {
+                                                const container = document.getElementById('cardsContainer');
+                                                if (container && container.children.length === 0) {
+                                                    console.log('Retrying renderQuestion2 call');
+                                                    try {
+                                                        renderQuestion2(question2Content_1);
+                                                        console.log('renderQuestion2 called successfully on retry');
+                                                        // Start countdown after lesson is loaded
+                                                        if (window.startCountdown) {
+                                                            window.startCountdown();
+                                                        }
+                                                    } catch (error) {
+                                                        console.error('Error calling renderQuestion2 on retry:', error);
+                                                    }
+                                                }
+                                            } else {
+                                                console.error('Still not available after retry');
+                                            }
+                                        }, 500);
+                                    }
+                                }, 200);
+                            }
+                            
+                            // Start waiting for DOM
+                            if (document.readyState === 'loading') {
+                                document.addEventListener('DOMContentLoaded', executeScript);
+                            } else {
+                                // DOM already ready, but wait a bit for containers
+                                setTimeout(executeScript, 100);
+                            }
+                        
+                        // Check if content was rendered after a short delay
+                        setTimeout(function() {
+                            const container = document.getElementById('cardsContainer');
+                            if (container && container.children.length > 0) {
+                                console.log('Content rendered successfully, children:', container.children.length);
+                                // Start countdown if content is rendered
+                                if (window.startCountdown) {
+                                    window.startCountdown();
+                                }
+                            } else {
+                                console.warn('Content not rendered yet, container:', container);
+                                // Try again after a longer delay - script might need more time
+                                setTimeout(function() {
+                                    const container2 = document.getElementById('cardsContainer');
+                                    if (container2 && container2.children.length > 0) {
+                                        console.log('Content rendered on second check, children:', container2.children.length);
+                                        // Start countdown if content is rendered
+                                        if (window.startCountdown) {
+                                            window.startCountdown();
+                                        }
+                                    } else {
+                                        console.error('Content still not rendered after delay, container:', container2);
+                                    }
+                                }, 1000);
+                            }
+                        }, 500);
+                    })
+                    .catch(error => {
+                        console.error('Failed to fetch/execute default script:', error);
+                        // Fallback: try normal script loading
+                        console.log('Trying fallback: normal script loading');
+                        const script = document.createElement('script');
+                        script.src = scriptUrl;
+                        script.defer = true;
+                        script.onload = function() {
+                            console.log('Fallback script loaded');
+                        };
+                        script.onerror = function() {
+                            console.error('Fallback script also failed');
+                        };
+                        document.head.appendChild(script);
+                    });
+            }
+            
+            loadLessonScript();
+        })();
+    </script>
 </head>
 
 <body>
@@ -33,7 +513,7 @@
   <!-- Center Section (Countdown Timer) -->
   <div class="d-flex align-items-center">
     
-    <span class="countdown fs-4 fw-bold" id="countdownTimer">34:00</span>
+    <span class="countdown fs-4 fw-bold" id="countdownTimer">35:00</span>
   </div>
 
   <!-- Right Section (Current Step) -->
@@ -141,4 +621,78 @@
         </div>
     </div>
 
+<!-- Loading Indicator -->
+<div id="lesson-loading-indicator">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Đang tải bài học...</div>
+    </div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // Countdown Timer for Part 2 & 3
+    // Timer will only start after lesson is loaded
+    (function() {
+        let totalSeconds = 35 * 60; // 35 minutes in seconds
+        let countdownInterval = null;
+        const countdownElement = document.getElementById('countdownTimer');
+        let countdownStarted = false;
+        
+        function updateCountdown() {
+            if (totalSeconds <= 0) {
+                countdownElement.textContent = '00:00';
+                if (countdownInterval) {
+                    clearInterval(countdownInterval);
+                    countdownInterval = null;
+                }
+                return;
+            }
+            
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            
+            // Format as MM:SS
+            const formattedTime = 
+                String(minutes).padStart(2, '0') + ':' + 
+                String(seconds).padStart(2, '0');
+            
+            countdownElement.textContent = formattedTime;
+            
+            // Change color to red when less than 5 minutes remaining
+            if (totalSeconds <= 5 * 60) {
+                countdownElement.style.color = '#ff4444';
+            } else {
+                countdownElement.style.color = '';
+            }
+            
+            totalSeconds--;
+        }
+        
+        // Function to start countdown (only call this after lesson is loaded)
+        function startCountdown() {
+            if (countdownStarted) {
+                return; // Already started
+            }
+            
+            countdownStarted = true;
+            console.log('Starting countdown timer...');
+            
+            // Update immediately
+            updateCountdown();
+            
+            // Update every second
+            countdownInterval = setInterval(function() {
+                updateCountdown();
+                if (totalSeconds <= 0) {
+                    clearInterval(countdownInterval);
+                    countdownInterval = null;
+                }
+            }, 1000);
+            
+            // Store interval ID for cleanup if needed
+            window.countdownInterval = countdownInterval;
+        }
+        
+        // Expose startCountdown globally so it can be called after lesson loads
+        window.startCountdown = startCountdown;
+    })();
+</script>

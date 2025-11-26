@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "minihippofuill/aptiskey.com/api/**/*.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "minihippofuill/aptiskey.com/**/*",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/minihippofuill/aptiskey.com/api/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/minihippofuill/aptiskey.com/$1"
+    }
+  ],
+  "cleanUrls": false,
+  "trailingSlash": false
+}
+

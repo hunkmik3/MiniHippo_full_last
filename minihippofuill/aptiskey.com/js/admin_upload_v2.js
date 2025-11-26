@@ -15,21 +15,112 @@ window.questionSets = window.questionSets || {
 // Create references to use in this file
 const questionSets = window.questionSets;
 
+function requireAuthTokenOrRedirect() {
+    const token = typeof getAuthToken === 'function'
+        ? getAuthToken()
+        : localStorage.getItem('auth_token');
+    if (!token) {
+        alert('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.');
+        window.location.href = 'login.html';
+        throw new Error('AUTH_TOKEN_MISSING');
+    }
+    return token;
+}
+
+window.buildAuthorizedHeaders = function(additionalHeaders = {}) {
+    const token = requireAuthTokenOrRedirect();
+    return {
+        Authorization: `Bearer ${token}`,
+        ...additionalHeaders
+    };
+};
+
+function getJsonAuthHeaders() {
+    return window.buildAuthorizedHeaders({ 'Content-Type': 'application/json' });
+}
+
 // Initialize on page load - Wait a bit to avoid conflict with admin_upload.js
 document.addEventListener('DOMContentLoaded', function() {
     // Use setTimeout to ensure admin_upload.js initializes first
     setTimeout(function() {
         console.log('Admin upload v2 initialized');
         
-        // Render empty sets for all parts
-        renderQuestionSets(1);
-        renderQuestionSets(2);
-        renderQuestionSets(4);
-        renderQuestionSets(5);
+        // Check if editing existing lesson
+        const urlParams = new URLSearchParams(window.location.search);
+        const editLessonId = urlParams.get('edit');
+        const editPart = urlParams.get('part');
+        
+        if (editLessonId && editPart) {
+            // Load existing lesson
+            loadExistingLesson(editLessonId, editPart);
+        } else {
+            // Render empty sets for all parts
+            renderQuestionSets(1);
+            renderQuestionSets(2);
+            renderQuestionSets(4);
+            renderQuestionSets(5);
+        }
         
         console.log('All question sets rendered');
     }, 100);
 });
+
+// Load existing lesson for editing
+async function loadExistingLesson(lessonId, requestedPart) {
+    try {
+        // Show loading state
+        const banner = document.getElementById('edit-mode-banner');
+        if (banner) {
+            banner.style.display = 'block';
+            banner.innerHTML = `<i class="bi bi-info-circle me-2"></i><strong>Chế độ chỉnh sửa:</strong> Đang tải dữ liệu bài học...`;
+        }
+        
+        // Fetch lesson data
+        const response = await fetch(`/api/lessons/get?id=${lessonId}`, {
+            headers: getJsonAuthHeaders()
+        });
+        const result = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to load lesson');
+        }
+        
+        const lesson = result.lesson;
+        
+        // Store editing state
+        window.editingLessonId = lessonId;
+        window.editingLessonFilePath = lesson.file_path;
+        
+        const lessonPart = lesson.part || requestedPart;
+        let loaded = false;
+        
+        if (lesson.file_path) {
+            const scriptContent = await fetchLessonScript(lesson.file_path);
+            const embeddedData = extractLessonDataFromScript(scriptContent);
+            if (embeddedData && Array.isArray(embeddedData.sets) && embeddedData.sets.length > 0) {
+                loaded = applyLessonDataToEditor(embeddedData, lessonPart);
+            }
+        }
+        
+        if (!loaded) {
+            alert(`Đang chỉnh sửa bài học: ${lesson.title || lesson.topic}\n\nKhông tìm thấy dữ liệu nhúng trong file. Vui lòng nhập lại nội dung thủ công.`);
+            if (typeof switchPart === 'function' && lessonPart) {
+                const numericPart = parseInt(lessonPart, 10);
+                if (!Number.isNaN(numericPart)) {
+                    switchPart(numericPart);
+                }
+            }
+        } else if (banner) {
+            banner.innerHTML = `<i class="bi bi-info-circle me-2"></i><strong>Chế độ chỉnh sửa:</strong> ${lesson.title || lesson.topic || 'Bài học'} đã được tải. Vui lòng chỉnh sửa và nhấn Upload để lưu.`;
+        }
+        
+    } catch (error) {
+        console.error('Error loading lesson:', error);
+        if (error.message !== 'AUTH_TOKEN_MISSING') {
+        alert('Lỗi khi tải bài học: ' + error.message);
+        }
+    }
+}
 
 // Override switchPart to also render question sets
 (function() {
@@ -375,6 +466,59 @@ function saveCurrentSet() {
     clearFormSilently(currentPart);
 }
 
+// Save Part 1 Set from direct input form
+function savePart1Set() {
+    const titleInput = document.getElementById('part1-title-input');
+    const title = titleInput ? titleInput.value.trim() : '';
+    
+    // Collect data from part1-questions-container
+    const questions = [];
+    document.querySelectorAll('#part1-questions-container .question-item').forEach((item) => {
+        const questionStart = item.querySelector('.part1-questionStart')?.value.trim() || '';
+        const questionEnd = item.querySelector('.part1-questionEnd')?.value.trim() || '';
+        const correctAnswer = item.querySelector('.part1-correctAnswer')?.value.trim() || '';
+        const answerOptionsText = item.querySelector('.part1-answerOptions')?.value.trim() || '';
+        const answerOptions = answerOptionsText.split('\n').filter(opt => opt.trim() !== '');
+        
+        if (questionStart || questionEnd || correctAnswer) {
+            questions.push({
+                questionStart,
+                answerOptions,
+                questionEnd,
+                correctAnswer
+            });
+        }
+    });
+    
+    if (questions.length === 0) {
+        alert('Vui lòng thêm ít nhất một câu hỏi!');
+        return;
+    }
+    
+    // Create new set
+    const newSet = {
+        id: questionSets[1].length + 1,
+        title: title || `Bộ đề ${questionSets[1].length + 1}`,
+        data: { questions }
+    };
+    
+    questionSets[1].push(newSet);
+    
+    // Clear form
+    if (titleInput) titleInput.value = '';
+    document.getElementById('part1-questions-container').innerHTML = '';
+    window.part1Questions = [];
+    
+    // Re-render sets
+    renderQuestionSets(1);
+    
+    // Show success message
+    alert('Đã lưu bộ đề thành công!');
+}
+
+// Make savePart1Set global
+window.savePart1Set = savePart1Set;
+
 // ============================================
 // Data Collection (Updated for sets)
 // ============================================
@@ -522,13 +666,74 @@ function exportToJS() {
     document.getElementById('preview-section').style.display = 'block';
 }
 
+function ensureCurrentSetPersisted(part) {
+    const editForm = document.getElementById(`part${part}-edit-form`);
+    if (editForm && editForm.style.display !== 'none') {
+        saveCurrentSet();
+    }
+}
+
+function sanitizeQuestionSets(part) {
+    const sets = Array.isArray(questionSets[part]) ? questionSets[part] : [];
+    const filtered = sets.filter(set => hasContentForSet(part, set)).map((set, index) => ({
+        ...set,
+        id: index + 1
+    }));
+    questionSets[part] = filtered;
+    return filtered;
+}
+
+function hasContentForSet(part, set) {
+    if (!set || !set.data) return false;
+    switch(part) {
+        case 1:
+            return Array.isArray(set.data.questions) && set.data.questions.length > 0;
+        case 2:
+            return Array.isArray(set.data.sentences) && set.data.sentences.length > 0;
+        case 4:
+            return Array.isArray(set.data.questions) && set.data.questions.length > 0;
+        case 5:
+            const optionCount = Array.isArray(set.data.options) ? set.data.options.length - 1 : 0;
+            const paragraphCount = Array.isArray(set.data.paragraphs) ? set.data.paragraphs.length : 0;
+            return optionCount > 0 && paragraphCount > 0;
+        default:
+            return false;
+    }
+}
+
+function appendLessonDataComment(code, payload) {
+    try {
+        const serialized = JSON.stringify(payload, null, 2);
+        return `${code}\n/* MINI_HIPPO_LESSON_DATA_START\n${serialized}\nMINI_HIPPO_LESSON_DATA_END */\n`;
+    } catch (error) {
+        console.error('Failed to append lesson data comment:', error);
+        return code;
+    }
+}
+
 // Upload lesson to GitHub
 async function uploadLessonToGitHub() {
+    // Check if listening or reading
+    const currentLessonType = window.currentLessonType || 'reading';
+    
+    if (currentLessonType === 'listening') {
+        // Use listening upload function
+        if (window.uploadListeningLessonToGitHub) {
+            return await window.uploadListeningLessonToGitHub();
+        } else {
+            alert('Listening upload function chưa được load. Vui lòng refresh trang.');
+            return;
+        }
+    }
+    
+    // Reading upload logic
     const currentPart = window.currentPart || 1;
+    ensureCurrentSetPersisted(currentPart);
+    const availableSets = sanitizeQuestionSets(currentPart);
     
     // Check if there are any question sets
-    if (!questionSets[currentPart] || questionSets[currentPart].length === 0) {
-        alert('Chưa có bộ đề nào để upload. Vui lòng thêm bộ đề trước.');
+    if (!availableSets || availableSets.length === 0) {
+        alert('Chưa có bộ đề nào để upload. Vui lòng thêm và lưu bộ đề trước.');
         return;
     }
     
@@ -554,23 +759,47 @@ async function uploadLessonToGitHub() {
         return;
     }
     
-    // Determine file path based on part
-    const filePaths = {
-        1: 'js/reading_question/reading_question1.js',
-        2: 'js/reading_question/reading_question2.js',
-        4: 'js/reading_question/reading_question4.js',
-        5: 'js/reading_question/reading_question5.js'
-    };
+    jsCode = appendLessonDataComment(jsCode, {
+        version: 1,
+        lessonType: 'reading',
+        part: String(currentPart),
+        sets: availableSets
+    });
     
-    const filePath = filePaths[currentPart];
-    if (!filePath) {
-        alert('Part không hợp lệ.');
-        return;
+    // Determine file path based on part and whether editing existing lesson
+    let filePath;
+    const editingLessonId = window.editingLessonId;
+    
+    if (editingLessonId && window.editingLessonFilePath) {
+        // Use existing file path if editing
+        filePath = window.editingLessonFilePath;
+    } else {
+        // Create new file with lesson ID
+        const basePaths = {
+            1: 'js/reading_question/reading_question1',
+            2: 'js/reading_question/reading_question2',
+            4: 'js/reading_question/reading_question4',
+            5: 'js/reading_question/reading_question5'
+        };
+        
+        const basePath = basePaths[currentPart];
+        if (!basePath) {
+            alert('Part không hợp lệ.');
+            return;
+        }
+        
+        // Generate unique lesson ID (timestamp-based)
+        const lessonId = Date.now();
+        filePath = `${basePath}_lesson_${lessonId}.js`;
     }
     
-    // Get number of sets for commit message
-    const numSets = questionSets[currentPart].length;
-    const commitMessage = `Add/Update ${numSets} lesson set(s) for Part ${currentPart}`;
+    // Get title for commit message (use first set's title or default)
+    const firstSet = availableSets[0];
+    const lessonTitle = firstSet && firstSet.title ? firstSet.title : `Part ${currentPart} Lesson`;
+    const numSets = availableSets.length;
+    const commitMessage = editingLessonId 
+        ? `Update lesson: ${lessonTitle} (${numSets} sets)`
+        : `Add new lesson: ${lessonTitle} (${numSets} sets)`;
     
     // Show loading state
     const uploadButton = document.getElementById('upload-github-btn');
@@ -584,14 +813,15 @@ async function uploadLessonToGitHub() {
         // Send POST request to API
         const response = await fetch('/api/upload-lesson', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: getJsonAuthHeaders(),
             body: JSON.stringify({
                 filePath: filePath,
                 content: jsCode,
                 message: commitMessage,
-                append: false
+                append: false,
+                lessonId: editingLessonId || null,
+                title: lessonTitle,
+                topic: firstSet && firstSet.data && firstSet.data.topic ? firstSet.data.topic : ''
             })
         });
         
@@ -604,15 +834,21 @@ async function uploadLessonToGitHub() {
         // Success
         alert(`Upload thành công!\n\nCommit: ${result.commitUrl}\nFile: ${result.fileUrl}`);
         
-        // Optionally open commit URL in new tab
-        if (result.commitUrl) {
-            if (confirm('Bạn có muốn mở commit trên GitHub không?')) {
-                window.open(result.commitUrl, '_blank');
-            }
+        // Clear editing state
+        if (editingLessonId) {
+            window.editingLessonId = null;
+            window.editingLessonFilePath = null;
+            const banner = document.getElementById('edit-mode-banner');
+            if (banner) banner.style.display = 'none';
         }
+        
+        // Upload successful - no popups
         
     } catch (error) {
         console.error('Upload error:', error);
+        if (error.message === 'AUTH_TOKEN_MISSING') {
+            return;
+        }
         alert('Lỗi khi upload: ' + error.message);
     } finally {
         // Restore button state
@@ -821,6 +1057,9 @@ function generatePart2JS() {
     });
     code += `];\n\n`;
     
+    // Expose to window scope for external access
+    code += `window.questionSets = questionSets;\n\n`;
+    
     // Generate questheader1 object
     code += `const questheader1 = {\n`;
     questionSets[2].forEach((set, index) => {
@@ -833,6 +1072,207 @@ function generatePart2JS() {
     code += `    return Object.values(obj);\n`;
     code += `}\n\n`;
     code += `const questheader = getQuestHeaders(questheader1);\n`;
+    
+    // Expose to window scope for external access
+    code += `window.questionSets = questionSets;\n`;
+    code += `window.questheader = questheader;\n\n`;
+    
+    // Add render function and dependencies
+    code += `let currentSetIndex = 0;\n`;
+    code += `let correctAnswersQuestion2 = [];\n\n`;
+    code += `function shuffleQuestions(questions) {\n`;
+    code += `  for (let i = questions.length - 1; i > 0; i--) {\n`;
+    code += `    const j = Math.floor(Math.random() * (i + 1));\n`;
+    code += `    [questions[i], questions[j]] = [questions[j], questions[i]];\n`;
+    code += `  }\n`;
+    code += `  return questions;\n`;
+    code += `}\n\n`;
+    code += `function initSortable() {\n`;
+    code += `  const cardsContainer = document.getElementById('cardsContainer');\n`;
+    code += `  if (!cardsContainer) {\n`;
+    code += `    console.error('cardsContainer not found');\n`;
+    code += `    return;\n`;
+    code += `  }\n`;
+    code += `  // Check if Sortable is available\n`;
+    code += `  if (typeof Sortable === 'undefined') {\n`;
+    code += `    console.error('SortableJS is not loaded. Please ensure sortablejs library is included.');\n`;
+    code += `    // Try to wait a bit and retry\n`;
+    code += `    setTimeout(function() {\n`;
+    code += `      if (typeof Sortable !== 'undefined') {\n`;
+    code += `        initSortable();\n`;
+    code += `      } else {\n`;
+    code += `        console.error('SortableJS still not available after retry');\n`;
+    code += `      }\n`;
+    code += `    }, 500);\n`;
+    code += `    return;\n`;
+    code += `  }\n`;
+    code += `  // Destroy existing Sortable instance if any\n`;
+    code += `  if (cardsContainer.sortableInstance) {\n`;
+    code += `    cardsContainer.sortableInstance.destroy();\n`;
+    code += `    cardsContainer.sortableInstance = null;\n`;
+    code += `  }\n`;
+    code += `  // Create new Sortable instance\n`;
+    code += `  // Only allow dragging items with class 'draggable-item' (excludes first item)\n`;
+    code += `  try {\n`;
+    code += `    const sortable = new Sortable(cardsContainer, {\n`;
+    code += `      animation: 150,\n`;
+    code += `      draggable: '.draggable-item',\n`;
+    code += `      filter: function(evt, item) {\n`;
+    code += `        // Prevent dragging first child (which doesn't have draggable-item class)\n`;
+    code += `        return item === cardsContainer.firstElementChild;\n`;
+    code += `      },\n`;
+    code += `      preventOnFilter: true,\n`;
+    code += `      forceFallback: false,\n`;
+    code += `      swapThreshold: 0.65,\n`;
+    code += `      ghostClass: 'sortable-ghost',\n`;
+    code += `      chosenClass: 'sortable-chosen'\n`;
+    code += `    });\n`;
+    code += `    // Store instance for later cleanup\n`;
+    code += `    cardsContainer.sortableInstance = sortable;\n`;
+    code += `    console.log('Sortable initialized successfully');\n`;
+    code += `  } catch (error) {\n`;
+    code += `    console.error('Error initializing Sortable:', error);\n`;
+    code += `  }\n`;
+    code += `}\n\n`;
+    code += `function renderQuestion2(questionlist) {\n`;
+    code += `  correctAnswersQuestion2 = [];\n`;
+    code += `  questionlist.forEach(item => { correctAnswersQuestion2.push(item); });\n`;
+    code += `  // Keep first sentence fixed at index 0, shuffle the rest\n`;
+    code += `  const firstSentence = questionlist[0];\n`;
+    code += `  const restSentences = questionlist.slice(1);\n`;
+    code += `  const shuffledRest = shuffleQuestions([...restSentences]);\n`;
+    code += `  const shuffledQuestionlist = [firstSentence, ...shuffledRest];\n`;
+    code += `  const cardsContainer = document.getElementById('cardsContainer');\n`;
+    code += `  if (cardsContainer) {\n`;
+    code += `    cardsContainer.innerHTML = '';\n`;
+    code += `    shuffledQuestionlist.forEach((text, index) => {\n`;
+    code += `      const cardDiv = document.createElement('div');\n`;
+    code += `      if (index === 0) {\n`;
+    code += `        // First sentence: fixed, not draggable, with checkmark and highlight\n`;
+    code += `        cardDiv.classList.add('card', 'mb-2');\n`;
+    code += `        cardDiv.style.backgroundColor = '#e3f2fd';\n`;
+    code += `        cardDiv.style.border = '2px solid #1976d2';\n`;
+    code += `        cardDiv.style.cursor = 'default';\n`;
+    code += `        const cardBody = document.createElement('div');\n`;
+    code += `        cardBody.classList.add('card-body', 'd-flex', 'align-items-center');\n`;
+    code += `        const checkIcon = document.createElement('i');\n`;
+    code += `        checkIcon.classList.add('bi', 'bi-check-circle-fill', 'text-success', 'me-2');\n`;
+    code += `        checkIcon.style.fontSize = '1.2rem';\n`;
+    code += `        cardBody.appendChild(checkIcon);\n`;
+    code += `        const textSpan = document.createElement('span');\n`;
+    code += `        textSpan.innerText = text;\n`;
+    code += `        cardBody.appendChild(textSpan);\n`;
+    code += `        cardDiv.appendChild(cardBody);\n`;
+    code += `      } else {\n`;
+    code += `        // Other sentences: draggable\n`;
+    code += `        cardDiv.classList.add('card', 'mb-2', 'draggable-item');\n`;
+    code += `        // Don't set draggable attribute - SortableJS handles dragging\n`;
+    code += `        cardDiv.id = 'item' + (index + 1);\n`;
+    code += `        const cardBody = document.createElement('div');\n`;
+    code += `        cardBody.classList.add('card-body', 'd-flex', 'align-items-center');\n`;
+    code += `        const dragIcon = document.createElement('i');\n`;
+    code += `        dragIcon.classList.add('bi', 'bi-grip-vertical', 'me-2', 'text-muted');\n`;
+    code += `        dragIcon.style.fontSize = '1.2rem';\n`;
+    code += `        cardBody.appendChild(dragIcon);\n`;
+    code += `        const textSpan = document.createElement('span');\n`;
+    code += `        textSpan.innerText = text;\n`;
+    code += `        cardBody.appendChild(textSpan);\n`;
+    code += `        cardDiv.appendChild(cardBody);\n`;
+    code += `      }\n`;
+    code += `      cardsContainer.appendChild(cardDiv);\n`;
+    code += `    });\n`;
+    code += `    // Initialize Sortable after a short delay to ensure DOM is ready and SortableJS is loaded\n`;
+    code += `    setTimeout(function() {\n`;
+    code += `      initSortable();\n`;
+    code += `    }, 200);\n`;
+    code += `  }\n`;
+    code += `  const headerEl = document.getElementById('html_questheader');\n`;
+    code += `  if (headerEl) headerEl.textContent = 'Reading Question 2 & 3 ( ' + (currentSetIndex + 1) + ' / ' + questheader.length + ' )';\n`;
+    code += `  const topicEl = document.getElementById('question2_topic');\n`;
+    code += `  if (topicEl) topicEl.textContent = 'Topic: ' + questheader[currentSetIndex];\n`;
+    code += `}\n`;
+    code += `// Expose renderQuestion2 to window\n`;
+    code += `window.renderQuestion2 = renderQuestion2;\n\n`;
+    code += `// User answers array\n`;
+    code += `const userAnswersQuestion2 = [];\n`;
+    code += `let question2Score = 0;\n\n`;
+    code += `// Check result button handler\n`;
+    code += `document.getElementById('checkResultButton').addEventListener('click', function() {\n`;
+    code += `  userAnswersQuestion2.length = 0;\n`;
+    code += `  const cardsContainer = document.getElementById('cardsContainer');\n`;
+    code += `  // Get all cards including the first one (which is not draggable)\n`;
+    code += `  const cards = cardsContainer.querySelectorAll('.card');\n`;
+    code += `  cards.forEach((card) => {\n`;
+    code += `    // Get text content, removing icon text if present\n`;
+    code += `    const cardBody = card.querySelector('.card-body');\n`;
+    code += `    if (cardBody) {\n`;
+    code += `      const textSpan = cardBody.querySelector('span');\n`;
+    code += `      const selectedAnswer = textSpan ? textSpan.textContent.trim() : cardBody.textContent.trim().replace(/^[✓\\s]*/, '').trim();\n`;
+    code += `      userAnswersQuestion2.push(selectedAnswer || "(không chọn)");\n`;
+    code += `    } else {\n`;
+    code += `      const selectedAnswer = card.textContent.trim() || "(không chọn)";\n`;
+    code += `      userAnswersQuestion2.push(selectedAnswer);\n`;
+    code += `    }\n`;
+    code += `  });\n`;
+    code += `  const answers = [];\n`;
+    code += `  const correctAnswers = [];\n`;
+    code += `  correctAnswersQuestion2.forEach((correctAnswer, index) => {\n`;
+    code += `    const selectedAnswer = userAnswersQuestion2[index] || "(không chọn)";\n`;
+    code += `    answers.push(selectedAnswer);\n`;
+    code += `    correctAnswers.push(correctAnswer);\n`;
+    code += `  });\n`;
+    code += `  question2Score = displayComparisonResultsQuestion2(answers, correctAnswers);\n`;
+    code += `  const resultModal = new bootstrap.Modal(document.getElementById('resultModal'));\n`;
+    code += `  resultModal.show();\n`;
+    code += `});\n\n`;
+    code += `// Display comparison results function\n`;
+    code += `function displayComparisonResultsQuestion2(userAnswers, correctAnswers) {\n`;
+    code += `  const comparisonBody = document.getElementById('comparisonTableBody');\n`;
+    code += `  const totalScoreElement = document.getElementById('totalScore');\n`;
+    code += `  comparisonBody.innerHTML = '';\n`;
+    code += `  let score = 0;\n`;
+    code += `  userAnswers.forEach((userAnswer, index) => {\n`;
+    code += `    const tr = document.createElement('tr');\n`;
+    code += `    const userAnswerTd = document.createElement('td');\n`;
+    code += `    userAnswerTd.innerHTML = '<span class="' + (userAnswer === correctAnswers[index] ? 'correct' : 'incorrect') + '">' + userAnswer + '</span>';\n`;
+    code += `    tr.appendChild(userAnswerTd);\n`;
+    code += `    const correctAnswerTd = document.createElement('td');\n`;
+    code += `    correctAnswerTd.innerHTML = '<span class="correct">' + correctAnswers[index] + '</span>';\n`;
+    code += `    tr.appendChild(correctAnswerTd);\n`;
+    code += `    if (userAnswer === correctAnswers[index]) score++;\n`;
+    code += `    comparisonBody.appendChild(tr);\n`;
+    code += `  });\n`;
+    code += `  totalScoreElement.innerHTML = '<strong>Your score: ' + score + ' / ' + correctAnswers.length + '</strong>';\n`;
+    code += `  return score;\n`;
+    code += `}\n\n`;
+    code += `// Next button handler\n`;
+    code += `document.getElementById('nextButton').addEventListener('click', function() {\n`;
+    code += `  if (currentSetIndex < questionSets.length - 1) {\n`;
+    code += `    currentSetIndex++;\n`;
+    code += `    renderQuestion2(questionSets[currentSetIndex]);\n`;
+    code += `    if (currentSetIndex === questionSets.length - 1) {\n`;
+    code += `      document.getElementById('nextButton').textContent = "The end";\n`;
+    code += `    }\n`;
+    code += `  }\n`;
+    code += `});\n\n`;
+    code += `// Back button handler\n`;
+    code += `document.getElementById('backButton').addEventListener('click', function() {\n`;
+    code += `  if (currentSetIndex > 0) {\n`;
+    code += `    currentSetIndex--;\n`;
+    code += `    renderQuestion2(questionSets[currentSetIndex]);\n`;
+    code += `    if (currentSetIndex !== questionSets.length - 1) {\n`;
+    code += `      document.getElementById('nextButton').textContent = "Next";\n`;
+    code += `    }\n`;
+    code += `  }\n`;
+    code += `});\n\n`;
+    code += `// Initialize on load\n`;
+    code += `if (document.readyState === 'loading') {\n`;
+    code += `  document.addEventListener('DOMContentLoaded', function() {\n`;
+    code += `    if (questionSets && questionSets.length > 0) renderQuestion2(questionSets[0]);\n`;
+    code += `  });\n`;
+    code += `} else {\n`;
+    code += `  if (questionSets && questionSets.length > 0) renderQuestion2(questionSets[0]);\n`;
+    code += `}\n\n`;
     
     return code;
 }
@@ -908,6 +1348,247 @@ function generatePart4JS() {
     code += `}\n\n`;
     code += `const question4Topic = getQuestHeaders(question4Topic1);\n`;
     
+    // Expose to window scope for external access
+    code += `window.question4Text = question4Text;\n`;
+    code += `window.question4Content = question4Content;\n\n`;
+    
+    // Add render function and dependencies
+    code += `let currentIndex = 0;\n\n`;
+    code += `function renderQuestion4(index) {\n`;
+    code += `  document.getElementById('question4_index').textContent = "Reading Question 4" + " (" + (index + 1) + "/" + question4Text.length + ")";\n`;
+    code += `  if (!question4Text[index] || !question4Content[index]) {\n`;
+    code += `    console.error('Không tìm thấy dữ liệu cho câu hỏi tại index: ' + index);\n`;
+    code += `    return;\n`;
+    code += `  }\n`;
+    code += `  const container = document.getElementById('question4');\n`;
+    code += `  const row = container.querySelector('.row');\n`;
+    code += `  const leftColumn = row.querySelector('.col-md-7');\n`;
+    code += `  leftColumn.innerHTML = '';\n`;
+    code += `  question4Text[index].forEach((text, textIndex) => {\n`;
+    code += `    const p = document.createElement('p');\n`;
+    code += `    let formattedText = text || '';\n`;
+    code += `    \n`;
+    code += `    // First paragraph (index 0) - introduction, make it bold\n`;
+    code += `    if (textIndex === 0) {\n`;
+    code += `      // If not already wrapped in strong tags, wrap the entire text\n`;
+    code += `      if (!formattedText.includes('<strong>')) {\n`;
+    code += `        formattedText = '<strong>' + formattedText + '</strong>';\n`;
+    code += `      }\n`;
+    code += `    } else {\n`;
+    code += `      // Other paragraphs (A, B, C, D) - add letter prefix and make it bold\n`;
+    code += `      const letters = ['A', 'B', 'C', 'D'];\n`;
+    code += `      const letterIndex = textIndex - 1; // textIndex 1->A, 2->B, 3->C, 4->D\n`;
+    code += `      \n`;
+    code += `      if (letterIndex < letters.length) {\n`;
+    code += `        const letter = letters[letterIndex];\n`;
+    code += `        const letterPrefix = letter + ': ';\n`;
+    code += `        \n`;
+    code += `        // Check if text already starts with the letter (with or without strong tags)\n`;
+    code += `        const hasLetterPrefix = formattedText.trim().toUpperCase().startsWith(letter + ':');\n`;
+    code += `        \n`;
+    code += `        if (hasLetterPrefix) {\n`;
+    code += `          // Text already has letter prefix, just ensure it's bold\n`;
+    code += `          // Remove existing strong tags around letter if any, then add new ones\n`;
+    code += `          formattedText = formattedText.replace(/^\\s*<strong>\\s*([A-D]):\\s*<\\/strong>\\s*/i, '');\n`;
+    code += `          formattedText = formattedText.replace(/^\\s*([A-D]):\\s*/i, '');\n`;
+    code += `          formattedText = '<strong>' + letter + ':</strong> ' + formattedText.trim();\n`;
+    code += `        } else {\n`;
+    code += `          // Text doesn't have letter prefix, add it with bold\n`;
+    code += `          formattedText = '<strong>' + letter + ':</strong> ' + formattedText.trim();\n`;
+    code += `        }\n`;
+    code += `      }\n`;
+    code += `    }\n`;
+    code += `    \n`;
+    code += `    p.innerHTML = formattedText;\n`;
+    code += `    leftColumn.appendChild(p);\n`;
+    code += `  });\n`;
+    code += `  const rightColumn = row.querySelector('.col-md-5');\n`;
+    code += `  const form = rightColumn.querySelector('form');\n`;
+    code += `  form.innerHTML = '';\n`;
+    code += `  question4Content[index].forEach(item => {\n`;
+    code += `    const div = document.createElement('div');\n`;
+    code += `    div.classList.add('mb-3', 'row', 'align-items-center');\n`;
+    code += `    const label = document.createElement('label');\n`;
+    code += `    label.setAttribute('for', item.id);\n`;
+    code += `    label.classList.add('col-9', 'col-form-label');\n`;
+    code += `    label.textContent = item.question;\n`;
+    code += `    const selectDiv = document.createElement('div');\n`;
+    code += `    selectDiv.classList.add('col-3');\n`;
+    code += `    const select = document.createElement('select');\n`;
+    code += `    select.id = item.id;\n`;
+    code += `    select.classList.add('form-select', 'select-fixed');\n`;
+    code += `    item.options.forEach(option => {\n`;
+    code += `      const optionElement = document.createElement('option');\n`;
+    code += `      optionElement.textContent = option;\n`;
+    code += `      select.appendChild(optionElement);\n`;
+    code += `    });\n`;
+    code += `    selectDiv.appendChild(select);\n`;
+    code += `    div.appendChild(label);\n`;
+    code += `    div.appendChild(selectDiv);\n`;
+    code += `    form.appendChild(div);\n`;
+    code += `  });\n`;
+    code += `  const topicElement = document.getElementById('question4_topic');\n`;
+    code += `  topicElement.textContent = 'Topic: ' + question4Topic[index];\n`;
+    code += `  currentIndex = index;\n`;
+    code += `}\n`;
+    code += `// Expose renderQuestion4 to window\n`;
+    code += `window.renderQuestion4 = renderQuestion4;\n`;
+    code += `window.setupNavigationButtons = setupNavigationButtons;\n\n`;
+    code += `// Check result function\n`;
+    code += `function displayComparisonResultsQuestion4(userAnswers, correctAnswers) {\n`;
+    code += `  const comparisonBody = document.getElementById('comparisonTableBody');\n`;
+    code += `  const totalScoreElement = document.getElementById('totalScore_question4');\n`;
+    code += `  \n`;
+    code += `  // Clear previous results\n`;
+    code += `  comparisonBody.innerHTML = '';\n`;
+    code += `  \n`;
+    code += `  // Calculate score\n`;
+    code += `  let score = 0;\n`;
+    code += `  \n`;
+    code += `  // Loop through questions and display results\n`;
+    code += `  question4Content[currentIndex].forEach((item, index) => {\n`;
+    code += `    const tr = document.createElement('tr');\n`;
+    code += `    \n`;
+    code += `    // Question column\n`;
+    code += `    const questionTd = document.createElement('td');\n`;
+    code += `    questionTd.innerHTML = item.question;\n`;
+    code += `    tr.appendChild(questionTd);\n`;
+    code += `    \n`;
+    code += `    // User answer column\n`;
+    code += `    const userAnswerTd = document.createElement('td');\n`;
+    code += `    const userAnswer = userAnswers[index] || "(không chọn)";\n`;
+    code += `    userAnswerTd.innerHTML = '<span class="' + (userAnswer === correctAnswers[index] ? 'correct' : 'incorrect') + '">' + userAnswer + '</span>';\n`;
+    code += `    tr.appendChild(userAnswerTd);\n`;
+    code += `    \n`;
+    code += `    // Correct answer column\n`;
+    code += `    const correctAnswerTd = document.createElement('td');\n`;
+    code += `    correctAnswerTd.innerHTML = '<span class="correct">' + correctAnswers[index] + '</span>';\n`;
+    code += `    tr.appendChild(correctAnswerTd);\n`;
+    code += `    \n`;
+    code += `    // If correct, add score\n`;
+    code += `    if (userAnswer === correctAnswers[index]) {\n`;
+    code += `      score += 2;\n`;
+    code += `    }\n`;
+    code += `    \n`;
+    code += `    comparisonBody.appendChild(tr);\n`;
+    code += `  });\n`;
+    code += `  \n`;
+    code += `  // Display total score\n`;
+    code += `  if (totalScoreElement) {\n`;
+    code += `    totalScoreElement.textContent = 'Total Score: ' + score + ' / ' + (question4Content[currentIndex].length * 2);\n`;
+    code += `  }\n`;
+    code += `  \n`;
+    code += `  return score;\n`;
+    code += `}\n\n`;
+    code += `// Check result button event listener\n`;
+    code += `if (document.readyState === 'loading') {\n`;
+    code += `  document.addEventListener('DOMContentLoaded', function() {\n`;
+    code += `    const checkResultBtn = document.getElementById('checkResultButton');\n`;
+    code += `    if (checkResultBtn) {\n`;
+    code += `      checkResultBtn.addEventListener('click', function() {\n`;
+    code += `        const answers = [];\n`;
+    code += `        const correctAnswers = [];\n`;
+    code += `        \n`;
+    code += `        // Get user answers\n`;
+    code += `        question4Content[currentIndex].forEach((item, index) => {\n`;
+    code += `          const selectElement = document.getElementById(item.id);\n`;
+    code += `          if (selectElement) {\n`;
+    code += `            const selectedAnswer = selectElement.value || "(không chọn)";\n`;
+    code += `            answers.push(selectedAnswer);\n`;
+    code += `            correctAnswers.push(correctAnswersQuestion4[currentIndex][index]);\n`;
+    code += `          }\n`;
+    code += `        });\n`;
+    code += `        \n`;
+    code += `        // Display results\n`;
+    code += `        displayComparisonResultsQuestion4(answers, correctAnswers);\n`;
+    code += `        \n`;
+    code += `        // Show modal\n`;
+    code += `        const modal = new bootstrap.Modal(document.getElementById('resultModal'));\n`;
+    code += `        modal.show();\n`;
+    code += `      });\n`;
+    code += `    }\n`;
+    code += `  });\n`;
+    code += `} else {\n`;
+    code += `  const checkResultBtn = document.getElementById('checkResultButton');\n`;
+    code += `  if (checkResultBtn) {\n`;
+    code += `    checkResultBtn.addEventListener('click', function() {\n`;
+    code += `      const answers = [];\n`;
+    code += `      const correctAnswers = [];\n`;
+    code += `      \n`;
+    code += `      // Get user answers\n`;
+    code += `      question4Content[currentIndex].forEach((item, index) => {\n`;
+    code += `        const selectElement = document.getElementById(item.id);\n`;
+    code += `        if (selectElement) {\n`;
+    code += `          const selectedAnswer = selectElement.value || "(không chọn)";\n`;
+    code += `          answers.push(selectedAnswer);\n`;
+    code += `          correctAnswers.push(correctAnswersQuestion4[currentIndex][index]);\n`;
+    code += `        }\n`;
+    code += `      });\n`;
+    code += `      \n`;
+    code += `      // Display results\n`;
+    code += `      displayComparisonResultsQuestion4(answers, correctAnswers);\n`;
+    code += `      \n`;
+    code += `      // Show modal\n`;
+    code += `      const modal = new bootstrap.Modal(document.getElementById('resultModal'));\n`;
+    code += `      modal.show();\n`;
+    code += `    });\n`;
+    code += `  }\n`;
+    code += `}\n\n`;
+    code += `// Next and Back button handlers\n`;
+    code += `let navigationButtonsSetup = false;\n`;
+    code += `function setupNavigationButtons() {\n`;
+    code += `  if (navigationButtonsSetup) {\n`;
+    code += `    return; // Already setup\n`;
+    code += `  }\n`;
+    code += `  \n`;
+    code += `  const nextButton = document.getElementById('nextButton');\n`;
+    code += `  const backButton = document.getElementById('backButton');\n`;
+    code += `  \n`;
+    code += `  if (nextButton) {\n`;
+    code += `    nextButton.addEventListener('click', function() {\n`;
+    code += `      if (backButton) backButton.textContent = "Back";\n`;
+    code += `      if (currentIndex < question4Text.length - 1) {\n`;
+    code += `        currentIndex++;\n`;
+    code += `        renderQuestion4(currentIndex);\n`;
+    code += `        // Update header with current index\n`;
+    code += `        const headerEl = document.getElementById('question4_index');\n`;
+    code += `        if (headerEl) headerEl.textContent = 'Reading Question 4 (' + (currentIndex + 1) + '/' + question4Text.length + ')';\n`;
+    code += `      } else {\n`;
+    code += `        // If at last question, change button text\n`;
+    code += `        nextButton.textContent = "The end";\n`;
+    code += `      }\n`;
+    code += `    });\n`;
+    code += `  }\n`;
+    code += `  \n`;
+    code += `  if (backButton) {\n`;
+    code += `    backButton.addEventListener('click', function() {\n`;
+    code += `      if (currentIndex > 0) {\n`;
+    code += `        currentIndex--;\n`;
+    code += `        renderQuestion4(currentIndex);\n`;
+    code += `        if (nextButton) nextButton.textContent = "Next";\n`;
+    code += `        // Update header with current index\n`;
+    code += `        const headerEl = document.getElementById('question4_index');\n`;
+    code += `        if (headerEl) headerEl.textContent = 'Reading Question 4 (' + (currentIndex + 1) + '/' + question4Text.length + ')';\n`;
+    code += `      } else {\n`;
+    code += `        // If at first question, change button text\n`;
+    code += `        backButton.textContent = "No Previous Question";\n`;
+    code += `      }\n`;
+    code += `    });\n`;
+    code += `  }\n`;
+    code += `  \n`;
+    code += `  navigationButtonsSetup = true;\n`;
+    code += `}\n\n`;
+    code += `// Initialize on load\n`;
+    code += `if (document.readyState === 'loading') {\n`;
+    code += `  document.addEventListener('DOMContentLoaded', function() {\n`;
+    code += `    renderQuestion4(0);\n`;
+    code += `    setupNavigationButtons();\n`;
+    code += `  });\n`;
+    code += `} else {\n`;
+    code += `  renderQuestion4(0);\n`;
+    code += `  setupNavigationButtons();\n`;
+    code += `}\n\n`;
+    
     return code;
 }
 
@@ -961,15 +1642,17 @@ function generatePart5JS() {
     });
     code += `];\n\n`;
     
-    code += `const paragraph_question5 = Array.from(\n`;
-    code += `  { length: options.length },\n`;
-    code += `  (_, i) => eval(\`paragraph_question5_\${i + 1}\`)\n`;
-    code += `);\n\n`;
+    code += `const paragraph_question5 = [\n`;
+    questionSets[5].forEach((set, index) => {
+        code += `  paragraph_question5_${index + 1},\n`;
+    });
+    code += `];\n\n`;
     
-    code += `const meohoc = Array.from({ length: options.length }, (_, i) => [\n`;
-    code += `  eval(\`question5_keyword_\${i + 1}\`),\n`;
-    code += `  eval(\`question5_meo_\${i + 1}\`)\n`;
-    code += `]);\n\n`;
+    code += `const meohoc = [\n`;
+    questionSets[5].forEach((set, index) => {
+        code += `  [question5_keyword_${index + 1}, question5_meo_${index + 1}],\n`;
+    });
+    code += `];\n\n`;
     
     // Generate topics
     code += `const topic_name = {\n`;
@@ -979,6 +1662,296 @@ function generatePart5JS() {
     code += `};\n\n`;
     
     code += `const dodai = options.length;\n`;
+    
+    // Expose to window scope for external access
+    code += `window.options = options;\n`;
+    code += `window.paragraph_question5 = paragraph_question5;\n`;
+    code += `window.meohoc = meohoc;\n`;
+    code += `window.topic_name = topic_name;\n\n`;
+    
+    // Add render function and dependencies
+    code += `let currentQuestion = 0;\n`;
+    code += `let questions5 = [];\n\n`;
+    code += `function shuffleArray(array) {\n`;
+    code += `  const firstElement = array[0]; // Lưu phần tử đầu tiên (rỗng)\n`;
+    code += `  // Tách phần tử đầu tiên và xáo trộn phần còn lại của mảng\n`;
+    code += `  const remainingElements = array.slice(1);\n`;
+    code += `  // Xáo trộn phần còn lại của mảng\n`;
+    code += `  for (let i = remainingElements.length - 1; i > 0; i--) {\n`;
+    code += `    const j = Math.floor(Math.random() * (i + 1));\n`;
+    code += `    [remainingElements[i], remainingElements[j]] = [remainingElements[j], remainingElements[i]];\n`;
+    code += `  }\n`;
+    code += `  // Thêm lại phần tử đầu tiên vào đầu mảng đã xáo trộn\n`;
+    code += `  remainingElements.unshift(firstElement);\n`;
+    code += `  return remainingElements;\n`;
+    code += `}\n\n`;
+    code += `function renderQuestion5(options, paragraph_question5, meohoc) {\n`;
+    code += `  const container = document.getElementById('question5-container');\n`;
+    code += `  if (!container) { console.error("Container không tồn tại!"); return; }\n`;
+    code += `  const topicEl = document.getElementById("question5_topic");\n`;
+    code += `  if (topicEl) topicEl.innerText = "TOPIC: " + topic_name["topic_" + (currentQuestion + 1)];\n`;
+    code += `  const indexEl = document.getElementById('question5_index');\n`;
+    code += `  if (indexEl) indexEl.textContent = 'Reading question 5 (' + (currentQuestion + 1) + '/' + dodai + ')';\n`;
+    code += `  // Shuffle options (shuffleArray already keeps first empty option at beginning)\n`;
+    code += `  const shuffledOptions = shuffleArray([...options]);\n`;
+    code += `  questions5 = [\n`;
+    code += `    { id: 'question5_q1', label: '1.', paragraph: paragraph_question5[0], correctAnswer: options[1] },\n`;
+    code += `    { id: 'question5_q2', label: '2.', paragraph: paragraph_question5[1], correctAnswer: options[2] },\n`;
+    code += `    { id: 'question5_q3', label: '3.', paragraph: paragraph_question5[2], correctAnswer: options[3] },\n`;
+    code += `    { id: 'question5_q4', label: '4.', paragraph: paragraph_question5[3], correctAnswer: options[4] },\n`;
+    code += `    { id: 'question5_q5', label: '5.', paragraph: paragraph_question5[4], correctAnswer: options[5] },\n`;
+    code += `    { id: 'question5_q6', label: '6.', paragraph: paragraph_question5[5], correctAnswer: options[6] },\n`;
+    code += `    { id: 'question5_q7', label: '7.', paragraph: paragraph_question5[6], correctAnswer: options[7] },\n`;
+    code += `  ];\n`;
+    code += `  container.innerHTML = '';\n`;
+    code += `  questions5.forEach((question, index) => {\n`;
+    code += `    // Tạo div cho mỗi câu hỏi\n`;
+    code += `    const questionDiv = document.createElement('div');\n`;
+    code += `    questionDiv.classList.add('mb-3', 'border', 'rounded-3', 'p-3', 'bg-white', 'shadow-sm');\n`;
+    code += `    \n`;
+    code += `    // Tạo một div cha để hiển thị label số và select trên cùng một hàng\n`;
+    code += `    const questionRow = document.createElement('div');\n`;
+    code += `    questionRow.style.display = 'flex';\n`;
+    code += `    questionRow.style.alignItems = 'center';\n`;
+    code += `    questionRow.style.gap = '12px';\n`;
+    code += `    questionRow.classList.add('mb-2');\n`;
+    code += `    \n`;
+    code += `    // Tạo label số\n`;
+    code += `    const label = document.createElement('label');\n`;
+    code += `    label.classList.add('mb-0', 'fw-semibold');\n`;
+    code += `    label.textContent = (index + 1) + '.';\n`;
+    code += `    label.style.minWidth = '30px';\n`;
+    code += `    \n`;
+    code += `    // Tạo phần tử select cho câu hỏi\n`;
+    code += `    const select = document.createElement('select');\n`;
+    code += `    select.classList.add('form-select');\n`;
+    code += `    select.id = question.id;\n`;
+    code += `    shuffledOptions.forEach((optionValue, optIndex) => {\n`;
+    code += `      // Skip empty, null, undefined values (except for '-- Chọn --')\n`;
+    code += `      if (optionValue === null || optionValue === undefined || (typeof optionValue === 'string' && optionValue.trim() === '' && optionValue !== '-- Chọn --')) {\n`;
+    code += `        return;\n`;
+    code += `      }\n`;
+    code += `      const option = document.createElement('option');\n`;
+    code += `      option.value = optionValue === '-- Chọn --' ? '' : optionValue;\n`;
+    code += `      option.textContent = optionValue === '-- Chọn --' ? '-- Chọn --' : optionValue;\n`;
+    code += `      if (optionValue === '-- Chọn --') {\n`;
+    code += `        option.selected = true; // Select empty option by default\n`;
+    code += `      }\n`;
+    code += `      select.appendChild(option);\n`;
+    code += `    });\n`;
+    code += `    \n`;
+    code += `    questionRow.appendChild(label);\n`;
+    code += `    questionRow.appendChild(select);\n`;
+    code += `    \n`;
+    code += `    // Tạo paragraph để hiển thị nội dung (ẩn mặc định)\n`;
+    code += `    const paragraph = document.createElement('p');\n`;
+    code += `    paragraph.classList.add('mt-2', 'mb-0');\n`;
+    code += `    paragraph.id = 'paragraph' + question.id.slice(10);\n`;
+    code += `    paragraph.style.display = 'none';\n`;
+    code += `    paragraph.textContent = question.paragraph;\n`;
+    code += `    \n`;
+    code += `    questionDiv.appendChild(questionRow);\n`;
+    code += `    questionDiv.appendChild(paragraph);\n`;
+    code += `    container.appendChild(questionDiv);\n`;
+    code += `  });\n`;
+    code += `}\n`;
+    code += `// Expose renderQuestion5 to window\n`;
+    code += `window.renderQuestion5 = renderQuestion5;\n\n`;
+    code += `// Setup button handlers\n`;
+    code += `let buttonsSetup = false;\n`;
+    code += `function setupPart5Buttons() {\n`;
+    code += `  if (buttonsSetup) {\n`;
+    code += `    console.log('Buttons already setup, skipping...');\n`;
+    code += `    return;\n`;
+    code += `  }\n`;
+    code += `  console.log('Setting up Part 5 buttons...');\n`;
+    code += `  // Show/Hide paragraphs button\n`;
+    code += `  const showParagraphBtn = document.getElementById('showParagraphButton');\n`;
+    code += `  if (showParagraphBtn) {\n`;
+    code += `    showParagraphBtn.addEventListener('click', function() {\n`;
+    code += `      const paragraphs = document.querySelectorAll('#question5-container p.mt-2');\n`;
+    code += `      if (paragraphs.length === 0) {\n`;
+    code += `        console.warn('No paragraphs found in question5-container');\n`;
+    code += `        return;\n`;
+    code += `      }\n`;
+    code += `      \n`;
+    code += `      // Check current state - if first paragraph is visible, hide all; otherwise show all\n`;
+    code += `      const firstParagraph = paragraphs[0];\n`;
+    code += `      const isCurrentlyVisible = firstParagraph && (firstParagraph.style.display !== 'none' && window.getComputedStyle(firstParagraph).display !== 'none');\n`;
+    code += `      \n`;
+    code += `      // Toggle visibility\n`;
+    code += `      paragraphs.forEach(paragraph => {\n`;
+    code += `        paragraph.style.display = isCurrentlyVisible ? 'none' : 'block';\n`;
+    code += `      });\n`;
+    code += `      \n`;
+    code += `      // Update button text\n`;
+    code += `      showParagraphBtn.textContent = isCurrentlyVisible ? 'Xem nội dung' : 'Ẩn nội dung';\n`;
+    code += `      console.log('Paragraphs toggled, isVisible:', isCurrentlyVisible, 'paragraphs count:', paragraphs.length);\n`;
+    code += `    });\n`;
+    code += `  } else {\n`;
+    code += `    console.warn('showParagraphButton not found');\n`;
+    code += `  }\n`;
+    code += `  \n`;
+    code += `  // Show tips button\n`;
+    code += `  const showAnswerBtn = document.getElementById('showAnswerButton');\n`;
+    code += `  if (showAnswerBtn) {\n`;
+    code += `    showAnswerBtn.addEventListener('click', function() {\n`;
+    code += `      const modalBody = document.getElementById('modal-body');\n`;
+    code += `      if (modalBody) {\n`;
+    code += `        modalBody.innerHTML = '';\n`;
+    code += `        const p1 = document.createElement('p');\n`;
+    code += `        p1.innerHTML = '<strong>Học mẹo nếu bạn cần học gấp:</strong>';\n`;
+    code += `        modalBody.appendChild(p1);\n`;
+    code += `        const p2 = document.createElement('p');\n`;
+    code += `        p2.innerHTML = meohoc[currentQuestion][0] || '';\n`;
+    code += `        modalBody.appendChild(p2);\n`;
+    code += `        const p3 = document.createElement('p');\n`;
+    code += `        p3.innerHTML = meohoc[currentQuestion][1] || '';\n`;
+    code += `        modalBody.appendChild(p3);\n`;
+    code += `        const modalElement = document.getElementById('answerModal');\n`;
+    code += `        if (modalElement) {\n`;
+    code += `          // Remove any existing backdrop first\n`;
+    code += `          const existingBackdrop = document.querySelector('.modal-backdrop');\n`;
+    code += `          if (existingBackdrop) {\n`;
+    code += `            existingBackdrop.remove();\n`;
+    code += `            document.body.classList.remove('modal-open');\n`;
+    code += `            document.body.style.overflow = '';\n`;
+    code += `            document.body.style.paddingRight = '';\n`;
+    code += `          }\n`;
+    code += `          const modal = new bootstrap.Modal(modalElement);\n`;
+    code += `          modal.show();\n`;
+    code += `          // Clean up backdrop when modal is hidden\n`;
+    code += `          modalElement.addEventListener('hidden.bs.modal', function() {\n`;
+    code += `            const backdrop = document.querySelector('.modal-backdrop');\n`;
+    code += `            if (backdrop) {\n`;
+    code += `              backdrop.remove();\n`;
+    code += `            }\n`;
+    code += `            document.body.classList.remove('modal-open');\n`;
+    code += `            document.body.style.overflow = '';\n`;
+    code += `            document.body.style.paddingRight = '';\n`;
+    code += `          }, { once: true });\n`;
+    code += `        }\n`;
+    code += `      }\n`;
+    code += `    });\n`;
+    code += `  }\n`;
+    code += `  \n`;
+    code += `  // Check result button\n`;
+    code += `  const checkResultBtn = document.getElementById('checkResultButton');\n`;
+    code += `  if (checkResultBtn) {\n`;
+    code += `    checkResultBtn.addEventListener('click', function() {\n`;
+    code += `      const answers = [];\n`;
+    code += `      const correctAnswers = [];\n`;
+    code += `      questions5.forEach((question, index) => {\n`;
+    code += `        const selectElement = document.getElementById(question.id);\n`;
+    code += `        if (selectElement) {\n`;
+    code += `          const selectedAnswer = selectElement.value || "(không chọn)";\n`;
+    code += `          answers.push(selectedAnswer);\n`;
+    code += `          correctAnswers.push(question.correctAnswer);\n`;
+    code += `        }\n`;
+    code += `      });\n`;
+    code += `      \n`;
+    code += `      // Display results\n`;
+    code += `      const comparisonBody = document.getElementById('comparisonTableBody');\n`;
+    code += `      const totalScoreEl = document.getElementById('totalScore_question4');\n`;
+    code += `      if (comparisonBody) {\n`;
+    code += `        comparisonBody.innerHTML = '';\n`;
+    code += `        let score = 0;\n`;
+    code += `        questions5.forEach((question, index) => {\n`;
+    code += `          const tr = document.createElement('tr');\n`;
+    code += `          const questionTd = document.createElement('td');\n`;
+    code += `          questionTd.textContent = (index + 1) + '. ' + question.paragraph.substring(0, 50) + '...';\n`;
+    code += `          tr.appendChild(questionTd);\n`;
+    code += `          const userAnswerTd = document.createElement('td');\n`;
+    code += `          const userAnswer = answers[index] || "(không chọn)";\n`;
+    code += `          userAnswerTd.innerHTML = '<span class="' + (userAnswer === correctAnswers[index] ? 'correct' : 'incorrect') + '">' + userAnswer + '</span>';\n`;
+    code += `          tr.appendChild(userAnswerTd);\n`;
+    code += `          const correctAnswerTd = document.createElement('td');\n`;
+    code += `          correctAnswerTd.innerHTML = '<span class="correct">' + correctAnswers[index] + '</span>';\n`;
+    code += `          tr.appendChild(correctAnswerTd);\n`;
+    code += `          if (userAnswer === correctAnswers[index]) score += 2;\n`;
+    code += `          comparisonBody.appendChild(tr);\n`;
+    code += `        });\n`;
+    code += `        if (totalScoreEl) {\n`;
+    code += `          totalScoreEl.textContent = 'Total Score: ' + score + ' / ' + (questions5.length * 2);\n`;
+    code += `        }\n`;
+    code += `        const resultModalElement = document.getElementById('resultModal');\n`;
+    code += `        if (resultModalElement) {\n`;
+    code += `          // Remove any existing backdrop first\n`;
+    code += `          const existingBackdrop = document.querySelector('.modal-backdrop');\n`;
+    code += `          if (existingBackdrop) {\n`;
+    code += `            existingBackdrop.remove();\n`;
+    code += `            document.body.classList.remove('modal-open');\n`;
+    code += `            document.body.style.overflow = '';\n`;
+    code += `            document.body.style.paddingRight = '';\n`;
+    code += `          }\n`;
+    code += `          const modal = new bootstrap.Modal(resultModalElement);\n`;
+    code += `          modal.show();\n`;
+    code += `          // Clean up backdrop when modal is hidden\n`;
+    code += `          resultModalElement.addEventListener('hidden.bs.modal', function() {\n`;
+    code += `            const backdrop = document.querySelector('.modal-backdrop');\n`;
+    code += `            if (backdrop) {\n`;
+    code += `              backdrop.remove();\n`;
+    code += `            }\n`;
+    code += `            document.body.classList.remove('modal-open');\n`;
+    code += `            document.body.style.overflow = '';\n`;
+    code += `            document.body.style.paddingRight = '';\n`;
+    code += `          }, { once: true });\n`;
+    code += `        }\n`;
+    code += `      }\n`;
+    code += `    });\n`;
+    code += `  }\n`;
+    code += `  \n`;
+    code += `  // Next button\n`;
+    code += `  const nextButton = document.getElementById('nextButton');\n`;
+    code += `  if (nextButton) {\n`;
+    code += `    nextButton.addEventListener('click', function() {\n`;
+    code += `      if (currentQuestion < options.length - 1) {\n`;
+    code += `        currentQuestion++;\n`;
+    code += `        const container = document.getElementById('question5-container');\n`;
+    code += `        if (container) container.innerHTML = '';\n`;
+    code += `        renderQuestion5(options[currentQuestion], paragraph_question5[currentQuestion], meohoc[currentQuestion] || ['', '']);\n`;
+    code += `        const backButton = document.getElementById('backButton');\n`;
+    code += `        if (backButton) backButton.textContent = 'Back';\n`;
+    code += `      } else {\n`;
+    code += `        nextButton.textContent = 'The end';\n`;
+    code += `      }\n`;
+    code += `    });\n`;
+    code += `  }\n`;
+    code += `  \n`;
+    code += `  // Back button\n`;
+    code += `  const backButton = document.getElementById('backButton');\n`;
+    code += `  if (backButton) {\n`;
+    code += `    backButton.addEventListener('click', function() {\n`;
+    code += `      if (currentQuestion > 0) {\n`;
+    code += `        currentQuestion--;\n`;
+    code += `        const container = document.getElementById('question5-container');\n`;
+    code += `        if (container) container.innerHTML = '';\n`;
+    code += `        renderQuestion5(options[currentQuestion], paragraph_question5[currentQuestion], meohoc[currentQuestion] || ['', '']);\n`;
+    code += `        const nextButton = document.getElementById('nextButton');\n`;
+    code += `        if (nextButton) nextButton.textContent = 'Next';\n`;
+    code += `      }\n`;
+    code += `    });\n`;
+    code += `  }\n`;
+    code += `  \n`;
+    code += `  buttonsSetup = true;\n`;
+    code += `  console.log('Part 5 buttons setup completed');\n`;
+    code += `}\n\n`;
+    code += `// Expose setupPart5Buttons to window\n`;
+    code += `window.setupPart5Buttons = setupPart5Buttons;\n\n`;
+    code += `// Initialize on load\n`;
+    code += `if (document.readyState === 'loading') {\n`;
+    code += `  document.addEventListener('DOMContentLoaded', function() {\n`;
+    code += `    if (options && options.length > 0 && paragraph_question5 && paragraph_question5.length > 0 && meohoc && meohoc.length > 0) {\n`;
+    code += `      renderQuestion5(options[0], paragraph_question5[0], meohoc[0] || ['', '']);\n`;
+    code += `      setupPart5Buttons();\n`;
+    code += `    }\n`;
+    code += `  });\n`;
+    code += `} else {\n`;
+    code += `  if (options && options.length > 0 && paragraph_question5 && paragraph_question5.length > 0 && meohoc && meohoc.length > 0) {\n`;
+    code += `    renderQuestion5(options[0], paragraph_question5[0], meohoc[0] || ['', '']);\n`;
+    code += `    setupPart5Buttons();\n`;
+    code += `  }\n`;
+    code += `}\n\n`;
     
     return code;
 }
@@ -1193,6 +2166,111 @@ function loadPart5SetData(data) {
     }
 }
 
+async function fetchLessonScript(filePath) {
+    if (!filePath) {
+        return null;
+    }
+    let headers = {};
+    try {
+        headers = window.buildAuthorizedHeaders();
+    } catch (error) {
+        if (error.message === 'AUTH_TOKEN_MISSING') {
+            throw error;
+        }
+    }
+    
+    const response = await fetch(`/api/lessons/get-script?filePath=${encodeURIComponent(filePath)}`, {
+        headers
+    });
+    
+    if (!response.ok) {
+        console.warn('Không thể tải file script từ GitHub:', await response.text());
+        return null;
+    }
+    
+    return await response.text();
+}
+
+function extractLessonDataFromScript(scriptContent) {
+    if (!scriptContent) return null;
+    const match = scriptContent.match(/MINI_HIPPO_LESSON_DATA_START\s*([\s\S]*?)\s*MINI_HIPPO_LESSON_DATA_END/);
+    if (!match || !match[1]) {
+        return null;
+    }
+    try {
+        return JSON.parse(match[1]);
+    } catch (error) {
+        console.error('Không thể parse dữ liệu bài học:', error);
+        return null;
+    }
+}
+
+function normalizeListeningPart(part) {
+    if (!part) return null;
+    if (part.startsWith('listening_')) {
+        return part.replace('listening_', '');
+    }
+    return part;
+}
+
+function applyLessonDataToEditor(data, fallbackPart) {
+    if (!data || !Array.isArray(data.sets)) {
+        return false;
+    }
+    
+    const lessonType = data.lessonType || 'reading';
+    
+    if (lessonType === 'listening') {
+        const listeningPart = normalizeListeningPart(data.part || fallbackPart);
+        if (!listeningPart) {
+            return false;
+        }
+        
+        const listeningSelector = document.getElementById('typeListening');
+        if (listeningSelector && !listeningSelector.checked) {
+            listeningSelector.checked = true;
+            listeningSelector.dispatchEvent(new Event('change'));
+        }
+        
+        window.currentLessonType = 'listening';
+        window.currentListeningPart = listeningPart;
+        window.listeningQuestionSets[listeningPart] = data.sets;
+        
+        if (typeof renderListeningQuestionSets === 'function') {
+            renderListeningQuestionSets(listeningPart);
+        }
+        return true;
+    }
+    
+    const partValue = data.part || fallbackPart;
+    const numericPart = parseInt(partValue, 10);
+    if (Number.isNaN(numericPart)) {
+        return false;
+    }
+    
+    const readingSelector = document.getElementById('typeReading');
+    if (readingSelector && !readingSelector.checked) {
+        readingSelector.checked = true;
+        readingSelector.dispatchEvent(new Event('change'));
+    }
+    
+    window.currentLessonType = 'reading';
+    questionSets[numericPart] = (data.sets || []).map((set, index) => ({
+        id: set.id || index + 1,
+        title: set.title || `Bộ đề ${index + 1}`,
+        data: set.data || {}
+    }));
+    
+    if (typeof switchPart === 'function') {
+        switchPart(numericPart);
+    } else {
+        window.currentPart = numericPart;
+    }
+    
+    renderQuestionSets(numericPart);
+    return true;
+}
+
 function copyJS() {
     const jsCode = document.getElementById('js-preview').textContent;
     navigator.clipboard.writeText(jsCode).then(() => {
@@ -1291,6 +2369,20 @@ window.previewPart = 1;
 window.previewUserAnswers = {}; // Store user answers for each part and set
 
 function previewLessonInterface() {
+    // Check if listening or reading
+    const currentLessonType = window.currentLessonType || 'reading';
+    
+    if (currentLessonType === 'listening') {
+        // Use listening preview function
+        if (window.previewListeningLessonInterface) {
+            return window.previewListeningLessonInterface();
+        } else {
+            alert('Listening preview function chưa được load. Vui lòng refresh trang.');
+            return;
+        }
+    }
+    
+    // Reading preview logic
     const currentPart = window.currentPart || 1;
     const sets = questionSets[currentPart] || [];
     

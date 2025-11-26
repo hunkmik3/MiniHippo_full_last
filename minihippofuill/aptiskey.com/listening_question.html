@@ -40,7 +40,7 @@
     <!--begin::Fonts-->
     <link
       rel="stylesheet"
-      href="../cdn.jsdelivr.net/npm/%40fontsource/source-sans-3%405.0.12/index.css"
+      href="https://cdn.jsdelivr.net/npm/@fontsource/source-sans-3@5.0.12/index.css"
       integrity="sha256-tXJfXfp6Ewt1ilPzLDtQnJV4hclT9XuaZUKyUvmyr+Q="
       crossorigin="anonymous"
       media="print"
@@ -51,7 +51,7 @@
     <!--begin::Third Party Plugin(OverlayScrollbars)-->
     <link
       rel="stylesheet"
-      href="../cdn.jsdelivr.net/npm/overlayscrollbars%402.11.0/styles/overlayscrollbars.min.css"
+      href="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/styles/overlayscrollbars.min.css"
       crossorigin="anonymous"
     />
     <!--end::Third Party Plugin(OverlayScrollbars)-->
@@ -76,7 +76,7 @@
     <!-- apexcharts -->
     <link
       rel="stylesheet"
-      href="../cdn.jsdelivr.net/npm/apexcharts%403.37.1/dist/apexcharts.css"
+      href="https://cdn.jsdelivr.net/npm/apexcharts@3.37.1/dist/apexcharts.css"
       integrity="sha256-4MX+61mt9NVvvuPjUWdUdyfZfxSB1/Rf9WtqRHgG5S0="
       crossorigin="anonymous"
     />
@@ -84,12 +84,10 @@
     <!-- jsvectormap -->
     <link
       rel="stylesheet"
-      href="../cdn.jsdelivr.net/npm/jsvectormap%401.5.3/dist/css/jsvectormap.min.css"
+      href="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/css/jsvectormap.min.css"
       integrity="sha256-+uGLJmmTKOqBr+2E6KDYs/NRsHxSkONXFHUL0fy2O/4="
       crossorigin="anonymous"
     />
-    <script async src="../pagead2.googlesyndication.com/pagead/js/fddf6.txt?client=ca-pub-4940447633722822"
-     crossorigin="anonymous"></script>
   </head>
   <!--end::Head-->
   <!--begin::Body-->
@@ -249,35 +247,54 @@
 <div class="container-fluid">
     <!-- Content Wrapper -->
     <div id="content-wrapper" class="d-flex flex-column">
-        <div class="container my-4">
-            <h1 class="text-center mb-4">Listening Practice - by question</h1>
-            <div class="row justify-content-center">
-                <!-- Part 1 -->
-                <div class="col-md-3 mb-4">
-                    <button onclick="window.location.href = 'listening_question1_13.html';" class="btn btn-primary btn-lg w-100 my-2 d-flex align-items-center justify-content-center">
-                        <i class="bi bi-book-fill fa-2x me-3"></i> Question 1 - 13
-                    </button>
+        <div class="container my-3">
+            <h1 class="text-center mb-3">Listening Practice - by question</h1>
+            
+            <!-- Section 2: Bài học upload -->
+            <div class="mb-3">
+                <h2 class="mb-2 text-success fs-4">
+                    <i class="bi bi-cloud-upload-fill me-2"></i>Bài học upload
+                </h2>
+                <div class="row justify-content-center g-2">
+                    <!-- Question 1-13 Uploaded Lessons -->
+                    <div class="col-md-3 mb-2">
+                        <div class="text-center mb-2">
+                            <span class="badge bg-primary fs-6 px-2 py-1">Question 1 - 13</span>
+                        </div>
+                        <div id="listening-1_13-lessons-list">
+                            <!-- Dynamic content loaded from API -->
+                    </div>
                 </div>
 
-                <!-- Part 2 & 3 -->
-                <div class="col-md-3 mb-4">
-                    <button onclick="window.location.href = 'listening_question14.html';" class="btn btn-info btn-lg w-100 my-2 d-flex align-items-center justify-content-center">
-                        <i class="bi bi-puzzle-fill fa-2x me-3"></i> Question 14
-                    </button>
+                    <!-- Question 14 Uploaded Lessons -->
+                    <div class="col-md-3 mb-2">
+                        <div class="text-center mb-2">
+                            <span class="badge bg-info fs-6 px-2 py-1">Question 14</span>
+                    </div>
+                        <div id="listening-14-lessons-list">
+                            <!-- Dynamic content loaded from API -->
+                    </div>
                 </div>
 
-                <!-- Part 4 -->
-                <div class="col-md-3 mb-4">
-                    <button onclick="window.location.href = 'listening_question15.html';" class="btn btn-warning btn-lg w-100 my-2 d-flex align-items-center justify-content-center">
-                        <i class="bi bi-clipboard-check fa-2x me-3"></i> Question 15
-                    </button>
+                    <!-- Question 15 Uploaded Lessons -->
+                    <div class="col-md-3 mb-2">
+                        <div class="text-center mb-2">
+                            <span class="badge bg-warning fs-6 px-2 py-1">Question 15</span>
+                    </div>
+                        <div id="listening-15-lessons-list">
+                            <!-- Dynamic content loaded from API -->
+                    </div>
                 </div>
 
-                <!-- Part 5 -->
-                <div class="col-md-3 mb-4">
-                    <button onclick="window.location.href = 'listening_question16_17.html';" class="btn btn-success btn-lg w-100 my-2 d-flex align-items-center justify-content-center">
-                        <i class="bi bi-lightbulb-fill fa-2x me-3"></i> Question 16 & 17
-                    </button>
+                    <!-- Question 16 & 17 Uploaded Lessons -->
+                    <div class="col-md-3 mb-2">
+                        <div class="text-center mb-2">
+                            <span class="badge bg-success fs-6 px-2 py-1">Question 16 & 17</span>
+                    </div>
+                        <div id="listening-16_17-lessons-list">
+                            <!-- Dynamic content loaded from API -->
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -332,17 +349,17 @@
     <!--begin::Script-->
     <!--begin::Third Party Plugin(OverlayScrollbars)-->
     <script
-      src="../cdn.jsdelivr.net/npm/overlayscrollbars%402.11.0/browser/overlayscrollbars.browser.es6.min.js"
+      src="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/browser/overlayscrollbars.browser.es6.min.js"
       crossorigin="anonymous"
     ></script>
     <!--end::Third Party Plugin(OverlayScrollbars)--><!--begin::Required Plugin(popperjs for Bootstrap 5)-->
     <script
-      src="../cdn.jsdelivr.net/npm/%40popperjs/core%402.11.8/dist/umd/popper.min.js"
+      src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"
       crossorigin="anonymous"
     ></script>
     <!--end::Required Plugin(popperjs for Bootstrap 5)--><!--begin::Required Plugin(Bootstrap 5)-->
     <script
-      src="../cdn.jsdelivr.net/npm/bootstrap%405.3.7/dist/js/bootstrap.min.js"
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.min.js"
       crossorigin="anonymous"
     ></script>
     <!--end::Required Plugin(Bootstrap 5)--><!--begin::Required Plugin(AdminLTE)-->
@@ -382,10 +399,13 @@
 
     <!-- sortablejs -->
     <script
-      src="../cdn.jsdelivr.net/npm/sortablejs%401.15.0/Sortable.min.js"
+      src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"
       crossorigin="anonymous"
     ></script>
     <!--end::Script-->
+    
+    <!-- Listening Question List JS -->
+    <script src="js/listening_question_list.js"></script>
   </body>
   <!--end::Body-->
 

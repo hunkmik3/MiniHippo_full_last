@@ -1,88 +1,101 @@
-// Vercel Serverless Function for user login
+import parseBody from '../_utils/parseBody.js';
+import { selectFrom, updateTable } from '../_utils/supabase.js';
+
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+
 export default async function handler(req, res) {
-  // Only allow POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    return res.status(500).json({ error: 'Supabase environment variables are missing' });
+  }
+
+  let body;
   try {
-    const { email, password } = req.body;
+    body = await parseBody(req);
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'Invalid request body' });
+  }
 
-    // Validate required fields
-    if (!email || !password) {
-      return res.status(400).json({ 
-        error: 'Email and password are required' 
-      });
-    }
+  const { email, password } = body;
 
-    // Get Supabase configuration
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Thiếu email hoặc mật khẩu' });
+  }
 
-    if (!supabaseUrl || !supabaseServiceKey) {
-      return res.status(500).json({ 
-        error: 'Supabase configuration missing' 
-      });
-    }
-
-    // Import Supabase client (you'll need to install @supabase/supabase-js)
-    // For now, we'll use fetch to call Supabase REST API
-    const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'apikey': supabaseServiceKey
+        apikey: SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        email: email,
-        password: password
-      })
+      body: JSON.stringify({ email, password })
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const errorData = await response.json();
-      return res.status(401).json({ 
-        error: 'Invalid email or password',
-        details: errorData.message || 'Authentication failed'
+      return res.status(response.status).json({
+        error: data.error_description || data.error || 'Đăng nhập thất bại'
       });
     }
 
-    const authData = await response.json();
+    const supabaseUser = data.user;
+    const userId = supabaseUser?.id;
 
-    // Get user info
-    const userResponse = await fetch(`${supabaseUrl}/rest/v1/users?email=eq.${email}&select=*`, {
-      headers: {
-        'apikey': supabaseServiceKey,
-        'Authorization': `Bearer ${supabaseServiceKey}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    let user = null;
-    if (userResponse.ok) {
-      const users = await userResponse.json();
-      user = users[0] || null;
+    if (!userId) {
+      return res.status(500).json({ error: 'Không lấy được thông tin tài khoản' });
     }
 
-    // Return success with token and user info
-    return res.status(200).json({
-      success: true,
-      token: authData.access_token,
-      refreshToken: authData.refresh_token,
-      user: {
-        id: user?.id || authData.user?.id,
-        email: user?.email || authData.user?.email,
-        role: user?.role || 'user',
-        status: user?.status || 'active'
-      }
+    const profile = await selectFrom('users', {
+      filters: [{ column: 'id', value: userId }],
+      single: true
     });
 
+    if (!profile) {
+      return res.status(403).json({ error: 'Tài khoản chưa được cấp quyền truy cập' });
+    }
+
+    if (profile.status && profile.status !== 'active') {
+      return res.status(403).json({ error: 'Tài khoản đang bị khóa' });
+    }
+
+    try {
+      await updateTable(
+        'users',
+        [{ column: 'id', value: userId }],
+        { last_login: new Date().toISOString() }
+      );
+    } catch (updateError) {
+      console.warn('Failed to update last_login:', updateError);
+    }
+
+    const userPayload = {
+      id: profile.id || userId,
+      email: profile.email || supabaseUser.email,
+      username: profile.username || supabaseUser.user_metadata?.username || '',
+      role: profile.role || 'user',
+      status: profile.status || 'active'
+    };
+
+    return res.status(200).json({
+      success: true,
+      token: data.access_token,
+      refreshToken: data.refresh_token,
+      expiresIn: data.expires_in,
+      user: userPayload
+    });
   } catch (error) {
-    console.error('Login error:', error);
-    return res.status(500).json({ 
-      error: 'Internal server error',
-      details: error.message 
+    console.error('Auth login error:', error);
+    return res.status(500).json({
+      error: 'Có lỗi xảy ra khi đăng nhập',
+      details: error.message
     });
   }
 }
+
 

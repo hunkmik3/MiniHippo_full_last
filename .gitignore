@@ -33,3 +33,4 @@ hts-log.txt
 *.tmp
 *.temp
 
+.vercel

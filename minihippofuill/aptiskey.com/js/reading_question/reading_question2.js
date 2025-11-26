@@ -380,8 +380,11 @@ function renderQuestion2(questionlist) {
     correctAnswersQuestion2.push(item);
 });
 
-    // Xáo trộn mảng câu hỏi
-    let shuffledQuestionlist = shuffleQuestions([...questionlist]);
+    // Keep first sentence fixed at index 0, shuffle the rest
+    const firstSentence = questionlist[0];
+    const restSentences = questionlist.slice(1);
+    const shuffledRest = shuffleQuestions([...restSentences]);
+    const shuffledQuestionlist = [firstSentence, ...shuffledRest];
 
     // Xóa các card cũ
     const cardsContainer = document.getElementById('cardsContainer');
@@ -390,15 +393,40 @@ function renderQuestion2(questionlist) {
     // Tạo và thêm các thẻ card mới
     shuffledQuestionlist.forEach((text, index) => {
         const cardDiv = document.createElement('div');
-        cardDiv.classList.add('card', 'mb-2', 'draggable-item');
-        cardDiv.setAttribute('draggable', 'true');
-        cardDiv.id = `item${index + 1}`;
-
-        const cardBody = document.createElement('div');
-        cardBody.classList.add('card-body');
-        cardBody.innerText = text;
-
-        cardDiv.appendChild(cardBody);
+        
+        if (index === 0) {
+            // First sentence: fixed, not draggable, with checkmark and highlight
+            cardDiv.classList.add('card', 'mb-2');
+            cardDiv.style.backgroundColor = '#e3f2fd';
+            cardDiv.style.border = '2px solid #1976d2';
+            cardDiv.style.cursor = 'default';
+            const cardBody = document.createElement('div');
+            cardBody.classList.add('card-body', 'd-flex', 'align-items-center');
+            const checkIcon = document.createElement('i');
+            checkIcon.classList.add('bi', 'bi-check-circle-fill', 'text-success', 'me-2');
+            checkIcon.style.fontSize = '1.2rem';
+            cardBody.appendChild(checkIcon);
+            const textSpan = document.createElement('span');
+            textSpan.innerText = text;
+            cardBody.appendChild(textSpan);
+            cardDiv.appendChild(cardBody);
+        } else {
+            // Other sentences: draggable
+            cardDiv.classList.add('card', 'mb-2', 'draggable-item');
+            cardDiv.setAttribute('draggable', 'true');
+            cardDiv.id = `item${index + 1}`;
+            const cardBody = document.createElement('div');
+            cardBody.classList.add('card-body', 'd-flex', 'align-items-center');
+            const dragIcon = document.createElement('i');
+            dragIcon.classList.add('bi', 'bi-grip-vertical', 'me-2', 'text-muted');
+            dragIcon.style.fontSize = '1.2rem';
+            cardBody.appendChild(dragIcon);
+            const textSpan = document.createElement('span');
+            textSpan.innerText = text;
+            cardBody.appendChild(textSpan);
+            cardDiv.appendChild(cardBody);
+        }
+        
         cardsContainer.appendChild(cardDiv);
     });
 

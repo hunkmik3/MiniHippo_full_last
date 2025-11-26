@@ -457,22 +457,23 @@ document.getElementById('showAnswerButton').addEventListener('click', function()
 
 
     // Tạo các câu hỏi động
-    questions5.forEach(question => {
+    questions5.forEach((question, index) => {
         // Tạo div cho mỗi câu hỏi
         const questionDiv = document.createElement('div');
-        questionDiv.classList.add('mb-3');
+        questionDiv.classList.add('mb-3', 'border', 'rounded-3', 'p-3', 'bg-white', 'shadow-sm');
 
-        // Tạo một div cha để hiển thị label và select trên cùng một hàng
+        // Tạo một div cha để hiển thị label số và select
         const questionRow = document.createElement('div');
         questionRow.style.display = 'flex';
         questionRow.style.alignItems = 'center'; // Căn chỉnh các phần tử giữa
+        questionRow.style.gap = '12px';
+        questionRow.classList.add('mb-2');
 
-        // Tạo label cho câu hỏi
+        // Tạo label số
         const label = document.createElement('label');
-        label.setAttribute('for', question.id);
-        label.classList.add('form-label');
-        label.textContent = question.label;
-        label.style.marginRight = '10px'; // Thêm khoảng cách giữa label và select
+        label.classList.add('mb-0', 'fw-semibold');
+        label.textContent = `${index + 1}.`;
+        label.style.minWidth = '30px';
 
         // Tạo phần tử select cho câu hỏi
         const select = document.createElement('select');
@@ -481,9 +482,18 @@ document.getElementById('showAnswerButton').addEventListener('click', function()
 
         // Thêm các option vào select
         shuffledOptions.forEach(optionValue => {
+            // Skip empty, null, undefined values (except for '-- Chọn --')
+            if (optionValue === null || optionValue === undefined || (typeof optionValue === 'string' && optionValue.trim() === '' && optionValue !== '-- Chọn --')) {
+                return;
+            }
             const option = document.createElement('option');
-            option.value = optionValue;
-            option.textContent = optionValue.charAt(0).toUpperCase() + optionValue.slice(1); // Viết hoa chữ cái đầu tiên
+            option.value = optionValue === '-- Chọn --' ? '' : optionValue;
+            if (optionValue === '' || optionValue === '-- Chọn --') {
+                option.textContent = '-- Chọn --';
+                option.selected = true; // Select empty option by default
+            } else {
+                option.textContent = optionValue.charAt(0).toUpperCase() + optionValue.slice(1); // Viết hoa chữ cái đầu tiên
+            }
             select.appendChild(option);
         });
 
@@ -493,7 +503,7 @@ document.getElementById('showAnswerButton').addEventListener('click', function()
 
         // Tạo đoạn văn cho câu hỏi (ẩn ban đầu)
         const paragraph = document.createElement('p');
-        paragraph.classList.add('mt-2');
+        paragraph.classList.add('mt-2', 'mb-0');
         paragraph.id = `paragraph${question.id.slice(10)}`;
         paragraph.style.display = 'none'; // Đảm bảo đoạn văn ẩn khi tải trang
         paragraph.textContent = question.paragraph;
@@ -585,12 +595,26 @@ function displayComparisonResultsQuestion5(userAnswers, correctAnswers) {
 // ////////////// HIỂN THỊ ĐOẠN VĂN VÀ XEM MẸO ///////////////
 // ===============================================================================================================
 
-// Hiển thị/Ẩn đoạn văn khi nhấn nút "Hiển thị đoạn văn"
+// Hiển thị/Ẩn đoạn văn khi nhấn nút "Xem nội dung"
 document.getElementById('showParagraphButton').addEventListener('click', function() {
-    const paragraphs = document.querySelectorAll('.mt-2');
+    const paragraphs = document.querySelectorAll('#question5-container p.mt-2');
+    const button = document.getElementById('showParagraphButton');
+    
+    if (paragraphs.length === 0) return;
+    
+    // Check current state - if first paragraph is visible, hide all; otherwise show all
+    const firstParagraph = paragraphs[0];
+    const isCurrentlyVisible = firstParagraph && (firstParagraph.style.display !== 'none' && window.getComputedStyle(firstParagraph).display !== 'none');
+    
+    // Toggle visibility
     paragraphs.forEach(paragraph => {
-        paragraph.style.display = (paragraph.style.display === 'none' || paragraph.style.display === '') ? 'block' : 'none';
+        paragraph.style.display = isCurrentlyVisible ? 'none' : 'block';
     });
+    
+    // Update button text
+    if (button) {
+        button.textContent = isCurrentlyVisible ? 'Xem nội dung' : 'Ẩn nội dung';
+    }
 });
 
 // // Hiển thị/Ẩn đáp án khi nhấn nút "Xem mẹo"

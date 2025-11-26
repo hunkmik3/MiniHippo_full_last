@@ -6,18 +6,1543 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Thêm thẻ này -->
-    <title>Aptis listening keys</title>
+    <title>Mini Hippo - Listening Practice</title>
     <link rel="icon" href="images/favicon.ico" type="image/x-icon">
-    <link href="../cdn.jsdelivr.net/npm/bootstrap%405.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="../cdn.jsdelivr.net/npm/bootstrap-icons%401.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
     <link href="css/listeningkey.css" rel="stylesheet">
     <link href="css/lesson-ui.css" rel="stylesheet">
-    <script src="js/listening_question/listening_question1_13.js"></script>
-    <script async src="../pagead2.googlesyndication.com/pagead/js/fddf6.txt?client=ca-pub-4940447633722822"
-     crossorigin="anonymous"></script>
+    <style>
+        /* Hide content initially when loading lesson script */
+        body.lesson-loading #question1_13 {
+            opacity: 0;
+            pointer-events: none;
+        }
+        body.lesson-loading #question1_13 * {
+            visibility: hidden;
+        }
+        /* Hide by default if lesson parameter exists */
+        #question1_13.lesson-loading {
+            opacity: 0;
+            pointer-events: none;
+        }
+        #question1_13.lesson-loading * {
+            visibility: hidden;
+        }
+        
+        /* Loading indicator styles */
+        #lesson-loading-indicator {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
+            background: white;
+            padding: 30px 50px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            text-align: center;
+            display: none;
+        }
+        
+        body.lesson-loading #lesson-loading-indicator {
+            display: block;
+        }
+        
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            font-size: 18px;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        /* Ensure footer is always visible, even when modal is open */
+        .footer {
+            display: flex !important;
+            flex-direction: row !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            visibility: visible !important;
+            z-index: 1055 !important; /* Above modal backdrop but below modal */
+            gap: 1rem !important; /* Add spacing between buttons */
+        }
+        
+        .footer button {
+            display: inline-block !important;
+            visibility: visible !important;
+            flex: 0 0 auto !important; /* Don't grow or shrink */
+            margin: 0 !important;
+        }
+    </style>
+    <script>
+        // Check for lesson parameter and add inline style to hide content immediately
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('lesson')) {
+                // Add style to hide #question1_13 immediately with an ID so we can remove it later
+                const style = document.createElement('style');
+                style.id = 'lesson-loading-style';
+                style.textContent = '#question1_13 { opacity: 0 !important; pointer-events: none !important; } #question1_13 * { visibility: hidden !important; }';
+                document.head.appendChild(style);
+                
+                // Store reference to remove later
+                window._lessonLoadingStyle = style;
+                
+                // Show loading indicator when body is ready
+                if (document.body) {
+                    document.body.classList.add('lesson-loading');
+                } else {
+                    document.addEventListener('DOMContentLoaded', function() {
+                        document.body.classList.add('lesson-loading');
+                    });
+                }
+            }
+        })();
+    </script>
+    <script>
+        // Dynamic JS loading based on lesson ID parameter
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const lessonId = urlParams.get('lesson');
+            const part = 'listening_1_13';
+            let lessonScriptLoaded = false;
+            
+            // Function to hide/show content
+            function setLoadingState(isLoading) {
+                if (document.body) {
+                    if (isLoading) {
+                        document.body.classList.add('lesson-loading');
+                    } else {
+                        document.body.classList.remove('lesson-loading');
+                    }
+                }
+                // Also set on question container directly
+                const questionContainer = document.getElementById('question1_13');
+                if (questionContainer) {
+                    if (isLoading) {
+                        questionContainer.classList.add('lesson-loading');
+                    } else {
+                        questionContainer.classList.remove('lesson-loading');
+                    }
+                }
+                
+                // Remove inline style if it exists
+                if (!isLoading) {
+                    const loadingStyle = document.getElementById('lesson-loading-style');
+                    if (loadingStyle) {
+                        loadingStyle.remove();
+                    }
+                    // Also check window reference
+                    if (window._lessonLoadingStyle && window._lessonLoadingStyle.parentNode) {
+                        window._lessonLoadingStyle.remove();
+                    }
+                }
+            }
+            
+            // Hide content if loading lesson (wait for DOM)
+            if (lessonId) {
+                if (document.body) {
+                    setLoadingState(true);
+                } else {
+                    // Wait for DOM
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', function() {
+                            setLoadingState(true);
+                        });
+                    } else {
+                        // DOM already ready
+                        setLoadingState(true);
+                    }
+                }
+            }
+            
+            async function loadLessonScript() {
+                // If no lesson ID, load default script immediately and return
+                if (!lessonId) {
+                    console.log('No lesson parameter - loading default/original lesson');
+                    loadDefaultScript();
+                    return; // Exit early, don't do anything else
+                }
+                
+                // Only proceed with lesson loading if lessonId exists
+                try {
+                    console.log('Loading lesson with ID:', lessonId);
+                    // Fetch lesson data from API
+                    const response = await fetch(`/api/lessons/get?id=${lessonId}`);
+                    const result = await response.json();
+                    
+                    console.log('Lesson data response:', result);
+                    
+                    if (response.ok && result.lesson) {
+                        const lesson = result.lesson;
+                        console.log('Lesson found:', lesson);
+                        
+                        // Get GitHub raw URL from API
+                        const scriptResponse = await fetch(`/api/lessons/get-script-url?filePath=${encodeURIComponent(lesson.file_path)}`);
+                        const scriptResult = await scriptResponse.json();
+                        
+                        console.log('Script URL response:', scriptResult);
+                        
+                        // Store script URL for audio path conversion
+                        const lessonScriptUrl = scriptResult.scriptUrl || '';
+                        
+                        // Fetch script content and execute directly (handles DOMContentLoaded issue)
+                        const scriptPath = `/api/lessons/get-script?filePath=${encodeURIComponent(lesson.file_path)}&v=${new Date().getTime()}`;
+                        console.log('Fetching script content from API proxy:', scriptPath);
+                        
+                        try {
+                            const scriptResponse = await fetch(scriptPath);
+                            if (!scriptResponse.ok) {
+                                throw new Error(`Failed to fetch script: ${scriptResponse.status}`);
+                            }
+                            
+                            const scriptContent = await scriptResponse.text();
+                            console.log('Script content fetched, executing...');
+                            
+                            // Replace DOMContentLoaded with immediate execution if DOM is ready
+                            let modifiedContent = scriptContent;
+                            if (document.readyState !== 'loading') {
+                                // DOM already ready, replace DOMContentLoaded with IIFE
+                                console.log('DOM already ready, replacing DOMContentLoaded with immediate execution');
+                                // Replace the DOMContentLoaded listener with an IIFE
+                                modifiedContent = scriptContent.replace(
+                                    /document\.addEventListener\(['"]DOMContentLoaded['"],\s*function\(\)\s*\{/g,
+                                    '(function() {'
+                                );
+                                // Replace the closing }); with })(); to execute immediately
+                                // Find the last }); that closes the DOMContentLoaded function
+                                const lastMatch = modifiedContent.lastIndexOf('});');
+                                if (lastMatch !== -1 && modifiedContent !== scriptContent) {
+                                    modifiedContent = modifiedContent.substring(0, lastMatch) + '})();' + modifiedContent.substring(lastMatch + 3);
+                                }
+                                
+                                // Replace window.onload with immediate execution (multiline)
+                                modifiedContent = modifiedContent.replace(
+                                    /window\.onload\s*=\s*function\(\)\s*\{[\s\S]*?renderQuestion1_13\(listeningQuestions1\[0\]\);[\s\S]*?\};?/g,
+                                    '(function() { renderQuestion1_13(listeningQuestions1[0]); })();'
+                                );
+                            } else {
+                                console.log('DOM still loading, keeping DOMContentLoaded listener');
+                            }
+                            
+                            // Execute the script
+                            const scriptElement = document.createElement('script');
+                            scriptElement.textContent = modifiedContent;
+                            
+                            // Add error handler
+                            scriptElement.onerror = function(error) {
+                                console.error('Error executing script:', error);
+                            };
+                            
+                            // Log script content for debugging (first 500 chars)
+                            console.log('Script content preview (first 500 chars):', modifiedContent.substring(0, 500));
+                            
+                            document.head.appendChild(scriptElement);
+                            
+                            // Immediately check if window.listeningQuestions1 was set
+                            setTimeout(function() {
+                                console.log('Immediate check - window.listeningQuestions1:', typeof window.listeningQuestions1, window.listeningQuestions1 ? window.listeningQuestions1.length : 'N/A');
+                            }, 0);
+                            
+                            // After script execution, manually call renderQuestion1_13 if it exists
+                            // Use multiple timeouts to ensure script has fully executed
+                            setTimeout(function() {
+                                // Check multiple times for data availability
+                                function checkAndCopyData() {
+                                    // Check for window.listeningQuestions1 first (new script format)
+                                    if (typeof window.listeningQuestions1 !== 'undefined' && window.listeningQuestions1.length > 0) {
+                                        console.log('Found window.listeningQuestions1, length:', window.listeningQuestions1.length);
+                                        return true;
+                                    }
+                                    
+                                    // Check for global listeningQuestions1 (old script format)
+                                    if (typeof listeningQuestions1 !== 'undefined' && listeningQuestions1.length > 0) {
+                                        window.listeningQuestions1 = listeningQuestions1;
+                                        console.log('Copied listeningQuestions1 to window scope, length:', window.listeningQuestions1.length);
+                                        return true;
+                                    }
+                                    
+                                    return false;
+                                }
+                                
+                                // Try multiple times with increasing delays
+                                let attempts = 0;
+                                const maxAttempts = 10;
+                                
+                                function tryCopyData() {
+                                    attempts++;
+                                    console.log(`Attempt ${attempts} to find listeningQuestions1...`);
+                                    
+                                    if (checkAndCopyData()) {
+                                        // Convert local audio paths to GitHub raw URLs if needed
+                                        if (window.listeningQuestions1 && Array.isArray(window.listeningQuestions1)) {
+                                            // Extract GitHub owner, repo, branch from script URL
+                                            const githubMatch = lessonScriptUrl.match(/https:\/\/raw\.githubusercontent\.com\/([^\/]+)\/([^\/]+)\/([^\/]+)\//);
+                                            if (githubMatch) {
+                                                const [, owner, repo, branch] = githubMatch;
+                                                window.listeningQuestions1.forEach(q => {
+                                                    if (q.audioUrl && q.audioUrl.startsWith('audio/') && !q.audioUrl.startsWith('http')) {
+                                                        // Convert local path to GitHub raw URL
+                                                        q.audioUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${q.audioUrl}`;
+                                                        console.log('Converted audio URL to GitHub raw URL:', q.audioUrl);
+                                                    }
+                                                });
+                                            }
+                                        }
+                                        
+                                        // Data found, proceed with rendering
+                                        if (typeof userAnswers !== 'undefined') {
+                                            window.userAnswers = userAnswers;
+                                            console.log('Copied userAnswers to window scope, length:', window.userAnswers.length);
+                                        }
+                                        
+                                        if (typeof window.renderQuestion1_13 === 'function' && window.listeningQuestions1.length > 0) {
+                                            console.log('Manually calling renderQuestion1_13 after script load');
+                                            window.renderQuestion1_13(window.listeningQuestions1[0]);
+                                        } else if (typeof renderQuestion1_13 === 'function' && typeof listeningQuestions1 !== 'undefined' && listeningQuestions1.length > 0) {
+                                            console.log('Manually calling renderQuestion1_13 after script load (fallback)');
+                                            renderQuestion1_13(listeningQuestions1[0]);
+                                        }
+                                    } else if (attempts < maxAttempts) {
+                                        // Try again after a short delay
+                                        setTimeout(tryCopyData, 100);
+                                    } else {
+                                        console.error('Failed to find listeningQuestions1 after', maxAttempts, 'attempts');
+                                        console.log('Available globals:', Object.keys(window).filter(k => k.includes('listening') || k.includes('question')));
+                                    }
+                                }
+                                
+                                tryCopyData();
+                                
+                                // Initialize countdown timer if it exists (only once, prevent multiple timers)
+                                // Clear any existing timer first to prevent duplicates
+                                if (window.countdownTimerId) {
+                                    clearTimeout(window.countdownTimerId);
+                                    window.countdownTimerId = null;
+                                }
+                                
+                                if (!window.countdownInitialized) {
+                                    window.countdownInitialized = true;
+                                    if (typeof window.updateCountdown === 'function') {
+                                        console.log('Initializing countdown timer (existing function)');
+                                        // Clear any existing timer in the function
+                                        if (window.countdownTimerId) {
+                                            clearTimeout(window.countdownTimerId);
+                                            window.countdownTimerId = null;
+                                        }
+                                        // Reset timer to 40:00
+                                        if (typeof window.timeLeft !== 'undefined') {
+                                            window.timeLeft = 40 * 60;
+                                        }
+                                        // Override updateCountdown to use timerId
+                                        const originalUpdateCountdown = window.updateCountdown;
+                                        const countdownElement = document.getElementById('countdownTimer');
+                                        window.updateCountdown = function() {
+                                            if (!countdownElement) return;
+                                            const minutes = Math.floor(window.timeLeft / 60);
+                                            const seconds = window.timeLeft % 60;
+                                            countdownElement.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+                                            if (window.timeLeft > 0) {
+                                                window.timeLeft--;
+                                                if (window.countdownTimerId) {
+                                                    clearTimeout(window.countdownTimerId);
+                                                }
+                                                window.countdownTimerId = setTimeout(window.updateCountdown, 1000);
+                                            }
+                                        };
+                                        window.updateCountdown();
+                                    } else {
+                                        // If updateCountdown doesn't exist, create it
+                                        console.log('Creating countdown timer manually');
+                                        window.timeLeft = 40 * 60;
+                                        const countdownElement = document.getElementById('countdownTimer');
+                                        if (countdownElement) {
+                                            window.updateCountdown = function() {
+                                                if (!countdownElement) return;
+                                                const minutes = Math.floor(window.timeLeft / 60);
+                                                const seconds = window.timeLeft % 60;
+                                                countdownElement.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+                                                if (window.timeLeft > 0) {
+                                                    window.timeLeft--;
+                                                    if (window.countdownTimerId) {
+                                                        clearTimeout(window.countdownTimerId);
+                                                    }
+                                                    window.countdownTimerId = setTimeout(window.updateCountdown, 1000);
+                                                }
+                                            };
+                                            window.updateCountdown();
+                                        }
+                                    }
+                                } else {
+                                    console.log('Countdown timer already initialized, skipping');
+                                }
+                                
+                                // Initialize variables if they don't exist (check both window and global scope)
+                                if (typeof window.listeningQuestions1 === 'undefined' || window.listeningQuestions1.length === 0) {
+                                    window.listeningQuestions1 = typeof listeningQuestions1 !== 'undefined' && listeningQuestions1.length > 0 ? listeningQuestions1 : (window.listeningQuestions1 || []);
+                                    console.log('Initialized listeningQuestions1, length:', window.listeningQuestions1.length);
+                                }
+                                if (typeof window.userAnswers === 'undefined') {
+                                    window.userAnswers = typeof userAnswers !== 'undefined' ? userAnswers : (window.userAnswers || []);
+                                }
+                                if (typeof window.currentIndex === 'undefined') {
+                                    window.currentIndex = typeof currentIndex !== 'undefined' ? currentIndex : (window.currentIndex || 0);
+                                }
+                                if (typeof window.question1_13Score === 'undefined') {
+                                    window.question1_13Score = typeof question1_13Score !== 'undefined' ? question1_13Score : (window.question1_13Score || 0);
+                                }
+                                
+                                // Wait a bit for script to fully execute, then check again
+                                setTimeout(function() {
+                                    if ((typeof listeningQuestions1 !== 'undefined' && listeningQuestions1.length > 0) && 
+                                        (typeof window.listeningQuestions1 === 'undefined' || window.listeningQuestions1.length === 0)) {
+                                        window.listeningQuestions1 = listeningQuestions1;
+                                        console.log('Updated listeningQuestions1 from script, length:', window.listeningQuestions1.length);
+                                    }
+                                    if (typeof userAnswers !== 'undefined' && (!window.userAnswers || window.userAnswers.length === 0)) {
+                                        window.userAnswers = userAnswers;
+                                        console.log('Updated userAnswers from script, length:', window.userAnswers.length);
+                                    }
+                                }, 200);
+                                
+                                // Function to override old functions with new format (call after script loads)
+                                // Make it global so it can be called from anywhere
+                                window.overrideFunctionsWithNewFormat = function() {
+                                    console.log('Overriding functions with new format (Reading style)');
+                                    
+                                    // Force override showResults_question1_13 to use new format
+                                    window.showResults_question1_13 = function() {
+                                        const comparisonTableBody = document.getElementById('comparisonTableBody');
+                                        if (!comparisonTableBody) {
+                                            console.error('comparisonTableBody not found');
+                                            return;
+                                        }
+                                        comparisonTableBody.innerHTML = '';
+                                        let score = 0;
+                                        let questions = window.listeningQuestions1 || [];
+                                        if (questions.length === 0 && typeof listeningQuestions1 !== 'undefined') {
+                                            questions = listeningQuestions1;
+                                            window.listeningQuestions1 = listeningQuestions1;
+                                        }
+                                        let userAnswersArray = window.userAnswers || [];
+                                        if (userAnswersArray.length === 0 && typeof userAnswers !== 'undefined') {
+                                            userAnswersArray = userAnswers;
+                                            window.userAnswers = userAnswers;
+                                        }
+                                        if (questions.length === 0) {
+                                            comparisonTableBody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No questions data available.</td></tr>';
+                                            return;
+                                        }
+                                        questions.forEach((question, index) => {
+                                            const userAnswer = userAnswersArray[index];
+                                            const isCorrect = userAnswer === question.correctAnswer;
+                                            const textColor = isCorrect ? 'text-success' : 'text-danger';
+                                            if (isCorrect) score += 2;
+                                            comparisonTableBody.innerHTML += `
+                                                <tr>
+                                                    <td class="${textColor} fw-bold">${userAnswer || 'Not answered'}</td>
+                                                    <td class="text-success fw-bold">${question.correctAnswer}</td>
+                                                </tr>
+                                            `;
+                                        });
+                                        window.question1_13Score = score;
+                                        console.log('Results table populated, score:', score);
+                                    };
+                                    
+                                    // Force override calculateTotalScore to use new format
+                                    window.calculateTotalScore = function() {
+                                        const totalScore = window.question1_13Score || 0;
+                                        const totalScoreEl = document.getElementById('totalScore');
+                                        if (totalScoreEl) {
+                                            totalScoreEl.innerText = 'Your Score: ' + totalScore;
+                                            console.log('Set totalScore to:', 'Your Score: ' + totalScore);
+                                        }
+                                        if (typeof window.classifyScore === 'function') {
+                                            window.classifyScore(totalScore);
+                                        }
+                                    };
+                                    
+                                    // Force override classifyScore to use new format
+                                    window.classifyScore = function(score) {
+                                        let classification = '';
+                                        const questions = window.listeningQuestions1 || [];
+                                        const totalQuestions = questions.length || 13;
+                                        const maxScore = totalQuestions * 2;
+                                        const percentage = maxScore > 0 ? (score / maxScore) * 100 : 0;
+                                        if (percentage >= 80) {
+                                            classification = 'Excellent';
+                                        } else if (percentage >= 50) {
+                                            classification = 'Good';
+                                        } else {
+                                            classification = 'Cố gắng thêm nhé!';
+                                        }
+                                        const scoreEl = document.getElementById('scoreClassification');
+                                        if (scoreEl) {
+                                            scoreEl.innerText = 'Classification: ' + classification;
+                                            console.log('Set classification to:', 'Classification: ' + classification);
+                                        }
+                                    };
+                                }
+                                
+                                // Override functions immediately
+                                window.overrideFunctionsWithNewFormat();
+                                
+                                // Override again after script fully loads (with delay to ensure script has executed)
+                                setTimeout(function() {
+                                    window.overrideFunctionsWithNewFormat();
+                                }, 500);
+                                
+                                // Also override when script finishes loading (if script has onload)
+                                setTimeout(function() {
+                                    window.overrideFunctionsWithNewFormat();
+                                }, 1000);
+                                
+                                // Create fallback functions if they don't exist
+                                if (typeof window.showResults_question1_13 !== 'function') {
+                                    console.log('Creating fallback showResults_question1_13 function');
+                                    window.showResults_question1_13 = function() {
+                                        const comparisonTableBody = document.getElementById('comparisonTableBody');
+                                        
+                                        if (!comparisonTableBody) {
+                                            console.error('comparisonTableBody not found');
+                                            return;
+                                        }
+                                        
+                                        // Clear modal table
+                                        comparisonTableBody.innerHTML = '';
+                                        
+                                        let score = 0;
+                                        // Try to get questions from multiple sources
+                                        let questions = [];
+                                        
+                                        // First, check window.listeningQuestions1 (new script format)
+                                        if (typeof window.listeningQuestions1 !== 'undefined' && window.listeningQuestions1.length > 0) {
+                                            questions = window.listeningQuestions1;
+                                            console.log('Using window.listeningQuestions1, length:', questions.length);
+                                        }
+                                        // If empty, try global listeningQuestions1 (old script format)
+                                        else if (typeof listeningQuestions1 !== 'undefined' && listeningQuestions1.length > 0) {
+                                            questions = listeningQuestions1;
+                                            window.listeningQuestions1 = listeningQuestions1;
+                                            console.log('Using listeningQuestions1 from global scope, length:', questions.length);
+                                        }
+                                        
+                                        let userAnswersArray = window.userAnswers || [];
+                                        if (userAnswersArray.length === 0 && typeof userAnswers !== 'undefined') {
+                                            userAnswersArray = userAnswers;
+                                            window.userAnswers = userAnswers;
+                                            console.log('Using userAnswers from global scope, length:', userAnswersArray.length);
+                                        }
+                                        
+                                        console.log('Processing questions:', questions.length);
+                                        console.log('User answers:', userAnswersArray);
+                                        console.log('window.listeningQuestions1:', window.listeningQuestions1);
+                                        console.log('typeof listeningQuestions1:', typeof listeningQuestions1);
+                                        
+                                        if (questions.length === 0) {
+                                            console.error('No questions found! Cannot display results.');
+                                            console.log('Available window properties:', Object.keys(window).filter(k => k.toLowerCase().includes('listen') || k.toLowerCase().includes('question')));
+                                            // Show message in modal table only
+                                            comparisonTableBody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No questions data available. Please refresh the page.</td></tr>';
+                                            return;
+                                        }
+                                        
+                                        questions.forEach((question, index) => {
+                                            const userAnswer = userAnswersArray[index];
+                                            const isCorrect = userAnswer === question.correctAnswer;
+                                            const textColor = isCorrect ? 'text-success' : 'text-danger';
+                                            
+                                            if (isCorrect) {
+                                                score += 2;
+                                            }
+                                            
+                                            // Populate table inside modal only (not on page) - format like Reading
+                                            comparisonTableBody.innerHTML += `
+                                                <tr>
+                                                    <td class="${textColor} fw-bold">${userAnswer || 'Not answered'}</td>
+                                                    <td class="text-success fw-bold">${question.correctAnswer}</td>
+                                                </tr>
+                                            `;
+                                        });
+                                        
+                                        window.question1_13Score = score;
+                                        // Don't show result on page, only in modal
+                                        // totalScoreDisplay.innerText = `Score: ${score} / ${questions.length * 2}`;
+                                        // const resultContainer = document.getElementById('comparisonResult_question1');
+                                        // if (resultContainer) resultContainer.style.display = "block";
+                                        
+                                        console.log('Results displayed. Score:', score, '/', questions.length * 2);
+                                    };
+                                }
+                                
+                                if (typeof window.calculateTotalScore !== 'function') {
+                                    console.log('Creating fallback calculateTotalScore function');
+                                    window.calculateTotalScore = function() {
+                                        const totalScore = window.question1_13Score || 0;
+                                        const totalScoreEl = document.getElementById('totalScore');
+                                        if (totalScoreEl) {
+                                            totalScoreEl.innerText = 'Your Score: ' + totalScore;
+                                        }
+                                        
+                                        if (typeof window.classifyScore === 'function') {
+                                            window.classifyScore(totalScore);
+                                        } else {
+                                            // Create classifyScore if it doesn't exist - format like Reading
+                                            window.classifyScore = function(score) {
+                                                let classification = '';
+                                                const questions = window.listeningQuestions1 || [];
+                                                const totalQuestions = questions.length || 13;
+                                                const maxScore = totalQuestions * 2;
+                                                const percentage = (score / maxScore) * 100;
+                                                if (percentage >= 80) {
+                                                    classification = 'Excellent';
+                                                } else if (percentage >= 50) {
+                                                    classification = 'Good';
+                                                } else {
+                                                    classification = 'Cố gắng thêm nhé!';
+                                                }
+                                                const scoreEl = document.getElementById('scoreClassification');
+                                                if (scoreEl) scoreEl.innerText = 'Classification: ' + classification;
+                                            };
+                                            window.classifyScore(totalScore);
+                                        }
+                                    };
+                                }
+                                
+                                // Override old functions to ensure new format is used
+                                // Force override showResults_question1_13 to use new format
+                                if (typeof window.showResults_question1_13 === 'function') {
+                                    console.log('Overriding existing showResults_question1_13 with new format');
+                                }
+                                window.showResults_question1_13 = function() {
+                                    const comparisonTableBody = document.getElementById('comparisonTableBody');
+                                    if (!comparisonTableBody) {
+                                        console.error('comparisonTableBody not found');
+                                        return;
+                                    }
+                                    comparisonTableBody.innerHTML = '';
+                                    let score = 0;
+                                    let questions = window.listeningQuestions1 || [];
+                                    if (questions.length === 0 && typeof listeningQuestions1 !== 'undefined') {
+                                        questions = listeningQuestions1;
+                                        window.listeningQuestions1 = listeningQuestions1;
+                                    }
+                                    let userAnswersArray = window.userAnswers || [];
+                                    if (userAnswersArray.length === 0 && typeof userAnswers !== 'undefined') {
+                                        userAnswersArray = userAnswers;
+                                        window.userAnswers = userAnswers;
+                                    }
+                                    if (questions.length === 0) {
+                                        comparisonTableBody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No questions data available.</td></tr>';
+                                        return;
+                                    }
+                                    questions.forEach((question, index) => {
+                                        const userAnswer = userAnswersArray[index];
+                                        const isCorrect = userAnswer === question.correctAnswer;
+                                        const textColor = isCorrect ? 'text-success' : 'text-danger';
+                                        if (isCorrect) score += 2;
+                                        comparisonTableBody.innerHTML += `
+                                            <tr>
+                                                <td class="${textColor} fw-bold">${userAnswer || 'Not answered'}</td>
+                                                <td class="text-success fw-bold">${question.correctAnswer}</td>
+                                            </tr>
+                                        `;
+                                    });
+                                    window.question1_13Score = score;
+                                };
+                                
+                                // Force override calculateTotalScore to use new format
+                                window.calculateTotalScore = function() {
+                                    const totalScore = window.question1_13Score || 0;
+                                    const totalScoreEl = document.getElementById('totalScore');
+                                    if (totalScoreEl) {
+                                        totalScoreEl.innerText = 'Your Score: ' + totalScore;
+                                    }
+                                    if (typeof window.classifyScore === 'function') {
+                                        window.classifyScore(totalScore);
+                                    } else {
+                                        window.classifyScore = function(score) {
+                                            let classification = '';
+                                            const questions = window.listeningQuestions1 || [];
+                                            const totalQuestions = questions.length || 13;
+                                            const maxScore = totalQuestions * 2;
+                                            const percentage = (score / maxScore) * 100;
+                                            if (percentage >= 80) {
+                                                classification = 'Excellent';
+                                            } else if (percentage >= 50) {
+                                                classification = 'Good';
+                                            } else {
+                                                classification = 'Cố gắng thêm nhé!';
+                                            }
+                                            const scoreEl = document.getElementById('scoreClassification');
+                                            if (scoreEl) scoreEl.innerText = 'Classification: ' + classification;
+                                        };
+                                        window.classifyScore(totalScore);
+                                    }
+                                };
+                                
+                                // Ensure check result button has event listener
+                                const checkResultBtn = document.getElementById('checkResultButton');
+                                if (checkResultBtn && !checkResultBtn.dataset.listenerAttached) {
+                                    console.log('Attaching check result button listener');
+                                    checkResultBtn.dataset.listenerAttached = 'true';
+                                    checkResultBtn.addEventListener('click', function() {
+                                        console.log('Check result button clicked');
+                                        try {
+                                            // Override functions again before calling (in case script overrode them)
+                                            if (typeof window.overrideFunctionsWithNewFormat === 'function') {
+                                                window.overrideFunctionsWithNewFormat();
+                                                console.log('Functions overridden again before showing results');
+                                            }
+                                            
+                                            // Try window scope first, then fallback to local scope
+                                            const showResults = window.showResults_question1_13 || showResults_question1_13;
+                                            const calculateScore = window.calculateTotalScore || calculateTotalScore;
+                                            
+                                            if (typeof showResults === 'function') {
+                                                console.log('Calling showResults_question1_13');
+                                                showResults();
+                                            } else {
+                                                console.error('showResults_question1_13 function not found');
+                                            }
+                                            if (typeof calculateScore === 'function') {
+                                                console.log('Calling calculateTotalScore');
+                                                calculateScore();
+                                            } else {
+                                                console.error('calculateTotalScore function not found');
+                                            }
+                                            
+                                            // Keep question container visible (like Reading) - ensure it's not hidden
+                                            const questionContainer = document.getElementById("question1_13");
+                                            if (questionContainer) {
+                                                questionContainer.style.display = "block";
+                                                questionContainer.style.visibility = "visible";
+                                                questionContainer.style.opacity = "1";
+                                                console.log('Question container kept visible');
+                                            }
+                                            
+                                            // Don't show result container on page, only show modal
+                                            // const resultContainer = document.getElementById('comparisonResult_question1');
+                                            // if (resultContainer) {
+                                            //     resultContainer.style.display = "block";
+                                            //     console.log('Result container shown');
+                                            // } else {
+                                            //     console.error('comparisonResult_question1 element not found');
+                                            // }
+                                            
+                                            // Keep navigation buttons visible (don't hide them)
+                                            // const backBtn = document.getElementById('backButton');
+                                            // if (backBtn) backBtn.style.display = "none";
+                                            // checkResultBtn.style.display = "none";
+                                            // const nextBtn = document.getElementById('nextButton');
+                                            // if (nextBtn) nextBtn.style.display = "none";
+                                            
+                                            // Show modal with results
+                                            const resultModal = document.getElementById('resultModal');
+                                            if (resultModal && typeof bootstrap !== 'undefined') {
+                                                // Ensure comparisonResult_question1 is hidden
+                                                const resultContainer = document.getElementById('comparisonResult_question1');
+                                                if (resultContainer) {
+                                                    resultContainer.style.display = "none";
+                                                }
+                                                
+                                                const modal = new bootstrap.Modal(resultModal);
+                                                
+                                                // Add event listener to clean up when modal is closed
+                                                resultModal.addEventListener('hidden.bs.modal', function() {
+                                                    console.log('Modal closed, cleaning up...');
+                                                    // Hide comparisonResult_question1
+                                                    if (resultContainer) {
+                                                        resultContainer.style.display = "none";
+                                                    }
+                                                    // Remove backdrop if exists
+                                                    const backdrop = document.querySelector('.modal-backdrop');
+                                                    if (backdrop) {
+                                                        backdrop.remove();
+                                                    }
+                                                    // Remove modal-open class from body
+                                                    document.body.classList.remove('modal-open');
+                                                    document.body.style.overflow = '';
+                                                    document.body.style.paddingRight = '';
+                                                    // Ensure question container is visible and interactive
+                                                    const questionContainer = document.getElementById("question1_13");
+                                                    if (questionContainer) {
+                                                        questionContainer.style.display = "block";
+                                                        questionContainer.style.visibility = "visible";
+                                                        questionContainer.style.opacity = "1";
+                                                        questionContainer.style.pointerEvents = "auto";
+                                                    }
+                                                    console.log('Cleanup completed');
+                                                }, { once: true });
+                                                
+                                                modal.show();
+                                                console.log('Result modal shown');
+                                            } else {
+                                                console.error('resultModal not found or bootstrap not available');
+                                            }
+                                        } catch (error) {
+                                            console.error('Error in check result button handler:', error);
+                                        }
+                                    });
+                                }
+                            }, 100);
+                            
+                            // Script executes synchronously, so wait a bit for DOM updates
+                            // Use multiple fallbacks to ensure content is shown
+                            
+                            // Immediate: remove style after script execution
+                            setTimeout(function() {
+                                setLoadingState(false);
+                                // Hide loading indicator
+                                const loadingIndicator = document.getElementById('lesson-loading-indicator');
+                                if (loadingIndicator) {
+                                    loadingIndicator.style.display = 'none';
+                                }
+                                console.log('Removed loading state (immediate)');
+                            }, 100);
+                            
+                            // Wait for content to be rendered
+                            function showContentWhenReady() {
+                                const container = document.getElementById('question1_13');
+                                
+                                // Check if content is rendered
+                                if (container && container.innerHTML.trim().length > 100) {
+                                    // Content is ready
+                                    if (!lessonScriptLoaded) {
+                                        lessonScriptLoaded = true;
+                                        setLoadingState(false);
+                                        // Hide loading indicator
+                                        const loadingIndicator = document.getElementById('lesson-loading-indicator');
+                                        if (loadingIndicator) {
+                                            loadingIndicator.style.display = 'none';
+                                        }
+                                        console.log('Lesson script executed successfully, content visible');
+                                    }
+                                } else {
+                                    // Check again after a short delay
+                                    setTimeout(showContentWhenReady, 50);
+                                }
+                            }
+                            
+                            // Start checking after script execution
+                            requestAnimationFrame(function() {
+                                requestAnimationFrame(function() {
+                                    showContentWhenReady();
+                                });
+                            });
+                            
+                            // Final fallback: force show after 300ms
+                            setTimeout(function() {
+                                if (!lessonScriptLoaded) {
+                                    lessonScriptLoaded = true;
+                                    setLoadingState(false);
+                                    // Hide loading indicator
+                                    const loadingIndicator = document.getElementById('lesson-loading-indicator');
+                                    if (loadingIndicator) {
+                                        loadingIndicator.style.display = 'none';
+                                    }
+                                    console.log('Lesson script loaded (final fallback)');
+                                }
+                            }, 300);
+                            
+                            return;
+                        } catch (error) {
+                            console.error('Failed to fetch/execute script from API proxy:', error);
+                            setLoadingState(false);
+                            // Hide loading indicator on error
+                            const loadingIndicator = document.getElementById('lesson-loading-indicator');
+                            if (loadingIndicator) {
+                                loadingIndicator.style.display = 'none';
+                            }
+                            // Try GitHub raw URL as fallback
+                            if (scriptResponse.ok && scriptResult.scriptUrl) {
+                                console.log('Trying GitHub raw URL fallback...');
+                                const rawScript = document.createElement('script');
+                                rawScript.src = scriptResult.scriptUrl + '?v=' + new Date().getTime();
+                                rawScript.defer = true;
+                                rawScript.onload = function() {
+                                    setLoadingState(false);
+                                    const loadingIndicator = document.getElementById('lesson-loading-indicator');
+                                    if (loadingIndicator) {
+                                        loadingIndicator.style.display = 'none';
+                                    }
+                                };
+                                rawScript.onerror = function() {
+                                    console.error('GitHub raw URL also failed, trying local...');
+                                    const localPath = lesson.file_path;
+                                    const localScript = document.createElement('script');
+                                    localScript.src = (localPath.startsWith('js/') ? localPath : 'js/' + localPath) + '?v=' + new Date().getTime();
+                                    localScript.defer = true;
+                                    localScript.onload = function() {
+                                        setLoadingState(false);
+                                        const loadingIndicator = document.getElementById('lesson-loading-indicator');
+                                        if (loadingIndicator) {
+                                            loadingIndicator.style.display = 'none';
+                                        }
+                                    };
+                                    localScript.onerror = function() {
+                                        console.error('All methods failed, loading default');
+                                        setLoadingState(false);
+                                        loadDefaultScript();
+                                    };
+                                    document.head.appendChild(localScript);
+                                };
+                                document.head.appendChild(rawScript);
+                                return;
+                            } else {
+                                console.log('Loading default script');
+                                loadDefaultScript();
+                                return;
+                            }
+                        }
+                    } else {
+                        console.error('Lesson not found or error:', result);
+                        setLoadingState(false);
+                        const loadingIndicator = document.getElementById('lesson-loading-indicator');
+                        if (loadingIndicator) {
+                            loadingIndicator.style.display = 'none';
+                        }
+                        // Fallback to default script if lesson not found
+                        console.log('Lesson not found, loading default script');
+                        loadDefaultScript();
+                    }
+                } catch (error) {
+                    console.error('Error loading lesson:', error);
+                    console.error('Error details:', error.stack);
+                    setLoadingState(false);
+                    const loadingIndicator = document.getElementById('lesson-loading-indicator');
+                    if (loadingIndicator) {
+                        loadingIndicator.style.display = 'none';
+                    }
+                    // Fallback to default script on error
+                    console.log('Error loading lesson, loading default script');
+                    loadDefaultScript();
+                }
+            }
+            
+            function loadDefaultScript() {
+                console.log('loadDefaultScript called, DOM readyState:', document.readyState);
+                const scriptUrl = 'js/listening_question/listening_question1_13.js?v=' + new Date().getTime();
+                
+                // Always fetch and execute directly to handle DOMContentLoaded issue
+                console.log('Fetching script content directly');
+                fetch(scriptUrl)
+                        .then(response => {
+                            console.log('Fetch response status:', response.status);
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
+                            }
+                            return response.text();
+                        })
+                        .then(scriptContent => {
+                            console.log('Script content fetched, length:', scriptContent.length);
+                            let modifiedContent = scriptContent.replace(
+                                /document\.addEventListener\(['"]DOMContentLoaded['"],\s*function\(\)\s*\{/g,
+                                '(function() {'
+                            );
+                            const lastMatch = modifiedContent.lastIndexOf('});');
+                            if (lastMatch !== -1 && modifiedContent !== scriptContent) {
+                                modifiedContent = modifiedContent.substring(0, lastMatch) + '})();' + modifiedContent.substring(lastMatch + 3);
+                                console.log('Replaced DOMContentLoaded with IIFE');
+                            } else {
+                                console.log('No DOMContentLoaded found, using script as-is');
+                            }
+                            
+                            // Replace window.onload with immediate execution (multiline)
+                            modifiedContent = modifiedContent.replace(
+                                /window\.onload\s*=\s*function\(\)\s*\{[\s\S]*?renderQuestion1_13\(listeningQuestions1\[0\]\);[\s\S]*?\};?/g,
+                                '(function() { renderQuestion1_13(listeningQuestions1[0]); })();'
+                            );
+                            
+                            const scriptElement = document.createElement('script');
+                            scriptElement.textContent = modifiedContent;
+                            
+                            // Add error handler
+                            scriptElement.onerror = function(error) {
+                                console.error('Error executing script:', error);
+                            };
+                            
+                            document.head.appendChild(scriptElement);
+                            console.log('Default script executed successfully');
+                            
+                            // After script execution, manually call renderQuestion1_13 if it exists
+                            // Use multiple timeouts to ensure script has fully executed
+                            setTimeout(function() {
+                                // Check multiple times for data availability
+                                function checkAndCopyData() {
+                                    // Check for window.listeningQuestions1 first (new script format)
+                                    if (typeof window.listeningQuestions1 !== 'undefined' && window.listeningQuestions1.length > 0) {
+                                        console.log('Found window.listeningQuestions1 in default script, length:', window.listeningQuestions1.length);
+                                        return true;
+                                    }
+                                    
+                                    // Check for global listeningQuestions1 (old script format)
+                                    if (typeof listeningQuestions1 !== 'undefined' && listeningQuestions1.length > 0) {
+                                        window.listeningQuestions1 = listeningQuestions1;
+                                        console.log('Copied listeningQuestions1 from default script to window scope, length:', window.listeningQuestions1.length);
+                                        return true;
+                                    }
+                                    
+                                    return false;
+                                }
+                                
+                                // Try multiple times with increasing delays
+                                let attempts = 0;
+                                const maxAttempts = 10;
+                                
+                                function tryCopyData() {
+                                    attempts++;
+                                    console.log(`Attempt ${attempts} to find listeningQuestions1 in default script...`);
+                                    
+                                    if (checkAndCopyData()) {
+                                        // Data found, proceed with rendering
+                                        if (typeof userAnswers !== 'undefined') {
+                                            window.userAnswers = userAnswers;
+                                            console.log('Copied userAnswers from default script to window scope, length:', window.userAnswers.length);
+                                        }
+                                        
+                                        if (typeof window.renderQuestion1_13 === 'function' && window.listeningQuestions1.length > 0) {
+                                            console.log('Manually calling renderQuestion1_13 after default script load');
+                                            window.renderQuestion1_13(window.listeningQuestions1[0]);
+                                        } else if (typeof renderQuestion1_13 === 'function' && typeof listeningQuestions1 !== 'undefined' && listeningQuestions1.length > 0) {
+                                            console.log('Manually calling renderQuestion1_13 after default script load (fallback)');
+                                            renderQuestion1_13(listeningQuestions1[0]);
+                                        }
+                                    } else if (attempts < maxAttempts) {
+                                        // Try again after a short delay
+                                        setTimeout(tryCopyData, 100);
+                                    } else {
+                                        console.error('Failed to find listeningQuestions1 in default script after', maxAttempts, 'attempts');
+                                        console.log('Available globals:', Object.keys(window).filter(k => k.includes('listening') || k.includes('question')));
+                                    }
+                                }
+                                
+                                tryCopyData();
+                                
+                                // Initialize countdown timer if it exists (only once, prevent multiple timers)
+                                // Clear any existing timer first to prevent duplicates
+                                if (window.countdownTimerId) {
+                                    clearTimeout(window.countdownTimerId);
+                                    window.countdownTimerId = null;
+                                }
+                                
+                                if (!window.countdownInitialized) {
+                                    window.countdownInitialized = true;
+                                    if (typeof window.updateCountdown === 'function') {
+                                        console.log('Initializing countdown timer (existing function)');
+                                        // Clear any existing timer in the function
+                                        if (window.countdownTimerId) {
+                                            clearTimeout(window.countdownTimerId);
+                                            window.countdownTimerId = null;
+                                        }
+                                        // Reset timer to 40:00
+                                        if (typeof window.timeLeft !== 'undefined') {
+                                            window.timeLeft = 40 * 60;
+                                        }
+                                        // Override updateCountdown to use timerId
+                                        const countdownElement = document.getElementById('countdownTimer');
+                                        window.updateCountdown = function() {
+                                            if (!countdownElement) return;
+                                            const minutes = Math.floor(window.timeLeft / 60);
+                                            const seconds = window.timeLeft % 60;
+                                            countdownElement.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+                                            if (window.timeLeft > 0) {
+                                                window.timeLeft--;
+                                                if (window.countdownTimerId) {
+                                                    clearTimeout(window.countdownTimerId);
+                                                }
+                                                window.countdownTimerId = setTimeout(window.updateCountdown, 1000);
+                                            }
+                                        };
+                                        window.updateCountdown();
+                                    } else {
+                                        // If updateCountdown doesn't exist, create it
+                                        console.log('Creating countdown timer manually');
+                                        window.timeLeft = 40 * 60;
+                                        const countdownElement = document.getElementById('countdownTimer');
+                                        if (countdownElement) {
+                                            window.updateCountdown = function() {
+                                                if (!countdownElement) return;
+                                                const minutes = Math.floor(window.timeLeft / 60);
+                                                const seconds = window.timeLeft % 60;
+                                                countdownElement.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+                                                if (window.timeLeft > 0) {
+                                                    window.timeLeft--;
+                                                    if (window.countdownTimerId) {
+                                                        clearTimeout(window.countdownTimerId);
+                                                    }
+                                                    window.countdownTimerId = setTimeout(window.updateCountdown, 1000);
+                                                }
+                                            };
+                                            window.updateCountdown();
+                                        }
+                                    }
+                                } else {
+                                    console.log('Countdown timer already initialized, skipping');
+                                }
+                                
+                                // Initialize variables if they don't exist (check both window and global scope)
+                                if (typeof window.listeningQuestions1 === 'undefined' || window.listeningQuestions1.length === 0) {
+                                    window.listeningQuestions1 = typeof listeningQuestions1 !== 'undefined' && listeningQuestions1.length > 0 ? listeningQuestions1 : (window.listeningQuestions1 || []);
+                                    console.log('Initialized listeningQuestions1, length:', window.listeningQuestions1.length);
+                                }
+                                if (typeof window.userAnswers === 'undefined') {
+                                    window.userAnswers = typeof userAnswers !== 'undefined' ? userAnswers : (window.userAnswers || []);
+                                }
+                                if (typeof window.currentIndex === 'undefined') {
+                                    window.currentIndex = typeof currentIndex !== 'undefined' ? currentIndex : (window.currentIndex || 0);
+                                }
+                                if (typeof window.question1_13Score === 'undefined') {
+                                    window.question1_13Score = typeof question1_13Score !== 'undefined' ? question1_13Score : (window.question1_13Score || 0);
+                                }
+                                
+                                // Wait a bit for script to fully execute, then check again
+                                setTimeout(function() {
+                                    if ((typeof listeningQuestions1 !== 'undefined' && listeningQuestions1.length > 0) && 
+                                        (typeof window.listeningQuestions1 === 'undefined' || window.listeningQuestions1.length === 0)) {
+                                        window.listeningQuestions1 = listeningQuestions1;
+                                        console.log('Updated listeningQuestions1 from script, length:', window.listeningQuestions1.length);
+                                    }
+                                    if (typeof userAnswers !== 'undefined' && (!window.userAnswers || window.userAnswers.length === 0)) {
+                                        window.userAnswers = userAnswers;
+                                        console.log('Updated userAnswers from script, length:', window.userAnswers.length);
+                                    }
+                                }, 200);
+                                
+                                // Function to override old functions with new format (call after script loads)
+                                // Make it global so it can be called from anywhere
+                                window.overrideFunctionsWithNewFormat = function() {
+                                    console.log('Overriding functions with new format (Reading style)');
+                                    
+                                    // Force override showResults_question1_13 to use new format
+                                    window.showResults_question1_13 = function() {
+                                        const comparisonTableBody = document.getElementById('comparisonTableBody');
+                                        if (!comparisonTableBody) {
+                                            console.error('comparisonTableBody not found');
+                                            return;
+                                        }
+                                        comparisonTableBody.innerHTML = '';
+                                        let score = 0;
+                                        let questions = window.listeningQuestions1 || [];
+                                        if (questions.length === 0 && typeof listeningQuestions1 !== 'undefined') {
+                                            questions = listeningQuestions1;
+                                            window.listeningQuestions1 = listeningQuestions1;
+                                        }
+                                        let userAnswersArray = window.userAnswers || [];
+                                        if (userAnswersArray.length === 0 && typeof userAnswers !== 'undefined') {
+                                            userAnswersArray = userAnswers;
+                                            window.userAnswers = userAnswers;
+                                        }
+                                        if (questions.length === 0) {
+                                            comparisonTableBody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No questions data available.</td></tr>';
+                                            return;
+                                        }
+                                        questions.forEach((question, index) => {
+                                            const userAnswer = userAnswersArray[index];
+                                            const isCorrect = userAnswer === question.correctAnswer;
+                                            const textColor = isCorrect ? 'text-success' : 'text-danger';
+                                            if (isCorrect) score += 2;
+                                            comparisonTableBody.innerHTML += `
+                                                <tr>
+                                                    <td class="${textColor} fw-bold">${userAnswer || 'Not answered'}</td>
+                                                    <td class="text-success fw-bold">${question.correctAnswer}</td>
+                                                </tr>
+                                            `;
+                                        });
+                                        window.question1_13Score = score;
+                                        console.log('Results table populated, score:', score);
+                                    };
+                                    
+                                    // Force override calculateTotalScore to use new format
+                                    window.calculateTotalScore = function() {
+                                        const totalScore = window.question1_13Score || 0;
+                                        const totalScoreEl = document.getElementById('totalScore');
+                                        if (totalScoreEl) {
+                                            totalScoreEl.innerText = 'Your Score: ' + totalScore;
+                                            console.log('Set totalScore to:', 'Your Score: ' + totalScore);
+                                        }
+                                        if (typeof window.classifyScore === 'function') {
+                                            window.classifyScore(totalScore);
+                                        }
+                                    };
+                                    
+                                    // Force override classifyScore to use new format
+                                    window.classifyScore = function(score) {
+                                        let classification = '';
+                                        const questions = window.listeningQuestions1 || [];
+                                        const totalQuestions = questions.length || 13;
+                                        const maxScore = totalQuestions * 2;
+                                        const percentage = maxScore > 0 ? (score / maxScore) * 100 : 0;
+                                        if (percentage >= 80) {
+                                            classification = 'Excellent';
+                                        } else if (percentage >= 50) {
+                                            classification = 'Good';
+                                        } else {
+                                            classification = 'Cố gắng thêm nhé!';
+                                        }
+                                        const scoreEl = document.getElementById('scoreClassification');
+                                        if (scoreEl) {
+                                            scoreEl.innerText = 'Classification: ' + classification;
+                                            console.log('Set classification to:', 'Classification: ' + classification);
+                                        }
+                                    };
+                                }
+                                
+                                // Override functions immediately
+                                window.overrideFunctionsWithNewFormat();
+                                
+                                // Override again after script fully loads (with delay to ensure script has executed)
+                                setTimeout(function() {
+                                    window.overrideFunctionsWithNewFormat();
+                                }, 500);
+                                
+                                // Also override when script finishes loading (if script has onload)
+                                setTimeout(function() {
+                                    window.overrideFunctionsWithNewFormat();
+                                }, 1000);
+                                
+                                // Create fallback functions if they don't exist
+                                if (typeof window.showResults_question1_13 !== 'function') {
+                                    console.log('Creating fallback showResults_question1_13 function');
+                                    window.showResults_question1_13 = function() {
+                                        const comparisonTableBody = document.getElementById('comparisonTableBody');
+                                        
+                                        if (!comparisonTableBody) {
+                                            console.error('comparisonTableBody not found');
+                                            return;
+                                        }
+                                        
+                                        // Clear modal table
+                                        comparisonTableBody.innerHTML = '';
+                                        
+                                        let score = 0;
+                                        // Try to get questions from multiple sources
+                                        let questions = [];
+                                        
+                                        // First, check window.listeningQuestions1 (new script format)
+                                        if (typeof window.listeningQuestions1 !== 'undefined' && window.listeningQuestions1.length > 0) {
+                                            questions = window.listeningQuestions1;
+                                            console.log('Using window.listeningQuestions1, length:', questions.length);
+                                        }
+                                        // If empty, try global listeningQuestions1 (old script format)
+                                        else if (typeof listeningQuestions1 !== 'undefined' && listeningQuestions1.length > 0) {
+                                            questions = listeningQuestions1;
+                                            window.listeningQuestions1 = listeningQuestions1;
+                                            console.log('Using listeningQuestions1 from global scope, length:', questions.length);
+                                        }
+                                        
+                                        let userAnswersArray = window.userAnswers || [];
+                                        if (userAnswersArray.length === 0 && typeof userAnswers !== 'undefined') {
+                                            userAnswersArray = userAnswers;
+                                            window.userAnswers = userAnswers;
+                                            console.log('Using userAnswers from global scope, length:', userAnswersArray.length);
+                                        }
+                                        
+                                        console.log('Processing questions:', questions.length);
+                                        console.log('User answers:', userAnswersArray);
+                                        console.log('window.listeningQuestions1:', window.listeningQuestions1);
+                                        console.log('typeof listeningQuestions1:', typeof listeningQuestions1);
+                                        
+                                        if (questions.length === 0) {
+                                            console.error('No questions found! Cannot display results.');
+                                            console.log('Available window properties:', Object.keys(window).filter(k => k.toLowerCase().includes('listen') || k.toLowerCase().includes('question')));
+                                            // Show message in modal table only
+                                            comparisonTableBody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No questions data available. Please refresh the page.</td></tr>';
+                                            return;
+                                        }
+                                        
+                                        questions.forEach((question, index) => {
+                                            const userAnswer = userAnswersArray[index];
+                                            const isCorrect = userAnswer === question.correctAnswer;
+                                            const textColor = isCorrect ? 'text-success' : 'text-danger';
+                                            
+                                            if (isCorrect) {
+                                                score += 2;
+                                            }
+                                            
+                                            // Populate table inside modal only (not on page) - format like Reading
+                                            comparisonTableBody.innerHTML += `
+                                                <tr>
+                                                    <td class="${textColor} fw-bold">${userAnswer || 'Not answered'}</td>
+                                                    <td class="text-success fw-bold">${question.correctAnswer}</td>
+                                                </tr>
+                                            `;
+                                        });
+                                        
+                                        window.question1_13Score = score;
+                                        // Don't show result on page, only in modal
+                                        // totalScoreDisplay.innerText = `Score: ${score} / ${questions.length * 2}`;
+                                        // const resultContainer = document.getElementById('comparisonResult_question1');
+                                        // if (resultContainer) resultContainer.style.display = "block";
+                                        
+                                        console.log('Results displayed. Score:', score, '/', questions.length * 2);
+                                    };
+                                }
+                                
+                                if (typeof window.calculateTotalScore !== 'function') {
+                                    console.log('Creating fallback calculateTotalScore function');
+                                    window.calculateTotalScore = function() {
+                                        const totalScore = window.question1_13Score || 0;
+                                        const totalScoreEl = document.getElementById('totalScore');
+                                        if (totalScoreEl) {
+                                            totalScoreEl.innerText = 'Your Score: ' + totalScore;
+                                        }
+                                        
+                                        if (typeof window.classifyScore === 'function') {
+                                            window.classifyScore(totalScore);
+                                        } else {
+                                            // Create classifyScore if it doesn't exist - format like Reading
+                                            window.classifyScore = function(score) {
+                                                let classification = '';
+                                                const questions = window.listeningQuestions1 || [];
+                                                const totalQuestions = questions.length || 13;
+                                                const maxScore = totalQuestions * 2;
+                                                const percentage = (score / maxScore) * 100;
+                                                if (percentage >= 80) {
+                                                    classification = 'Excellent';
+                                                } else if (percentage >= 50) {
+                                                    classification = 'Good';
+                                                } else {
+                                                    classification = 'Cố gắng thêm nhé!';
+                                                }
+                                                const scoreEl = document.getElementById('scoreClassification');
+                                                if (scoreEl) scoreEl.innerText = 'Classification: ' + classification;
+                                            };
+                                            window.classifyScore(totalScore);
+                                        }
+                                    };
+                                }
+                                
+                                // Override old functions to ensure new format is used
+                                // Force override showResults_question1_13 to use new format
+                                if (typeof window.showResults_question1_13 === 'function') {
+                                    console.log('Overriding existing showResults_question1_13 with new format');
+                                }
+                                window.showResults_question1_13 = function() {
+                                    const comparisonTableBody = document.getElementById('comparisonTableBody');
+                                    if (!comparisonTableBody) {
+                                        console.error('comparisonTableBody not found');
+                                        return;
+                                    }
+                                    comparisonTableBody.innerHTML = '';
+                                    let score = 0;
+                                    let questions = window.listeningQuestions1 || [];
+                                    if (questions.length === 0 && typeof listeningQuestions1 !== 'undefined') {
+                                        questions = listeningQuestions1;
+                                        window.listeningQuestions1 = listeningQuestions1;
+                                    }
+                                    let userAnswersArray = window.userAnswers || [];
+                                    if (userAnswersArray.length === 0 && typeof userAnswers !== 'undefined') {
+                                        userAnswersArray = userAnswers;
+                                        window.userAnswers = userAnswers;
+                                    }
+                                    if (questions.length === 0) {
+                                        comparisonTableBody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No questions data available.</td></tr>';
+                                        return;
+                                    }
+                                    questions.forEach((question, index) => {
+                                        const userAnswer = userAnswersArray[index];
+                                        const isCorrect = userAnswer === question.correctAnswer;
+                                        const textColor = isCorrect ? 'text-success' : 'text-danger';
+                                        if (isCorrect) score += 2;
+                                        comparisonTableBody.innerHTML += `
+                                            <tr>
+                                                <td class="${textColor} fw-bold">${userAnswer || 'Not answered'}</td>
+                                                <td class="text-success fw-bold">${question.correctAnswer}</td>
+                                            </tr>
+                                        `;
+                                    });
+                                    window.question1_13Score = score;
+                                };
+                                
+                                // Force override calculateTotalScore to use new format
+                                window.calculateTotalScore = function() {
+                                    const totalScore = window.question1_13Score || 0;
+                                    const totalScoreEl = document.getElementById('totalScore');
+                                    if (totalScoreEl) {
+                                        totalScoreEl.innerText = 'Your Score: ' + totalScore;
+                                    }
+                                    if (typeof window.classifyScore === 'function') {
+                                        window.classifyScore(totalScore);
+                                    } else {
+                                        window.classifyScore = function(score) {
+                                            let classification = '';
+                                            const questions = window.listeningQuestions1 || [];
+                                            const totalQuestions = questions.length || 13;
+                                            const maxScore = totalQuestions * 2;
+                                            const percentage = (score / maxScore) * 100;
+                                            if (percentage >= 80) {
+                                                classification = 'Excellent';
+                                            } else if (percentage >= 50) {
+                                                classification = 'Good';
+                                            } else {
+                                                classification = 'Cố gắng thêm nhé!';
+                                            }
+                                            const scoreEl = document.getElementById('scoreClassification');
+                                            if (scoreEl) scoreEl.innerText = 'Classification: ' + classification;
+                                        };
+                                        window.classifyScore(totalScore);
+                                    }
+                                };
+                                
+                                // Ensure check result button has event listener
+                                const checkResultBtn = document.getElementById('checkResultButton');
+                                if (checkResultBtn && !checkResultBtn.dataset.listenerAttached) {
+                                    console.log('Attaching check result button listener');
+                                    checkResultBtn.dataset.listenerAttached = 'true';
+                                    checkResultBtn.addEventListener('click', function() {
+                                        console.log('Check result button clicked');
+                                        try {
+                                            // Override functions again before calling (in case script overrode them)
+                                            if (typeof window.overrideFunctionsWithNewFormat === 'function') {
+                                                window.overrideFunctionsWithNewFormat();
+                                                console.log('Functions overridden again before showing results');
+                                            }
+                                            
+                                            // Try window scope first, then fallback to local scope
+                                            const showResults = window.showResults_question1_13 || showResults_question1_13;
+                                            const calculateScore = window.calculateTotalScore || calculateTotalScore;
+                                            
+                                            if (typeof showResults === 'function') {
+                                                console.log('Calling showResults_question1_13');
+                                                showResults();
+                                            } else {
+                                                console.error('showResults_question1_13 function not found');
+                                            }
+                                            if (typeof calculateScore === 'function') {
+                                                console.log('Calling calculateTotalScore');
+                                                calculateScore();
+                                            } else {
+                                                console.error('calculateTotalScore function not found');
+                                            }
+                                            
+                                            // Keep question container visible (like Reading) - ensure it's not hidden
+                                            const questionContainer = document.getElementById("question1_13");
+                                            if (questionContainer) {
+                                                questionContainer.style.display = "block";
+                                                questionContainer.style.visibility = "visible";
+                                                questionContainer.style.opacity = "1";
+                                                console.log('Question container kept visible');
+                                            }
+                                            
+                                            // Don't show result container on page, only show modal
+                                            // const resultContainer = document.getElementById('comparisonResult_question1');
+                                            // if (resultContainer) {
+                                            //     resultContainer.style.display = "block";
+                                            //     console.log('Result container shown');
+                                            // } else {
+                                            //     console.error('comparisonResult_question1 element not found');
+                                            // }
+                                            
+                                            // Keep navigation buttons visible (don't hide them)
+                                            // const backBtn = document.getElementById('backButton');
+                                            // if (backBtn) backBtn.style.display = "none";
+                                            // checkResultBtn.style.display = "none";
+                                            // const nextBtn = document.getElementById('nextButton');
+                                            // if (nextBtn) nextBtn.style.display = "none";
+                                            
+                                            // Show modal with results
+                                            const resultModal = document.getElementById('resultModal');
+                                            if (resultModal && typeof bootstrap !== 'undefined') {
+                                                // Ensure comparisonResult_question1 is hidden
+                                                const resultContainer = document.getElementById('comparisonResult_question1');
+                                                if (resultContainer) {
+                                                    resultContainer.style.display = "none";
+                                                }
+                                                
+                                                const modal = new bootstrap.Modal(resultModal);
+                                                
+                                                // Add event listener to clean up when modal is closed
+                                                resultModal.addEventListener('hidden.bs.modal', function() {
+                                                    console.log('Modal closed, cleaning up...');
+                                                    // Hide comparisonResult_question1
+                                                    if (resultContainer) {
+                                                        resultContainer.style.display = "none";
+                                                    }
+                                                    // Remove backdrop if exists
+                                                    const backdrop = document.querySelector('.modal-backdrop');
+                                                    if (backdrop) {
+                                                        backdrop.remove();
+                                                    }
+                                                    // Remove modal-open class from body
+                                                    document.body.classList.remove('modal-open');
+                                                    document.body.style.overflow = '';
+                                                    document.body.style.paddingRight = '';
+                                                    // Ensure question container is visible and interactive
+                                                    const questionContainer = document.getElementById("question1_13");
+                                                    if (questionContainer) {
+                                                        questionContainer.style.display = "block";
+                                                        questionContainer.style.visibility = "visible";
+                                                        questionContainer.style.opacity = "1";
+                                                        questionContainer.style.pointerEvents = "auto";
+                                                    }
+                                                    console.log('Cleanup completed');
+                                                }, { once: true });
+                                                
+                                                modal.show();
+                                                console.log('Result modal shown');
+                                            } else {
+                                                console.error('resultModal not found or bootstrap not available');
+                                            }
+                                        } catch (error) {
+                                            console.error('Error in check result button handler:', error);
+                                        }
+                                    });
+                                }
+                            }, 100);
+                            
+                            // Check if content was rendered after a short delay
+                            setTimeout(function() {
+                                const container = document.getElementById('question1_13');
+                                if (container && container.innerHTML.trim().length > 100) {
+                                    console.log('Content rendered successfully');
+                                } else {
+                                    console.warn('Content not rendered yet, container:', container);
+                                }
+                            }, 500);
+                        })
+                        .catch(error => {
+                            console.error('Failed to fetch/execute default script:', error);
+                            // Fallback: try normal script loading
+                            console.log('Trying fallback: normal script loading');
+                            const script = document.createElement('script');
+                            script.src = scriptUrl;
+                            script.defer = true;
+                            script.onload = function() {
+                                console.log('Fallback script loaded');
+                            };
+                            script.onerror = function() {
+                                console.error('Fallback script also failed');
+                            };
+                            document.head.appendChild(script);
+                        });
+            }
+            
+            loadLessonScript();
+        })();
+    </script>
 </head>
 
 <body>
+<!-- Loading Indicator -->
+<div id="lesson-loading-indicator">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Đang tải bài học...</div>
+</div>
 <!-- ====================================================================================
                   HEADER SECTION
 ======================================================================================== -->
@@ -110,8 +1635,8 @@
 <!-- ============================================
                   Kết quả so sánh 
 ================================================ -->
-<!-- 2. Kết quả so sánh - Question 1 đến Question 13 -->
-<div class="container" id="comparisonResult_question1" style="display: none;">
+<!-- 2. Kết quả so sánh - Question 1 đến Question 13 (Always hidden, only show in modal) -->
+<div class="container" id="comparisonResult_question1" style="display: none !important; visibility: hidden !important;">
     <h3>Question 1 to 13</h3>
     <p id="totalScore_question1_13"></p> <!-- Hiển thị điểm tổng -->
     <table class="table table-striped">
@@ -193,4 +1718,112 @@
         </div>
     </div>
 
-<script src="../cdn.jsdelivr.net/npm/bootstrap%405.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // Cleanup function to ensure page is interactive after modal closes
+    (function() {
+        // Ensure comparisonResult_question1 is always hidden
+        const resultContainer = document.getElementById('comparisonResult_question1');
+        if (resultContainer) {
+            resultContainer.style.display = "none";
+            resultContainer.style.visibility = "hidden";
+        }
+        
+        // Listen for modal close events globally
+        document.addEventListener('hidden.bs.modal', function(event) {
+            if (event.target.id === 'resultModal') {
+                console.log('Result modal closed, performing cleanup...');
+                
+                // Hide comparisonResult_question1
+                if (resultContainer) {
+                    resultContainer.style.display = "none";
+                    resultContainer.style.visibility = "hidden";
+                }
+                
+                // Remove any remaining backdrop
+                const backdrops = document.querySelectorAll('.modal-backdrop');
+                backdrops.forEach(backdrop => backdrop.remove());
+                
+                // Clean up body classes and styles
+                document.body.classList.remove('modal-open');
+                document.body.style.overflow = '';
+                document.body.style.paddingRight = '';
+                
+                // Ensure question container is fully interactive
+                const questionContainer = document.getElementById("question1_13");
+                if (questionContainer) {
+                    questionContainer.style.display = "block";
+                    questionContainer.style.visibility = "visible";
+                    questionContainer.style.opacity = "1";
+                    questionContainer.style.pointerEvents = "auto";
+                }
+                
+                // Ensure footer/navigation buttons are visible
+                const footer = document.querySelector('.footer');
+                if (footer) {
+                    footer.style.display = "block";
+                    footer.style.visibility = "visible";
+                }
+                const backBtn = document.getElementById('backButton');
+                const checkResultBtn = document.getElementById('checkResultButton');
+                const nextBtn = document.getElementById('nextButton');
+                if (backBtn) {
+                    backBtn.style.display = "block";
+                    backBtn.style.visibility = "visible";
+                }
+                if (checkResultBtn) {
+                    checkResultBtn.style.display = "block";
+                    checkResultBtn.style.visibility = "visible";
+                }
+                if (nextBtn) {
+                    nextBtn.style.display = "block";
+                    nextBtn.style.visibility = "visible";
+                }
+                
+                console.log('Global cleanup completed');
+            }
+        });
+        
+        // Also ensure footer is visible when modal opens (prevent hiding)
+        document.addEventListener('shown.bs.modal', function(event) {
+            if (event.target.id === 'resultModal') {
+                console.log('Result modal opened, ensuring footer is visible...');
+                const footer = document.querySelector('.footer');
+                if (footer) {
+                    footer.style.display = "block";
+                    footer.style.visibility = "visible";
+                    footer.style.zIndex = "1055"; // Above modal backdrop but below modal
+                }
+                const backBtn = document.getElementById('backButton');
+                const checkResultBtn = document.getElementById('checkResultButton');
+                const nextBtn = document.getElementById('nextButton');
+                if (backBtn) {
+                    backBtn.style.display = "block";
+                    backBtn.style.visibility = "visible";
+                }
+                if (checkResultBtn) {
+                    checkResultBtn.style.display = "block";
+                    checkResultBtn.style.visibility = "visible";
+                }
+                if (nextBtn) {
+                    nextBtn.style.display = "block";
+                    nextBtn.style.visibility = "visible";
+                }
+                console.log('Footer visibility ensured');
+            }
+        });
+        
+        // Also cleanup on page load in case modal was left open
+        window.addEventListener('load', function() {
+            const backdrops = document.querySelectorAll('.modal-backdrop');
+            backdrops.forEach(backdrop => backdrop.remove());
+            document.body.classList.remove('modal-open');
+            document.body.style.overflow = '';
+            document.body.style.paddingRight = '';
+            if (resultContainer) {
+                resultContainer.style.display = "none";
+                resultContainer.style.visibility = "hidden";
+            }
+        });
+    })();
+</script>

@@ -6,18 +6,323 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Thêm thẻ này -->
-    <title>Aptis listening keys</title>
+    <title>Mini Hippo - Listening Practice</title>
     <link rel="icon" href="images/favicon.ico" type="image/x-icon">
-    <link href="../cdn.jsdelivr.net/npm/bootstrap%405.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="../cdn.jsdelivr.net/npm/bootstrap-icons%401.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
     <link href="css/listeningkey.css" rel="stylesheet">
     <link href="css/lesson-ui.css" rel="stylesheet">
-    <script src="js/listening_question/listening_question16_17.js"></script>
-    <script async src="../pagead2.googlesyndication.com/pagead/js/fddf6.txt?client=ca-pub-4940447633722822"
-     crossorigin="anonymous"></script>
+    <style>
+        body.lesson-loading #question16 { opacity: 0; pointer-events: none; }
+        body.lesson-loading #question16 * { visibility: hidden; }
+        #question16.lesson-loading { opacity: 0; pointer-events: none; }
+        #question16.lesson-loading * { visibility: hidden; }
+        #lesson-loading-indicator {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            z-index: 9999; background: white; padding: 30px 50px; border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15); text-align: center; display: none;
+        }
+        body.lesson-loading #lesson-loading-indicator { display: block; }
+        .loading-spinner {
+            border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%;
+            width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .loading-text { font-size: 18px; color: #333; font-weight: 500; }
+    </style>
+    <script>
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('lesson')) {
+                const style = document.createElement('style');
+                style.id = 'lesson-loading-style';
+                style.textContent = '#question16 { opacity: 0 !important; pointer-events: none !important; } #question16 * { visibility: hidden !important; }';
+                document.head.appendChild(style);
+                window._lessonLoadingStyle = style;
+                if (document.body) {
+                    document.body.classList.add('lesson-loading');
+                } else {
+                    document.addEventListener('DOMContentLoaded', function() {
+                        document.body.classList.add('lesson-loading');
+                    });
+                }
+            }
+        })();
+    </script>
+    <script>
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const lessonId = urlParams.get('lesson');
+            const part = 'listening_16_17';
+            let lessonScriptLoaded = false;
+            
+            function setLoadingState(isLoading) {
+                if (document.body) {
+                    if (isLoading) document.body.classList.add('lesson-loading');
+                    else document.body.classList.remove('lesson-loading');
+                }
+                const questionContainer = document.getElementById('question16');
+                if (questionContainer) {
+                    if (isLoading) questionContainer.classList.add('lesson-loading');
+                    else questionContainer.classList.remove('lesson-loading');
+                }
+                if (!isLoading) {
+                    const loadingStyle = document.getElementById('lesson-loading-style');
+                    if (loadingStyle) loadingStyle.remove();
+                    if (window._lessonLoadingStyle && window._lessonLoadingStyle.parentNode) {
+                        window._lessonLoadingStyle.remove();
+                    }
+                }
+            }
+            
+            if (lessonId) {
+                if (document.body) setLoadingState(true);
+                else {
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', function() { setLoadingState(true); });
+                    } else setLoadingState(true);
+                }
+            }
+            
+            async function loadLessonScript() {
+                if (!lessonId) {
+                    console.log('No lesson parameter - trying to load latest uploaded lesson');
+                    try {
+                        const listResponse = await fetch(`/api/lessons/list?part=listening_16_17`);
+                        const listResult = await listResponse.json();
+                        if (listResult.success && listResult.lessons && listResult.lessons.length > 0) {
+                            const latestLesson = listResult.lessons[0]; // First one is latest (ordered by created_at.desc)
+                            console.log('Found latest lesson, loading:', latestLesson.id);
+                            // Redirect to same page with lesson ID
+                            window.location.href = `${window.location.pathname}?lesson=${latestLesson.id}`;
+                            return;
+                        } else {
+                            console.log('No uploaded lessons found - loading default/original lesson');
+                            loadDefaultScript();
+                            return;
+                        }
+                    } catch (error) {
+                        console.error('Error fetching latest lesson:', error);
+                        console.log('Falling back to default/original lesson');
+                    loadDefaultScript();
+                    return;
+                    }
+                }
+                
+                try {
+                    console.log('Loading lesson with ID:', lessonId);
+                    const response = await fetch(`/api/lessons/get?id=${lessonId}`);
+                    const result = await response.json();
+                    console.log('Lesson data response:', result);
+                    
+                    if (response.ok && result.lesson) {
+                        const lesson = result.lesson;
+                        console.log('Lesson found:', lesson);
+                        
+                        const scriptResponse = await fetch(`/api/lessons/get-script-url?filePath=${encodeURIComponent(lesson.file_path)}`);
+                        const scriptResult = await scriptResponse.json();
+                        console.log('Script URL response:', scriptResult);
+                        
+                        const scriptPath = `/api/lessons/get-script?filePath=${encodeURIComponent(lesson.file_path)}&v=${new Date().getTime()}`;
+                        console.log('Fetching script content from API proxy:', scriptPath);
+                        
+                        try {
+                            const scriptResponse = await fetch(scriptPath);
+                            if (!scriptResponse.ok) throw new Error(`Failed to fetch script: ${scriptResponse.status}`);
+                            
+                            const scriptContent = await scriptResponse.text();
+                            console.log('Script content fetched, executing...');
+                            
+                            let modifiedContent = scriptContent;
+                            if (document.readyState !== 'loading') {
+                                console.log('DOM already ready, replacing DOMContentLoaded with immediate execution');
+                                modifiedContent = scriptContent.replace(
+                                    /document\.addEventListener\(['"]DOMContentLoaded['"],\s*function\(\)\s*\{/g,
+                                    '(function() {'
+                                );
+                                const lastMatch = modifiedContent.lastIndexOf('});');
+                                if (lastMatch !== -1 && modifiedContent !== scriptContent) {
+                                    modifiedContent = modifiedContent.substring(0, lastMatch) + '})();' + modifiedContent.substring(lastMatch + 3);
+                                }
+                            } else console.log('DOM still loading, keeping DOMContentLoaded listener');
+                            
+                            const scriptElement = document.createElement('script');
+                            scriptElement.textContent = modifiedContent;
+                            document.head.appendChild(scriptElement);
+                            
+                            // After script execution, manually call renderQuestion16 if it exists
+                            setTimeout(function() {
+                                function checkAndRender() {
+                                    // Check in both global and window scope
+                                    const q16Data = window.question16Data || (typeof question16Data !== 'undefined' ? question16Data : null);
+                                    const renderFn = window.renderQuestion16 || (typeof renderQuestion16 !== 'undefined' ? renderQuestion16 : null);
+                                    
+                                    console.log('Checking for question16Data:', {
+                                        windowQuestion16Data: typeof window.question16Data,
+                                        question16Data: typeof question16Data,
+                                        windowRenderQuestion16: typeof window.renderQuestion16,
+                                        renderQuestion16: typeof renderQuestion16,
+                                        q16DataLength: q16Data ? q16Data.length : 'N/A'
+                                    });
+                                    
+                                    if (q16Data && q16Data.length > 0 && renderFn) {
+                                        console.log('Found question16Data and renderQuestion16, calling render...');
+                                        try {
+                                            renderFn(q16Data[0]);
+                                setLoadingState(false);
+                                const loadingIndicator = document.getElementById('lesson-loading-indicator');
+                                if (loadingIndicator) loadingIndicator.style.display = 'none';
+                                            lessonScriptLoaded = true;
+                                            console.log('Question 16 rendered successfully');
+                                            return true;
+                                        } catch (error) {
+                                            console.error('Error calling renderQuestion16:', error);
+                                        }
+                                    }
+                                    return false;
+                                }
+                                
+                                // Try multiple times with increasing delays
+                                let attempts = 0;
+                                const maxAttempts = 30;
+                                
+                                function tryRender() {
+                                    attempts++;
+                                    console.log(`Attempt ${attempts} to find and render question16Data...`);
+                                    
+                                    if (checkAndRender()) {
+                                        // Success, already handled in checkAndRender
+                                    } else if (attempts < maxAttempts) {
+                                        setTimeout(tryRender, 150);
+                                    } else {
+                                        console.error('Failed to render question16Data after', maxAttempts, 'attempts');
+                                        console.log('Available globals:', Object.keys(window).filter(k => k.includes('question') || k.includes('16')));
+                                        setLoadingState(false);
+                                        const loadingIndicator = document.getElementById('lesson-loading-indicator');
+                                        if (loadingIndicator) loadingIndicator.style.display = 'none';
+                                    lessonScriptLoaded = true;
+                                    }
+                                }
+                                
+                                tryRender();
+                            }, 200);
+                            
+                            return;
+                        } catch (error) {
+                            console.error('Failed to fetch/execute script from API proxy:', error);
+                            setLoadingState(false);
+                            const loadingIndicator = document.getElementById('lesson-loading-indicator');
+                            if (loadingIndicator) loadingIndicator.style.display = 'none';
+                            if (scriptResponse.ok && scriptResult.scriptUrl) {
+                                console.log('Trying GitHub raw URL fallback...');
+                                const rawScript = document.createElement('script');
+                                rawScript.src = scriptResult.scriptUrl + '?v=' + new Date().getTime();
+                                rawScript.defer = true;
+                                rawScript.onload = function() {
+                                    setLoadingState(false);
+                                    const loadingIndicator = document.getElementById('lesson-loading-indicator');
+                                    if (loadingIndicator) loadingIndicator.style.display = 'none';
+                                };
+                                rawScript.onerror = function() {
+                                    console.error('GitHub raw URL also failed, trying local...');
+                                    const localPath = lesson.file_path;
+                                    const localScript = document.createElement('script');
+                                    localScript.src = (localPath.startsWith('js/') ? localPath : 'js/' + localPath) + '?v=' + new Date().getTime();
+                                    localScript.defer = true;
+                                    localScript.onload = function() {
+                                        setLoadingState(false);
+                                        const loadingIndicator = document.getElementById('lesson-loading-indicator');
+                                        if (loadingIndicator) loadingIndicator.style.display = 'none';
+                                    };
+                                    localScript.onerror = function() {
+                                        console.error('All methods failed, loading default');
+                                        setLoadingState(false);
+                                        loadDefaultScript();
+                                    };
+                                    document.head.appendChild(localScript);
+                                };
+                                document.head.appendChild(rawScript);
+                                return;
+                            } else {
+                                console.log('Loading default script');
+                                loadDefaultScript();
+                                return;
+                            }
+                        }
+                    } else {
+                        console.error('Lesson not found or error:', result);
+                        setLoadingState(false);
+                        const loadingIndicator = document.getElementById('lesson-loading-indicator');
+                        if (loadingIndicator) loadingIndicator.style.display = 'none';
+                        console.log('Lesson not found, loading default script');
+                        loadDefaultScript();
+                    }
+                } catch (error) {
+                    console.error('Error loading lesson:', error);
+                    setLoadingState(false);
+                    const loadingIndicator = document.getElementById('lesson-loading-indicator');
+                    if (loadingIndicator) loadingIndicator.style.display = 'none';
+                    console.log('Error loading lesson, loading default script');
+                    loadDefaultScript();
+                }
+            }
+            
+            function loadDefaultScript() {
+                console.log('loadDefaultScript called, DOM readyState:', document.readyState);
+                const scriptUrl = 'js/listening_question/listening_question16_17.js?v=' + new Date().getTime();
+                console.log('Fetching script content directly');
+                fetch(scriptUrl)
+                        .then(response => {
+                            console.log('Fetch response status:', response.status);
+                            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                            return response.text();
+                        })
+                        .then(scriptContent => {
+                            console.log('Script content fetched, length:', scriptContent.length);
+                            let modifiedContent = scriptContent.replace(
+                                /document\.addEventListener\(['"]DOMContentLoaded['"],\s*function\(\)\s*\{/g,
+                                '(function() {'
+                            );
+                            const lastMatch = modifiedContent.lastIndexOf('});');
+                            if (lastMatch !== -1 && modifiedContent !== scriptContent) {
+                                modifiedContent = modifiedContent.substring(0, lastMatch) + '})();' + modifiedContent.substring(lastMatch + 3);
+                                console.log('Replaced DOMContentLoaded with IIFE');
+                            } else console.log('No DOMContentLoaded found, using script as-is');
+                            const scriptElement = document.createElement('script');
+                            scriptElement.textContent = modifiedContent;
+                            scriptElement.onerror = function(error) { console.error('Error executing script:', error); };
+                            document.head.appendChild(scriptElement);
+                            console.log('Default script executed successfully');
+                            setTimeout(function() {
+                                const container = document.getElementById('question16');
+                                if (container && container.innerHTML.trim().length > 100) {
+                                    console.log('Content rendered successfully');
+                                } else console.warn('Content not rendered yet, container:', container);
+                            }, 500);
+                        })
+                        .catch(error => {
+                            console.error('Failed to fetch/execute default script:', error);
+                            console.log('Trying fallback: normal script loading');
+                            const script = document.createElement('script');
+                            script.src = scriptUrl;
+                            script.defer = true;
+                            script.onload = function() { console.log('Fallback script loaded'); };
+                            script.onerror = function() { console.error('Fallback script also failed'); };
+                            document.head.appendChild(script);
+                        });
+            }
+            
+            loadLessonScript();
+        })();
+    </script>
 </head>
 
 <body>
+<!-- Loading Indicator -->
+<div id="lesson-loading-indicator">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Đang tải bài học...</div>
+</div>
 <!-- ====================================================================================
                   HEADER SECTION
 ======================================================================================== -->
@@ -160,7 +465,7 @@
   </div>
 </div>
 
-<script src="../cdn.jsdelivr.net/npm/bootstrap%405.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <!-- ============================================
                   FOOTER SECTION
 ================================================ -->

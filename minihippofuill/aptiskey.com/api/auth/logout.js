@@ -1,60 +1,59 @@
-// Vercel Serverless Function for user logout
+import parseBody from '../_utils/parseBody.js';
+
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+
 export default async function handler(req, res) {
-  // Only allow POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  try {
-    // Get token from header or body
-    const token = req.headers.authorization?.replace('Bearer ', '') || req.body?.token;
-    const refreshToken = req.body?.refreshToken;
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    return res.status(500).json({ error: 'Supabase environment variables are missing' });
+  }
 
-    if (!token) {
-      // If no token, just return success (client-side cleanup)
-      return res.status(200).json({
-        success: true,
-        message: 'Logged out successfully'
+  let body = {};
+
+  try {
+    body = await parseBody(req);
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'Invalid payload' });
+  }
+
+  const token = body.token;
+
+  if (!token) {
+    return res.status(400).json({ error: 'Missing token' });
+  }
+
+  try {
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        refresh_token: body.refreshToken
+      })
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      return res.status(response.status).json({
+        error: data.error_description || data.error || 'Đăng xuất thất bại'
       });
     }
 
-    // Get Supabase configuration
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
-
-    if (supabaseUrl && supabaseServiceKey && refreshToken) {
-      // Revoke refresh token with Supabase (optional)
-      try {
-        await fetch(`${supabaseUrl}/auth/v1/logout`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'apikey': supabaseServiceKey,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            refresh_token: refreshToken
-          })
-        });
-      } catch (error) {
-        // Ignore errors, token might already be invalid
-        console.log('Token revocation error (ignored):', error.message);
-      }
-    }
-
-    // Return success
-    return res.status(200).json({
-      success: true,
-      message: 'Logged out successfully'
-    });
-
+    return res.status(200).json({ success: true });
   } catch (error) {
-    console.error('Logout error:', error);
-    // Still return success even if there's an error
-    return res.status(200).json({
-      success: true,
-      message: 'Logged out successfully'
+    console.error('Auth logout error:', error);
+    return res.status(500).json({
+      error: 'Có lỗi xảy ra khi đăng xuất',
+      details: error.message
     });
   }
 }
+
 

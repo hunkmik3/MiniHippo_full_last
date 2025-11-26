@@ -18,91 +18,449 @@
     <link rel="stylesheet" href="css/lesson-ui.css">
     
     <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success: #10b981;
+            --bg-light: #f8fafc;
+            --border: #e2e8f0;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        /* Sidebar Styles */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 280px;
+            background: white;
+            border-right: 1px solid var(--border);
+            box-shadow: var(--shadow-lg);
+            z-index: 1000;
+            overflow-y: auto;
+            transition: transform 0.3s ease;
+        }
+        
+        .sidebar-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+            color: white;
+        }
+        
+        .sidebar-header h2 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .sidebar-menu {
+            padding: 1rem 0;
+        }
+        
+        .menu-section {
+            margin-bottom: 1.5rem;
+        }
+        
+        .menu-section-title {
+            padding: 0.5rem 1.5rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .menu-item {
+            display: block;
+            padding: 0.75rem 1.5rem;
+            color: var(--text-primary);
+            text-decoration: none;
+            transition: all 0.2s ease;
+            border-left: 3px solid transparent;
+            cursor: pointer;
+        }
+        
+        .menu-item:hover {
+            background: var(--bg-light);
+            border-left-color: var(--primary);
+            color: var(--primary);
+        }
+        
+        .menu-item.active {
+            background: #eff6ff;
+            border-left-color: var(--primary);
+            color: var(--primary);
+            font-weight: 600;
+        }
+        
+        .menu-item i {
+            width: 20px;
+            margin-right: 0.75rem;
+        }
+        
+        .sidebar-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border);
+            margin-top: auto;
+        }
+        
+        /* Main Content */
+        .main-content {
+            margin-left: 280px;
+            min-height: 100vh;
+            transition: margin-left 0.3s ease;
+        }
+        
         .admin-container {
             max-width: 1400px;
             margin: 0 auto;
-            padding: 2rem;
+            padding: 2rem 1.5rem 3rem;
         }
         
-        .part-selector {
-            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-            color: white;
-            padding: 1.5rem;
+        /* Mobile Toggle Button */
+        .sidebar-toggle {
+            position: fixed;
+            top: 1rem;
+            left: 1rem;
+            z-index: 1001;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            box-shadow: var(--shadow-md);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        
+        .sidebar-toggle i {
+            font-size: 1.25rem;
+            color: var(--text-primary);
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .sidebar.show {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+            
+            .sidebar-toggle {
+                display: flex;
+            }
+            
+            .admin-container {
+                padding: 1rem;
+                padding-top: 4rem;
+            }
+        }
+        
+        /* Compact Header */
+        .upload-hero {
+            background: white;
             border-radius: 1rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem 2rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-md);
+        }
+        .upload-hero h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+        .upload-hero p {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            margin: 0;
+        }
+        .hero-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .hero-actions .btn {
+            border-radius: 0.5rem;
+            padding: 0.5rem 1rem;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+        
+        /* Compact Selectors */
+        .mode-selector-card {
+            background: white;
+            border-radius: 0.75rem;
+            padding: 1rem 1.5rem;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 1rem;
+        }
+        .mode-selector-card h3 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .mode-pill-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .mode-pill input {
+            display: none;
+        }
+        .mode-pill label {
+            border-radius: 0.5rem;
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border);
+            background: var(--bg-light);
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+        .mode-pill input:checked + label {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+            box-shadow: var(--shadow-sm);
+        }
+        
+        .selector-panel {
+            background: white;
+            border-radius: 0.75rem;
+            padding: 1rem 1.5rem;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 1rem;
+        }
+        .selector-panel h3 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .selector-grid {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .selector-pill {
+            position: relative;
+        }
+        .selector-pill input {
+            display: none;
+        }
+        .selector-pill label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.375rem;
+            border-radius: 0.5rem;
+            padding: 0.5rem 0.875rem;
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+        .selector-pill input:checked + label {
+            background: #e0f2fe;
+            border-color: #93c5fd;
+            color: var(--text-primary);
         }
         
         .form-section {
             background: white;
-            padding: 2rem;
-            border-radius: 1rem;
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-            margin-bottom: 2rem;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 1.5rem;
+        }
+        
+        /* Compact Form Elements */
+        .form-label {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.375rem;
+        }
+        .form-control, .form-select {
+            font-size: 0.875rem;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+        }
+        .form-control-sm {
+            font-size: 0.8125rem;
+            padding: 0.375rem 0.625rem;
         }
         
         .question-item {
-            background: #f8fafc;
-            padding: 1.5rem;
-            border-radius: 0.75rem;
-            margin-bottom: 1rem;
-            border: 2px solid #e2e8f0;
-            transition: all 0.3s ease;
+            background: var(--bg-light);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 0.75rem;
+            border: 1px solid var(--border);
+            transition: all 0.2s ease;
         }
         
         .question-item:hover {
-            border-color: #2563eb;
-            box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.1);
+            border-color: #93c5fd;
+            box-shadow: var(--shadow-sm);
         }
         
-        .btn-add {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            color: white;
-            border: none;
-            padding: 0.75rem 1.5rem;
+        /* Compact Card Styles */
+        .card {
+            border-radius: 0.75rem;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
+        }
+        .card-header {
+            background: var(--bg-light);
+            border-bottom: 1px solid var(--border);
+            padding: 0.75rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        .card-body {
+            padding: 1rem;
+        }
+        
+        /* Compact Buttons */
+        .btn {
             border-radius: 0.5rem;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }
-        
-        .btn-add:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3);
-        }
-        
-        .btn-remove {
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-            color: white;
-            border: none;
+            font-weight: 600;
+            font-size: 0.875rem;
             padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
         }
-        
-        .btn-export {
-            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        .btn-sm {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.8125rem;
+        }
+        .btn-add {
+            background: #38bdf8;
             color: white;
             border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.5rem;
-            font-weight: 500;
+        }
+        .btn-add:hover {
+            background: #0ea5e9;
+        }
+        .btn-remove {
+            background: #fca5a5;
+            border: none;
+            color: #7f1d1d;
+        }
+        .btn-export {
+            background: #fbbf24;
+            border: none;
+            color: #7a3410;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            border: none;
+        }
+        .btn-primary:hover {
+            background: var(--primary-hover);
+        }
+        .btn-success {
+            background: var(--success);
+            color: white;
+            border: none;
+        }
+        .btn-success:hover {
+            background: #059669;
+        }
+        .btn-outline-primary {
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            background: transparent;
+        }
+        .btn-outline-primary:hover {
+            background: #eff6ff;
+        }
+        .btn-outline-secondary {
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            background: white;
+        }
+        .btn-outline-secondary:hover {
+            background: var(--bg-light);
+        }
+        
+        /* Compact Accordion */
+        .accordion-item {
+            border: 1px solid var(--border);
+            border-radius: 0.5rem !important;
+            margin-bottom: 0.5rem;
+        }
+        .accordion-button {
+            padding: 0.75rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            background: var(--bg-light);
+        }
+        .accordion-button:not(.collapsed) {
+            background: var(--primary);
+            color: white;
+        }
+        .accordion-body {
+            padding: 1rem;
         }
         
         .preview-section {
-            background: #f8fafc;
-            padding: 2rem;
-            border-radius: 1rem;
-            border: 2px dashed #cbd5e1;
-            margin-top: 2rem;
+            background: var(--bg-light);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border: 1px dashed var(--border);
+            margin-top: 1rem;
         }
         
         .json-output {
             background: #1e293b;
             color: #e2e8f0;
-            padding: 1.5rem;
+            padding: 1rem;
             border-radius: 0.5rem;
             font-family: 'Courier New', monospace;
-            font-size: 0.875rem;
-            max-height: 400px;
+            font-size: 0.8125rem;
+            max-height: 300px;
             overflow-y: auto;
             white-space: pre-wrap;
             word-wrap: break-word;
@@ -131,8 +489,8 @@
         }
         
         #json-preview table thead {
-            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-            color: white;
+            background: #e2e8f0;
+            color: #0f172a;
         }
         
         #json-preview table thead th {
@@ -174,22 +532,99 @@
         }
         
         .question-set-item {
-            margin-bottom: 1.5rem;
+            margin-bottom: 1rem;
         }
         
         .question-set-item .card {
-            border: 2px solid #e2e8f0;
-            transition: all 0.3s ease;
-        }
-        
-        .question-set-item .card:hover {
-            border-color: #2563eb;
-            box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.1);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            box-shadow: var(--shadow-sm);
         }
         
         .question-set-item .card-header {
-            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-            border-bottom: 2px solid #cbd5e1;
+            background: var(--bg-light);
+            border-bottom: 1px solid var(--border);
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 0.875rem;
+            padding: 0.75rem 1rem;
+        }
+        
+        /* Section Headers */
+        .form-section h3 {
+            font-size: 1.125rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+        .form-section h4 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
+        }
+        .form-section h5 {
+            font-size: 0.9375rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+        
+        /* Compact Spacing */
+        .mb-4 {
+            margin-bottom: 1rem !important;
+        }
+        .mt-4 {
+            margin-top: 1rem !important;
+        }
+        .py-4 {
+            padding-top: 1rem !important;
+            padding-bottom: 1rem !important;
+        }
+        .px-4 {
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+        }
+
+        .part-subtitle {
+            color: #64748b;
+            font-size: 0.9rem;
+            margin-top: 0.25rem;
+        }
+
+        .empty-state-notice {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1d4ed8;
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            font-size: 0.875rem;
+        }
+        
+        /* Responsive Improvements */
+        @media (max-width: 768px) {
+            .admin-container {
+                padding: 1rem;
+            }
+            .upload-hero {
+                padding: 1rem 1.5rem;
+            }
+            .upload-hero h1 {
+                font-size: 1.25rem;
+            }
+            .form-section {
+                padding: 1rem;
+            }
+            .mode-pill-group,
+            .selector-grid,
+            .switch-buttons {
+                flex-direction: column;
+            }
+            .mode-pill label,
+            .selector-pill label,
+            .module-switch button {
+                width: 100%;
+            }
         }
         
         /* Action Buttons Section - Always Visible */
@@ -198,87 +633,370 @@
             visibility: visible !important;
             opacity: 1 !important;
             position: sticky;
-            top: 0;
+            top: 1rem;
             z-index: 1000;
+        }
+
+        .tool-card {
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+        }
+
+        .module-switch {
             background: white;
-            border: 2px solid #2563eb;
+            border-radius: 0.75rem;
+            border: 1px solid var(--border);
+            padding: 1rem 1.5rem;
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 1.5rem;
+        }
+
+        .module-switch h4 {
+            font-size: 0.875rem;
+            margin-bottom: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+        }
+
+        .module-switch .switch-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .module-switch button {
+            border-radius: 0.5rem;
+            border: 1px solid var(--border);
+            background: var(--bg-light);
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 0.875rem;
+            padding: 0.5rem 1rem;
+            transition: all 0.2s ease;
+        }
+
+        .module-switch button:hover {
+            background: #e0f2fe;
+            border-color: #93c5fd;
+            color: var(--text-primary);
+        }
+
+        .module-switch button.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .reading-set-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 1rem;
+            padding: 1.25rem;
+            background: #fff;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+        }
+
+        .reading-set-card + .reading-set-card {
+            margin-top: 1rem;
+        }
+
+        .reading-set-form .accordion-button {
+            font-weight: 600;
+        }
+
+        .reading-set-form .form-text {
+            font-size: 0.85rem;
         }
         
-        #action-buttons-section h4 {
-            color: #1e40af;
-            font-size: 1.5rem;
-            font-weight: bold;
+        .tool-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .tool-actions .btn {
+            border-radius: 0.5rem;
+        }
+        
+        /* Lessons Management Styles */
+        .nav-pills .nav-link {
+            border-radius: 999px;
+            padding: 0.65rem 1.5rem;
+            font-weight: 600;
+            color: #475569;
+            border: 1px solid transparent;
+        }
+        .nav-pills .nav-link.active {
+            background: #dbeafe;
+            color: #1e3a8a;
+            border-color: #bfdbfe;
+            box-shadow: 0 6px 15px rgba(148, 163, 184, 0.25);
+        }
+        .lesson-card {
+            background: #f8fafc;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            border-radius: 0.9rem;
+            padding: 1.2rem;
+            margin-bottom: 0.9rem;
+            transition: all 0.2s ease;
+        }
+        .lesson-card:hover {
+            border-color: #bfdbfe;
+            background: #eff6ff;
+            box-shadow: 0 10px 24px rgba(148, 163, 184, 0.25);
+        }
+        .lesson-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 0.35rem;
+        }
+        .lesson-meta {
+            display: flex;
+            gap: 0.85rem;
+            flex-wrap: wrap;
+            font-size: 0.78rem;
+            color: #64748b;
+        }
+        .lesson-meta span i {
+            color: #6366f1;
+        }
+        .lesson-actions {
+            display: flex;
+            gap: 0.4rem;
+        }
+        .lesson-actions .btn {
+            border-radius: 0.65rem;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 2rem 1rem;
+            color: #64748b;
+        }
+        .empty-state i {
+            font-size: 2.5rem;
+            margin-bottom: 0.75rem;
+            opacity: 0.6;
+        }
+        
+        /* Compact Reading/Listening Set Headers */
+        .reading-set-form h3,
+        #listening-set-module h3 {
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+        }
+        .reading-set-form p,
+        #listening-set-module p {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        @media (max-width: 992px) {
+            .hero-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .selector-grid {
+                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            }
         }
     </style>
 </head>
 <body class="bg-body-tertiary">
-    <div class="admin-container">
-        <!-- Header -->
-        <div class="text-center mb-4">
-            <h1 class="display-4 fw-bold mb-2">
-                <i class="bi bi-cloud-upload me-3"></i>
-                Admin Upload Bài Học
-            </h1>
-            <p class="text-muted">Tạo và quản lý bài học Reading cho Mini Hippo</p>
+    <!-- Sidebar Toggle Button (Mobile) -->
+    <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()">
+        <i class="bi bi-list"></i>
+    </button>
+    
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2>
+                <i class="bi bi-pencil-square"></i>
+                Admin Upload
+            </h2>
         </div>
         
-        <!-- Part Selector -->
-        <div class="part-selector">
-            <h3 class="mb-3"><i class="bi bi-list-ul me-2"></i>Chọn Part</h3>
-            <div class="btn-group w-100" role="group">
-                <input type="radio" class="btn-check" name="partSelect" id="part1" value="1" checked>
-                <label class="btn btn-outline-light" for="part1">
-                    <i class="bi bi-1-circle me-2"></i>Part 1
-                </label>
-                
-                <input type="radio" class="btn-check" name="partSelect" id="part2" value="2">
-                <label class="btn btn-outline-light" for="part2">
-                    <i class="bi bi-2-circle me-2"></i>Part 2 & 3
-                </label>
-                
-                <input type="radio" class="btn-check" name="partSelect" id="part4" value="4">
-                <label class="btn btn-outline-light" for="part4">
-                    <i class="bi bi-4-circle me-2"></i>Part 4
-                </label>
-                
-                <input type="radio" class="btn-check" name="partSelect" id="part5" value="5">
-                <label class="btn btn-outline-light" for="part5">
-                    <i class="bi bi-5-circle me-2"></i>Part 5
-                </label>
+        <nav class="sidebar-menu">
+            <div class="menu-section">
+                <div class="menu-section-title">Loại bài học</div>
+                <a href="#" class="menu-item" data-type="reading" onclick="selectType('reading'); return false;">
+                    <i class="bi bi-book-half"></i>
+                    Reading
+                </a>
+                <a href="#" class="menu-item" data-type="listening" onclick="selectType('listening'); return false;">
+                    <i class="bi bi-headphones"></i>
+                    Listening
+                </a>
+            </div>
+            
+            <div class="menu-section" id="reading-menu-section">
+                <div class="menu-section-title">Reading Parts</div>
+                <a href="#" class="menu-item" data-part="1" onclick="selectReadingPart(1); return false;">
+                    <i class="bi bi-1-circle"></i>
+                    Question 1
+                </a>
+                <a href="#" class="menu-item" data-part="2" onclick="selectReadingPart(2); return false;">
+                    <i class="bi bi-2-circle"></i>
+                    Question 2
+                </a>
+                <a href="#" class="menu-item" data-part="4" onclick="selectReadingPart(4); return false;">
+                    <i class="bi bi-3-circle"></i>
+                    Question 3
+                </a>
+                <a href="#" class="menu-item" data-part="5" onclick="selectReadingPart(5); return false;">
+                    <i class="bi bi-4-circle"></i>
+                    Question 4
+                </a>
+            </div>
+            
+            <div class="menu-section" id="listening-menu-section" style="display: none;">
+                <div class="menu-section-title">Listening Parts</div>
+                <a href="#" class="menu-item" data-part="1_13" onclick="selectListeningPart('1_13'); return false;">
+                    <i class="bi bi-1-circle"></i>
+                    Question 1-13
+                </a>
+                <a href="#" class="menu-item" data-part="14" onclick="selectListeningPart('14'); return false;">
+                    <i class="bi bi-2-circle"></i>
+                    Question 14
+                </a>
+                <a href="#" class="menu-item" data-part="15" onclick="selectListeningPart('15'); return false;">
+                    <i class="bi bi-3-circle"></i>
+                    Question 15
+                </a>
+                <a href="#" class="menu-item" data-part="16_17" onclick="selectListeningPart('16_17'); return false;">
+                    <i class="bi bi-4-circle"></i>
+                    Question 16 & 17
+                </a>
+            </div>
+            
+            <div class="menu-section">
+                <div class="menu-section-title">Chế độ làm việc</div>
+                <a href="#" class="menu-item" data-module="single-part-module" onclick="selectModule('single-part-module'); return false;">
+                    <i class="bi bi-file-earmark-plus"></i>
+                    Upload theo phần
+                </a>
+                <a href="#" class="menu-item" data-module="reading-set-module" onclick="selectModule('reading-set-module'); return false;">
+                    <i class="bi bi-book"></i>
+                    Bộ đề Reading
+                </a>
+                <a href="#" class="menu-item" data-module="listening-set-module" onclick="selectModule('listening-set-module'); return false;">
+                    <i class="bi bi-headphones"></i>
+                    Bộ đề Listening
+                </a>
+            </div>
+            
+            <div class="menu-section">
+                <div class="menu-section-title">Quản lý</div>
+                <a href="#" class="menu-item" data-module="lessons-management-module" onclick="selectModule('lessons-management-module'); return false;">
+                    <i class="bi bi-journal-text"></i>
+                    Quản lý bài học
+                </a>
+            </div>
+        </nav>
+        
+        <div class="sidebar-footer">
+            <a href="admin.html" class="menu-item">
+                <i class="bi bi-arrow-left"></i>
+                Về Admin Panel
+            </a>
+        </div>
+    </aside>
+    
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="admin-container">
+        <!-- Compact Header -->
+        <div class="upload-hero">
+            <div>
+                <h1>
+                    <i class="bi bi-pencil-square me-2"></i>
+                    Tạo & Quản lý Bài Học
+                </h1>
+                <p>Thiết kế và đẩy bài học Reading/Listening lên GitHub</p>
+            </div>
+        </div>
+
+        <!-- Action Buttons - Compact and Contextual -->
+        <div id="action-buttons-section" class="form-section" style="display: none;">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2">
+                <div class="flex-grow-1">
+                    <h5 class="mb-1 fw-semibold" style="font-size: 0.875rem;">
+                        <i class="bi bi-tools me-2"></i>Công cụ
+                    </h5>
+                    <p class="text-muted small mb-0" style="font-size: 0.75rem;">Kiểm tra dữ liệu, xem trước và đẩy bài học lên GitHub.</p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="previewQuestionSets()">
+                        <i class="bi bi-list-ul me-1"></i>Danh sách
+                    </button>
+                    <a href="admin_lessons.html" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-collection me-1"></i>Quản lý
+                    </a>
+                </div>
+            </div>
+            <div id="edit-mode-banner" class="alert alert-info py-2 px-3 mb-2 mt-2" style="display: none; font-size: 0.875rem;">
+                <i class="bi bi-info-circle me-2"></i>
+                <strong>Chế độ chỉnh sửa:</strong> Bạn đang chỉnh sửa bài học. Thay đổi sẽ được lưu khi upload.
+            </div>
+            <div class="tool-actions d-flex gap-2 flex-wrap mt-2">
+                <button type="button" class="btn btn-primary btn-sm" onclick="previewLessonInterface()">
+                    <i class="bi bi-eye me-1"></i>Preview
+                </button>
+                <button type="button" class="btn btn-success btn-sm" id="upload-github-btn" onclick="handleUploadToGitHub()">
+                    <i class="bi bi-cloud-upload me-1"></i>Upload
+                </button>
             </div>
         </div>
         
-        <!-- Action Buttons - Always Visible -->
-        <div id="action-buttons-section" class="form-section" style="display: block !important; visibility: visible !important; position: sticky; top: 0; z-index: 1000; background: white; padding: 1.5rem; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 2rem; border: 2px solid #2563eb;">
-            <h4 class="mb-3 fw-bold"><i class="bi bi-tools me-2"></i>Công cụ</h4>
-            <div class="d-flex gap-3 flex-wrap">
-                <button type="button" class="btn btn-primary btn-lg" onclick="previewQuestionSets()">
-                    <i class="bi bi-list-ul me-2"></i>Danh sách bộ đề
-                </button>
-                <button type="button" class="btn btn-info btn-lg" onclick="previewLessonInterface()">
-                    <i class="bi bi-eye me-2"></i>Preview giao diện bài học
-                </button>
-                <button type="button" class="btn btn-export btn-lg" onclick="exportToJS()">
-                    <i class="bi bi-code-square me-2"></i>Export JS Code
-                </button>
-                <button type="button" class="btn btn-success btn-lg" id="upload-github-btn" onclick="uploadLessonToGitHub()">
-                    <i class="bi bi-cloud-upload me-2"></i>Upload to GitHub
-                </button>
-            </div>
-        </div>
-        
+        <div id="single-part-module">
         <!-- Part 1 Form -->
         <div id="part1-form" class="form-section">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h3 class="mb-0"><i class="bi bi-pencil-square me-2"></i>Part 1: Fill in the Blank</h3>
-                <button type="button" class="btn btn-primary" onclick="addQuestionSet(1)">
-                    <i class="bi bi-plus-circle me-2"></i>Thêm bộ đề mới
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-2">
+                <div>
+                    <h3 class="mb-1" style="font-size: 1rem;"><i class="bi bi-pencil-square me-2"></i>Question 1: Fill in the Blank</h3>
+                    <p class="text-muted small mb-0" style="font-size: 0.75rem;">Nhập câu hỏi dạng điền từ vào chỗ trống, tối ưu cho học sinh A1/A2.</p>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" onclick="addQuestionSet(1)">
+                    <i class="bi bi-plus-circle me-1"></i>Thêm bộ đề
                 </button>
+            </div>
+            
+            <!-- Question Input Form - Always Visible -->
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0" style="font-size: 0.875rem;">Nhập câu hỏi</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Tiêu đề bộ đề (tùy chọn)</label>
+                        <input type="text" class="form-control form-control-sm" id="part1-title-input" placeholder="Ví dụ: Đề mới tháng 10 - Bộ đề 22">
+                    </div>
+                    
+                    <div id="part1-questions-container">
+                        <!-- Questions will be added here -->
+                    </div>
+                    
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="addPart1Question()">
+                            <i class="bi bi-plus-circle me-1"></i>Thêm câu hỏi
+                        </button>
+                        <button type="button" class="btn btn-success btn-sm" onclick="savePart1Set()">
+                            <i class="bi bi-check-circle me-1"></i>Lưu bộ đề
+                        </button>
+                    </div>
+                </div>
             </div>
             
             <!-- Question Sets Container -->
             <div id="part1-sets-container" class="mb-4">
                 <!-- Question sets will be rendered here -->
+            </div>
+            <div class="empty-state-notice mb-3" id="part1-empty-state" style="display:none;">
+                <i class="bi bi-info-circle me-2"></i>Chưa có bộ đề nào cho Part 1. Tạo bộ đề mới để bắt đầu.
             </div>
             
             <!-- Edit Form (hidden by default) -->
@@ -312,14 +1030,420 @@
                 </div>
             </div>
         </div>
+        </div> <!-- /single-part-module -->
+        
+        <!-- Reading Practice Set Module -->
+        <div id="reading-set-module" class="form-section reading-set-form" style="display: none;">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-2">
+                <div>
+                    <h3 class="mb-1" style="font-size: 1rem;"><i class="bi bi-collection me-2"></i>Bộ đề Reading (4 phần)</h3>
+                    <p class="text-muted small mb-0" style="font-size: 0.75rem;">Tạo trọn bộ Part 1 → Part 5 trong một lần, dùng cho trang học theo bộ đề.</p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="refreshReadingSetsBtn">
+                        <i class="bi bi-arrow-repeat me-1"></i>Tải lại
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" id="createReadingSetBtn">
+                        <i class="bi bi-plus-circle me-1"></i>Tạo mới
+                    </button>
+                </div>
+            </div>
+
+            <div id="reading-set-list" class="mb-4"></div>
+            <div id="reading-set-empty" class="empty-state-notice" style="display: none;">
+                <i class="bi bi-info-circle me-2"></i>Chưa có bộ đề upload nào. Hãy tạo bộ đề đầu tiên của bạn.
+            </div>
+
+            <div id="reading-set-form-card" class="card" style="display: none;">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0" id="reading-set-form-title">Tạo bộ đề Reading</h5>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="cancelReadingSetBtn">
+                            <i class="bi bi-x-lg me-1"></i>Đóng
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Tiêu đề bộ đề</label>
+                            <input type="text" class="form-control" id="reading-set-title" placeholder="Ví dụ: Bộ đề Reading #010">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Thời lượng (phút)</label>
+                            <input type="number" class="form-control" id="reading-set-duration" min="10" max="60" value="35">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Mô tả ngắn</label>
+                            <textarea class="form-control" id="reading-set-description" rows="2" placeholder="Thông tin nổi bật, ví dụ: Chủ đề công việc mùa hè..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="accordion mt-4" id="readingSetAccordion">
+                        <!-- Part 1 -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="headingPart1">
+                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePart1" aria-expanded="true">
+                                    Question 1
+                                </button>
+                            </h2>
+                            <div id="collapsePart1" class="accordion-collapse collapse show" data-bs-parent="#readingSetAccordion">
+                                <div class="accordion-body">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Giới thiệu (tuỳ chọn)</label>
+                                        <textarea class="form-control" id="reading-part1-intro" rows="2" placeholder="Ví dụ: Choose the best word to complete each sentence."></textarea>
+                                    </div>
+                                    <div id="reading-part1-questions" class="mb-3"></div>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" id="addReadingPart1QuestionBtn">
+                                        <i class="bi bi-plus-circle me-1"></i>Thêm câu hỏi
+                                    </button>
+                                    <div class="form-text mt-2">Nhập ít nhất 5 câu hỏi. Với phần tùy chọn, dùng dấu phẩy hoặc xuống dòng để tách đáp án.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Part 2 -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="headingPart2">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePart2">
+                                    Question 2
+                                </button>
+                            </h2>
+                            <div id="collapsePart2" class="accordion-collapse collapse" data-bs-parent="#readingSetAccordion">
+                                <div class="accordion-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Topic</label>
+                                            <input type="text" class="form-control" id="reading-part2-topic" placeholder="Ví dụ: Visiting a new island">
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label fw-bold">Danh sách câu (mỗi câu một dòng)</label>
+                                            <textarea class="form-control" id="reading-part2-sentences" rows="5" placeholder="Nhập từng câu và xuống dòng. Thứ tự nhập = đáp án đúng."></textarea>
+                                            <div class="form-text">Người học sẽ kéo thả lại các câu để tạo thứ tự đúng.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Part 4 -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="headingPart4">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePart4">
+                                    Question 3
+                                </button>
+                            </h2>
+                            <div id="collapsePart4" class="accordion-collapse collapse" data-bs-parent="#readingSetAccordion">
+                                <div class="accordion-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Topic</label>
+                                            <input type="text" class="form-control" id="reading-part4-topic" placeholder="Ví dụ: Music festival">
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label fw-bold">Đoạn giới thiệu</label>
+                                            <textarea class="form-control" id="reading-part4-intro" rows="2" placeholder="Ví dụ: Here are four opinions about ..."></textarea>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Đoạn A</label>
+                                            <textarea class="form-control" id="reading-part4-text-a" rows="3"></textarea>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Đoạn B</label>
+                                            <textarea class="form-control" id="reading-part4-text-b" rows="3"></textarea>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Đoạn C</label>
+                                            <textarea class="form-control" id="reading-part4-text-c" rows="3"></textarea>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Đoạn D</label>
+                                            <textarea class="form-control" id="reading-part4-text-d" rows="3"></textarea>
+                                        </div>
+                                    </div>
+                                    <hr>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="mb-0 fw-semibold">Câu hỏi (mặc định 7 câu)</h6>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" id="addReadingPart4QuestionBtn">
+                                            <i class="bi bi-plus-circle me-1"></i>Thêm câu hỏi
+                                        </button>
+                                    </div>
+                                    <div id="reading-part4-questions"></div>
+                                    <div class="form-text">Đáp án hợp lệ: A, B, C, D.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Part 5 -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="headingPart5">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePart5">
+                                    Question 4
+                                </button>
+                            </h2>
+                            <div id="collapsePart5" class="accordion-collapse collapse" data-bs-parent="#readingSetAccordion">
+                                <div class="accordion-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Topic</label>
+                                            <input type="text" class="form-control" id="reading-part5-topic" placeholder="Ví dụ: Mountain adventures">
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label fw-bold">Options/Headings (mỗi dòng một tiêu đề, dòng đầu tiên để trống)</label>
+                                            <textarea class="form-control" id="reading-part5-options" rows="5" placeholder="-- Chọn --&#10;The meaning of mountain&#10;Sense of achievement ..."></textarea>
+                                        </div>
+                                    </div>
+                                    <hr>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="mb-0 fw-semibold">Đoạn văn & đáp án</h6>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" id="addReadingPart5ParagraphBtn">
+                                            <i class="bi bi-plus-circle me-1"></i>Thêm đoạn văn
+                                        </button>
+                                    </div>
+                                    <div id="reading-part5-paragraphs"></div>
+                                    <div class="row g-3 mt-2">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Mẹo học - Keyword</label>
+                                            <textarea class="form-control" id="reading-part5-keyword" rows="2"></textarea>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Mẹo học - Nhớ theo đoạn văn</label>
+                                            <textarea class="form-control" id="reading-part5-meo" rows="2"></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-column flex-md-row gap-2 mt-4">
+                        <button type="button" class="btn btn-success" id="saveReadingSetBtn">
+                            <i class="bi bi-cloud-arrow-up me-2"></i>Lưu bộ đề
+                        </button>
+                        <button type="button" class="btn btn-outline-primary" id="previewReadingSetBtn" disabled title="Preview trực tiếp sẽ khả dụng sau khi lưu bộ đề.">
+                            <i class="bi bi-eye me-2"></i>Preview nhanh
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Listening Practice Set Module -->
+        <div id="listening-set-module" class="form-section" style="display: none;">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-2">
+                <div>
+                    <h3 class="mb-1" style="font-size: 1rem;"><i class="bi bi-headphones me-2"></i>Bộ đề Listening (4 phần)</h3>
+                    <p class="text-muted small mb-0" style="font-size: 0.75rem;">Tạo trọn bộ Question 1-13 → Question 16-17 trong một lần, dùng cho trang học theo bộ đề.</p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="refreshListeningSetsBtn">
+                        <i class="bi bi-arrow-repeat me-1"></i>Tải lại
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" id="createListeningSetBtn">
+                        <i class="bi bi-plus-circle me-1"></i>Tạo mới
+                    </button>
+                </div>
+            </div>
+
+            <div id="listening-set-list" class="mb-4"></div>
+            <div id="listening-set-empty" class="empty-state-notice" style="display: none;">
+                <i class="bi bi-info-circle me-2"></i>Chưa có bộ đề listening nào. Hãy tạo bộ đề đầu tiên của bạn.
+            </div>
+
+            <div id="listening-set-form-card" class="card" style="display: none;">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0" id="listening-set-form-title">Tạo bộ đề Listening</h5>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="cancelListeningSetBtn">
+                            <i class="bi bi-x-lg me-1"></i>Đóng
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Tiêu đề bộ đề</label>
+                            <input type="text" class="form-control" id="listening-set-title" placeholder="Ví dụ: Bộ đề Listening #001">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Thời lượng (phút)</label>
+                            <input type="number" class="form-control" id="listening-set-duration" min="10" max="60" value="35">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Mô tả ngắn</label>
+                            <textarea class="form-control" id="listening-set-description" rows="2" placeholder="Thông tin nổi bật..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="accordion mt-4" id="listeningSetAccordion">
+                        <!-- Part 1: Questions 1-13 -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="headingListeningPart1">
+                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseListeningPart1" aria-expanded="true">
+                                    Question 1 (Questions 1-13)
+                                </button>
+                            </h2>
+                            <div id="collapseListeningPart1" class="accordion-collapse collapse show" data-bs-parent="#listeningSetAccordion">
+                                <div class="accordion-body">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Số lượng câu hỏi (1-13)</label>
+                                        <input type="number" class="form-control" id="listening-part1-count" min="1" max="13" value="13">
+                                    </div>
+                                    <div id="listening-part1-questions" class="mb-3"></div>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" id="addListeningPart1QuestionBtn">
+                                        <i class="bi bi-plus-circle me-1"></i>Thêm câu hỏi
+                                    </button>
+                                    <div class="form-text mt-2">Mỗi câu hỏi cần: audio URL, câu hỏi, 3 lựa chọn, đáp án đúng, transcript.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Part 2: Question 14 -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="headingListeningPart2">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseListeningPart2">
+                                    Question 2 (Question 14)
+                                </button>
+                            </h2>
+                            <div id="collapseListeningPart2" class="accordion-collapse collapse" data-bs-parent="#listeningSetAccordion">
+                                <div class="accordion-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Topic</label>
+                                            <input type="text" class="form-control" id="listening-part2-topic" placeholder="Ví dụ: Shopping">
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label fw-bold">Chọn file MP3</label>
+                                            <input type="file" class="form-control" id="listening-part2-audio-file" accept="audio/mp3,audio/mpeg,.mp3">
+                                            <input type="hidden" id="listening-part2-audio" value="">
+                                            <div class="form-text">Hoặc nhập URL: <input type="text" class="form-control mt-1" id="listening-part2-audio-url" placeholder="audio/question14/audio_q1.mp3"></div>
+                                            <div id="listening-part2-audio-status" class="mt-2"></div>
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label fw-bold">Options (6 options, mỗi option một dòng)</label>
+                                            <textarea class="form-control" id="listening-part2-options" rows="6" placeholder="Option 1&#10;Option 2&#10;..."></textarea>
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label fw-bold">Correct Answers (4 answers, mỗi answer một dòng cho Person 1, 2, 3, 4)</label>
+                                            <textarea class="form-control" id="listening-part2-answers" rows="4" placeholder="Person 1 answer&#10;Person 2 answer&#10;..."></textarea>
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label fw-bold">Transcript</label>
+                                            <textarea class="form-control" id="listening-part2-transcript" rows="8"></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Part 3: Question 15 -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="headingListeningPart3">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseListeningPart3">
+                                    Question 3 (Question 15)
+                                </button>
+                            </h2>
+                            <div id="collapseListeningPart3" class="accordion-collapse collapse" data-bs-parent="#listeningSetAccordion">
+                                <div class="accordion-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Topic</label>
+                                            <input type="text" class="form-control" id="listening-part3-topic" placeholder="Ví dụ: Changes in the workplace">
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label fw-bold">Chọn file MP3</label>
+                                            <input type="file" class="form-control" id="listening-part3-audio-file" accept="audio/mp3,audio/mpeg,.mp3">
+                                            <input type="hidden" id="listening-part3-audio" value="">
+                                            <div class="form-text">Hoặc nhập URL: <input type="text" class="form-control mt-1" id="listening-part3-audio-url" placeholder="audio/question15/audio_q1.mp3"></div>
+                                            <div id="listening-part3-audio-status" class="mt-2"></div>
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label fw-bold">Questions (4 questions, mỗi question một dòng)</label>
+                                            <textarea class="form-control" id="listening-part3-questions" rows="4" placeholder="Question 1&#10;Question 2&#10;..."></textarea>
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label fw-bold">Correct Answers (Man/Woman/Both, mỗi answer một dòng)</label>
+                                            <textarea class="form-control" id="listening-part3-answers" rows="4" placeholder="Man&#10;Woman&#10;Both&#10;Man"></textarea>
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label fw-bold">Transcript</label>
+                                            <textarea class="form-control" id="listening-part3-transcript" rows="10"></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Part 4: Questions 16-17 -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="headingListeningPart4">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseListeningPart4">
+                                    Question 4 (Questions 16-17)
+                                </button>
+                            </h2>
+                            <div id="collapseListeningPart4" class="accordion-collapse collapse" data-bs-parent="#listeningSetAccordion">
+                                <div class="accordion-body">
+                                    <div id="listening-part4-questions" class="mb-3"></div>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" id="addListeningPart4QuestionBtn">
+                                        <i class="bi bi-plus-circle me-1"></i>Thêm câu hỏi (tối đa 2)
+                                    </button>
+                                    <div class="form-text mt-2">Mỗi câu hỏi (16 hoặc 17) cần: audio URL, topic, các câu hỏi con với options, transcript.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 d-flex gap-2 justify-content-end">
+                        <button type="button" class="btn btn-secondary" id="cancelListeningSetBtn2">Hủy</button>
+                        <button type="button" class="btn btn-primary" id="saveListeningSetBtn">
+                            <i class="bi bi-save me-2"></i>Lưu bộ đề
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
         
         <!-- Part 2 & 3 Form -->
         <div id="part2-form" class="form-section" style="display: none;">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h3 class="mb-0"><i class="bi bi-arrow-down-up me-2"></i>Part 2 & 3: Sentence Ordering</h3>
-                <button type="button" class="btn btn-primary" onclick="addQuestionSet(2)">
-                    <i class="bi bi-plus-circle me-2"></i>Thêm bộ đề mới
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-2">
+                <div>
+                    <h3 class="mb-1" style="font-size: 1rem;"><i class="bi bi-arrow-down-up me-2"></i>Question 2: Sentence Ordering</h3>
+                    <p class="text-muted small mb-0" style="font-size: 0.75rem;">Nhập các câu văn để học sinh sắp xếp lại theo thứ tự đúng.</p>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" onclick="addQuestionSet(2)">
+                    <i class="bi bi-plus-circle me-1"></i>Thêm bộ đề
                 </button>
+            </div>
+            
+            <!-- Question Input Form - Always Visible -->
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0" style="font-size: 0.875rem;">Nhập câu hỏi</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Tiêu đề bộ đề (tùy chọn)</label>
+                        <input type="text" class="form-control form-control-sm" id="part2-title-input" placeholder="Ví dụ: Films">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Topic</label>
+                        <input type="text" class="form-control form-control-sm" id="part2-topic-input" placeholder="Ví dụ: Visiting an island">
+                    </div>
+                    
+                    <div id="part2-sentences-container">
+                        <!-- Sentences will be added here -->
+                    </div>
+                    
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="addPart2Sentence()">
+                            <i class="bi bi-plus-circle me-1"></i>Thêm câu văn
+                        </button>
+                        <button type="button" class="btn btn-success btn-sm" onclick="savePart2Set()">
+                            <i class="bi bi-check-circle me-1"></i>Lưu bộ đề
+                        </button>
+                    </div>
+                </div>
             </div>
             
             <!-- Question Sets Container -->
@@ -366,11 +1490,74 @@
         
         <!-- Part 4 Form -->
         <div id="part4-form" class="form-section" style="display: none;">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h3 class="mb-0"><i class="bi bi-file-text me-2"></i>Part 4: Reading Comprehension</h3>
-                <button type="button" class="btn btn-primary" onclick="addQuestionSet(4)">
-                    <i class="bi bi-plus-circle me-2"></i>Thêm bộ đề mới
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-2">
+                <div>
+                    <h3 class="mb-1" style="font-size: 1rem;"><i class="bi bi-file-text me-2"></i>Question 3: Reading Comprehension</h3>
+                    <p class="text-muted small mb-0" style="font-size: 0.75rem;">Nhập đoạn văn và câu hỏi để học sinh đọc hiểu và chọn đáp án.</p>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" onclick="addQuestionSet(4)">
+                    <i class="bi bi-plus-circle me-1"></i>Thêm bộ đề
                 </button>
+            </div>
+            
+            <!-- Question Input Form - Always Visible -->
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0" style="font-size: 0.875rem;">Nhập câu hỏi</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Tiêu đề bộ đề (tùy chọn)</label>
+                        <input type="text" class="form-control form-control-sm" id="part4-title-input" placeholder="Ví dụ: Reading Question 4">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Topic</label>
+                        <input type="text" class="form-control form-control-sm" id="part4-topic-input" placeholder="Ví dụ: Games from childhood">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Đoạn văn (A, B, C, D)</label>
+                        <div class="row g-2">
+                            <div class="col-12">
+                                <label class="form-label small">Đoạn giới thiệu</label>
+                                <textarea class="form-control form-control-sm" id="part4-text-intro-input" rows="2" placeholder="<strong>Here is the perspective of four people...</strong>"></textarea>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small">Đoạn A</label>
+                                <textarea class="form-control form-control-sm" id="part4-text-a-input" rows="3" placeholder="<strong>A:</strong> Nội dung..."></textarea>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small">Đoạn B</label>
+                                <textarea class="form-control form-control-sm" id="part4-text-b-input" rows="3" placeholder="<strong>B:</strong> Nội dung..."></textarea>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small">Đoạn C</label>
+                                <textarea class="form-control form-control-sm" id="part4-text-c-input" rows="3" placeholder="<strong>C:</strong> Nội dung..."></textarea>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small">Đoạn D</label>
+                                <textarea class="form-control form-control-sm" id="part4-text-d-input" rows="3" placeholder="<strong>D:</strong> Nội dung..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Câu hỏi (7 câu)</label>
+                        <div id="part4-questions-container">
+                            <!-- Questions will be added here -->
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm mt-2" onclick="addPart4Question()">
+                            <i class="bi bi-plus-circle me-1"></i>Thêm câu hỏi
+                        </button>
+                    </div>
+                    
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="button" class="btn btn-success btn-sm" onclick="savePart4Set()">
+                            <i class="bi bi-check-circle me-1"></i>Lưu bộ đề
+                        </button>
+                    </div>
+                </div>
             </div>
             
             <!-- Question Sets Container -->
@@ -446,11 +1633,69 @@
         
         <!-- Part 5 Form -->
         <div id="part5-form" class="form-section" style="display: none;">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h3 class="mb-0"><i class="bi bi-link-45deg me-2"></i>Part 5: Paragraph Matching</h3>
-                <button type="button" class="btn btn-primary" onclick="addQuestionSet(5)">
-                    <i class="bi bi-plus-circle me-2"></i>Thêm bộ đề mới
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-2">
+                <div>
+                    <h3 class="mb-1" style="font-size: 1rem;"><i class="bi bi-link-45deg me-2"></i>Question 4: Paragraph Matching</h3>
+                    <p class="text-muted small mb-0" style="font-size: 0.75rem;">Nhập các tiêu đề và đoạn văn để học sinh nối đúng.</p>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" onclick="addQuestionSet(5)">
+                    <i class="bi bi-plus-circle me-1"></i>Thêm bộ đề
                 </button>
+            </div>
+            
+            <!-- Question Input Form - Always Visible -->
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0" style="font-size: 0.875rem;">Nhập câu hỏi</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Tiêu đề bộ đề (tùy chọn)</label>
+                        <input type="text" class="form-control form-control-sm" id="part5-title-input" placeholder="Ví dụ: Reading Question 5">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Topic</label>
+                        <input type="text" class="form-control form-control-sm" id="part5-topic-input" placeholder="Ví dụ: Mountain">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Options (Headings) - 7 options</label>
+                        <div id="part5-options-container">
+                            <!-- Options will be added here -->
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm mt-2" onclick="addPart5Option()">
+                            <i class="bi bi-plus-circle me-1"></i>Thêm option
+                        </button>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Paragraphs (Đoạn văn) - 7 đoạn</label>
+                        <div id="part5-paragraphs-container">
+                            <!-- Paragraphs will be added here -->
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm mt-2" onclick="addPart5Paragraph()">
+                            <i class="bi bi-plus-circle me-1"></i>Thêm đoạn văn
+                        </button>
+                    </div>
+                    
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Mẹo học - Keyword</label>
+                            <textarea class="form-control form-control-sm" id="part5-keyword-input" rows="2" placeholder="<strong>Mẹo nhớ Keyword:</strong> ..."></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Mẹo học - Nhớ theo đoạn văn</label>
+                            <textarea class="form-control form-control-sm" id="part5-meo-input" rows="2" placeholder="<strong>Nhớ theo đoạn văn:</strong> ..."></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="button" class="btn btn-success btn-sm" onclick="savePart5Set()">
+                            <i class="bi bi-check-circle me-1"></i>Lưu bộ đề
+                        </button>
+                    </div>
+                </div>
             </div>
             
             <!-- Question Sets Container -->
@@ -518,6 +1763,510 @@
             </div>
         </div>
         
+        <!-- ============================================
+                    LISTENING FORMS
+        ============================================ -->
+        
+        <!-- Listening Question 1-13 Form -->
+        <div id="listening-part1_13-form" class="form-section" style="display: none;">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-2">
+                <div>
+                    <h3 class="mb-1" style="font-size: 1rem;"><i class="bi bi-headphones me-2"></i>Listening Question 1-13</h3>
+                    <p class="text-muted small mb-0" style="font-size: 0.75rem;">Nhập các câu hỏi nghe hiểu với audio, câu hỏi, lựa chọn và đáp án.</p>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" onclick="addListeningQuestionSet('1_13')">
+                    <i class="bi bi-plus-circle me-1"></i>Thêm bộ đề
+                </button>
+            </div>
+            
+            <!-- Question Input Form - Always Visible -->
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0" style="font-size: 0.875rem;">Nhập câu hỏi</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Tiêu đề bộ đề (tùy chọn)</label>
+                        <input type="text" class="form-control form-control-sm" id="listening-part1_13-title-input" placeholder="Ví dụ: Listening Question 1-13 - Set 1">
+                    </div>
+                    
+                    <div id="listening-part1_13-questions-container">
+                        <!-- Questions will be added here -->
+                    </div>
+                    
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="addListeningQuestion1_13()">
+                            <i class="bi bi-plus-circle me-1"></i>Thêm câu hỏi
+                        </button>
+                        <button type="button" class="btn btn-success btn-sm" onclick="saveListeningPart1_13Set()">
+                            <i class="bi bi-check-circle me-1"></i>Lưu bộ đề
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Question Sets Container -->
+            <div id="listening-part1_13-sets-container" class="mb-4">
+                <!-- Question sets will be rendered here -->
+            </div>
+            
+            <!-- Edit Form (hidden by default) -->
+            <div id="listening-part1_13-edit-form" style="display: none;">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Chỉnh sửa bộ đề Question 1-13</h5>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="cancelListeningEdit('1_13')">
+                            <i class="bi bi-x"></i> Hủy
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Tiêu đề bộ đề</label>
+                            <input type="text" class="form-control" id="listening-part1_13-title" placeholder="Ví dụ: Listening Question 1-13 - Set 1">
+                        </div>
+                        
+                        <div id="listening-part1_13-questions-container">
+                            <!-- Questions will be added here -->
+                        </div>
+                        
+                        <div class="d-flex gap-2 mt-3">
+                            <button type="button" class="btn btn-add" onclick="addListeningQuestion1_13()">
+                                <i class="bi bi-plus-circle me-2"></i>Thêm câu hỏi (tối đa 13)
+                            </button>
+                            <button type="button" class="btn btn-success" onclick="saveListeningCurrentSet('1_13')">
+                                <i class="bi bi-check-circle me-2"></i>Lưu bộ đề
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Listening Question 14 Form -->
+        <div id="listening-part14-form" class="form-section" style="display: none;">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-2">
+                <div>
+                    <h3 class="mb-1" style="font-size: 1rem;"><i class="bi bi-headphones me-2"></i>Listening Question 14</h3>
+                    <p class="text-muted small mb-0" style="font-size: 0.75rem;">Nhập topic, audio, options và transcript cho câu hỏi matching.</p>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" onclick="addListeningQuestionSet('14')">
+                    <i class="bi bi-plus-circle me-1"></i>Thêm bộ đề
+                </button>
+            </div>
+            
+            <!-- Question Input Form - Always Visible -->
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0" style="font-size: 0.875rem;">Nhập câu hỏi</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Tiêu đề bộ đề (tùy chọn)</label>
+                        <input type="text" class="form-control form-control-sm" id="listening-part14-title-input" placeholder="Ví dụ: Listening Question 14 - Set 1">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Topic</label>
+                        <input type="text" class="form-control form-control-sm" id="listening-part14-topic-input" placeholder="Ví dụ: Protect the environment">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Chọn file MP3</label>
+                        <input type="file" class="form-control form-control-sm" id="listening-part14-audio-input" accept="audio/mpeg,audio/mp3">
+                        <div class="form-text small">Hoặc nhập URL: <input type="text" class="form-control form-control-sm mt-1" id="listening-part14-audio-url-input" placeholder="audio/question14/audio_q1.mp3"></div>
+                        <div id="listening-part14-audio-status-input" class="mt-2"></div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Options (6 options - 4 đáp án đúng đầu tiên)</label>
+                        <div id="listening-part14-options-container">
+                            <!-- Options will be added here -->
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm mt-2" onclick="addListeningQuestion14Option()">
+                            <i class="bi bi-plus-circle me-1"></i>Thêm option
+                        </button>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Transcript</label>
+                        <textarea class="form-control form-control-sm" id="listening-part14-transcript-input" rows="4" placeholder="Person A: ...&#10;Person B: ...&#10;Person C: ...&#10;Person D: ..."></textarea>
+                    </div>
+                    
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="button" class="btn btn-success btn-sm" onclick="saveListeningPart14Set()">
+                            <i class="bi bi-check-circle me-1"></i>Lưu bộ đề
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Question Sets Container -->
+            <div id="listening-part14-sets-container" class="mb-4">
+                <!-- Question sets will be rendered here -->
+            </div>
+            
+            <!-- Edit Form (hidden by default) -->
+            <div id="listening-part14-edit-form" style="display: none;">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Chỉnh sửa bộ đề Question 14</h5>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="cancelListeningEdit('14')">
+                            <i class="bi bi-x"></i> Hủy
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Tiêu đề bộ đề</label>
+                            <input type="text" class="form-control" id="listening-part14-title" placeholder="Ví dụ: Listening Question 14 - Set 1">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Topic</label>
+                            <input type="text" class="form-control" id="listening-part14-topic" placeholder="Ví dụ: Protect the environment">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Upload Audio File (MP3)</label>
+                            <input type="file" class="form-control" id="listening-part14-audio" accept="audio/mpeg,audio/mp3">
+                            <small class="text-muted">File size tối đa: 10MB</small>
+                            <div id="listening-part14-audio-preview" class="mt-2"></div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Options (6 options - 4 đáp án đúng đầu tiên)</label>
+                            <div id="listening-part14-options-container">
+                                <!-- Options will be added here -->
+                            </div>
+                            <button type="button" class="btn btn-add mt-2" onclick="addListeningQuestion14Option()">
+                                <i class="bi bi-plus-circle me-2"></i>Thêm option
+                            </button>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Transcript</label>
+                            <textarea class="form-control" id="listening-part14-transcript" rows="8" placeholder="Person A: ...&#10;Person B: ...&#10;Person C: ...&#10;Person D: ..."></textarea>
+                        </div>
+                        
+                        <div class="d-flex gap-2 mt-3">
+                            <button type="button" class="btn btn-success" onclick="saveListeningCurrentSet('14')">
+                                <i class="bi bi-check-circle me-2"></i>Lưu bộ đề
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Listening Question 15 Form -->
+        <div id="listening-part15-form" class="form-section" style="display: none;">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-2">
+                <div>
+                    <h3 class="mb-1" style="font-size: 1rem;"><i class="bi bi-headphones me-2"></i>Listening Question 15</h3>
+                    <p class="text-muted small mb-0" style="font-size: 0.75rem;">Nhập topic, audio, câu hỏi và đáp án (Man/Woman/Both).</p>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" onclick="addListeningQuestionSet('15')">
+                    <i class="bi bi-plus-circle me-1"></i>Thêm bộ đề
+                </button>
+            </div>
+            
+            <!-- Question Input Form - Always Visible -->
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0" style="font-size: 0.875rem;">Nhập câu hỏi</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Tiêu đề bộ đề (tùy chọn)</label>
+                        <input type="text" class="form-control form-control-sm" id="listening-part15-title-input" placeholder="Ví dụ: Listening Question 15 - Set 1">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Topic</label>
+                        <input type="text" class="form-control form-control-sm" id="listening-part15-topic-input" placeholder="Ví dụ: Changes in the workplace">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Chọn file MP3</label>
+                        <input type="file" class="form-control form-control-sm" id="listening-part15-audio-input" accept="audio/mpeg,audio/mp3">
+                        <div class="form-text small">Hoặc nhập URL: <input type="text" class="form-control form-control-sm mt-1" id="listening-part15-audio-url-input" placeholder="audio/question15/audio_q1.mp3"></div>
+                        <div id="listening-part15-audio-status-input" class="mt-2"></div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Questions (4 câu hỏi)</label>
+                        <div id="listening-part15-questions-container">
+                            <!-- Questions will be added here -->
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm mt-2" onclick="addListeningQuestion15Question()">
+                            <i class="bi bi-plus-circle me-1"></i>Thêm câu hỏi
+                        </button>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Correct Answers (Man/Woman/Both)</label>
+                        <div id="listening-part15-answers-container">
+                            <!-- Answers will be added here -->
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Transcript</label>
+                        <textarea class="form-control form-control-sm" id="listening-part15-transcript-input" rows="4" placeholder="W: I'm thinking about...&#10;M: Why? Your current job..."></textarea>
+                    </div>
+                    
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="button" class="btn btn-success btn-sm" onclick="saveListeningPart15Set()">
+                            <i class="bi bi-check-circle me-1"></i>Lưu bộ đề
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Question Sets Container -->
+            <div id="listening-part15-sets-container" class="mb-4">
+                <!-- Question sets will be rendered here -->
+            </div>
+            
+            <!-- Edit Form (hidden by default) -->
+            <div id="listening-part15-edit-form" style="display: none;">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Chỉnh sửa bộ đề Question 15</h5>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="cancelListeningEdit('15')">
+                            <i class="bi bi-x"></i> Hủy
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Tiêu đề bộ đề</label>
+                            <input type="text" class="form-control" id="listening-part15-title" placeholder="Ví dụ: Listening Question 15 - Set 1">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Topic</label>
+                            <input type="text" class="form-control" id="listening-part15-topic" placeholder="Ví dụ: Changes in the workplace">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Upload Audio File (MP3)</label>
+                            <input type="file" class="form-control" id="listening-part15-audio" accept="audio/mpeg,audio/mp3">
+                            <small class="text-muted">File size tối đa: 10MB</small>
+                            <div id="listening-part15-audio-preview" class="mt-2"></div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Questions (4 câu hỏi)</label>
+                            <div id="listening-part15-questions-container">
+                                <!-- Questions will be added here -->
+                            </div>
+                            <button type="button" class="btn btn-add mt-2" onclick="addListeningQuestion15Question()">
+                                <i class="bi bi-plus-circle me-2"></i>Thêm câu hỏi
+                            </button>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Correct Answers (Man/Woman/Both)</label>
+                            <div id="listening-part15-answers-container">
+                                <!-- Answers will be added here -->
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Transcript</label>
+                            <textarea class="form-control" id="listening-part15-transcript" rows="8" placeholder="W: I'm thinking about...&#10;M: Why? Your current job..."></textarea>
+                        </div>
+                        
+                        <div class="d-flex gap-2 mt-3">
+                            <button type="button" class="btn btn-success" onclick="saveListeningCurrentSet('15')">
+                                <i class="bi bi-check-circle me-2"></i>Lưu bộ đề
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Listening Question 16-17 Form -->
+        <div id="listening-part16_17-form" class="form-section" style="display: none;">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-2">
+                <div>
+                    <h3 class="mb-1" style="font-size: 1rem;"><i class="bi bi-headphones me-2"></i>Listening Question 16 & 17</h3>
+                    <p class="text-muted small mb-0" style="font-size: 0.75rem;">Nhập topic, audio (tùy chọn), câu hỏi và transcript cho cả 2 câu.</p>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" onclick="addListeningQuestionSet('16_17')">
+                    <i class="bi bi-plus-circle me-1"></i>Thêm bộ đề
+                </button>
+            </div>
+            
+            <!-- Question Input Form - Always Visible -->
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0" style="font-size: 0.875rem;">Nhập câu hỏi</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Tiêu đề bộ đề (tùy chọn)</label>
+                        <input type="text" class="form-control form-control-sm" id="listening-part16_17-title-input" placeholder="Ví dụ: Listening Question 16-17 - Set 1">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h6 class="mb-2 fw-bold">Question 16</h6>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Topic</label>
+                            <input type="text" class="form-control form-control-sm" id="listening-part16-topic-input" placeholder="Ví dụ: A break from studying">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Chọn file MP3 (tùy chọn)</label>
+                            <input type="file" class="form-control form-control-sm" id="listening-part16-audio-input" accept="audio/mpeg,audio/mp3">
+                            <div class="form-text small">Hoặc nhập URL: <input type="text" class="form-control form-control-sm mt-1" id="listening-part16-audio-url-input" placeholder="audio/question16/audio_q1.mp3"></div>
+                            <div id="listening-part16-audio-status-input" class="mt-2"></div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Questions (2 câu hỏi)</label>
+                            <div id="listening-part16-questions-container">
+                                <!-- Questions will be added here -->
+                            </div>
+                            <button type="button" class="btn btn-primary btn-sm mt-2" onclick="addListeningQuestion16Question()">
+                                <i class="bi bi-plus-circle me-1"></i>Thêm câu hỏi
+                            </button>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Transcript</label>
+                            <textarea class="form-control form-control-sm" id="listening-part16-transcript-input" rows="3" placeholder="Bài văn này không có audio..."></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h6 class="mb-2 fw-bold">Question 17</h6>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Topic</label>
+                            <input type="text" class="form-control form-control-sm" id="listening-part17-topic-input" placeholder="Ví dụ: A book about a life of a scientist">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Chọn file MP3 (tùy chọn)</label>
+                            <input type="file" class="form-control form-control-sm" id="listening-part17-audio-input" accept="audio/mpeg,audio/mp3">
+                            <div class="form-text small">Hoặc nhập URL: <input type="text" class="form-control form-control-sm mt-1" id="listening-part17-audio-url-input" placeholder="audio/question17/audio_q1.mp3"></div>
+                            <div id="listening-part17-audio-status-input" class="mt-2"></div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Questions (2 câu hỏi)</label>
+                            <div id="listening-part17-questions-container">
+                                <!-- Questions will be added here -->
+                            </div>
+                            <button type="button" class="btn btn-primary btn-sm mt-2" onclick="addListeningQuestion17Question()">
+                                <i class="bi bi-plus-circle me-1"></i>Thêm câu hỏi
+                            </button>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Transcript</label>
+                            <textarea class="form-control form-control-sm" id="listening-part17-transcript-input" rows="3" placeholder="Bài văn này không có audio..."></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="button" class="btn btn-success btn-sm" onclick="saveListeningPart16_17Set()">
+                            <i class="bi bi-check-circle me-1"></i>Lưu bộ đề
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Question Sets Container -->
+            <div id="listening-part16_17-sets-container" class="mb-4">
+                <!-- Question sets will be rendered here -->
+            </div>
+            
+            <!-- Edit Form (hidden by default) -->
+            <div id="listening-part16_17-edit-form" style="display: none;">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Chỉnh sửa bộ đề Question 16 & 17</h5>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="cancelListeningEdit('16_17')">
+                            <i class="bi bi-x"></i> Hủy
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Tiêu đề bộ đề</label>
+                            <input type="text" class="form-control" id="listening-part16_17-title" placeholder="Ví dụ: Listening Question 16-17 - Set 1">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h5 class="mb-3">Question 16</h5>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Topic</label>
+                                <input type="text" class="form-control" id="listening-part16-topic" placeholder="Ví dụ: A break from studying">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Upload Audio File (MP3) - Optional</label>
+                                <input type="file" class="form-control" id="listening-part16-audio" accept="audio/mpeg,audio/mp3">
+                                <small class="text-muted">File size tối đa: 10MB (có thể để trống)</small>
+                                <div id="listening-part16-audio-preview" class="mt-2"></div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Questions (2 câu hỏi)</label>
+                                <div id="listening-part16-questions-container">
+                                    <!-- Questions will be added here -->
+                                </div>
+                                <button type="button" class="btn btn-add mt-2" onclick="addListeningQuestion16Question()">
+                                    <i class="bi bi-plus-circle me-2"></i>Thêm câu hỏi
+                                </button>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Transcript</label>
+                                <textarea class="form-control" id="listening-part16-transcript" rows="4" placeholder="Bài văn này không có audio..."></textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h5 class="mb-3">Question 17</h5>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Topic</label>
+                                <input type="text" class="form-control" id="listening-part17-topic" placeholder="Ví dụ: A book about a life of a scientist">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Upload Audio File (MP3) - Optional</label>
+                                <input type="file" class="form-control" id="listening-part17-audio" accept="audio/mpeg,audio/mp3">
+                                <small class="text-muted">File size tối đa: 10MB (có thể để trống)</small>
+                                <div id="listening-part17-audio-preview" class="mt-2"></div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Questions (2 câu hỏi)</label>
+                                <div id="listening-part17-questions-container">
+                                    <!-- Questions will be added here -->
+                                </div>
+                                <button type="button" class="btn btn-add mt-2" onclick="addListeningQuestion17Question()">
+                                    <i class="bi bi-plus-circle me-2"></i>Thêm câu hỏi
+                                </button>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Transcript</label>
+                                <textarea class="form-control" id="listening-part17-transcript" rows="4" placeholder="Bài văn này không có audio..."></textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex gap-2 mt-3">
+                            <button type="button" class="btn btn-success" onclick="saveListeningCurrentSet('16_17')">
+                                <i class="bi bi-check-circle me-2"></i>Lưu bộ đề
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <!-- Preview Section -->
         <div id="preview-section" class="preview-section" style="display: none;">
             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -534,7 +2283,170 @@
                 </button>
             </div>
         </div>
+        
+        <!-- Lessons Management Module -->
+        <div id="lessons-management-module" class="form-section" style="display: none;">
+            <div class="module-wrapper" style="background: white; border-radius: 1.25rem; padding: 1.5rem; box-shadow: 0 15px 40px rgba(15, 23, 42, 0.05);">
+                <ul class="nav nav-pills justify-content-center gap-2 flex-wrap" id="lessonTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="reading-tab" data-bs-toggle="pill" data-bs-target="#reading-panel" type="button" role="tab">
+                            <i class="bi bi-journal-text me-2"></i>Reading Lessons
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="listening-tab" data-bs-toggle="pill" data-bs-target="#listening-panel" type="button" role="tab">
+                            <i class="bi bi-headphones me-2"></i>Listening Lessons
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+                    <div class="tab-pane fade show active" id="reading-panel" role="tabpanel" aria-labelledby="reading-tab">
+                        <div class="section-grid" style="display: flex; flex-direction: column; gap: 1.25rem; margin-top: 1.75rem;">
+                            <div class="part-section" style="background: white; padding: 1.5rem; border-radius: 1.25rem; border: 1px solid rgba(148, 163, 184, 0.25); box-shadow: 0 10px 20px rgba(15, 23, 42, 0.05);">
+                                <div class="part-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 1px dashed rgba(148, 163, 184, 0.6);">
+                                    <div>
+                                        <p class="part-label mb-1" style="font-size: 0.8rem; color: #6366f1; text-transform: uppercase; letter-spacing: 0.08em;">Reading</p>
+                                        <h3 style="font-size: 1.05rem; font-weight: 700; color: #0f172a; margin: 0;"><i class="bi bi-1-circle me-2"></i>Part 1: Fill in the Blank</h3>
+                                    </div>
+                                </div>
+                                <div id="part1-lessons-container">
+                                    <div class="text-center text-muted">
+                                        <i class="spinner-border spinner-border-sm me-2"></i>Đang tải...
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="part-section" style="background: white; padding: 1.5rem; border-radius: 1.25rem; border: 1px solid rgba(148, 163, 184, 0.25); box-shadow: 0 10px 20px rgba(15, 23, 42, 0.05);">
+                                <div class="part-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 1px dashed rgba(148, 163, 184, 0.6);">
+                                    <div>
+                                        <p class="part-label mb-1" style="font-size: 0.8rem; color: #6366f1; text-transform: uppercase; letter-spacing: 0.08em;">Reading</p>
+                                        <h3 style="font-size: 1.05rem; font-weight: 700; color: #0f172a; margin: 0;"><i class="bi bi-2-circle me-2"></i>Part 2 & 3: Sentence Ordering</h3>
+                                    </div>
+                                </div>
+                                <div id="part2-lessons-container">
+                                    <div class="text-center text-muted">
+                                        <i class="spinner-border spinner-border-sm me-2"></i>Đang tải...
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="part-section" style="background: white; padding: 1.5rem; border-radius: 1.25rem; border: 1px solid rgba(148, 163, 184, 0.25); box-shadow: 0 10px 20px rgba(15, 23, 42, 0.05);">
+                                <div class="part-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 1px dashed rgba(148, 163, 184, 0.6);">
+                                    <div>
+                                        <p class="part-label mb-1" style="font-size: 0.8rem; color: #6366f1; text-transform: uppercase; letter-spacing: 0.08em;">Reading</p>
+                                        <h3 style="font-size: 1.05rem; font-weight: 700; color: #0f172a; margin: 0;"><i class="bi bi-4-circle me-2"></i>Part 4: Reading Comprehension</h3>
+                                    </div>
+                                </div>
+                                <div id="part4-lessons-container">
+                                    <div class="text-center text-muted">
+                                        <i class="spinner-border spinner-border-sm me-2"></i>Đang tải...
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="part-section" style="background: white; padding: 1.5rem; border-radius: 1.25rem; border: 1px solid rgba(148, 163, 184, 0.25); box-shadow: 0 10px 20px rgba(15, 23, 42, 0.05);">
+                                <div class="part-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 1px dashed rgba(148, 163, 184, 0.6);">
+                                    <div>
+                                        <p class="part-label mb-1" style="font-size: 0.8rem; color: #6366f1; text-transform: uppercase; letter-spacing: 0.08em;">Reading</p>
+                                        <h3 style="font-size: 1.05rem; font-weight: 700; color: #0f172a; margin: 0;"><i class="bi bi-5-circle me-2"></i>Part 5: Paragraph Matching</h3>
+                                    </div>
+                                </div>
+                                <div id="part5-lessons-container">
+                                    <div class="text-center text-muted">
+                                        <i class="spinner-border spinner-border-sm me-2"></i>Đang tải...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="listening-panel" role="tabpanel" aria-labelledby="listening-tab">
+                        <div class="section-grid" style="display: flex; flex-direction: column; gap: 1.25rem; margin-top: 1.75rem;">
+                            <div class="part-section" style="background: white; padding: 1.5rem; border-radius: 1.25rem; border: 1px solid rgba(148, 163, 184, 0.25); box-shadow: 0 10px 20px rgba(15, 23, 42, 0.05);">
+                                <div class="part-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 1px dashed rgba(148, 163, 184, 0.6);">
+                                    <div>
+                                        <p class="part-label mb-1" style="font-size: 0.8rem; color: #6366f1; text-transform: uppercase; letter-spacing: 0.08em;">Listening</p>
+                                        <h3 style="font-size: 1.05rem; font-weight: 700; color: #0f172a; margin: 0;"><i class="bi bi-soundwave me-2"></i>Question 1-13</h3>
+                                    </div>
+                                </div>
+                                <div id="listening_1_13-lessons-container">
+                                    <div class="text-center text-muted">
+                                        <i class="spinner-border spinner-border-sm me-2"></i>Đang tải...
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="part-section" style="background: white; padding: 1.5rem; border-radius: 1.25rem; border: 1px solid rgba(148, 163, 184, 0.25); box-shadow: 0 10px 20px rgba(15, 23, 42, 0.05);">
+                                <div class="part-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 1px dashed rgba(148, 163, 184, 0.6);">
+                                    <div>
+                                        <p class="part-label mb-1" style="font-size: 0.8rem; color: #6366f1; text-transform: uppercase; letter-spacing: 0.08em;">Listening</p>
+                                        <h3 style="font-size: 1.05rem; font-weight: 700; color: #0f172a; margin: 0;"><i class="bi bi-soundwave me-2"></i>Question 14</h3>
+                                    </div>
+                                </div>
+                                <div id="listening_14-lessons-container">
+                                    <div class="text-center text-muted">
+                                        <i class="spinner-border spinner-border-sm me-2"></i>Đang tải...
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="part-section" style="background: white; padding: 1.5rem; border-radius: 1.25rem; border: 1px solid rgba(148, 163, 184, 0.25); box-shadow: 0 10px 20px rgba(15, 23, 42, 0.05);">
+                                <div class="part-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 1px dashed rgba(148, 163, 184, 0.6);">
+                                    <div>
+                                        <p class="part-label mb-1" style="font-size: 0.8rem; color: #6366f1; text-transform: uppercase; letter-spacing: 0.08em;">Listening</p>
+                                        <h3 style="font-size: 1.05rem; font-weight: 700; color: #0f172a; margin: 0;"><i class="bi bi-soundwave me-2"></i>Question 15</h3>
+                                    </div>
+                                </div>
+                                <div id="listening_15-lessons-container">
+                                    <div class="text-center text-muted">
+                                        <i class="spinner-border spinner-border-sm me-2"></i>Đang tải...
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="part-section" style="background: white; padding: 1.5rem; border-radius: 1.25rem; border: 1px solid rgba(148, 163, 184, 0.25); box-shadow: 0 10px 20px rgba(15, 23, 42, 0.05);">
+                                <div class="part-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 1px dashed rgba(148, 163, 184, 0.6);">
+                                    <div>
+                                        <p class="part-label mb-1" style="font-size: 0.8rem; color: #6366f1; text-transform: uppercase; letter-spacing: 0.08em;">Listening</p>
+                                        <h3 style="font-size: 1.05rem; font-weight: 700; color: #0f172a; margin: 0;"><i class="bi bi-soundwave me-2"></i>Question 16 & 17</h3>
+                                    </div>
+                                </div>
+                                <div id="listening_16_17-lessons-container">
+                                    <div class="text-center text-muted">
+                                        <i class="spinner-border spinner-border-sm me-2"></i>Đang tải...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Delete Confirmation Modal -->
+            <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="deleteModalLabel">
+                                <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>
+                                Xác nhận xóa
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>Bạn có chắc chắn muốn xóa bài học này không?</p>
+                            <p class="text-muted small mb-0">
+                                <strong>Lưu ý:</strong> Hành động này sẽ xóa bài học khỏi database nhưng không xóa file trên GitHub.
+                            </p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                            <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                                <i class="bi bi-trash me-2"></i>
+                                Xóa
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
+    </main>
     
     <!-- Lesson Preview Modal -->
     <div class="modal fade" id="lessonPreviewModal" tabindex="-1" aria-labelledby="lessonPreviewModalLabel" aria-hidden="true">
@@ -552,9 +2464,12 @@
                     </div>
                 </div>
                 <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="previousPreviewSet()">
+                        <i class="bi bi-arrow-left me-2"></i>Previous
+                    </button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
-                    <button type="button" class="btn btn-primary" onclick="exportToJS()">
-                        <i class="bi bi-code-square me-2"></i>Export JS Code
+                    <button type="button" class="btn btn-primary" onclick="nextPreviewSet()">
+                        <i class="bi bi-arrow-right me-2"></i>Next
                     </button>
                 </div>
             </div>
@@ -630,6 +2545,286 @@
     <!-- Admin Upload JS -->
     <script src="js/admin_upload.js"></script>
     <script src="js/admin_upload_v2.js"></script>
+    <script src="js/admin_upload_listening.js"></script>
+    <script src="js/admin_reading_sets.js"></script>
+    <script src="js/admin_listening_sets.js"></script>
+    <script src="js/admin_lessons.js"></script>
+    
+    <!-- Sidebar JavaScript -->
+    <script>
+        // Toggle sidebar on mobile
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('show');
+        }
+        
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', function(event) {
+            const sidebar = document.getElementById('sidebar');
+            const toggleBtn = document.getElementById('sidebarToggle');
+            
+            if (window.innerWidth <= 768) {
+                if (!sidebar.contains(event.target) && !toggleBtn.contains(event.target)) {
+                    sidebar.classList.remove('show');
+                }
+            }
+        });
+        
+        // Select type (Reading/Listening)
+        function selectType(type) {
+            // Update menu items
+            document.querySelectorAll('.menu-item[data-type]').forEach(item => {
+                item.classList.remove('active');
+            });
+            document.querySelectorAll(`.menu-item[data-type="${type}"]`).forEach(item => {
+                item.classList.add('active');
+            });
+            
+            // Show/hide menu sections
+            if (type === 'reading') {
+                document.getElementById('reading-menu-section').style.display = 'block';
+                document.getElementById('listening-menu-section').style.display = 'none';
+                // Hide all reading and listening forms
+                ['part1-form', 'part2-form', 'part4-form', 'part5-form'].forEach(id => {
+                    const form = document.getElementById(id);
+                    if (form) form.style.display = 'none';
+                });
+                ['listening-part1_13-form', 'listening-part14-form', 'listening-part15-form', 'listening-part16_17-form'].forEach(id => {
+                    const form = document.getElementById(id);
+                    if (form) form.style.display = 'none';
+                });
+            } else {
+                document.getElementById('reading-menu-section').style.display = 'none';
+                document.getElementById('listening-menu-section').style.display = 'block';
+                // Hide all reading and listening forms
+                ['part1-form', 'part2-form', 'part4-form', 'part5-form'].forEach(id => {
+                    const form = document.getElementById(id);
+                    if (form) form.style.display = 'none';
+                });
+                ['listening-part1_13-form', 'listening-part14-form', 'listening-part15-form', 'listening-part16_17-form'].forEach(id => {
+                    const form = document.getElementById(id);
+                    if (form) form.style.display = 'none';
+                });
+            }
+            
+            // Close sidebar on mobile
+            if (window.innerWidth <= 768) {
+                document.getElementById('sidebar').classList.remove('show');
+            }
+        }
+        
+        // Select Reading Part
+        function selectReadingPart(part) {
+            // First ensure we're in reading mode
+            selectType('reading');
+            
+            // Hide all reading forms
+            ['part1-form', 'part2-form', 'part4-form', 'part5-form'].forEach(id => {
+                const form = document.getElementById(id);
+                if (form) form.style.display = 'none';
+            });
+            
+            // Show selected part form
+            const form = document.getElementById(`part${part}-form`);
+            if (form) {
+                form.style.display = 'block';
+            }
+            
+            // Update menu items
+            document.querySelectorAll('#reading-menu-section .menu-item[data-part]').forEach(item => {
+                item.classList.remove('active');
+            });
+            const menuItem = document.querySelector(`#reading-menu-section .menu-item[data-part="${part}"]`);
+            if (menuItem) {
+                menuItem.classList.add('active');
+            }
+            
+            // Trigger switchPart if function exists
+            if (typeof switchPart === 'function') {
+                switchPart(part);
+            }
+            
+            // Scroll to form
+            if (form) {
+                setTimeout(() => {
+                    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+            }
+            
+            // Close sidebar on mobile
+            if (window.innerWidth <= 768) {
+                document.getElementById('sidebar').classList.remove('show');
+            }
+        }
+        
+        // Select Listening Part
+        function selectListeningPart(part) {
+            // First ensure we're in listening mode
+            selectType('listening');
+            
+            // Hide all listening forms
+            ['listening-part1_13-form', 'listening-part14-form', 'listening-part15-form', 'listening-part16_17-form'].forEach(id => {
+                const form = document.getElementById(id);
+                if (form) form.style.display = 'none';
+            });
+            
+            // Show selected part form
+            const form = document.getElementById(`listening-part${part}-form`);
+            if (form) {
+                form.style.display = 'block';
+            }
+            
+            // Update menu items
+            document.querySelectorAll('#listening-menu-section .menu-item[data-part]').forEach(item => {
+                item.classList.remove('active');
+            });
+            const menuItem = document.querySelector(`#listening-menu-section .menu-item[data-part="${part}"]`);
+            if (menuItem) {
+                menuItem.classList.add('active');
+            }
+            
+            // Trigger switchListeningPart if function exists
+            if (typeof switchListeningPart === 'function') {
+                switchListeningPart(part);
+            }
+            
+            // Scroll to form
+            if (form) {
+                setTimeout(() => {
+                    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+            }
+            
+            // Close sidebar on mobile
+            if (window.innerWidth <= 768) {
+                document.getElementById('sidebar').classList.remove('show');
+            }
+        }
+        
+        // Select Module
+        function selectModule(module) {
+            // Hide all modules
+            const singlePartModule = document.getElementById('single-part-module');
+            const readingSetModule = document.getElementById('reading-set-module');
+            const listeningSetModule = document.getElementById('listening-set-module');
+            const lessonsManagementModule = document.getElementById('lessons-management-module');
+            
+            if (singlePartModule) singlePartModule.style.display = 'none';
+            if (readingSetModule) readingSetModule.style.display = 'none';
+            if (listeningSetModule) listeningSetModule.style.display = 'none';
+            if (lessonsManagementModule) lessonsManagementModule.style.display = 'none';
+            
+            // Hide all part forms when selecting set modules or lessons management
+            if (module === 'reading-set-module' || module === 'listening-set-module' || module === 'lessons-management-module') {
+                // Hide all reading part forms
+                ['part1-form', 'part2-form', 'part4-form', 'part5-form'].forEach(id => {
+                    const form = document.getElementById(id);
+                    if (form) form.style.display = 'none';
+                });
+                // Hide all listening part forms
+                ['listening-part1_13-form', 'listening-part14-form', 'listening-part15-form', 'listening-part16_17-form'].forEach(id => {
+                    const form = document.getElementById(id);
+                    if (form) form.style.display = 'none';
+                });
+            }
+            
+            // Show selected module
+            const moduleEl = document.getElementById(module);
+            if (moduleEl) {
+                moduleEl.style.display = 'block';
+            }
+            
+            // If selecting lessons-management-module, load lessons
+            if (module === 'lessons-management-module') {
+                if (typeof loadAllLessons === 'function') {
+                    loadAllLessons();
+                }
+            }
+            
+            // If selecting single-part-module, ensure the current part form is visible
+            if (module === 'single-part-module') {
+                const currentType = document.querySelector('.menu-item[data-type].active')?.getAttribute('data-type') || 'reading';
+                if (currentType === 'reading') {
+                    const activePart = document.querySelector('#reading-menu-section .menu-item[data-part].active')?.getAttribute('data-part');
+                    if (activePart) {
+                        const form = document.getElementById(`part${activePart}-form`);
+                        if (form) form.style.display = 'block';
+                    } else {
+                        // Default to Part 1 if no active part
+                        const form = document.getElementById('part1-form');
+                        if (form) form.style.display = 'block';
+                        const menuItem = document.querySelector('#reading-menu-section .menu-item[data-part="1"]');
+                        if (menuItem) menuItem.classList.add('active');
+                    }
+                } else {
+                    const activePart = document.querySelector('#listening-menu-section .menu-item[data-part].active')?.getAttribute('data-part');
+                    if (activePart) {
+                        const form = document.getElementById(`listening-part${activePart}-form`);
+                        if (form) form.style.display = 'block';
+                    } else {
+                        // Default to Part 14 if no active part
+                        const form = document.getElementById('listening-part14-form');
+                        if (form) form.style.display = 'block';
+                        const menuItem = document.querySelector('#listening-menu-section .menu-item[data-part="14"]');
+                        if (menuItem) menuItem.classList.add('active');
+                    }
+                }
+            }
+            
+            // Update menu items
+            document.querySelectorAll('.menu-item[data-module]').forEach(item => {
+                item.classList.remove('active');
+            });
+            const menuItem = document.querySelector(`.menu-item[data-module="${module}"]`);
+            if (menuItem) {
+                menuItem.classList.add('active');
+            }
+            
+            // Scroll to module
+            if (moduleEl) {
+                setTimeout(() => {
+                    moduleEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+            }
+            
+            // Close sidebar on mobile
+            if (window.innerWidth <= 768) {
+                document.getElementById('sidebar').classList.remove('show');
+            }
+        }
+        
+        // Initialize sidebar state
+        document.addEventListener('DOMContentLoaded', function() {
+            // Wait a bit for all scripts to load
+            setTimeout(function() {
+                // Set initial active states
+                selectType('reading');
+                selectModule('single-part-module');
+                // Show Part 1 form initially
+                const part1Form = document.getElementById('part1-form');
+                if (part1Form) {
+                    part1Form.style.display = 'block';
+                }
+                // Hide other reading forms
+                ['part2-form', 'part4-form', 'part5-form'].forEach(id => {
+                    const form = document.getElementById(id);
+                    if (form) form.style.display = 'none';
+                });
+                // Set active menu item
+                const menuItem = document.querySelector('#reading-menu-section .menu-item[data-part="1"]');
+                if (menuItem) {
+                    menuItem.classList.add('active');
+                }
+            }, 100);
+        });
+        
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            if (window.innerWidth > 768) {
+                document.getElementById('sidebar').classList.remove('show');
+            }
+        });
+    </script>
 </body>
 </html>
 
