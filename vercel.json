@@ -10,14 +10,14 @@
       "use": "@vercel/static"
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/minihippofuill/aptiskey.com/api/$1"
+      "source": "/api/(.*)",
+      "destination": "/minihippofuill/aptiskey.com/api/$1"
     },
     {
-      "src": "/(.*)",
-      "dest": "/minihippofuill/aptiskey.com/$1"
+      "source": "/(.*)",
+      "destination": "/minihippofuill/aptiskey.com/$1"
     }
   ],
   "cleanUrls": false,
