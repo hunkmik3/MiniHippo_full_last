@@ -2187,6 +2187,7 @@ async function uploadListeningLessonToGitHub() {
     // Get title from first set
     const title = sets[0]?.title || `Listening ${part} Lesson`;
     const topic = sets[0]?.topic || '';
+    const numSets = sets.length;
     
     try {
         const response = await fetch('/api/upload-lesson', {
@@ -2199,7 +2200,8 @@ async function uploadListeningLessonToGitHub() {
                 title: title,
                 topic: topic,
                 lessonType: 'listening',
-                part: partNumber
+                part: partNumber,
+                numSets: numSets
             })
         });
         
