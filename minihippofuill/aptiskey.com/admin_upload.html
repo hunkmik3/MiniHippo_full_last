@@ -2662,6 +2662,10 @@
             // First ensure we're in listening mode
             selectType('listening');
             
+            // Set current listening part
+            window.currentListeningPart = part;
+            window.currentLessonType = 'listening';
+            
             // Hide all listening forms
             ['listening-part1_13-form', 'listening-part14-form', 'listening-part15-form', 'listening-part16_17-form'].forEach(id => {
                 const form = document.getElementById(id);

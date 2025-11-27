@@ -2108,11 +2108,45 @@ async function uploadListeningLessonToGitHub() {
         return;
     }
     
-    const part = window.currentListeningPart;
+    // Try to get current part from window.currentListeningPart
+    let part = window.currentListeningPart;
+    
+    // If not set, try to detect from visible form
+    if (!part) {
+        const visibleForm = document.querySelector('[id^="listening-part"][id$="-form"][style*="block"], [id^="listening-part"][id$="-form"]:not([style*="none"])');
+        if (visibleForm) {
+            const formId = visibleForm.id;
+            // Extract part from form ID (e.g., "listening-part14-form" -> "14")
+            const match = formId.match(/listening-part(.+?)-form/);
+            if (match) {
+                part = match[1];
+                window.currentListeningPart = part;
+            }
+        }
+    }
+    
+    // If still not set, try to find any part with data
+    if (!part) {
+        const possibleParts = ['1_13', '14', '15', '16_17'];
+        for (const p of possibleParts) {
+            const sets = window.listeningQuestionSets[p] || [];
+            if (sets.length > 0) {
+                part = p;
+                window.currentListeningPart = part;
+                break;
+            }
+        }
+    }
+    
+    if (!part) {
+        alert('Vui lòng chọn một phần Listening trước!');
+        return;
+    }
+    
     const sets = window.listeningQuestionSets[part] || [];
     
     if (sets.length === 0) {
-        alert('Chưa có bộ đề nào để upload!');
+        alert(`Chưa có bộ đề nào cho phần ${part}. Vui lòng thêm và lưu bộ đề trước!`);
         return;
     }
     
@@ -2664,6 +2698,9 @@ window.previousPreviewSet = function() {
 // ============================================
 
 function saveListeningPart1_13Set() {
+    // Ensure currentListeningPart is set
+    window.currentListeningPart = '1_13';
+    
     const titleInput = document.getElementById('listening-part1_13-title-input');
     const title = titleInput ? titleInput.value.trim() : '';
     
@@ -2736,6 +2773,9 @@ function saveListeningPart1_13Set() {
 }
 
 function saveListeningPart14Set() {
+    // Ensure currentListeningPart is set
+    window.currentListeningPart = '14';
+    
     const titleInput = document.getElementById('listening-part14-title-input');
     const topicInput = document.getElementById('listening-part14-topic-input');
     const transcriptInput = document.getElementById('listening-part14-transcript-input');
@@ -2807,6 +2847,9 @@ function saveListeningPart14Set() {
 }
 
 function saveListeningPart15Set() {
+    // Ensure currentListeningPart is set
+    window.currentListeningPart = '15';
+    
     const titleInput = document.getElementById('listening-part15-title-input');
     const topicInput = document.getElementById('listening-part15-topic-input');
     const transcriptInput = document.getElementById('listening-part15-transcript-input');
@@ -2891,6 +2934,9 @@ function saveListeningPart15Set() {
 }
 
 function saveListeningPart16_17Set() {
+    // Ensure currentListeningPart is set
+    window.currentListeningPart = '16_17';
+    
     const titleInput = document.getElementById('listening-part16_17-title-input');
     const title = titleInput ? titleInput.value.trim() : '';
     
