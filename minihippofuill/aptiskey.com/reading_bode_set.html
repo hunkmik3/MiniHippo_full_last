@@ -92,16 +92,33 @@
             <section id="part2-section" class="practice-section">
                 <div id="question2" class="container py-5 main-content">
                     <div class="justify-content-between">
-                        <h1 class="mb-2" id="part2-heading"><strong>Question 2 of 4</strong></h1>
-                        <h4 id="part2-topic" class="mb-4 text-danger fw-semibold"></h4>
+                        <h1 class="mb-3" id="part2-heading"><strong>Question 2 of 4</strong></h1>
+                        <p class="text-muted mb-4">Reading Question 2 &amp; 3 · Arrange the sentences to build two short texts.</p>
                     </div>
-                    <div class="row">
-                        <div class="col-md-12">
-                            <h6 class="mb-4">Put the sentences below in the right order. The first sentence is done for you.</h6>
-                            <div id="cardsContainer"></div>
+
+                    <div class="card shadow-sm border-0 mb-4" id="reading-question2-block">
+                        <div class="card-body">
+                            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
+                                <h5 class="mb-0">Question 2</h5>
+                                <span id="part2-topic" class="text-danger fw-semibold text-md-end"></span>
+                            </div>
+                            <p class="text-muted small mb-3">Put the sentences below in the right order. The first sentence is done for you.</p>
+                            <div id="cardsContainerQ2"></div>
                         </div>
                     </div>
-                    <div class="alert alert-info d-none practice-feedback" id="part2-feedback"></div>
+
+                    <div class="card shadow-sm border-0" id="reading-question3-block">
+                        <div class="card-body">
+                            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
+                                <h5 class="mb-0">Question 3</h5>
+                                <span id="part3-topic" class="text-danger fw-semibold text-md-end"></span>
+                            </div>
+                            <p class="text-muted small mb-3">Put the sentences below in the right order. The first sentence is done for you.</p>
+                            <div id="cardsContainerQ3"></div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info d-none practice-feedback mt-4" id="part2-feedback"></div>
                 </div>
             </section>
 
@@ -175,17 +192,9 @@
     </div>
 
     <div class="container" id="comparisonResult_question2" style="display: none;">
-        <h3>Question 2</h3>
+        <h3>Question 2 &amp; 3</h3>
         <p id="totalScore_question2"></p>
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th>Your Order</th>
-                    <th>Correct Order</th>
-                </tr>
-            </thead>
-            <tbody id="comparisonBody_question2"></tbody>
-        </table>
+        <div id="comparisonBody_question2" class="d-flex flex-column gap-4"></div>
     </div>
 
     <div class="container" id="comparisonResult_question3" style="display: none;">

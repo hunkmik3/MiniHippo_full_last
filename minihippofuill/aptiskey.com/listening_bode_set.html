@@ -82,47 +82,158 @@
         </div>
 
         <div id="practiceContent" style="display: none;">
-            <!-- Single question container - will show one question at a time -->
-            <section id="question-section" class="practice-section active">
-                <div class="container py-5">
-                    <h3 class="mb-4"><strong id="question-heading">Question 1 / 20</strong></h3>
+            <!-- Part 1: Questions 1-13 -->
+            <section id="part1-section" class="practice-section active">
+                <div id="question1_13" class="container py-5">
+                    <h3 class="mb-4"><strong id="part1-heading">Question 1 of 4</strong></h3>
                     
-                    <!-- Audio Player Bar (will be shown/hidden based on question type) -->
-                    <div id="audio-player-bar" class="top-bar d-flex justify-content-between align-items-center" style="display: none;">
+                    <!-- Audio Player Bar -->
+                    <div class="top-bar d-flex justify-content-between align-items-center">
                         <div class="d-flex align-items-center gap-3">
-                            <button id="question-playButton" class="btn btn-link text-white p-0">
-                                <i id="question-playIcon" class="bi bi-play-fill fs-4"></i>
+                            <button id="part1-playButton" class="btn btn-link text-white p-0">
+                                <i id="part1-playIcon" class="bi bi-play-fill fs-4"></i>
                             </button>
                             <button class="btn btn-link text-white p-0">
                                 <i class="bi bi-volume-up-fill fs-5"></i>
                             </button>
-                            <input type="range" class="form-range" id="question-audioRange" min="0" max="1" step="0.01" value="0.5" style="width: 200px;">
+                            <input type="range" class="form-range" id="part1-audioRange" style="width: 200px;">
                         </div>
                         <div>
-                            <small id="question-playCountLabel">2 of 2 plays remaining</small>
+                            <small id="part1-playCountLabel">2 of 2 plays remaining</small>
                         </div>
-                        <audio id="question-audioPlayer" preload="none"></audio>
+                        <audio id="part1-audioPlayer" preload="none"></audio>
                     </div>
 
-                    <!-- Question Container (dynamic content based on question type) -->
-                    <div id="question-container" class="question-container">
-                        <!-- Question content will be dynamically inserted here -->
+                    <!-- Questions Container -->
+                    <div id="part1-questions-container" class="question-container">
+                        <!-- Questions will be dynamically inserted here -->
                     </div>
 
-                    <!-- Show Transcript Button (will be shown/hidden based on question type) -->
-                    <div id="transcript-button-container" class="mt-3" style="display: none;">
-                        <button id="question-showTranscriptButton" class="btn btn-primary">Show paragraph</button>
+                    <!-- Show Transcript Button -->
+                    <div class="mt-3">
+                        <button id="part1-showTranscriptButton" class="btn btn-primary">Show paragraph</button>
                     </div>
 
                     <!-- Transcript Content (Hidden by default) -->
-                    <div id="question-transcriptBox" class="card mt-3" style="display: none;">
+                    <div id="part1-transcriptBox" class="card mt-3" style="display: none;">
                         <div class="card-body">
                             <p><strong>Paragraph:</strong></p>
-                            <div id="question-transcriptContent"></div>
+                            <div id="part1-transcriptContent"></div>
                         </div>
                     </div>
 
-                    <div class="alert alert-info d-none practice-feedback" id="question-feedback"></div>
+                    <div class="alert alert-info d-none practice-feedback" id="part1-feedback"></div>
+                </div>
+            </section>
+
+            <!-- Part 2: Question 14 -->
+            <section id="part2-section" class="practice-section">
+                <div id="question14" class="container py-5">
+                    <h3 class="mb-4"><strong>Question 2 of 4</strong></h3>
+                    
+                    <!-- Audio Player Bar -->
+                    <div class="top-bar d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center gap-3">
+                            <button id="part2-playButton" class="btn btn-link text-white p-0">
+                                <i id="part2-playIcon" class="bi bi-play-fill fs-4"></i>
+                            </button>
+                            <button class="btn btn-link text-white p-0">
+                                <i class="bi bi-volume-up-fill fs-5"></i>
+                            </button>
+                            <input type="range" class="form-range" id="part2-audioRange" style="width: 200px;">
+                        </div>
+                        <div>
+                            <small id="part2-playCountLabel">2 of 2 plays remaining</small>
+                        </div>
+                        <audio id="part2-audioPlayer" preload="none"></audio>
+                    </div>
+
+                    <!-- Question Container -->
+                    <div class="question-container">
+                        <h5 class="mb-4"><strong id="part2-topic"></strong></h5>
+                        <p class="mb-4" id="part2-instruction">Four people are discussing their views on the topic above. Complete the sentences. Use each answer only once. You will not need two of the answers.</p>
+                        
+                        <div id="part2-matching-container">
+                            <!-- Matching questions will be inserted here -->
+                        </div>
+                    </div>
+
+                    <!-- Show Transcript Button -->
+                    <div class="mt-3">
+                        <button id="part2-showTranscriptButton" class="btn btn-primary">Show Paragraph</button>
+                    </div>
+
+                    <!-- Transcript Content -->
+                    <div id="part2-transcriptBox" class="card mt-3" style="display: none;">
+                        <div class="card-body">
+                            <p><strong>Paragraph:</strong></p>
+                            <p id="part2-transcriptContent"></p>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info d-none practice-feedback" id="part2-feedback"></div>
+                </div>
+            </section>
+
+            <!-- Part 3: Question 15 -->
+            <section id="part3-section" class="practice-section">
+                <div id="question15" class="container py-5">
+                    <h3 class="mb-4"><strong>Question 3 of 4</strong></h3>
+                    
+                    <!-- Audio Player Bar -->
+                    <div class="top-bar d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center gap-3">
+                            <button id="part3-playButton" class="btn btn-link text-white p-0">
+                                <i id="part3-playIcon" class="bi bi-play-fill fs-4"></i>
+                            </button>
+                            <button class="btn btn-link text-white p-0">
+                                <i class="bi bi-volume-up-fill fs-5"></i>
+                            </button>
+                            <input type="range" class="form-range" id="part3-audioRange" style="width: 200px;">
+                        </div>
+                        <div>
+                            <small id="part3-playCountLabel">2 of 2 plays remaining</small>
+                        </div>
+                        <audio id="part3-audioPlayer" preload="none"></audio>
+                    </div>
+
+                    <!-- Question Container -->
+                    <div class="question-container">
+                        <h5 class="mb-4"><strong id="part3-topic"></strong></h5>
+                        <p class="mb-4" id="part3-instruction">Listen to two people discussing potential modifications to the topic above. Read the statements and decide whose opinion matches best: the man's, the woman's, or both. Who expresses which opinion?</p>
+                        
+                        <div id="part3-opinions-container">
+                            <!-- Opinion questions will be inserted here -->
+                        </div>
+                    </div>
+
+                    <!-- Show Transcript Button -->
+                    <div class="mt-3">
+                        <button id="part3-showTranscriptButton" class="btn btn-primary">Show Paragraph</button>
+                    </div>
+
+                    <!-- Transcript Content -->
+                    <div id="part3-transcriptBox" class="card mt-3" style="display: none;">
+                        <div class="card-body">
+                            <p><strong>Paragraph:</strong></p>
+                            <p id="part3-transcriptContent"></p>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info d-none practice-feedback" id="part3-feedback"></div>
+                </div>
+            </section>
+
+            <!-- Part 4: Questions 16-17 -->
+            <section id="part4-section" class="practice-section">
+                <div id="question16_17" class="container py-5">
+                    <h3 class="mb-4"><strong>Question 4 of 4</strong></h3>
+                    
+                    <div id="part4-questions-container">
+                        <!-- Questions 16-17 will be inserted here -->
+                    </div>
+
+                    <div class="alert alert-info d-none practice-feedback" id="part4-feedback"></div>
                 </div>
             </section>
         </div>

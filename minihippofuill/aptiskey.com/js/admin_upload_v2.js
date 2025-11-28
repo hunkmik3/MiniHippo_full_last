@@ -466,59 +466,6 @@ function saveCurrentSet() {
     clearFormSilently(currentPart);
 }
 
-// Save Part 1 Set from direct input form
-function savePart1Set() {
-    const titleInput = document.getElementById('part1-title-input');
-    const title = titleInput ? titleInput.value.trim() : '';
-    
-    // Collect data from part1-questions-container
-    const questions = [];
-    document.querySelectorAll('#part1-questions-container .question-item').forEach((item) => {
-        const questionStart = item.querySelector('.part1-questionStart')?.value.trim() || '';
-        const questionEnd = item.querySelector('.part1-questionEnd')?.value.trim() || '';
-        const correctAnswer = item.querySelector('.part1-correctAnswer')?.value.trim() || '';
-        const answerOptionsText = item.querySelector('.part1-answerOptions')?.value.trim() || '';
-        const answerOptions = answerOptionsText.split('\n').filter(opt => opt.trim() !== '');
-        
-        if (questionStart || questionEnd || correctAnswer) {
-            questions.push({
-                questionStart,
-                answerOptions,
-                questionEnd,
-                correctAnswer
-            });
-        }
-    });
-    
-    if (questions.length === 0) {
-        alert('Vui lòng thêm ít nhất một câu hỏi!');
-        return;
-    }
-    
-    // Create new set
-    const newSet = {
-        id: questionSets[1].length + 1,
-        title: title || `Bộ đề ${questionSets[1].length + 1}`,
-        data: { questions }
-    };
-    
-    questionSets[1].push(newSet);
-    
-    // Clear form
-    if (titleInput) titleInput.value = '';
-    document.getElementById('part1-questions-container').innerHTML = '';
-    window.part1Questions = [];
-    
-    // Re-render sets
-    renderQuestionSets(1);
-    
-    // Show success message
-    alert('Đã lưu bộ đề thành công!');
-}
-
-// Make savePart1Set global
-window.savePart1Set = savePart1Set;
-
 // ============================================
 // Data Collection (Updated for sets)
 // ============================================

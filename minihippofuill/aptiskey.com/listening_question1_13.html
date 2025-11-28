@@ -328,43 +328,67 @@
                                 
                                 tryCopyData();
                                 
-                                // Initialize countdown timer (always ensure it runs, even if script has timer code)
+                                // Initialize countdown timer if it exists (only once, prevent multiple timers)
                                 // Clear any existing timer first to prevent duplicates
                                 if (window.countdownTimerId) {
                                     clearTimeout(window.countdownTimerId);
                                     window.countdownTimerId = null;
                                 }
                                 
-                                // Always initialize timer after script loads to ensure it works
-                                const countdownElement = document.getElementById('countdownTimer');
-                                if (countdownElement) {
-                                    // Initialize timeLeft if not already set
-                                    if (typeof window.timeLeft === 'undefined' || window.timeLeft <= 0) {
-                                        window.timeLeft = 40 * 60; // 40 minutes in seconds
-                                    }
-                                    
-                                    // Create or override updateCountdown function
-                                    window.updateCountdown = function() {
-                                        if (!countdownElement) return;
-                                        const minutes = Math.floor(window.timeLeft / 60);
-                                        const seconds = window.timeLeft % 60;
-                                        countdownElement.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-                                        if (window.timeLeft > 0) {
-                                            window.timeLeft--;
-                                            if (window.countdownTimerId) {
-                                                clearTimeout(window.countdownTimerId);
-                                            }
-                                            window.countdownTimerId = setTimeout(window.updateCountdown, 1000);
-                                        } else {
-                                            countdownElement.textContent = '00:00';
+                                if (!window.countdownInitialized) {
+                                    window.countdownInitialized = true;
+                                    if (typeof window.updateCountdown === 'function') {
+                                        console.log('Initializing countdown timer (existing function)');
+                                        // Clear any existing timer in the function
+                                        if (window.countdownTimerId) {
+                                            clearTimeout(window.countdownTimerId);
+                                            window.countdownTimerId = null;
                                         }
-                                    };
-                                    
-                                    // Start the timer
-                                    console.log('Starting countdown timer, timeLeft:', window.timeLeft);
-                                    window.updateCountdown();
+                                        // Reset timer to 40:00
+                                        if (typeof window.timeLeft !== 'undefined') {
+                                            window.timeLeft = 40 * 60;
+                                        }
+                                        // Override updateCountdown to use timerId
+                                        const originalUpdateCountdown = window.updateCountdown;
+                                        const countdownElement = document.getElementById('countdownTimer');
+                                        window.updateCountdown = function() {
+                                            if (!countdownElement) return;
+                                            const minutes = Math.floor(window.timeLeft / 60);
+                                            const seconds = window.timeLeft % 60;
+                                            countdownElement.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+                                            if (window.timeLeft > 0) {
+                                                window.timeLeft--;
+                                                if (window.countdownTimerId) {
+                                                    clearTimeout(window.countdownTimerId);
+                                                }
+                                                window.countdownTimerId = setTimeout(window.updateCountdown, 1000);
+                                            }
+                                        };
+                                        window.updateCountdown();
+                                    } else {
+                                        // If updateCountdown doesn't exist, create it
+                                        console.log('Creating countdown timer manually');
+                                        window.timeLeft = 40 * 60;
+                                        const countdownElement = document.getElementById('countdownTimer');
+                                        if (countdownElement) {
+                                            window.updateCountdown = function() {
+                                                if (!countdownElement) return;
+                                                const minutes = Math.floor(window.timeLeft / 60);
+                                                const seconds = window.timeLeft % 60;
+                                                countdownElement.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+                                                if (window.timeLeft > 0) {
+                                                    window.timeLeft--;
+                                                    if (window.countdownTimerId) {
+                                                        clearTimeout(window.countdownTimerId);
+                                                    }
+                                                    window.countdownTimerId = setTimeout(window.updateCountdown, 1000);
+                                                }
+                                            };
+                                            window.updateCountdown();
+                                        }
+                                    }
                                 } else {
-                                    console.warn('Countdown timer element not found');
+                                    console.log('Countdown timer already initialized, skipping');
                                 }
                                 
                                 // Initialize variables if they don't exist (check both window and global scope)
@@ -1009,43 +1033,66 @@
                                 
                                 tryCopyData();
                                 
-                                // Initialize countdown timer (always ensure it runs, even if script has timer code)
+                                // Initialize countdown timer if it exists (only once, prevent multiple timers)
                                 // Clear any existing timer first to prevent duplicates
                                 if (window.countdownTimerId) {
                                     clearTimeout(window.countdownTimerId);
                                     window.countdownTimerId = null;
                                 }
                                 
-                                // Always initialize timer after script loads to ensure it works
-                                const countdownElement = document.getElementById('countdownTimer');
-                                if (countdownElement) {
-                                    // Initialize timeLeft if not already set
-                                    if (typeof window.timeLeft === 'undefined' || window.timeLeft <= 0) {
-                                        window.timeLeft = 40 * 60; // 40 minutes in seconds
-                                    }
-                                    
-                                    // Create or override updateCountdown function
-                                    window.updateCountdown = function() {
-                                        if (!countdownElement) return;
-                                        const minutes = Math.floor(window.timeLeft / 60);
-                                        const seconds = window.timeLeft % 60;
-                                        countdownElement.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-                                        if (window.timeLeft > 0) {
-                                            window.timeLeft--;
-                                            if (window.countdownTimerId) {
-                                                clearTimeout(window.countdownTimerId);
-                                            }
-                                            window.countdownTimerId = setTimeout(window.updateCountdown, 1000);
-                                        } else {
-                                            countdownElement.textContent = '00:00';
+                                if (!window.countdownInitialized) {
+                                    window.countdownInitialized = true;
+                                    if (typeof window.updateCountdown === 'function') {
+                                        console.log('Initializing countdown timer (existing function)');
+                                        // Clear any existing timer in the function
+                                        if (window.countdownTimerId) {
+                                            clearTimeout(window.countdownTimerId);
+                                            window.countdownTimerId = null;
                                         }
-                                    };
-                                    
-                                    // Start the timer
-                                    console.log('Starting countdown timer, timeLeft:', window.timeLeft);
-                                    window.updateCountdown();
+                                        // Reset timer to 40:00
+                                        if (typeof window.timeLeft !== 'undefined') {
+                                            window.timeLeft = 40 * 60;
+                                        }
+                                        // Override updateCountdown to use timerId
+                                        const countdownElement = document.getElementById('countdownTimer');
+                                        window.updateCountdown = function() {
+                                            if (!countdownElement) return;
+                                            const minutes = Math.floor(window.timeLeft / 60);
+                                            const seconds = window.timeLeft % 60;
+                                            countdownElement.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+                                            if (window.timeLeft > 0) {
+                                                window.timeLeft--;
+                                                if (window.countdownTimerId) {
+                                                    clearTimeout(window.countdownTimerId);
+                                                }
+                                                window.countdownTimerId = setTimeout(window.updateCountdown, 1000);
+                                            }
+                                        };
+                                        window.updateCountdown();
+                                    } else {
+                                        // If updateCountdown doesn't exist, create it
+                                        console.log('Creating countdown timer manually');
+                                        window.timeLeft = 40 * 60;
+                                        const countdownElement = document.getElementById('countdownTimer');
+                                        if (countdownElement) {
+                                            window.updateCountdown = function() {
+                                                if (!countdownElement) return;
+                                                const minutes = Math.floor(window.timeLeft / 60);
+                                                const seconds = window.timeLeft % 60;
+                                                countdownElement.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+                                                if (window.timeLeft > 0) {
+                                                    window.timeLeft--;
+                                                    if (window.countdownTimerId) {
+                                                        clearTimeout(window.countdownTimerId);
+                                                    }
+                                                    window.countdownTimerId = setTimeout(window.updateCountdown, 1000);
+                                                }
+                                            };
+                                            window.updateCountdown();
+                                        }
+                                    }
                                 } else {
-                                    console.warn('Countdown timer element not found');
+                                    console.log('Countdown timer already initialized, skipping');
                                 }
                                 
                                 // Initialize variables if they don't exist (check both window and global scope)

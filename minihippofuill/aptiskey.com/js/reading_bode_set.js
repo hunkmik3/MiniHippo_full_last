@@ -43,7 +43,11 @@
         timeLeft: 35 * 60,
         timerInterval: null,
         setTitle: '',
-        completed: false
+        completed: false,
+        part2OrderData: {
+            question2: [],
+            question3: []
+        }
     };
 
     if (!setId) {
@@ -199,31 +203,75 @@
         return shuffled;
     }
 
-    function renderPart2(part2 = {}) {
-        const topicEl = document.getElementById('part2-topic');
-        topicEl.innerHTML = part2.topic ? `<strong>Topic: ${part2.topic}</strong>` : '';
-        const container = document.getElementById('cardsContainer');
+    function normalizePart2Question(part2 = {}, key) {
+        if (!part2) {
+            return null;
+        }
+
+        const data = part2[key];
+        if (data && Array.isArray(data.sentences)) {
+            return {
+                topic: data.topic || '',
+                sentences: [...data.sentences]
+            };
+        }
+
+        if (key === 'question2') {
+            const fallbackSentences = Array.isArray(part2.sentences) ? part2.sentences : [];
+            if (fallbackSentences.length) {
+                return {
+                    topic: part2.topic || '',
+                    sentences: [...fallbackSentences]
+                };
+            }
+        }
+
+        return null;
+    }
+
+    function renderOrderingQuestion(containerId, topicId, questionData) {
+        const container = document.getElementById(containerId);
+        const topicEl = document.getElementById(topicId);
+        const wrapper = container ? container.closest('.card') : null;
+
+        if (!container) {
+            return false;
+        }
+
         container.innerHTML = '';
-        
-        const sentences = part2.sentences || [];
-        if (sentences.length === 0) return;
-        
-        // Keep first sentence fixed, shuffle the rest
-        // Create array with original indices
+
+        if (!questionData || !Array.isArray(questionData.sentences) || !questionData.sentences.length) {
+            if (topicEl) {
+                topicEl.textContent = '';
+            }
+            if (wrapper) {
+                wrapper.style.display = '';
+            }
+            container.innerHTML = '<div class="alert alert-warning mb-0">Chưa có dữ liệu cho câu hỏi này.</div>';
+            return false;
+        }
+
+        if (wrapper) {
+            wrapper.style.display = '';
+        }
+        if (topicEl) {
+            topicEl.innerHTML = questionData.topic ? `<strong>Topic: ${questionData.topic}</strong>` : '';
+        }
+
+        const sentences = questionData.sentences.map(sentence => (typeof sentence === 'string' ? sentence.trim() : sentence));
         const sentencesWithIndex = sentences.map((sentence, index) => ({ text: sentence, originalIndex: index }));
         const firstSentence = sentencesWithIndex[0];
         const restSentences = sentencesWithIndex.slice(1);
         const shuffledRest = shuffleArray(restSentences);
         const shuffledSentences = [firstSentence, ...shuffledRest];
-        
+
         shuffledSentences.forEach((item, displayIndex) => {
-            const card = document.createElement('div');
             const sentence = typeof item === 'string' ? item : item.text;
             const originalIndex = typeof item === 'string' ? sentences.indexOf(item) : item.originalIndex;
+            const card = document.createElement('div');
             card.dataset.correctIndex = originalIndex;
-            
+
             if (displayIndex === 0) {
-                // First sentence: fixed, not draggable, with checkmark and highlight
                 card.className = 'card mb-2';
                 card.style.backgroundColor = '#e3f2fd';
                 card.style.border = '2px solid #1976d2';
@@ -235,8 +283,7 @@
                     </div>
                 `;
             } else {
-                // Other sentences: draggable
-            card.className = 'draggable-card';
+                card.className = 'draggable-card';
                 card.innerHTML = `
                     <div class="d-flex align-items-center">
                         <i class="bi bi-grip-vertical me-2 text-muted" style="font-size: 1.2rem;"></i>
@@ -244,37 +291,40 @@
                     </div>
                 `;
             }
+
             container.appendChild(card);
         });
 
-        // Create Sortable, but prevent dragging the first card (fixed sentence)
-        // Only draggable-card elements can be dragged, the first card has class 'card' so it won't be draggable
         Sortable.create(container, {
             animation: 150,
-            draggable: '.draggable-card' // Only allow dragging draggable-card elements (first card has class 'card', not 'draggable-card')
+            draggable: '.draggable-card'
         });
+
+        return true;
+    }
+
+    function renderPart2(part2 = {}) {
+        const question2Data = normalizePart2Question(part2, 'question2');
+        const question3Data = normalizePart2Question(part2, 'question3');
+        const hasQuestion2 = renderOrderingQuestion('cardsContainerQ2', 'part2-topic', question2Data);
+        const hasQuestion3 = renderOrderingQuestion('cardsContainerQ3', 'part3-topic', question3Data);
+
+        state.part2OrderData = {
+            question2: hasQuestion2 && question2Data ? [...question2Data.sentences] : [],
+            question3: hasQuestion3 && question3Data ? [...question3Data.sentences] : []
+        };
 
         const feedback = document.getElementById('part2-feedback');
         checkHandlers.part2 = () => {
-            // Get all cards including the fixed first one
-            const allCards = container.querySelectorAll('[data-correct-index]');
-            let correct = 0;
-            let totalCheckable = 0;
-            
-            allCards.forEach((card, displayIndex) => {
-                const correctIndex = Number(card.dataset.correctIndex);
-                // Check if the card is in the correct position
-                // For the first card (displayIndex 0), it should have correctIndex 0
-                // For other cards, check if their correctIndex matches their position in the original array
-                if (displayIndex === correctIndex) {
-                    correct += 1;
-                }
-                totalCheckable += 1;
-            });
-            
-            feedback.textContent = correct === totalCheckable
-                ? 'Chính xác! Bạn đã sắp xếp đúng thứ tự.'
-                : `Bạn đang đúng ${correct}/${totalCheckable} vị trí. Hãy thử lại!`;
+            const result = evaluatePart2();
+            if (!result.breakdown.length) {
+                feedback.textContent = 'Chưa có dữ liệu để kiểm tra.';
+            } else {
+                const detail = result.breakdown
+                    .map(section => `${section.label}: ${section.score}/${section.total}`)
+                    .join(' · ');
+                feedback.textContent = detail;
+            }
             feedback.classList.remove('d-none');
         };
     }
@@ -482,44 +532,56 @@
         return { score, total: questions.length || 0, rows };
     }
 
-    function evaluatePart2(part2 = {}) {
-        const correctOrder = part2.sentences || [];
-        // Get all cards including the fixed first one (they all have data-correct-index)
-        // Cards are in DOM order (display order)
-        const allCards = document.querySelectorAll('#cardsContainer [data-correct-index]');
-        
+    function evaluateOrderingQuestion(label, containerId, correctOrder = []) {
+        const container = document.getElementById(containerId);
+        if (!container || !correctOrder.length) {
+            return { label, score: 0, total: 0, rows: [] };
+        }
+
+        const cards = container.querySelectorAll('[data-correct-index]');
+        const rows = [];
         let score = 0;
-        const rows = Array.from(allCards).map((card, displayIndex) => {
-            // Get text from card - both card types have text in a <span> element
-            let actualText = '';
+
+        cards.forEach((card, displayIndex) => {
             const span = card.querySelector('span');
-            if (span) {
-                actualText = span.textContent.trim();
-            } else {
-                // Fallback: get from textContent and clean it
-                actualText = card.textContent.trim();
-            }
-            
-            // The correct sentence for position displayIndex should be correctOrder[displayIndex]
+            const userText = span ? span.textContent.trim() : card.textContent.trim();
             const correctSentence = correctOrder[displayIndex] || '';
-            
-            // Normalize both strings for comparison (trim and compare)
-            const normalizedUserText = actualText.trim();
+            const normalizedUserText = userText.trim();
             const normalizedCorrectText = correctSentence.trim();
-            
-            // Check if the card at this display position has the correct sentence
             const isCorrect = normalizedUserText === normalizedCorrectText;
             if (isCorrect) {
                 score += 1;
             }
-            
-            return {
-                user: formatAnswer(actualText),
+            rows.push({
+                user: formatAnswer(userText),
                 correct: correctSentence,
                 isCorrect
-            };
+            });
         });
-        return { score, total: correctOrder.length || 0, rows };
+
+        return { label, score, total: correctOrder.length, rows };
+    }
+
+    function evaluatePart2() {
+        const breakdown = [];
+        const question2Result = evaluateOrderingQuestion('Question 2', 'cardsContainerQ2', state.part2OrderData.question2);
+        if (question2Result.total) {
+            breakdown.push(question2Result);
+        }
+        const question3Result = evaluateOrderingQuestion('Question 3', 'cardsContainerQ3', state.part2OrderData.question3);
+        if (question3Result.total) {
+            breakdown.push(question3Result);
+        }
+
+        const score = breakdown.reduce((sum, section) => sum + section.score, 0);
+        const total = breakdown.reduce((sum, section) => sum + section.total, 0);
+
+        return {
+            score,
+            total,
+            rows: breakdown.flatMap(section => section.rows),
+            breakdown
+        };
     }
 
     function evaluatePart4(part4 = {}) {
@@ -584,21 +646,56 @@
     }
 
     function renderPart2Comparison(result) {
-        const body = document.getElementById('comparisonBody_question2');
+        const container = document.getElementById('comparisonBody_question2');
         const totalEl = document.getElementById('totalScore_question2');
-        if (!body || !totalEl) return;
-        body.innerHTML = '';
-        result.rows.forEach(row => {
-            const tr = document.createElement('tr');
-            const userTd = document.createElement('td');
-            userTd.innerHTML = `<span class="${row.isCorrect ? 'correct' : 'incorrect'}">${row.user}</span>`;
-            const correctTd = document.createElement('td');
-            correctTd.innerHTML = `<span class="correct">${row.correct}</span>`;
-            tr.appendChild(userTd);
-            tr.appendChild(correctTd);
-            body.appendChild(tr);
+        if (!container || !totalEl) return;
+
+        container.innerHTML = '';
+
+        if (!result.breakdown || !result.breakdown.length) {
+            totalEl.innerHTML = '<strong>Chưa có dữ liệu cho Question 2 &amp; 3.</strong>';
+            return;
+        }
+
+        const summaryText = result.breakdown
+            .map(section => `${section.label}: ${section.score}/${section.total}`)
+            .join(' · ');
+        totalEl.innerHTML = `<strong>${summaryText} (Tổng: ${result.score}/${result.total})</strong>`;
+
+        result.breakdown.forEach(section => {
+            const card = document.createElement('div');
+            card.className = 'card shadow-sm border-0';
+            card.innerHTML = `
+                <div class="card-body">
+                    <h5 class="card-title mb-3">${section.label}</h5>
+                    <div class="table-responsive">
+                        <table class="table table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Your Order</th>
+                                    <th>Correct Order</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+
+            const tbody = card.querySelector('tbody');
+            section.rows.forEach(row => {
+                const tr = document.createElement('tr');
+                const userTd = document.createElement('td');
+                userTd.innerHTML = `<span class="${row.isCorrect ? 'correct' : 'incorrect'}">${row.user}</span>`;
+                const correctTd = document.createElement('td');
+                correctTd.innerHTML = `<span class="correct">${row.correct}</span>`;
+                tr.appendChild(userTd);
+                tr.appendChild(correctTd);
+                tbody.appendChild(tr);
+            });
+
+            container.appendChild(card);
         });
-        totalEl.innerHTML = `<strong>Your score: ${result.score} / ${result.total || result.rows.length}</strong>`;
     }
 
     function renderPart4Comparison(result) {
@@ -664,7 +761,7 @@
     function completePractice() {
         const data = state.data?.data || {};
         const part1Result = evaluatePart1(data.part1);
-        const part2Result = evaluatePart2(data.part2);
+        const part2Result = evaluatePart2();
         const part4Result = evaluatePart4(data.part4);
         const part5Result = evaluatePart5(data.part5);
 

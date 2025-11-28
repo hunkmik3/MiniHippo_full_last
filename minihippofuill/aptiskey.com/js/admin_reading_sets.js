@@ -20,6 +20,8 @@
         part1Container: document.getElementById('reading-part1-questions'),
         part2Topic: document.getElementById('reading-part2-topic'),
         part2Sentences: document.getElementById('reading-part2-sentences'),
+        part3Topic: document.getElementById('reading-part3-topic'),
+        part3Sentences: document.getElementById('reading-part3-sentences'),
         part4Topic: document.getElementById('reading-part4-topic'),
         part4Intro: document.getElementById('reading-part4-intro'),
         part4TextA: document.getElementById('reading-part4-text-a'),
@@ -69,25 +71,13 @@
     }
 
     function toggleModules(targetId) {
-        const listeningSetModule = document.getElementById('listening-set-module');
         if (!singlePartModule || !readingSetModule) return;
-        
-        // Hide all modules first
-        singlePartModule.style.display = 'none';
-        readingSetModule.style.display = 'none';
-        if (listeningSetModule) {
-            listeningSetModule.style.display = 'none';
-        }
-        
-        // Show selected module
         if (targetId === 'reading-set-module') {
+            singlePartModule.style.display = 'none';
             readingSetModule.style.display = 'block';
-        } else if (targetId === 'listening-set-module') {
-            if (listeningSetModule) {
-                listeningSetModule.style.display = 'block';
-            }
         } else {
             singlePartModule.style.display = 'block';
+            readingSetModule.style.display = 'none';
         }
     }
 
@@ -233,6 +223,12 @@
         refs.part1Container.innerHTML = '';
         refs.part2Topic.value = '';
         refs.part2Sentences.value = '';
+        if (refs.part3Topic) {
+            refs.part3Topic.value = '';
+        }
+        if (refs.part3Sentences) {
+            refs.part3Sentences.value = '';
+        }
         refs.part4Topic.value = '';
         refs.part4Intro.value = '';
         refs.part4TextA.value = '';
@@ -373,8 +369,19 @@
         }
         refreshPart1Indexes();
 
-        refs.part2Topic.value = data.part2?.topic || '';
-        refs.part2Sentences.value = (data.part2?.sentences || []).join('\n');
+        const part2Question2 = data.part2?.question2 || {
+            topic: data.part2?.topic || '',
+            sentences: data.part2?.sentences || []
+        };
+        const part2Question3 = data.part2?.question3 || null;
+        refs.part2Topic.value = part2Question2.topic || '';
+        refs.part2Sentences.value = (part2Question2.sentences || []).join('\n');
+        if (refs.part3Topic) {
+            refs.part3Topic.value = part2Question3?.topic || '';
+        }
+        if (refs.part3Sentences) {
+            refs.part3Sentences.value = (part2Question3?.sentences || []).join('\n');
+        }
 
         refs.part4Topic.value = data.part4?.topic || '';
         refs.part4Intro.value = data.part4?.intro || '';
@@ -436,13 +443,26 @@
             throw new Error('Part 1 cần ít nhất 3 câu.');
         }
 
-        const part2Topic = refs.part2Topic.value.trim();
-        const part2Sentences = (refs.part2Sentences.value || '')
-            .split(/\r?\n/)
-            .map(sentence => sentence.trim())
-            .filter(Boolean);
-        if (!part2Topic || part2Sentences.length < 4) {
-            throw new Error('Part 2 cần topic và tối thiểu 4 câu.');
+        const part2Question2 = {
+            topic: refs.part2Topic.value.trim(),
+            sentences: (refs.part2Sentences.value || '')
+                .split(/\r?\n/)
+                .map(sentence => sentence.trim())
+                .filter(Boolean)
+        };
+        if (!part2Question2.topic || part2Question2.sentences.length < 4) {
+            throw new Error('Part 2 (Question 2) cần topic và tối thiểu 4 câu.');
+        }
+
+        const part2Question3 = {
+            topic: refs.part3Topic?.value.trim() || '',
+            sentences: (refs.part3Sentences?.value || '')
+                .split(/\r?\n/)
+                .map(sentence => sentence.trim())
+                .filter(Boolean)
+        };
+        if (!part2Question3.topic || part2Question3.sentences.length < 4) {
+            throw new Error('Part 2 (Question 3) cần topic và tối thiểu 4 câu.');
         }
 
         const part4Topic = refs.part4Topic.value.trim();
@@ -501,8 +521,10 @@
                     questions: part1Questions
                 },
                 part2: {
-                    topic: part2Topic,
-                    sentences: part2Sentences
+                    question2: part2Question2,
+                    question3: part2Question3,
+                    topic: part2Question2.topic,
+                    sentences: part2Question2.sentences
                 },
                 part4: {
                     topic: part4Topic,
