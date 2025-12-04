@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Setup audio upload event listeners
 function setupAudioUploadListeners() {
-    // Question 14 audio
+    // Question 14 audio - Form chính (Upload theo phần)
     const audio14 = document.getElementById('listening-part14-audio');
     if (audio14) {
         audio14.addEventListener('change', async function() {
@@ -53,7 +53,28 @@ function setupAudioUploadListeners() {
         });
     }
     
-    // Question 15 audio
+    // Question 14 audio - Form nhập nhanh (Nhập câu hỏi)
+    const audio14Input = document.getElementById('listening-part14-audio-input');
+    if (audio14Input) {
+        audio14Input.addEventListener('change', async function() {
+            if (this.files && this.files[0]) {
+                const preview = document.getElementById('listening-part14-audio-status-input') || document.getElementById('listening-part14-audio-preview');
+                if (preview) {
+                    preview.innerHTML = '<div class="alert alert-info">Đang upload audio...</div>';
+                }
+                const audioUrl = await handleAudioUpload('14', this);
+                if (audioUrl && preview) {
+                    preview.innerHTML = `<div class="alert alert-success">Upload thành công!<br><audio controls src="${audioUrl}" style="width: 100%; margin-top: 10px;"></audio></div>`;
+                    // Store audio URL in a hidden field or data attribute
+                    this.dataset.audioUrl = audioUrl;
+                } else if (preview) {
+                    preview.innerHTML = '<div class="alert alert-danger">Upload thất bại!</div>';
+                }
+            }
+        });
+    }
+    
+    // Question 15 audio - Form chính (Upload theo phần)
     const audio15 = document.getElementById('listening-part15-audio');
     if (audio15) {
         audio15.addEventListener('change', async function() {
@@ -73,7 +94,27 @@ function setupAudioUploadListeners() {
         });
     }
     
-    // Question 16 audio
+    // Question 15 audio - Form nhập nhanh (Nhập câu hỏi)
+    const audio15Input = document.getElementById('listening-part15-audio-input');
+    if (audio15Input) {
+        audio15Input.addEventListener('change', async function() {
+            if (this.files && this.files[0]) {
+                const preview = document.getElementById('listening-part15-audio-status-input') || document.getElementById('listening-part15-audio-preview');
+                if (preview) {
+                    preview.innerHTML = '<div class="alert alert-info">Đang upload audio...</div>';
+                }
+                const audioUrl = await handleAudioUpload('15', this);
+                if (audioUrl && preview) {
+                    preview.innerHTML = `<div class="alert alert-success">Upload thành công!<br><audio controls src="${audioUrl}" style="width: 100%; margin-top: 10px;"></audio></div>`;
+                    this.dataset.audioUrl = audioUrl;
+                } else if (preview) {
+                    preview.innerHTML = '<div class="alert alert-danger">Upload thất bại!</div>';
+                }
+            }
+        });
+    }
+    
+    // Question 16 audio - Form chính (Upload theo phần)
     const audio16 = document.getElementById('listening-part16-audio');
     if (audio16) {
         audio16.addEventListener('change', async function() {
@@ -93,12 +134,52 @@ function setupAudioUploadListeners() {
         });
     }
     
-    // Question 17 audio
+    // Question 16 audio - Form nhập nhanh (Nhập câu hỏi)
+    const audio16Input = document.getElementById('listening-part16-audio-input');
+    if (audio16Input) {
+        audio16Input.addEventListener('change', async function() {
+            if (this.files && this.files[0]) {
+                const preview = document.getElementById('listening-part16-audio-status-input') || document.getElementById('listening-part16-audio-preview');
+                if (preview) {
+                    preview.innerHTML = '<div class="alert alert-info">Đang upload audio...</div>';
+                }
+                const audioUrl = await handleAudioUpload('16_17', this, 16);
+                if (audioUrl && preview) {
+                    preview.innerHTML = `<div class="alert alert-success">Upload thành công!<br><audio controls src="${audioUrl}" style="width: 100%; margin-top: 10px;"></audio></div>`;
+                    this.dataset.audioUrl = audioUrl;
+                } else if (preview) {
+                    preview.innerHTML = '<div class="alert alert-danger">Upload thất bại!</div>';
+                }
+            }
+        });
+    }
+    
+    // Question 17 audio - Form chính (Upload theo phần)
     const audio17 = document.getElementById('listening-part17-audio');
     if (audio17) {
         audio17.addEventListener('change', async function() {
             if (this.files && this.files[0]) {
                 const preview = document.getElementById('listening-part17-audio-preview');
+                if (preview) {
+                    preview.innerHTML = '<div class="alert alert-info">Đang upload audio...</div>';
+                }
+                const audioUrl = await handleAudioUpload('16_17', this, 17);
+                if (audioUrl && preview) {
+                    preview.innerHTML = `<div class="alert alert-success">Upload thành công!<br><audio controls src="${audioUrl}" style="width: 100%; margin-top: 10px;"></audio></div>`;
+                    this.dataset.audioUrl = audioUrl;
+                } else if (preview) {
+                    preview.innerHTML = '<div class="alert alert-danger">Upload thất bại!</div>';
+                }
+            }
+        });
+    }
+    
+    // Question 17 audio - Form nhập nhanh (Nhập câu hỏi)
+    const audio17Input = document.getElementById('listening-part17-audio-input');
+    if (audio17Input) {
+        audio17Input.addEventListener('change', async function() {
+            if (this.files && this.files[0]) {
+                const preview = document.getElementById('listening-part17-audio-status-input') || document.getElementById('listening-part17-audio-preview');
                 if (preview) {
                     preview.innerHTML = '<div class="alert alert-info">Đang upload audio...</div>';
                 }
@@ -428,11 +509,11 @@ function loadListeningSet14(set) {
     document.getElementById('listening-part14-topic').value = set.topic || '';
     document.getElementById('listening-part14-transcript').value = set.transcript || '';
     
-    // Set audio URL if available
-    const audioInput = document.getElementById('listening-part14-audio');
+    // Set audio URL if available (tìm cả 2 form: chính và nhập nhanh)
+    const audioInput = document.getElementById('listening-part14-audio') || document.getElementById('listening-part14-audio-input');
     if (audioInput && set.audioUrl) {
         audioInput.dataset.audioUrl = set.audioUrl;
-        const preview = document.getElementById('listening-part14-audio-preview');
+        const preview = document.getElementById('listening-part14-audio-preview') || document.getElementById('listening-part14-audio-status-input');
         if (preview) {
             preview.innerHTML = `<div class="alert alert-info">Audio đã được upload<br><audio controls src="${set.audioUrl}" style="width: 100%; margin-top: 10px;"></audio></div>`;
         }
@@ -457,11 +538,11 @@ function loadListeningSet15(set) {
     document.getElementById('listening-part15-topic').value = set.topic || '';
     document.getElementById('listening-part15-transcript').value = set.transcript || '';
     
-    // Set audio URL if available
-    const audioInput = document.getElementById('listening-part15-audio');
+    // Set audio URL if available (tìm cả 2 form: chính và nhập nhanh)
+    const audioInput = document.getElementById('listening-part15-audio') || document.getElementById('listening-part15-audio-input');
     if (audioInput && set.audioUrl) {
         audioInput.dataset.audioUrl = set.audioUrl;
-        const preview = document.getElementById('listening-part15-audio-preview');
+        const preview = document.getElementById('listening-part15-audio-preview') || document.getElementById('listening-part15-audio-status-input');
         if (preview) {
             preview.innerHTML = `<div class="alert alert-info">Audio đã được upload<br><audio controls src="${set.audioUrl}" style="width: 100%; margin-top: 10px;"></audio></div>`;
         }
@@ -493,11 +574,11 @@ function loadListeningSet16_17(set) {
         document.getElementById('listening-part16-topic').value = set.question16.topic || '';
         document.getElementById('listening-part16-transcript').value = set.question16.transcript || '';
         
-        // Set audio URL if available
-        const audio16Input = document.getElementById('listening-part16-audio');
+        // Set audio URL if available (tìm cả 2 form: chính và nhập nhanh)
+        const audio16Input = document.getElementById('listening-part16-audio') || document.getElementById('listening-part16-audio-input');
         if (audio16Input && set.question16.audioUrl) {
             audio16Input.dataset.audioUrl = set.question16.audioUrl;
-            const preview = document.getElementById('listening-part16-audio-preview');
+            const preview = document.getElementById('listening-part16-audio-preview') || document.getElementById('listening-part16-audio-status-input');
             if (preview && set.question16.audioUrl !== 'audio/question16/no_audio.mp3') {
                 preview.innerHTML = `<div class="alert alert-info">Audio đã được upload<br><audio controls src="${set.question16.audioUrl}" style="width: 100%; margin-top: 10px;"></audio></div>`;
             }
@@ -526,11 +607,11 @@ function loadListeningSet16_17(set) {
         document.getElementById('listening-part17-topic').value = set.question17.topic || '';
         document.getElementById('listening-part17-transcript').value = set.question17.transcript || '';
         
-        // Set audio URL if available
-        const audio17Input = document.getElementById('listening-part17-audio');
+        // Set audio URL if available (tìm cả 2 form: chính và nhập nhanh)
+        const audio17Input = document.getElementById('listening-part17-audio') || document.getElementById('listening-part17-audio-input');
         if (audio17Input && set.question17.audioUrl) {
             audio17Input.dataset.audioUrl = set.question17.audioUrl;
-            const preview = document.getElementById('listening-part17-audio-preview');
+            const preview = document.getElementById('listening-part17-audio-preview') || document.getElementById('listening-part17-audio-status-input');
             if (preview && set.question17.audioUrl !== 'audio/question17/no_audio.mp3') {
                 preview.innerHTML = `<div class="alert alert-info">Audio đã được upload<br><audio controls src="${set.question17.audioUrl}" style="width: 100%; margin-top: 10px;"></audio></div>`;
             }
@@ -676,10 +757,7 @@ function collectListeningSet14() {
     const topic = document.getElementById('listening-part14-topic').value.trim();
     const transcript = document.getElementById('listening-part14-transcript').value.trim();
     
-    if (!title || !topic || !transcript) {
-        alert('Vui lòng điền đầy đủ thông tin!');
-        return null;
-    }
+    // Bỏ validation bắt buộc: không yêu cầu title, topic, transcript và 6 options
     
     const container = document.getElementById('listening-part14-options-container');
     const options = [];
@@ -691,13 +769,10 @@ function collectListeningSet14() {
         }
     });
     
-    if (options.length < 6) {
-        alert('Vui lòng thêm đủ 6 options!');
-        return null;
-    }
+    // Bỏ validation bắt buộc 6 options
     
-    // Get audio URL if uploaded
-    const audioInput = document.getElementById('listening-part14-audio');
+    // Get audio URL if uploaded (tìm cả 2 form: chính và nhập nhanh)
+    const audioInput = document.getElementById('listening-part14-audio') || document.getElementById('listening-part14-audio-input');
     const audioUrl = audioInput?.dataset.audioUrl || `audio/question14/audio_${Date.now()}.mp3`;
     
     return {
@@ -715,10 +790,7 @@ function collectListeningSet15() {
     const topic = document.getElementById('listening-part15-topic').value.trim();
     const transcript = document.getElementById('listening-part15-transcript').value.trim();
     
-    if (!title || !topic || !transcript) {
-        alert('Vui lòng điền đầy đủ thông tin!');
-        return null;
-    }
+    // Bỏ validation bắt buộc: không yêu cầu title, topic, transcript
     
     const questionsContainer = document.getElementById('listening-part15-questions-container');
     const answersContainer = document.getElementById('listening-part15-answers-container');
@@ -745,8 +817,8 @@ function collectListeningSet15() {
         return null;
     }
     
-    // Get audio URL if uploaded
-    const audioInput = document.getElementById('listening-part15-audio');
+    // Get audio URL if uploaded (tìm cả 2 form: chính và nhập nhanh)
+    const audioInput = document.getElementById('listening-part15-audio') || document.getElementById('listening-part15-audio-input');
     const audioUrl = audioInput?.dataset.audioUrl || `audio/question15/audio_${Date.now()}.mp3`;
     
     return {
@@ -816,9 +888,9 @@ function collectListeningSet16_17() {
         return null;
     }
     
-    // Get audio URLs if uploaded
-    const audio16Input = document.getElementById('listening-part16-audio');
-    const audio17Input = document.getElementById('listening-part17-audio');
+    // Get audio URLs if uploaded (tìm cả 2 form: chính và nhập nhanh)
+    const audio16Input = document.getElementById('listening-part16-audio') || document.getElementById('listening-part16-audio-input');
+    const audio17Input = document.getElementById('listening-part17-audio') || document.getElementById('listening-part17-audio-input');
     const audio16Url = audio16Input?.dataset.audioUrl || 'audio/question16/no_audio.mp3';
     const audio17Url = audio17Input?.dataset.audioUrl || 'audio/question17/no_audio.mp3';
     
@@ -1605,9 +1677,13 @@ function generateListeningJS14(sets) {
     code += `    icon.classList.remove("bi-pause-fill");\n`;
     code += `    icon.classList.add("bi-play-fill");\n`;
     code += `  });\n`;
+    code += `  const nextBtn = document.getElementById('nextButton');\n`;
     code += `  if (currentIndex < question14Data.length - 1) {\n`;
     code += `    currentIndex++;\n`;
     code += `    renderQuestionByIndex(currentIndex);\n`;
+    code += `  } else if (nextBtn && nextBtn.textContent === 'The end') {\n`;
+    code += `    // Khi đã xong toàn bộ bộ đề upload (Listening Question 14) -> quay về trang chọn bài Listening\n`;
+    code += `    window.location.href = 'listening_question.html';\n`;
     code += `  }\n`;
     code += `});\n\n`;
     code += `document.getElementById('backButton').addEventListener('click', function () {\n`;
@@ -1805,9 +1881,13 @@ function generateListeningJS15(sets) {
     code += `    icon.classList.remove("bi-pause-fill");\n`;
     code += `    icon.classList.add("bi-play-fill");\n`;
     code += `  });\n`;
+    code += `  const nextBtn = document.getElementById('nextButton');\n`;
     code += `  if (currentIndex < question15Data.length - 1) {\n`;
     code += `    currentIndex++;\n`;
     code += `    renderQuestionByIndex(currentIndex);\n`;
+    code += `  } else if (nextBtn && nextBtn.textContent === 'The end') {\n`;
+    code += `    // Khi đã xong toàn bộ bộ đề upload (Listening Question 15) -> quay về trang chọn bài Listening\n`;
+    code += `    window.location.href = 'listening_question.html';\n`;
     code += `  }\n`;
     code += `});\n\n`;
     code += `document.getElementById('backButton').addEventListener('click', function () {\n`;
@@ -2025,9 +2105,13 @@ function generateListeningJS16_17(sets) {
     code += `    icon.classList.remove("bi-pause-fill");\n`;
     code += `    icon.classList.add("bi-play-fill");\n`;
     code += `  });\n`;
+    code += `  const nextBtn = document.getElementById('nextButton');\n`;
     code += `  if (currentIndex < question16Data.length-1) {\n`;
     code += `    currentIndex++;\n`;
     code += `    renderQuestionByIndex(currentIndex);\n`;
+    code += `  } else if (nextBtn && nextBtn.textContent === 'The end') {\n`;
+    code += `    // Khi đã xong toàn bộ bộ đề upload (Listening Question 16 & 17) -> quay về trang chọn bài Listening\n`;
+    code += `    window.location.href = 'listening_question.html';\n`;
     code += `  }\n`;
     code += `});\n\n`;
     code += `document.getElementById('backButton').addEventListener('click', function () {\n`;
@@ -2785,11 +2869,6 @@ function saveListeningPart14Set() {
     const topic = topicInput ? topicInput.value.trim() : '';
     const transcript = transcriptInput ? transcriptInput.value.trim() : '';
     
-    if (!topic || !transcript) {
-        alert('Vui lòng điền đầy đủ Topic và Transcript!');
-        return;
-    }
-    
     // Collect options
     const container = document.getElementById('listening-part14-options-container');
     if (!container) {
@@ -2805,10 +2884,7 @@ function saveListeningPart14Set() {
         }
     });
     
-    if (options.length < 6) {
-        alert('Vui lòng thêm đủ 6 options!');
-        return;
-    }
+    // Bỏ validation bắt buộc: không yêu cầu topic, transcript và 6 options
     
     // Get audio URL if uploaded
     const audioInput = document.getElementById('listening-part14-audio-input');
@@ -2859,10 +2935,7 @@ function saveListeningPart15Set() {
     const topic = topicInput ? topicInput.value.trim() : '';
     const transcript = transcriptInput ? transcriptInput.value.trim() : '';
     
-    if (!topic || !transcript) {
-        alert('Vui lòng điền đầy đủ Topic và Transcript!');
-        return;
-    }
+    // Bỏ validation bắt buộc: không yêu cầu topic và transcript
     
     // Collect questions
     const questionsContainer = document.getElementById('listening-part15-questions-container');
@@ -2895,8 +2968,8 @@ function saveListeningPart15Set() {
         return;
     }
     
-    // Get audio URL if uploaded
-    const audioInput = document.getElementById('listening-part15-audio-input');
+    // Get audio URL if uploaded (tìm cả 2 form: chính và nhập nhanh)
+    const audioInput = document.getElementById('listening-part15-audio-input') || document.getElementById('listening-part15-audio');
     const audioUrlInput = document.getElementById('listening-part15-audio-url-input');
     let audioUrl = audioInput?.dataset.audioUrl || audioUrlInput?.value.trim() || `audio/question15/audio_${Date.now()}.mp3`;
     
@@ -3004,10 +3077,10 @@ function saveListeningPart16_17Set() {
         return;
     }
     
-    // Get audio URLs if uploaded
-    const audio16Input = document.getElementById('listening-part16-audio-input');
+    // Get audio URLs if uploaded (tìm cả 2 form: chính và nhập nhanh)
+    const audio16Input = document.getElementById('listening-part16-audio-input') || document.getElementById('listening-part16-audio');
     const audio16UrlInput = document.getElementById('listening-part16-audio-url-input');
-    const audio17Input = document.getElementById('listening-part17-audio-input');
+    const audio17Input = document.getElementById('listening-part17-audio-input') || document.getElementById('listening-part17-audio');
     const audio17UrlInput = document.getElementById('listening-part17-audio-url-input');
     
     const audio16Url = audio16Input?.dataset.audioUrl || audio16UrlInput?.value.trim() || 'audio/question16/no_audio.mp3';

@@ -8,6 +8,8 @@
         { id: 'part4-section', label: 'Reading Question 4', key: 'part4' },
         { id: 'part5-section', label: 'Reading Question 5', key: 'part5' }
     ];
+    const CACHE_PREFIX = 'practice_set_cache_reading_';
+    const cacheKey = setId ? `${CACHE_PREFIX}${setId}` : null;
 
     const refs = {
         loading: document.getElementById('loadingState'),
@@ -49,6 +51,25 @@
             question3: []
         }
     };
+    let hasRendered = false;
+
+    function getAuthorizedHeaders(extra = {}) {
+        const headers = { ...(extra || {}) };
+        const token = typeof getAuthToken === 'function' ? getAuthToken() : null;
+        if (token) {
+            headers.Authorization = `Bearer ${token}`;
+        }
+        if (typeof buildDeviceHeaders === 'function') {
+            return buildDeviceHeaders(headers);
+        }
+        if (typeof getDeviceId === 'function') {
+            headers['X-Device-Id'] = getDeviceId();
+        }
+        if (typeof getDeviceName === 'function') {
+            headers['X-Device-Name'] = getDeviceName();
+        }
+        return headers;
+    }
 
     if (!setId) {
         if (refs.loading) {
@@ -116,13 +137,16 @@
 
         refs.nextButton.addEventListener('click', () => {
             if (state.completed) {
+                // Khi đã hoàn thành bài và bấm "The end" -> quay về trang chọn bộ đề Reading
                 window.location.href = 'reading_bode.html';
                 return;
             }
 
             if (state.currentStep === state.totalSteps) {
-                const modal = new bootstrap.Modal(refs.submitModal);
-                modal.show();
+                if (!state.isSubmitting && !state.completed) {
+                    const modal = new bootstrap.Modal(refs.submitModal);
+                    modal.show();
+                }
             } else {
                 showStep(state.currentStep + 1);
             }
@@ -138,6 +162,10 @@
         }
 
         document.getElementById('confirmSubmitBtn').addEventListener('click', () => {
+            if (state.isSubmitting || state.completed) {
+                return;
+            }
+            state.isSubmitting = true;
             const instance = bootstrap.Modal.getInstance(refs.submitModal);
             if (instance) {
                 instance.hide();
@@ -772,6 +800,10 @@
 
         const totalScore = part1Result.score + part2Result.score + part4Result.score + part5Result.score;
         const totalPossible = part1Result.total + part2Result.total + part4Result.total + part5Result.total;
+        const durationSeconds = Math.max(
+            0,
+            (state.data?.duration_minutes || 35) * 60 - (state.timeLeft || 0)
+        );
 
         if (refs.totalScore) {
             refs.totalScore.textContent = `Total Score: ${totalScore} / ${totalPossible}`;
@@ -787,8 +819,29 @@
         if (refs.checkButton) {
             refs.checkButton.style.display = 'none';
         }
-        refs.nextButton.textContent = 'Back to home';
+        refs.nextButton.textContent = 'The end';
         state.completed = true;
+
+        if (typeof submitPracticeResult === 'function') {
+            submitPracticeResult({
+                practiceType: 'reading',
+                mode: 'set',
+                setId: state.data?.id || setId,
+                setTitle: state.setTitle,
+                totalScore,
+                maxScore: totalPossible,
+                durationSeconds,
+                partScores: {
+                    part1: { score: part1Result.score, total: part1Result.total },
+                    part2: { score: part2Result.score, total: part2Result.total },
+                    part4: { score: part4Result.score, total: part4Result.total },
+                    part5: { score: part5Result.score, total: part5Result.total }
+                },
+                metadata: {
+                    source: 'reading_bode_set'
+                }
+            });
+        }
 
         showComparisonSection('comparisonResult_question1');
         if (refs.navButtons && refs.navButtons.length) {
@@ -798,7 +851,41 @@
         }
     }
 
+    function cachePracticeSet(set) {
+        if (!cacheKey || !set) {
+            return;
+        }
+        try {
+            sessionStorage.setItem(cacheKey, JSON.stringify(set));
+        } catch (error) {
+            console.warn('Không thể lưu cache bộ đề đọc:', error);
+        }
+    }
+
+    function getCachedPracticeSet() {
+        if (!cacheKey) {
+            return null;
+        }
+        try {
+            const cached = sessionStorage.getItem(cacheKey);
+            if (!cached) {
+                return null;
+            }
+            const parsed = JSON.parse(cached);
+            if (!parsed || !parsed.data) {
+                sessionStorage.removeItem(cacheKey);
+                return null;
+            }
+            return parsed;
+        } catch (error) {
+            console.warn('Không thể đọc cache bộ đề đọc:', error);
+            sessionStorage.removeItem(cacheKey);
+            return null;
+        }
+    }
+
     function renderPractice(set) {
+        hasRendered = true;
         if (refs.loading) {
             refs.loading.style.display = 'none';
         }
@@ -820,22 +907,42 @@
         showStep(1);
     }
 
-    async function loadPracticeSet() {
+    async function loadPracticeSet(options = {}) {
         try {
-            const response = await fetch(`/api/practice_sets/get?id=${setId}`);
+            const response = await fetch(`/api/practice_sets/get?id=${setId}`, {
+                headers: getAuthorizedHeaders()
+            });
             const result = await response.json();
             if (!response.ok) {
                 throw new Error(result.error || 'Không tìm thấy bộ đề');
             }
             state.data = result.set;
-            renderPractice(result.set);
+            cachePracticeSet(result.set);
+            if (!options.skipRenderIfLoaded || !hasRendered) {
+                renderPractice(result.set);
+            }
         } catch (error) {
             console.error(error);
-            refs.loading.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+            if (!hasRendered && refs.loading) {
+                refs.loading.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+            }
         }
     }
 
-    document.addEventListener('DOMContentLoaded', loadPracticeSet);
+    document.addEventListener('DOMContentLoaded', async () => {
+        if (typeof requireAuth === 'function') {
+            const ok = await requireAuth();
+            if (!ok) {
+                return;
+            }
+        }
+        const cachedSet = getCachedPracticeSet();
+        if (cachedSet) {
+            state.data = cachedSet;
+            renderPractice(cachedSet);
+        }
+        loadPracticeSet({ skipRenderIfLoaded: Boolean(cachedSet) });
+    });
 })();
 
 

@@ -15,6 +15,174 @@ window.questionSets = window.questionSets || {
 // Create references to use in this file
 const questionSets = window.questionSets;
 
+// Helper for legacy single-part form: lưu bộ đề Part 1 vào questionSets[1]
+// Được gọi từ nút "Lưu bộ đề" trong form Upload theo phần (Reading Question 1)
+function savePart1Set() {
+    try {
+        const titleInput = document.getElementById('part1-title-input');
+        const title =
+            (titleInput && titleInput.value.trim()) ||
+            `Bộ đề ${questionSets[1].length + 1}`;
+
+        // Thu thập dữ liệu câu hỏi từ form hiện tại
+        const data = collectPart1DataFromInputForm(); // { questions: [...] }
+
+        if (!data.questions || !data.questions.length) {
+            alert('Vui lòng nhập ít nhất 1 câu hỏi cho bộ đề.');
+            return;
+        }
+
+        const newSet = {
+            id: questionSets[1].length + 1,
+            title,
+            data
+        };
+
+        questionSets[1].push(newSet);
+
+        // Render lại danh sách bộ đề cho Part 1 (bảng bên dưới form)
+        if (typeof renderQuestionSets === 'function') {
+            renderQuestionSets(1);
+        }
+
+        // Xóa nội dung form nhập nhanh để tránh nhập trùng
+        if (typeof clearFormSilently === 'function') {
+            clearFormSilently(1);
+        }
+        if (titleInput) {
+            titleInput.value = '';
+        }
+
+        alert('Đã lưu bộ đề Question 1. Bạn có thể xem trong danh sách bộ đề bên dưới hoặc dùng chức năng xuất file.');
+    } catch (error) {
+        console.error('savePart1Set error:', error);
+        alert('Không thể lưu bộ đề Question 1: ' + (error.message || 'Lỗi không xác định'));
+    }
+}
+
+// Helper for legacy single-part form: lưu bộ đề Part 2 vào questionSets[2]
+function savePart2Set() {
+    try {
+        const titleInput = document.getElementById('part2-title-input');
+        const title =
+            (titleInput && titleInput.value.trim()) ||
+            `Bộ đề ${questionSets[2].length + 1}`;
+
+        const data = collectPart2DataFromInputForm();
+
+        if (!data.sentences || !data.sentences.length) {
+            alert('Vui lòng nhập ít nhất 1 câu văn cho bộ đề.');
+            return;
+        }
+
+        const newSet = {
+            id: questionSets[2].length + 1,
+            title,
+            data
+        };
+
+        questionSets[2].push(newSet);
+
+        if (typeof renderQuestionSets === 'function') {
+            renderQuestionSets(2);
+        }
+
+        if (typeof clearFormSilently === 'function') {
+            clearFormSilently(2);
+        }
+        if (titleInput) titleInput.value = '';
+        const topicInput = document.getElementById('part2-topic-input');
+        if (topicInput) topicInput.value = '';
+
+        alert('Đã lưu bộ đề Question 2 & 3. Bạn có thể xem trong danh sách bộ đề bên dưới hoặc dùng chức năng xuất file.');
+    } catch (error) {
+        console.error('savePart2Set error:', error);
+        alert('Không thể lưu bộ đề Question 2 & 3: ' + (error.message || 'Lỗi không xác định'));
+    }
+}
+
+// Helper for legacy single-part form: lưu bộ đề Part 4 vào questionSets[4]
+function savePart4Set() {
+    try {
+        const titleInput = document.getElementById('part4-title-input');
+        const title =
+            (titleInput && titleInput.value.trim()) ||
+            `Bộ đề ${questionSets[4].length + 1}`;
+
+        const data = collectPart4DataFromInputForm();
+
+        if (!data.questions || !data.questions.length) {
+            alert('Vui lòng nhập ít nhất 1 câu hỏi cho bộ đề.');
+            return;
+        }
+
+        const newSet = {
+            id: questionSets[4].length + 1,
+            title,
+            data
+        };
+
+        questionSets[4].push(newSet);
+
+        if (typeof renderQuestionSets === 'function') {
+            renderQuestionSets(4);
+        }
+
+        if (typeof clearFormSilently === 'function') {
+            clearFormSilently(4);
+        }
+        if (titleInput) titleInput.value = '';
+        const topicInput = document.getElementById('part4-topic-input');
+        if (topicInput) topicInput.value = '';
+
+        alert('Đã lưu bộ đề Question 4. Bạn có thể xem trong danh sách bộ đề bên dưới hoặc dùng chức năng xuất file.');
+    } catch (error) {
+        console.error('savePart4Set error:', error);
+        alert('Không thể lưu bộ đề Question 4: ' + (error.message || 'Lỗi không xác định'));
+    }
+}
+
+// Helper for legacy single-part form: lưu bộ đề Part 5 vào questionSets[5]
+function savePart5Set() {
+    try {
+        const titleInput = document.getElementById('part5-title-input');
+        const title =
+            (titleInput && titleInput.value.trim()) ||
+            `Bộ đề ${questionSets[5].length + 1}`;
+
+        const data = collectPart5DataFromInputForm();
+
+        if (!data.options || data.options.length <= 1 || !data.paragraphs || !data.paragraphs.length) {
+            alert('Vui lòng nhập đủ options và paragraphs cho bộ đề.');
+            return;
+        }
+
+        const newSet = {
+            id: questionSets[5].length + 1,
+            title,
+            data
+        };
+
+        questionSets[5].push(newSet);
+
+        if (typeof renderQuestionSets === 'function') {
+            renderQuestionSets(5);
+        }
+
+        if (typeof clearFormSilently === 'function') {
+            clearFormSilently(5);
+        }
+        if (titleInput) titleInput.value = '';
+        const topicInput = document.getElementById('part5-topic-input');
+        if (topicInput) topicInput.value = '';
+
+        alert('Đã lưu bộ đề Question 5. Bạn có thể xem trong danh sách bộ đề bên dưới hoặc dùng chức năng xuất file.');
+    } catch (error) {
+        console.error('savePart5Set error:', error);
+        alert('Không thể lưu bộ đề Question 5: ' + (error.message || 'Lỗi không xác định'));
+    }
+}
+
 function requireAuthTokenOrRedirect() {
     const token = typeof getAuthToken === 'function'
         ? getAuthToken()
@@ -29,10 +197,20 @@ function requireAuthTokenOrRedirect() {
 
 window.buildAuthorizedHeaders = function(additionalHeaders = {}) {
     const token = requireAuthTokenOrRedirect();
-    return {
+    const headers = {
         Authorization: `Bearer ${token}`,
         ...additionalHeaders
     };
+    if (typeof buildDeviceHeaders === 'function') {
+        return buildDeviceHeaders(headers);
+    }
+    if (typeof getDeviceId === 'function') {
+        headers['X-Device-Id'] = getDeviceId();
+    }
+    if (typeof getDeviceName === 'function') {
+        headers['X-Device-Name'] = getDeviceName();
+    }
+    return headers;
 };
 
 function getJsonAuthHeaders() {
@@ -486,7 +664,108 @@ function collectCurrentPartData() {
     }
 }
 
-// Keep existing collect functions but adapt for sets
+// Collect data from input form (with -input suffix IDs) - for quick input forms
+function collectPart1DataFromInputForm() {
+    const questions = [];
+    document.querySelectorAll('#part1-questions-container .question-item').forEach((item) => {
+        const questionStart = item.querySelector('.part1-questionStart')?.value.trim() || '';
+        const questionEnd = item.querySelector('.part1-questionEnd')?.value.trim() || '';
+        const correctAnswer = item.querySelector('.part1-correctAnswer')?.value.trim() || '';
+        const answerOptionsText = item.querySelector('.part1-answerOptions')?.value.trim() || '';
+        const answerOptions = answerOptionsText.split('\n').filter(opt => opt.trim() !== '');
+        
+        if (questionStart || questionEnd || correctAnswer) {
+            questions.push({
+                questionStart,
+                answerOptions,
+                questionEnd,
+                correctAnswer
+            });
+        }
+    });
+    
+    return { questions };
+}
+
+function collectPart2DataFromInputForm() {
+    const sentences = [];
+    document.querySelectorAll('#part2-sentences-container .question-item').forEach(item => {
+        const sentence = item.querySelector('.part2-sentence')?.value.trim() || '';
+        if (sentence) {
+            sentences.push(sentence);
+        }
+    });
+    
+    const topicInput = document.getElementById('part2-topic-input');
+    return {
+        topic: topicInput ? topicInput.value.trim() : '',
+        sentences: sentences
+    };
+}
+
+function collectPart4DataFromInputForm() {
+    const questions = [];
+    document.querySelectorAll('#part4-questions-container .question-item').forEach(item => {
+        const question = item.querySelector('.part4-question')?.value.trim() || '';
+        const correctAnswer = item.querySelector('.part4-correctAnswer')?.value.trim() || '';
+        if (question || correctAnswer) {
+            questions.push({
+                question,
+                options: ['', 'A', 'B', 'C', 'D'],
+                correctAnswer
+            });
+        }
+    });
+    
+    const texts = [
+        document.getElementById('part4-text-intro-input')?.value.trim() || '',
+        document.getElementById('part4-text-a-input')?.value.trim() || '',
+        document.getElementById('part4-text-b-input')?.value.trim() || '',
+        document.getElementById('part4-text-c-input')?.value.trim() || '',
+        document.getElementById('part4-text-d-input')?.value.trim() || ''
+    ];
+    
+    const topicInput = document.getElementById('part4-topic-input');
+    return {
+        topic: topicInput ? topicInput.value.trim() : '',
+        texts: texts,
+        questions: questions
+    };
+}
+
+function collectPart5DataFromInputForm() {
+    const options = [];
+    document.querySelectorAll('#part5-options-container .question-item').forEach(item => {
+        const option = item.querySelector('.part5-option')?.value.trim() || '';
+        if (option) {
+            options.push(option);
+        }
+    });
+    
+    const paragraphs = [];
+    document.querySelectorAll('#part5-paragraphs-container .question-item').forEach(item => {
+        const paragraph = item.querySelector('.part5-paragraph')?.value.trim() || '';
+        if (paragraph) {
+            paragraphs.push(paragraph);
+        }
+    });
+    
+    const topicInput = document.getElementById('part5-topic-input');
+    const keywordInput = document.getElementById('part5-keyword-input');
+    const meoInput = document.getElementById('part5-meo-input');
+    
+    return {
+        topic: topicInput ? topicInput.value.trim() : '',
+        options: ['', ...options], // First option is always empty
+        paragraphs: paragraphs,
+        tips: {
+            keyword: keywordInput ? keywordInput.value.trim() : '',
+            meo: meoInput ? meoInput.value.trim() : ''
+        }
+    };
+}
+
+// Keep existing collect functions but adapt for sets (for edit forms)
 function collectPart1Data() {
     const questions = [];
     document.querySelectorAll('#part1-questions-container .question-item').forEach((item) => {
@@ -904,12 +1183,16 @@ function generatePart1JS() {
     code += `    renderQuestions();\n\n`;
     code += `    // Hàm chuyển đến câu hỏi tiếp theo\n`;
     code += `    document.getElementById('nextButton').addEventListener('click', function() {\n`;
+    code += `        const nextBtn = document.getElementById('nextButton');\n`;
     code += `        if (currentArrayIndex < questionsArrays.length - 1) {\n`;
     code += `            currentArrayIndex++;\n`;
     code += `            renderQuestions();\n`;
+    code += `        } else if (nextBtn && nextBtn.textContent === 'The end') {\n`;
+    code += `            // Khi đã xong toàn bộ bộ đề upload (Reading Question 1) -> quay về trang chọn bài Reading\n`;
+    code += `            window.location.href = 'reading_question.html';\n`;
     code += `        } else {\n`;
     code += `            document.getElementById('checkResultButton').style.display = 'block';\n`;
-    code += `            document.getElementById('nextButton').textContent = 'The end';\n`;
+    code += `            if (nextBtn) nextBtn.textContent = 'The end';\n`;
     code += `        }\n`;
     code += `    });\n\n`;
     code += `    // Hàm quay lại câu hỏi trước đó\n`;
@@ -1194,12 +1477,16 @@ function generatePart2JS() {
     code += `}\n\n`;
     code += `// Next button handler\n`;
     code += `document.getElementById('nextButton').addEventListener('click', function() {\n`;
+    code += `  const nextBtn = document.getElementById('nextButton');\n`;
     code += `  if (currentSetIndex < questionSets.length - 1) {\n`;
     code += `    currentSetIndex++;\n`;
     code += `    renderQuestion2(questionSets[currentSetIndex]);\n`;
-    code += `    if (currentSetIndex === questionSets.length - 1) {\n`;
-    code += `      document.getElementById('nextButton').textContent = "The end";\n`;
+    code += `    if (currentSetIndex === questionSets.length - 1 && nextBtn) {\n`;
+    code += `      nextBtn.textContent = "The end";\n`;
     code += `    }\n`;
+    code += `  } else if (nextBtn && nextBtn.textContent === 'The end') {\n`;
+    code += `    // Khi đã xong toàn bộ bộ đề upload (Reading Question 2 & 3) -> quay về trang chọn bài Reading\n`;
+    code += `    window.location.href = 'reading_question.html';\n`;
     code += `  }\n`;
     code += `});\n\n`;
     code += `// Back button handler\n`;
@@ -1500,6 +1787,9 @@ function generatePart4JS() {
     code += `        // Update header with current index\n`;
     code += `        const headerEl = document.getElementById('question4_index');\n`;
     code += `        if (headerEl) headerEl.textContent = 'Reading Question 4 (' + (currentIndex + 1) + '/' + question4Text.length + ')';\n`;
+    code += `      } else if (nextButton.textContent === 'The end') {\n`;
+    code += `        // Khi đã xong toàn bộ bộ đề upload (Reading Question 4) -> quay về trang chọn bài Reading\n`;
+    code += `        window.location.href = 'reading_question.html';\n`;
     code += `      } else {\n`;
     code += `        // If at last question, change button text\n`;
     code += `        nextButton.textContent = "The end";\n`;
@@ -1859,6 +2149,9 @@ function generatePart5JS() {
     code += `        renderQuestion5(options[currentQuestion], paragraph_question5[currentQuestion], meohoc[currentQuestion] || ['', '']);\n`;
     code += `        const backButton = document.getElementById('backButton');\n`;
     code += `        if (backButton) backButton.textContent = 'Back';\n`;
+    code += `      } else if (nextButton.textContent === 'The end') {\n`;
+    code += `        // Khi đã xong toàn bộ bộ đề upload (Reading Question 5) -> quay về trang chọn bài Reading\n`;
+    code += `        window.location.href = 'reading_question.html';\n`;
     code += `      } else {\n`;
     code += `        nextButton.textContent = 'The end';\n`;
     code += `      }\n`;
@@ -1918,13 +2211,18 @@ function escapeJS(str) {
 function clearFormSilently(part) {
     // Clear form without confirmation dialog
     // If part is not provided, use currentPart
+    // This function clears both edit forms (without -input suffix) and input forms (with -input suffix)
     if (!part) {
         part = window.currentPart || 1;
     }
     switch (part) {
         case 1:
+            // Clear edit form fields
             const title1 = document.getElementById('part1-title');
             if (title1) title1.value = '';
+            // Clear input form fields
+            const title1Input = document.getElementById('part1-title-input');
+            if (title1Input) title1Input.value = '';
             const container1 = document.getElementById('part1-questions-container');
             if (container1) container1.innerHTML = '';
             if (typeof part1Questions !== 'undefined') {
@@ -1932,10 +2230,16 @@ function clearFormSilently(part) {
             }
             break;
         case 2:
+            // Clear edit form fields
             const title2 = document.getElementById('part2-title');
             const topic2 = document.getElementById('part2-topic');
             if (title2) title2.value = '';
             if (topic2) topic2.value = '';
+            // Clear input form fields
+            const title2Input = document.getElementById('part2-title-input');
+            const topic2Input = document.getElementById('part2-topic-input');
+            if (title2Input) title2Input.value = '';
+            if (topic2Input) topic2Input.value = '';
             const container2 = document.getElementById('part2-sentences-container');
             if (container2) container2.innerHTML = '';
             if (typeof part2Sentences !== 'undefined') {
@@ -1943,6 +2247,7 @@ function clearFormSilently(part) {
             }
             break;
         case 4:
+            // Clear edit form fields
             const title4 = document.getElementById('part4-title');
             const topic4 = document.getElementById('part4-topic');
             const intro4 = document.getElementById('part4-text-intro');
@@ -1957,6 +2262,21 @@ function clearFormSilently(part) {
             if (b4) b4.value = '';
             if (c4) c4.value = '';
             if (d4) d4.value = '';
+            // Clear input form fields
+            const title4Input = document.getElementById('part4-title-input');
+            const topic4Input = document.getElementById('part4-topic-input');
+            const intro4Input = document.getElementById('part4-text-intro-input');
+            const a4Input = document.getElementById('part4-text-a-input');
+            const b4Input = document.getElementById('part4-text-b-input');
+            const c4Input = document.getElementById('part4-text-c-input');
+            const d4Input = document.getElementById('part4-text-d-input');
+            if (title4Input) title4Input.value = '';
+            if (topic4Input) topic4Input.value = '';
+            if (intro4Input) intro4Input.value = '';
+            if (a4Input) a4Input.value = '';
+            if (b4Input) b4Input.value = '';
+            if (c4Input) c4Input.value = '';
+            if (d4Input) d4Input.value = '';
             const container4 = document.getElementById('part4-questions-container');
             if (container4) container4.innerHTML = '';
             if (typeof part4Questions !== 'undefined') {
@@ -1964,6 +2284,7 @@ function clearFormSilently(part) {
             }
             break;
         case 5:
+            // Clear edit form fields
             const title5 = document.getElementById('part5-title');
             const topic5 = document.getElementById('part5-topic');
             const keyword5 = document.getElementById('part5-keyword');
@@ -1972,6 +2293,15 @@ function clearFormSilently(part) {
             if (topic5) topic5.value = '';
             if (keyword5) keyword5.value = '';
             if (meo5) meo5.value = '';
+            // Clear input form fields
+            const title5Input = document.getElementById('part5-title-input');
+            const topic5Input = document.getElementById('part5-topic-input');
+            const keyword5Input = document.getElementById('part5-keyword-input');
+            const meo5Input = document.getElementById('part5-meo-input');
+            if (title5Input) title5Input.value = '';
+            if (topic5Input) topic5Input.value = '';
+            if (keyword5Input) keyword5Input.value = '';
+            if (meo5Input) meo5Input.value = '';
             const optionsContainer5 = document.getElementById('part5-options-container');
             const paragraphsContainer5 = document.getElementById('part5-paragraphs-container');
             if (optionsContainer5) optionsContainer5.innerHTML = '';

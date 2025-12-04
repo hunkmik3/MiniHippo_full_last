@@ -213,8 +213,11 @@ updateCountdown();
         if (currentArrayIndex < questionsArrays.length - 1) {
             currentArrayIndex++;
             renderQuestions();
+        } else if (document.getElementById('nextButton').textContent === 'The end') {
+            // Sau khi đã xem kết quả của bộ câu hỏi cuối cùng -> quay lại trang chọn bài Reading
+            window.location.href = 'reading_question.html';
         } else {
-            // Hiển thị kết quả khi đến mảng cuối cùng
+            // Hiển thị kết quả khi đến mảng cuối cùng (lần đầu)
             document.getElementById('checkResultButton').style.display = 'block';
             document.getElementById('nextButton').textContent = 'The end';
         }

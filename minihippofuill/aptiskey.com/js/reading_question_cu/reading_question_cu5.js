@@ -480,6 +480,12 @@ let currentQuestion = 0; // Câu hỏi bắt đầu từ 0
 
 // Hàm xử lý sự kiện khi nhấn nút Next
 document.getElementById('nextButton').addEventListener('click', function() {
+    // Nếu đã ở câu cuối và nút đang là "The end" -> quay về trang chọn bài Reading cũ
+    if (currentQuestion === options.length - 1 && document.getElementById('nextButton').textContent === 'The end') {
+        window.location.href = 'reading_question_cu5.html';
+        return;
+    }
+
     // Kiểm tra nếu câu hỏi không phải câu cuối cùng
     if (currentQuestion < options.length - 1) {
         currentQuestion++; // Tăng chỉ số câu hỏi hiện tại
@@ -491,7 +497,7 @@ document.getElementById('nextButton').addEventListener('click', function() {
         // Gọi lại hàm render để hiển thị câu hỏi mới
         renderQuestion5(options[currentQuestion], paragraph_question5[currentQuestion], meohoc[currentQuestion]);
 
-        // Nếu là câu hỏi cuối cùng, đổi văn bản nút Next thành "Submit Test"
+        // Nếu là câu hỏi cuối cùng, đổi văn bản nút Next thành "The end"
         if (currentQuestion === options.length - 1) {
             document.getElementById('nextButton').textContent = 'The end';
         }

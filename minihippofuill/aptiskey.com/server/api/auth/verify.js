@@ -1,4 +1,5 @@
 import { selectFrom } from '../_utils/supabase.js';
+import { ensureDeviceAccess, resolveDeviceLimit } from '../_utils/device.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
@@ -54,15 +55,38 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Tài khoản đang bị khóa' });
     }
 
+    const userPayload = {
+      id: profile.id,
+      email: profile.email || data.email,
+      username: profile.username || data.user_metadata?.username || '',
+      role: profile.role || 'user',
+      status: profile.status || 'active',
+      accountCode: profile.account_code || '',
+      fullName: profile.full_name || '',
+      deviceLimit: resolveDeviceLimit(profile),
+      expiresAt: profile.expires_at || null
+    };
+
+    const deviceId = req.headers['x-device-id'] || req.headers['X-Device-Id'];
+    if (deviceId) {
+      try {
+        await ensureDeviceAccess({
+          userId: userPayload.id,
+          deviceId,
+          deviceName: req.headers['x-device-name'] || req.headers['X-Device-Name'],
+          userAgent: req.headers['user-agent'],
+          deviceLimit: userPayload.deviceLimit
+        });
+      } catch (deviceError) {
+        return res.status(deviceError.status || 500).json({
+          error: deviceError.message || 'Thiết bị không được phép sử dụng tài khoản này'
+        });
+      }
+    }
+
     return res.status(200).json({
       success: true,
-      user: {
-        id: profile.id,
-        email: profile.email || data.email,
-        username: profile.username || data.user_metadata?.username || '',
-        role: profile.role || 'user',
-        status: profile.status || 'active'
-      }
+      user: userPayload
     });
   } catch (error) {
     console.error('Auth verify error:', error);

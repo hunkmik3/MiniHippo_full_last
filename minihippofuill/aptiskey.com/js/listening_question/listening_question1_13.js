@@ -1428,6 +1428,9 @@ document.getElementById('nextButton').addEventListener('click', function (e) {
   if (currentIndex < listeningQuestions1.length - 1) {
     currentIndex++;
     renderQuestionByIndex(currentIndex);
+  } else if (document.getElementById('nextButton').textContent === 'The end') {
+    // Sau khi đã xem kết quả của câu hỏi cuối cùng -> quay lại trang chọn bài Listening
+    window.location.href = 'listening_question.html';
   }
 });
 

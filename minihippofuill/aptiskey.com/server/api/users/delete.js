@@ -18,14 +18,18 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Thiếu tham số id' });
   }
 
-  if (id === adminCheck.profile.id) {
+  if (id === adminCheck.user.id) {
     return res.status(400).json({ error: 'Không thể tự xoá chính mình' });
   }
 
   try {
-    await callSupabaseAuth(`admin/users/${id}`, {
-      method: 'DELETE'
-    });
+    await callSupabaseAuth(
+      `admin/users/${id}`,
+      {
+        method: 'DELETE'
+      },
+      { useAnonKey: false }
+    );
   } catch (error) {
     console.warn('Auth delete warning:', error.message);
   }

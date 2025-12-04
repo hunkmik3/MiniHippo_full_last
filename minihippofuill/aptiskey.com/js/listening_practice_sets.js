@@ -1,4 +1,5 @@
 (function () {
+    const CACHE_PREFIX = 'practice_set_cache_listening_';
     const listContainer = document.getElementById('listening-upload-sets');
     const placeholder = document.getElementById('listening-upload-placeholder');
 
@@ -18,6 +19,17 @@
     function hidePlaceholder() {
         if (placeholder) {
             placeholder.style.display = 'none';
+        }
+    }
+
+    function cachePracticeSet(set) {
+        if (!set || !set.id) {
+            return;
+        }
+        try {
+            sessionStorage.setItem(`${CACHE_PREFIX}${set.id}`, JSON.stringify(set));
+        } catch (error) {
+            console.warn('Không thể cache bộ đề nghe:', error);
         }
     }
 
@@ -42,6 +54,7 @@
         button.href = `listening_bode_set.html?set=${set.id}`;
         button.className = 'btn btn-light text-danger fw-semibold mt-3';
         button.textContent = 'Vào bộ đề';
+        button.addEventListener('click', () => cachePracticeSet(set));
 
         card.appendChild(title);
         card.appendChild(meta);

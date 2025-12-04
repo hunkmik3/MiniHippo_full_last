@@ -147,12 +147,21 @@
             loginBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang đăng nhập...';
             
             try {
+                const deviceId = typeof getDeviceId === 'function' ? getDeviceId() : null;
+                const deviceName = typeof getDeviceName === 'function' ? getDeviceName() : navigator.userAgent;
+                const deviceInfo = {
+                    platform: navigator.userAgentData?.platform || navigator.platform || '',
+                    language: navigator.language || '',
+                    userAgent: navigator.userAgent || '',
+                    screen: `${window.screen?.width || ''}x${window.screen?.height || ''}`
+                };
+                
                 const response = await fetch('/api/auth/login', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ email, password })
+                    body: JSON.stringify({ email, password, deviceId, deviceName, deviceInfo })
                 });
                 
                 const result = await response.json();
@@ -172,8 +181,18 @@
                     }
                 }
                 
-                // Redirect to home page
-                window.location.href = '/home.html';
+                let redirectTarget = typeof consumePostLoginRedirect === 'function' 
+                    ? consumePostLoginRedirect() 
+                    : localStorage.getItem('post_login_redirect');
+                if (redirectTarget && !redirectTarget.includes('login')) {
+                    if (!redirectTarget.startsWith('http')) {
+                        redirectTarget = `${window.location.origin}${redirectTarget}`;
+                    }
+                    localStorage.removeItem('post_login_redirect');
+                    window.location.href = redirectTarget;
+                } else {
+                    window.location.href = '/home.html';
+                }
                 
             } catch (error) {
                 // Show error message
@@ -191,7 +210,18 @@
             // Verify token
             checkAuth().then(isValid => {
                 if (isValid) {
-                    window.location.href = '/home.html';
+                    let redirectTarget = typeof consumePostLoginRedirect === 'function'
+                        ? consumePostLoginRedirect()
+                        : localStorage.getItem('post_login_redirect');
+                    if (redirectTarget && !redirectTarget.includes('login')) {
+                        if (!redirectTarget.startsWith('http')) {
+                            redirectTarget = `${window.location.origin}${redirectTarget}`;
+                        }
+                        localStorage.removeItem('post_login_redirect');
+                        window.location.href = redirectTarget;
+                    } else {
+                        window.location.href = '/home.html';
+                    }
                 }
             });
         }

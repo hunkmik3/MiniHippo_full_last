@@ -50,12 +50,15 @@ async function supabaseFetch(path, options = {}) {
   }
 }
 
-export async function selectFrom(table, { filters = [], order, limit, single } = {}) {
+export async function selectFrom(
+  table,
+  { filters = [], order, limit, single, columns = '*' } = {}
+) {
   const params = [];
   filters.forEach(({ column, operator = 'eq', value }) => {
     params.push(`${encodeURIComponent(column)}=${operator}.${encodeURIComponent(value)}`);
   });
-  params.push('select=*');
+  params.push(`select=${columns}`);
   if (order) {
     params.push(`order=${order.column}.${order.asc === false ? 'desc' : 'asc'}`);
   }

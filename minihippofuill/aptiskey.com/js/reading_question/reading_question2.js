@@ -537,7 +537,10 @@ let currentSetIndex = 0; // Biến để theo dõi bộ câu hỏi hiện tại
 
 // Hàm để chuyển sang bộ câu hỏi tiếp theo
 document.getElementById('nextButton').addEventListener('click', function() {
-    if (currentSetIndex < questionSets.length - 1) {
+    if (document.getElementById('nextButton').textContent === 'The end') {
+        // Sau khi đã xem kết quả của bộ câu hỏi cuối cùng -> quay lại trang chọn bài Reading
+        window.location.href = 'reading_question.html';
+    } else if (currentSetIndex < questionSets.length - 1) {
         // Chuyển sang bộ câu hỏi tiếp theo
         currentSetIndex++;
         renderQuestion2(questionSets[currentSetIndex]);
@@ -545,9 +548,9 @@ document.getElementById('nextButton').addEventListener('click', function() {
         // Cập nhật tiêu đề với tiền tố "Question 2 & 3 - "
        // document.getElementById('html_questheader').textContent = `Question ${currentSetIndex + 1} / ${questheader.length} - ${questheader[currentSetIndex]}`;
         
-        // Nếu đã đến bộ câu hỏi cuối, thay đổi nút Next thành "Đã hết câu hỏi"
+        // Nếu đã đến bộ câu hỏi cuối, thay đổi nút Next thành "The end"
         if (currentSetIndex === questionSets.length - 1) {
-            document.getElementById('nextButton').textContent = "Đã hết câu hỏi";
+            document.getElementById('nextButton').textContent = "The end";
         }
     }
 });

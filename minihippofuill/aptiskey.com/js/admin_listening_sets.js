@@ -814,7 +814,7 @@
                         audioUrl: part2Audio,
                         options: part2Options,
                         correctAnswers: part2Answers,
-                        transcript: part2Transcript
+                        transcript: part2Transcript || '' // Transcript là tùy chọn
                     }
                 }),
                 ...(part3Topic && {
@@ -823,7 +823,7 @@
                         audioUrl: part3Audio,
                         questions: part3Questions,
                         correctAnswers: part3Answers,
-                        transcript: part3Transcript
+                        transcript: part3Transcript || '' // Transcript là tùy chọn
                     }
                 }),
                 ...(part4Questions.length > 0 && {

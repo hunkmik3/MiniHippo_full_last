@@ -1,5 +1,6 @@
 import parseBody from '../_utils/parseBody.js';
 import { selectFrom, updateTable } from '../_utils/supabase.js';
+import { ensureDeviceAccess, resolveDeviceLimit } from '../_utils/device.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
@@ -20,7 +21,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: error.message || 'Invalid request body' });
   }
 
-  const { email, password } = body;
+  const { email, password, deviceId, deviceName, deviceInfo } = body;
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Thiếu email hoặc mật khẩu' });
@@ -74,12 +75,35 @@ export default async function handler(req, res) {
       console.warn('Failed to update last_login:', updateError);
     }
 
+    const deviceIdentifier = deviceId || deviceInfo?.id;
+    if (!deviceIdentifier) {
+      return res.status(400).json({ error: 'Thiếu thông tin thiết bị' });
+    }
+
+    try {
+      await ensureDeviceAccess({
+        userId,
+        deviceId: deviceIdentifier,
+        deviceName: deviceName || deviceInfo?.name,
+        userAgent: req.headers['user-agent'],
+        deviceLimit: resolveDeviceLimit(profile)
+      });
+    } catch (deviceError) {
+      return res.status(deviceError.status || 500).json({
+        error: deviceError.message || 'Thiết bị không được phép đăng nhập'
+      });
+    }
+
     const userPayload = {
       id: profile.id || userId,
       email: profile.email || supabaseUser.email,
       username: profile.username || supabaseUser.user_metadata?.username || '',
       role: profile.role || 'user',
-      status: profile.status || 'active'
+      status: profile.status || 'active',
+      accountCode: profile.account_code || '',
+      fullName: profile.full_name || '',
+      deviceLimit: resolveDeviceLimit(profile),
+      expiresAt: profile.expires_at || null
     };
 
     return res.status(200).json({

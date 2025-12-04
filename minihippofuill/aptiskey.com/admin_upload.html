@@ -895,6 +895,14 @@
                     <i class="bi bi-journal-text"></i>
                     Quản lý bài học
                 </a>
+                <a href="#" class="menu-item" data-module="user-management-module" onclick="selectModule('user-management-module'); return false;">
+                    <i class="bi bi-people-fill"></i>
+                    Quản lý học viên
+                </a>
+                <a href="#" class="menu-item" data-module="student-lessons-module" onclick="selectModule('student-lessons-module'); return false;">
+                    <i class="bi bi-clipboard-data"></i>
+                    Bài học học viên
+                </a>
             </div>
         </nav>
         
@@ -907,7 +915,7 @@
     </aside>
     
     <!-- Main Content -->
-    <main class="main-content">
+    <main class="main-content" id="admin-main" style="visibility: hidden;">
         <div class="admin-container">
         <!-- Compact Header -->
         <div class="upload-hero">
@@ -2467,6 +2475,291 @@
                 </div>
             </div>
         </div>
+
+        <!-- User Management Module -->
+        <div id="user-management-module" class="form-section" style="display: none;">
+            <div class="module-wrapper" style="background: white; border-radius: 1.25rem; padding: 1.5rem; box-shadow: 0 15px 40px rgba(15, 23, 42, 0.05);">
+                <div class="row g-3">
+                    <div class="col-12 col-lg-4">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h4 class="mb-3"><i class="bi bi-person-plus-fill me-2"></i>Cấp tài khoản</h4>
+                                <div id="user-create-alert" class="alert alert-info py-2 px-3" style="display: none;"></div>
+                                <form id="user-create-form" class="d-flex flex-column gap-3">
+                                    <div>
+                                        <label class="form-label fw-semibold">Mã tài khoản</label>
+                                        <input type="text" class="form-control" id="create-account-code" placeholder="Ví dụ: 001" required>
+                                    </div>
+                                    <div>
+                                        <label class="form-label fw-semibold">Email (tùy chọn)</label>
+                                        <input type="email" class="form-control" id="create-email" placeholder="Nếu bỏ trống sẽ tạo theo mã">
+                                    </div>
+                                    <div>
+                                        <label class="form-label fw-semibold">Họ tên</label>
+                                        <input type="text" class="form-control" id="create-full-name" placeholder="Tên học viên">
+                                    </div>
+                                    <div>
+                                        <label class="form-label fw-semibold">Số điện thoại</label>
+                                        <input type="text" class="form-control" id="create-phone" placeholder="0987 123 456">
+                                    </div>
+                                    <div class="row g-2">
+                                        <div class="col-6">
+                                            <label class="form-label fw-semibold">Giới hạn thiết bị</label>
+                                            <input type="number" min="1" class="form-control" id="create-device-limit" value="2">
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="form-label fw-semibold">Hết hạn</label>
+                                            <input type="date" class="form-control" id="create-expires-at">
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="form-label fw-semibold">Mật khẩu tạm (tùy chọn)</label>
+                                        <input type="text" class="form-control" id="create-password" placeholder="Để trống để hệ thống tạo">
+                                    </div>
+                                    <div>
+                                        <label class="form-label fw-semibold">Ghi chú</label>
+                                        <textarea class="form-control" id="create-notes" rows="2" placeholder="Thông tin thêm (khóa học, nhóm...)"></textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100" id="createUserBtn">
+                                        <i class="bi bi-send-check me-2"></i>Tạo tài khoản
+                                    </button>
+                                </form>
+
+                                <hr class="my-4">
+                                <h5 class="mb-2"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Nhập tài khoản từ file</h5>
+                                <p class="text-muted small mb-2">
+                                    Tải mẫu Excel/Google Sheet với các cột chuẩn, sau đó xuất ra CSV và upload để tạo nhiều tài khoản cùng lúc.
+                                </p>
+                                <div class="d-flex flex-column gap-2">
+                                    <div>
+                                        <label class="form-label fw-semibold small mb-1">Chọn file CSV</label>
+                                        <input type="file" class="form-control form-control-sm" id="bulk-user-file" accept=".csv,text/csv">
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button type="button" class="btn btn-outline-primary btn-sm" id="bulk-user-import-btn">
+                                            <i class="bi bi-upload me-1"></i>Nhập từ file
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" id="bulk-user-template-btn">
+                                            <i class="bi bi-download me-1"></i>Tải file mẫu (.csv)
+                                        </button>
+                                    </div>
+                                    <p class="text-muted small mb-0">
+                                        Các cột trong file: <code>account_code</code>, <code>email</code>, <code>full_name</code>, <code>phone</code>, <code>device_limit</code>, <code>expires_at</code> (YYYY-MM-DD), <code>notes</code>, <code>password</code> (tùy chọn).
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-lg-8">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <div class="d-flex flex-column flex-md-row justify-content-between gap-2 mb-3">
+                                    <input type="text" class="form-control" id="user-search-input" placeholder="Tìm theo mã, tên hoặc email">
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-outline-secondary" id="clearUserSearchBtn">
+                                            <i class="bi bi-eraser me-1"></i>Xóa tìm
+                                        </button>
+                                        <button class="btn btn-outline-primary" id="refreshUsersBtn">
+                                            <i class="bi bi-arrow-clockwise"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle">
+                                        <thead>
+                                            <tr>
+                                                <th>Mã</th>
+                                                <th>Họ tên</th>
+                                                <th>Email</th>
+                                                <th>Trạng thái</th>
+                                                <th>Thiết bị</th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="user-table-body">
+                                            <tr>
+                                                <td colspan="6" class="text-center text-muted">
+                                                    <i class="spinner-border spinner-border-sm me-2"></i>Đang tải danh sách học viên...
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-4" id="user-detail-panel" style="display: none;">
+                    <div class="card-body">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3">
+                            <div>
+                                <h4 class="mb-1"><i class="bi bi-person-badge me-2"></i>Thông tin tài khoản</h4>
+                                <p class="mb-0 text-muted small" id="detail-account-label"></p>
+                                <p class="mb-0 text-muted small" id="detail-email-label"></p>
+                            </div>
+                            <div id="detail-updated-label" class="text-muted small"></div>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Trạng thái</label>
+                                <select class="form-select" id="detail-status">
+                                    <option value="active">Đang hoạt động</option>
+                                    <option value="locked">Bị khóa</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Vai trò</label>
+                                <select class="form-select" id="detail-role">
+                                    <option value="user">Học viên</option>
+                                    <option value="admin">Admin</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Giới hạn thiết bị</label>
+                                <input type="number" min="1" class="form-control" id="detail-device-limit">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Họ tên</label>
+                                <input type="text" class="form-control" id="detail-full-name">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Số điện thoại</label>
+                                <input type="text" class="form-control" id="detail-phone">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Ngày hết hạn</label>
+                                <input type="date" class="form-control" id="detail-expires-at">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Ghi chú</label>
+                                <input type="text" class="form-control" id="detail-notes" placeholder="Ghi chú nội bộ">
+                            </div>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 mt-3">
+                            <button type="button" class="btn btn-primary" id="detail-save-btn">
+                                <i class="bi bi-save me-2"></i>Lưu thay đổi
+                            </button>
+                            <button type="button" class="btn btn-outline-danger" id="detail-reset-devices-btn">
+                                <i class="bi bi-phone-flip me-2"></i>Reset thiết bị
+                            </button>
+                            <button type="button" class="btn btn-outline-danger ms-auto" id="detail-delete-user-btn">
+                                <i class="bi bi-trash me-2"></i>Xóa tài khoản
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mt-1">
+                    <div class="col-12">
+                        <div class="card h-100" id="user-devices-panel" style="display: none;">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h5 class="mb-0"><i class="bi bi-laptop me-2"></i>Thiết bị đã đăng nhập</h5>
+                                    <button class="btn btn-sm btn-outline-secondary" id="refreshDevicesBtn">
+                                        <i class="bi bi-arrow-clockwise"></i>
+                                    </button>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>Thiết bị</th>
+                                                <th>Trạng thái</th>
+                                                <th>Lần cuối</th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="user-devices-body">
+                                            <tr>
+                                                <td colspan="4" class="text-muted text-center">Chọn học viên để xem danh sách thiết bị.</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Student Lessons Module -->
+        <div id="student-lessons-module" class="form-section" style="display: none;">
+            <div class="module-wrapper" style="background: white; border-radius: 1.25rem; padding: 1.5rem; box-shadow: 0 15px 40px rgba(15, 23, 42, 0.05);">
+                <div class="row g-3">
+                    <div class="col-12 col-lg-5">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h4 class="mb-3"><i class="bi bi-people me-2"></i>Danh sách học viên</h4>
+                                <div class="d-flex flex-column gap-2 mb-3">
+                                    <input type="text" class="form-control" id="student-lessons-search-input" placeholder="Tìm theo mã, tên hoặc email">
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-outline-secondary btn-sm" id="clear-student-lessons-search-btn">
+                                            <i class="bi bi-eraser me-1"></i>Xóa
+                                        </button>
+                                        <button class="btn btn-outline-primary btn-sm" id="refresh-student-lessons-btn">
+                                            <i class="bi bi-arrow-clockwise"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="table-responsive" style="max-height: 70vh; overflow-y: auto;">
+                                    <table class="table table-hover align-middle">
+                                        <thead class="table-light sticky-top">
+                                            <tr>
+                                                <th style="min-width: 80px;">Mã</th>
+                                                <th style="min-width: 150px;">Họ tên</th>
+                                                <th style="min-width: 200px;">Email</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="student-lessons-user-table-body">
+                                            <tr>
+                                                <td colspan="3" class="text-center text-muted">
+                                                    <i class="spinner-border spinner-border-sm me-2"></i>Đang tải danh sách học viên...
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-lg-7">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <div>
+                                        <h4 class="mb-1"><i class="bi bi-clipboard-data me-2"></i>Kết quả bài học</h4>
+                                        <p class="mb-0 text-muted small" id="student-lessons-selected-user-label">Chọn học viên để xem kết quả</p>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-secondary" id="refresh-student-lessons-results-btn" style="display: none;">
+                                        <i class="bi bi-arrow-clockwise"></i>
+                                    </button>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle">
+                                        <thead>
+                                            <tr>
+                                                <th>Ngày</th>
+                                                <th>Loại</th>
+                                                <th>Điểm</th>
+                                                <th>Thời gian</th>
+                                                <th>Chi tiết</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="student-lessons-results-body">
+                                            <tr>
+                                                <td colspan="5" class="text-center text-muted">Chọn học viên để xem kết quả bài học.</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
     </main>
     
@@ -2558,9 +2851,16 @@
     <!-- Authentication -->
     <script src="js/auth.js"></script>
     <script>
-        // Require admin access
+        // Require admin access as sớm nhất có thể, ẩn toàn bộ nội dung cho tới khi kiểm tra xong
         document.addEventListener('DOMContentLoaded', async function() {
-            await requireAdmin();
+            const main = document.getElementById('admin-main');
+            if (main) {
+                main.style.visibility = 'hidden';
+            }
+            const ok = await requireAdmin();
+            if (ok && main) {
+                main.style.visibility = 'visible';
+            }
         });
     </script>
     
@@ -2571,6 +2871,8 @@
     <script src="js/admin_reading_sets.js"></script>
     <script src="js/admin_listening_sets.js"></script>
     <script src="js/admin_lessons.js"></script>
+    <script src="js/admin_users.js"></script>
+    <script src="js/admin_student_lessons.js"></script>
     
     <!-- Sidebar JavaScript -->
     <script>
@@ -2734,14 +3036,18 @@
             const readingSetModule = document.getElementById('reading-set-module');
             const listeningSetModule = document.getElementById('listening-set-module');
             const lessonsManagementModule = document.getElementById('lessons-management-module');
+            const userManagementModule = document.getElementById('user-management-module');
+            const studentLessonsModule = document.getElementById('student-lessons-module');
             
             if (singlePartModule) singlePartModule.style.display = 'none';
             if (readingSetModule) readingSetModule.style.display = 'none';
             if (listeningSetModule) listeningSetModule.style.display = 'none';
             if (lessonsManagementModule) lessonsManagementModule.style.display = 'none';
+            if (userManagementModule) userManagementModule.style.display = 'none';
+            if (studentLessonsModule) studentLessonsModule.style.display = 'none';
             
-            // Hide all part forms when selecting set modules or lessons management
-            if (module === 'reading-set-module' || module === 'listening-set-module' || module === 'lessons-management-module') {
+            // Hide all part forms when selecting set modules or management modules
+            if (module === 'reading-set-module' || module === 'listening-set-module' || module === 'lessons-management-module' || module === 'user-management-module' || module === 'student-lessons-module') {
                 // Hide all reading part forms
                 ['part1-form', 'part2-form', 'part4-form', 'part5-form'].forEach(id => {
                     const form = document.getElementById(id);
@@ -2752,6 +3058,22 @@
                     const form = document.getElementById(id);
                     if (form) form.style.display = 'none';
                 });
+            }
+            
+            // Show/hide header and action buttons based on module type
+            const uploadHero = document.querySelector('.upload-hero');
+            const actionButtonsSection = document.getElementById('action-buttons-section');
+            // Only show header and tools for upload-related modules
+            const isUploadRelatedModule = module === 'single-part-module' || module === 'reading-set-module' || module === 'listening-set-module';
+            // Hide for management modules
+            const isManagementModule = module === 'user-management-module' || module === 'student-lessons-module' || module === 'lessons-management-module';
+            
+            if (uploadHero) {
+                uploadHero.style.display = isUploadRelatedModule ? 'block' : 'none';
+            }
+            if (actionButtonsSection) {
+                // Always hide for management modules, show only for upload-related modules
+                actionButtonsSection.style.display = (isManagementModule || !isUploadRelatedModule) ? 'none' : 'block';
             }
             
             // Show selected module
@@ -2768,6 +3090,34 @@
                         loadAllLessons();
                     }
                 }, 200);
+            }
+
+            if (module === 'user-management-module') {
+                // Ensure header and tools are hidden
+                const uploadHero = document.querySelector('.upload-hero');
+                const actionButtonsSection = document.getElementById('action-buttons-section');
+                if (uploadHero) uploadHero.style.display = 'none';
+                if (actionButtonsSection) actionButtonsSection.style.display = 'none';
+                
+                setTimeout(() => {
+                    if (typeof window.initUserManagementModule === 'function') {
+                        window.initUserManagementModule();
+                    }
+                }, 150);
+            }
+
+            if (module === 'student-lessons-module') {
+                // Ensure header and tools are hidden
+                const uploadHero = document.querySelector('.upload-hero');
+                const actionButtonsSection = document.getElementById('action-buttons-section');
+                if (uploadHero) uploadHero.style.display = 'none';
+                if (actionButtonsSection) actionButtonsSection.style.display = 'none';
+                
+                setTimeout(() => {
+                    if (typeof window.initStudentLessonsModule === 'function') {
+                        window.initStudentLessonsModule();
+                    }
+                }, 150);
             }
             
             // If selecting single-part-module, ensure the current part form is visible

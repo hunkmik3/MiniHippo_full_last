@@ -388,8 +388,11 @@ document.getElementById('nextButton').addEventListener('click', function() {
     if (currentIndex < question4Text.length - 1) {
         currentIndex++; // Tăng chỉ số lên để chuyển sang câu hỏi tiếp theo
         renderQuestion4(currentIndex); // Render câu hỏi mới
+    } else if (document.getElementById('nextButton').textContent === 'The end') {
+        // Sau khi đã xem kết quả của bộ câu hỏi cuối cùng -> quay lại trang chọn bài Reading cũ
+        window.location.href = 'reading_question_cu.html';
     } else {
-        // Nếu đã ở câu hỏi cuối cùng, thay đổi văn bản nút Next thành "Submit Test"
+        // Nếu đã ở câu hỏi cuối cùng, thay đổi văn bản nút Next thành "The end"
         document.getElementById('nextButton').textContent = "The end";
     }
 });
