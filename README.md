@@ -64,6 +64,8 @@ minihippofuill/aptiskey.com/
 - ✅ Admin Lesson Upload (GitHub API)
 - ✅ Lesson Display on Frontend
 - ✅ User Management (Admin only)
+- ✅ Device quota enforcement (2 devices/account)
+- ✅ Practice score tracking & reporting
 - ✅ Auto-deploy on Vercel
 
 ## 📚 Documentation
@@ -71,6 +73,7 @@ minihippofuill/aptiskey.com/
 - [`SETUP_CHECKLIST.md`](minihippofuill/aptiskey.com/SETUP_CHECKLIST.md) - Step-by-step setup guide
 - [`README_SETUP.md`](minihippofuill/aptiskey.com/README_SETUP.md) - Detailed setup instructions
 - [`supabase_setup.sql`](minihippofuill/aptiskey.com/supabase_setup.sql) - Database setup script
+- [`account_management_setup.md`](minihippofuill/aptiskey.com/docs/account_management_setup.md) - Extra tables for devices & scores
 
 ## 🛠️ Tech Stack
 

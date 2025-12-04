@@ -34,13 +34,14 @@
     const state = {
         data: null,
         currentStep: 1,
-        totalSteps: 4,
+        totalSteps: 1, // Sẽ được tính lại dựa trên số câu hỏi thực tế
         timeLeft: 35 * 60,
         timerInterval: null,
         setTitle: '',
         completed: false,
         isSubmitting: false,
         currentQuestionIndex: 0, // For Part 1 (questions 1-13)
+        questionMapping: [], // Map step number to {part, questionIndex}
         userAnswers: {
             part1: [], // Array of answers for questions 1-13
             part2: [], // Array of 4 answers for question 14
@@ -134,13 +135,52 @@
         stopAllAudio();
         
         state.currentStep = Math.min(Math.max(step, 1), state.totalSteps);
-        sections.forEach((sectionConfig, index) => {
+        
+        // Get current question mapping
+        const currentMapping = state.questionMapping[state.currentStep - 1];
+        if (!currentMapping) return;
+
+        // Hide all sections first
+        sections.forEach((sectionConfig) => {
             const section = document.getElementById(sectionConfig.id);
-            if (!section) {
-                return;
+            if (section) {
+                section.classList.remove('active');
             }
-            section.classList.toggle('active', index + 1 === state.currentStep);
         });
+
+        // Show the appropriate section and render question based on mapping
+        if (currentMapping.part === 'part1') {
+            const part1Section = document.getElementById('part1-section');
+            if (part1Section) {
+                part1Section.classList.add('active');
+            }
+            // Render the specific question
+            const questions = state.data?.data?.part1?.questions || [];
+            if (questions[currentMapping.questionIndex]) {
+                state.currentQuestionIndex = currentMapping.questionIndex;
+                renderPart1Question(questions[currentMapping.questionIndex], currentMapping.questionIndex, questions.length);
+            }
+        } else if (currentMapping.part === 'part2') {
+            const part2Section = document.getElementById('part2-section');
+            if (part2Section) {
+                part2Section.classList.add('active');
+            }
+        } else if (currentMapping.part === 'part3') {
+            const part3Section = document.getElementById('part3-section');
+            if (part3Section) {
+                part3Section.classList.add('active');
+            }
+        } else if (currentMapping.part === 'part4') {
+            const part4Section = document.getElementById('part4-section');
+            if (part4Section) {
+                part4Section.classList.add('active');
+            }
+            // Render the specific question for part4
+            const questions = state.data?.data?.part4?.questions || [];
+            if (questions[currentMapping.questionIndex]) {
+                renderPart4Question(questions[currentMapping.questionIndex], currentMapping.questionIndex);
+            }
+        }
 
         updateQuestionStep();
         if (refs.backButton) {
@@ -320,38 +360,8 @@
         state.userAnswers.part1 = new Array(questions.length).fill(null);
         state.currentQuestionIndex = 0;
 
-        // Store navigation setup function
-        if (questions.length > 1) {
-            window.setupPart1Navigation = () => {
-                const prevBtn = document.getElementById('part1-prevBtn');
-                const nextBtn = document.getElementById('part1-nextBtn');
-                
-                if (prevBtn) {
-                    prevBtn.onclick = () => {
-                        if (state.currentQuestionIndex > 0) {
-                            state.currentQuestionIndex--;
-                            renderPart1Question(questions[state.currentQuestionIndex], state.currentQuestionIndex, questions.length);
-                            updatePart1NavButtons();
-                        }
-                    };
-                }
-                
-                if (nextBtn) {
-                    nextBtn.onclick = () => {
-                        if (state.currentQuestionIndex < questions.length - 1) {
-                            state.currentQuestionIndex++;
-                            renderPart1Question(questions[state.currentQuestionIndex], state.currentQuestionIndex, questions.length);
-                            updatePart1NavButtons();
-                        }
-                    };
-                }
-                
-                updatePart1NavButtons();
-            };
-        }
-
-        // Render first question
-        renderPart1Question(questions[state.currentQuestionIndex], state.currentQuestionIndex, questions.length);
+        // Không render ngay - sẽ render khi showStep được gọi
+        // Chỉ cần đảm bảo container sẵn sàng
 
         // Setup audio player
         setupAudioPlayer('part1-audioPlayer', 'part1-playButton', 'part1-playIcon', 'part1-playCountLabel');
@@ -414,27 +424,8 @@
             </div>
         `;
         
-        // Add navigation if multiple questions
-        let navHTML = '';
-        if (questions.length > 1) {
-            navHTML = `
-                <div class="d-flex justify-content-between mt-3 part1-nav-buttons">
-                    <button class="btn btn-outline-secondary" id="part1-prevBtn">
-                        <i class="bi bi-chevron-left me-1"></i>Previous
-                    </button>
-                    <button class="btn btn-outline-primary" id="part1-nextBtn">
-                        Next<i class="bi bi-chevron-right ms-1"></i>
-                    </button>
-                </div>
-            `;
-        }
-        
-        container.innerHTML = questionHTML + navHTML;
-        
-        // Setup navigation if exists
-        if (questions.length > 1 && window.setupPart1Navigation) {
-            window.setupPart1Navigation();
-        }
+        // Bỏ navigation buttons - mỗi câu hỏi là 1 trang riêng, dùng nút Next ở footer
+        container.innerHTML = questionHTML;
 
         // Set audio source and setup player
         const audio = document.getElementById('part1-audioPlayer');
@@ -649,140 +640,149 @@
         const questions = part4.questions || [];
         if (questions.length === 0) return;
 
+        // Initialize user answers array
+        state.userAnswers.part4 = new Array(questions.length).fill(null).map(() => ({}));
+
+        // Setup check handler
+        const feedback = document.getElementById('part4-feedback');
+        if (feedback) {
+            checkHandlers.part4 = () => {
+                let totalCorrect = 0;
+                let totalQuestions = 0;
+                questions.forEach((q, qIndex) => {
+                    q.questions?.forEach((subQ, subIndex) => {
+                        totalQuestions++;
+                        const userAnswer = state.userAnswers.part4[qIndex]?.[subIndex];
+                        if (userAnswer === subQ.correctAnswer) {
+                            totalCorrect++;
+                        }
+                    });
+                });
+                feedback.textContent = `Bạn trả lời đúng ${totalCorrect}/${totalQuestions} câu.`;
+                feedback.classList.remove('d-none');
+            };
+        }
+
+        // Không render ngay - sẽ render khi showStep được gọi
+    }
+
+    function renderPart4Question(question, qIndex) {
+        if (!question) return;
+
         const container = document.getElementById('part4-questions-container');
         container.innerHTML = '';
 
-        questions.forEach((question, qIndex) => {
-            const questionNum = 16 + qIndex;
-            const questionDiv = document.createElement('div');
-            questionDiv.className = 'question-container mb-4';
+        const questionNum = 16 + qIndex;
+        const questionDiv = document.createElement('div');
+        questionDiv.className = 'question-container mb-4';
+        
+        // Audio player bar
+        const audioId = `part4-audio${questionNum}`;
+        const playButtonId = `part4-playButton${questionNum}`;
+        const playIconId = `part4-playIcon${questionNum}`;
+        const playCountLabelId = `part4-playCountLabel${questionNum}`;
+        
+        questionDiv.innerHTML = `
+            <h5 class="mb-3"><strong>Question ${questionNum}</strong></h5>
+            <h6 class="mb-3"><strong id="part4-topic${questionNum}">${question.topic || ''}</strong></h6>
             
-            // Audio player bar
-            const audioId = `part4-audio${questionNum}`;
-            const playButtonId = `part4-playButton${questionNum}`;
-            const playIconId = `part4-playIcon${questionNum}`;
-            const playCountLabelId = `part4-playCountLabel${questionNum}`;
+            <div class="top-bar d-flex justify-content-between align-items-center mb-3">
+                <div class="d-flex align-items-center gap-3">
+                    <button id="${playButtonId}" class="btn btn-link text-white p-0">
+                        <i id="${playIconId}" class="bi bi-play-fill fs-4"></i>
+                    </button>
+                    <button class="btn btn-link text-white p-0">
+                        <i class="bi bi-volume-up-fill fs-5"></i>
+                    </button>
+                    <input type="range" class="form-range" id="part4-audioRange${questionNum}" style="width: 200px;">
+                </div>
+                <div>
+                    <small id="${playCountLabelId}">2 of 2 plays remaining</small>
+                </div>
+                <audio id="${audioId}" preload="none"></audio>
+            </div>
             
-            questionDiv.innerHTML = `
-                <h5 class="mb-3"><strong>Question ${questionNum}</strong></h5>
-                <h6 class="mb-3"><strong id="part4-topic${questionNum}">${question.topic || ''}</strong></h6>
-                
-                <div class="top-bar d-flex justify-content-between align-items-center mb-3">
-                    <div class="d-flex align-items-center gap-3">
-                        <button id="${playButtonId}" class="btn btn-link text-white p-0">
-                            <i id="${playIconId}" class="bi bi-play-fill fs-4"></i>
-                        </button>
-                        <button class="btn btn-link text-white p-0">
-                            <i class="bi bi-volume-up-fill fs-5"></i>
-                        </button>
-                        <input type="range" class="form-range" id="part4-audioRange${questionNum}" style="width: 200px;">
-                    </div>
-                    <div>
-                        <small id="${playCountLabelId}">2 of 2 plays remaining</small>
-                    </div>
-                    <audio id="${audioId}" preload="none"></audio>
+            <div class="part4-subquestions${questionNum}"></div>
+            
+            <div class="mt-3">
+                <button id="part4-showTranscript${questionNum}" class="btn btn-primary">Show Paragraph</button>
+            </div>
+            
+            <div id="part4-transcriptBox${questionNum}" class="card mt-3" style="display: none;">
+                <div class="card-body">
+                    <p><strong>Paragraph:</strong></p>
+                    <p id="part4-transcriptContent${questionNum}"></p>
                 </div>
-                
-                <div class="part4-subquestions${questionNum}"></div>
-                
-                <div class="mt-3">
-                    <button id="part4-showTranscript${questionNum}" class="btn btn-primary">Show Paragraph</button>
+            </div>
+        `;
+        
+        container.appendChild(questionDiv);
+
+        // Render sub-questions
+        const subQuestionsContainer = questionDiv.querySelector(`.part4-subquestions${questionNum}`);
+        question.questions?.forEach((subQ, subIndex) => {
+            const subQDiv = document.createElement('div');
+            subQDiv.className = 'mb-4';
+            subQDiv.innerHTML = `
+                <label class="form-label mb-2 fw-bold">${subQ.id || `${questionNum}.${subIndex + 1}`} ${subQ.question || ''}</label>
+                <div class="form-check">
+                    <input class="form-check-input part4-radio" type="radio" name="part4-q${questionNum}-sub${subIndex}" id="part4-q${questionNum}-sub${subIndex}-A" value="A">
+                    <label class="form-check-label" for="part4-q${questionNum}-sub${subIndex}-A">${subQ.options?.[0] || ''}</label>
                 </div>
-                
-                <div id="part4-transcriptBox${questionNum}" class="card mt-3" style="display: none;">
-                    <div class="card-body">
-                        <p><strong>Paragraph:</strong></p>
-                        <p id="part4-transcriptContent${questionNum}"></p>
-                    </div>
+                <div class="form-check">
+                    <input class="form-check-input part4-radio" type="radio" name="part4-q${questionNum}-sub${subIndex}" id="part4-q${questionNum}-sub${subIndex}-B" value="B">
+                    <label class="form-check-label" for="part4-q${questionNum}-sub${subIndex}-B">${subQ.options?.[1] || ''}</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input part4-radio" type="radio" name="part4-q${questionNum}-sub${subIndex}" id="part4-q${questionNum}-sub${subIndex}-C" value="C">
+                    <label class="form-check-label" for="part4-q${questionNum}-sub${subIndex}-C">${subQ.options?.[2] || ''}</label>
                 </div>
             `;
-            
-            container.appendChild(questionDiv);
+            subQuestionsContainer.appendChild(subQDiv);
 
-            // Render sub-questions
-            const subQuestionsContainer = questionDiv.querySelector(`.part4-subquestions${questionNum}`);
-            question.questions?.forEach((subQ, subIndex) => {
-                const subQDiv = document.createElement('div');
-                subQDiv.className = 'mb-4';
-                subQDiv.innerHTML = `
-                    <label class="form-label mb-2 fw-bold">${subQ.id || `${questionNum}.${subIndex + 1}`} ${subQ.question || ''}</label>
-                    <div class="form-check">
-                        <input class="form-check-input part4-radio" type="radio" name="part4-q${questionNum}-sub${subIndex}" id="part4-q${questionNum}-sub${subIndex}-A" value="A">
-                        <label class="form-check-label" for="part4-q${questionNum}-sub${subIndex}-A">${subQ.options?.[0] || ''}</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input part4-radio" type="radio" name="part4-q${questionNum}-sub${subIndex}" id="part4-q${questionNum}-sub${subIndex}-B" value="B">
-                        <label class="form-check-label" for="part4-q${questionNum}-sub${subIndex}-B">${subQ.options?.[1] || ''}</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input part4-radio" type="radio" name="part4-q${questionNum}-sub${subIndex}" id="part4-q${questionNum}-sub${subIndex}-C" value="C">
-                        <label class="form-check-label" for="part4-q${questionNum}-sub${subIndex}-C">${subQ.options?.[2] || ''}</label>
-                    </div>
-                `;
-                subQuestionsContainer.appendChild(subQDiv);
-
-                // Store answer
-                const answerKey = `${questionNum}-${subIndex}`;
-                subQDiv.querySelectorAll('input[type="radio"]').forEach(radio => {
-                    radio.addEventListener('change', () => {
-                        if (!state.userAnswers.part4[qIndex]) {
-                            state.userAnswers.part4[qIndex] = {};
-                        }
-                        state.userAnswers.part4[qIndex][subIndex] = radio.value;
-                    });
+            // Store answer
+            subQDiv.querySelectorAll('input[type="radio"]').forEach(radio => {
+                radio.addEventListener('change', () => {
+                    if (!state.userAnswers.part4[qIndex]) {
+                        state.userAnswers.part4[qIndex] = {};
+                    }
+                    state.userAnswers.part4[qIndex][subIndex] = radio.value;
                 });
-
-                // Restore saved answer
-                if (state.userAnswers.part4[qIndex] && state.userAnswers.part4[qIndex][subIndex]) {
-                    const savedValue = state.userAnswers.part4[qIndex][subIndex];
-                    const radio = subQDiv.querySelector(`input[value="${savedValue}"]`);
-                    if (radio) radio.checked = true;
-                }
             });
 
-            // Set audio
-            const audio = document.getElementById(audioId);
-            if (audio && question.audioUrl) {
-                audio.src = question.audioUrl;
-            }
-
-            // Set transcript
-            const transcriptContent = document.getElementById(`part4-transcriptContent${questionNum}`);
-            if (transcriptContent) {
-                transcriptContent.textContent = question.transcript || '';
-            }
-
-            // Setup audio player
-            setupAudioPlayer(audioId, playButtonId, playIconId, playCountLabelId);
-
-            // Setup transcript toggle
-            const showTranscriptBtn = document.getElementById(`part4-showTranscript${questionNum}`);
-            const transcriptBox = document.getElementById(`part4-transcriptBox${questionNum}`);
-            if (showTranscriptBtn && transcriptBox) {
-                showTranscriptBtn.addEventListener('click', () => {
-                    const isHidden = transcriptBox.style.display === 'none';
-                    transcriptBox.style.display = isHidden ? 'block' : 'none';
-                    showTranscriptBtn.textContent = isHidden ? 'Hide Paragraph' : 'Show Paragraph';
-                });
+            // Restore saved answer
+            if (state.userAnswers.part4[qIndex] && state.userAnswers.part4[qIndex][subIndex]) {
+                const savedValue = state.userAnswers.part4[qIndex][subIndex];
+                const radio = subQDiv.querySelector(`input[value="${savedValue}"]`);
+                if (radio) radio.checked = true;
             }
         });
 
-        const feedback = document.getElementById('part4-feedback');
-        checkHandlers.part4 = () => {
-            let totalCorrect = 0;
-            let totalQuestions = 0;
-            questions.forEach((q, qIndex) => {
-                q.questions?.forEach((subQ, subIndex) => {
-                    totalQuestions++;
-                    const userAnswer = state.userAnswers.part4[qIndex]?.[subIndex];
-                    if (userAnswer === subQ.correctAnswer) {
-                        totalCorrect++;
-                    }
-                });
+        // Set audio
+        const audio = document.getElementById(audioId);
+        if (audio && question.audioUrl) {
+            audio.src = question.audioUrl;
+        }
+
+        // Set transcript
+        const transcriptContent = document.getElementById(`part4-transcriptContent${questionNum}`);
+        if (transcriptContent) {
+            transcriptContent.textContent = question.transcript || '';
+        }
+
+        // Setup audio player
+        setupAudioPlayer(audioId, playButtonId, playIconId, playCountLabelId);
+
+        // Setup transcript toggle
+        const showTranscriptBtn = document.getElementById(`part4-showTranscript${questionNum}`);
+        const transcriptBox = document.getElementById(`part4-transcriptBox${questionNum}`);
+        if (showTranscriptBtn && transcriptBox) {
+            showTranscriptBtn.addEventListener('click', () => {
+                const isHidden = transcriptBox.style.display === 'none';
+                transcriptBox.style.display = isHidden ? 'block' : 'none';
+                showTranscriptBtn.textContent = isHidden ? 'Hide Paragraph' : 'Show Paragraph';
             });
-            feedback.textContent = `Bạn trả lời đúng ${totalCorrect}/${totalQuestions} câu.`;
-            feedback.classList.remove('d-none');
-        };
+        }
     }
 
     // Evaluation functions
@@ -1062,6 +1062,34 @@
         }
     }
 
+    function buildQuestionMapping(set) {
+        const mapping = [];
+        
+        // Part 1: Questions 1-13 (mỗi câu là 1 step)
+        const part1Questions = set.data?.part1?.questions || [];
+        part1Questions.forEach((_, index) => {
+            mapping.push({ part: 'part1', questionIndex: index });
+        });
+        
+        // Part 2: Question 14 (1 step)
+        if (set.data?.part2?.topic) {
+            mapping.push({ part: 'part2', questionIndex: 0 });
+        }
+        
+        // Part 3: Question 15 (1 step)
+        if (set.data?.part3?.topic) {
+            mapping.push({ part: 'part3', questionIndex: 0 });
+        }
+        
+        // Part 4: Questions 16-17 (mỗi câu là 1 step)
+        const part4Questions = set.data?.part4?.questions || [];
+        part4Questions.forEach((_, index) => {
+            mapping.push({ part: 'part4', questionIndex: index });
+        });
+        
+        return mapping;
+    }
+
     function renderPractice(set) {
         hasRendered = true;
         if (refs.loading) {
@@ -1073,6 +1101,10 @@
         if (refs.resultTitle) {
             refs.resultTitle.textContent = state.setTitle ? `Test and Answer Review · ${state.setTitle}` : 'Test and Answer Review';
         }
+
+        // Build question mapping and calculate total steps
+        state.questionMapping = buildQuestionMapping(set);
+        state.totalSteps = state.questionMapping.length;
 
         renderPart1(set.data?.part1);
         renderPart2(set.data?.part2);

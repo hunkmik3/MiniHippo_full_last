@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     await callSupabaseAuth(
       `admin/users/${id}`,
       {
-        method: 'DELETE'
+      method: 'DELETE'
       },
       { useAnonKey: false }
     );

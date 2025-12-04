@@ -96,20 +96,20 @@ export default async function handler(req, res) {
     let record;
     try {
       const [inserted] = await insertInto('users', [
-        {
-          id: authUser.id,
-          email: resolvedEmail,
-          username: usernameFallback,
-          role,
-          status,
-          account_code: trimmedAccountCode || null,
-          full_name: fullName || null,
-          phone_number: phone || null,
-          device_limit: Number(deviceLimit) || resolveDeviceLimit(),
-          expires_at: expiresAt || null,
-          notes: notes || null
-        }
-      ]);
+      {
+        id: authUser.id,
+        email: resolvedEmail,
+        username: usernameFallback,
+        role,
+        status,
+        account_code: trimmedAccountCode || null,
+        full_name: fullName || null,
+        phone_number: phone || null,
+        device_limit: Number(deviceLimit) || resolveDeviceLimit(),
+        expires_at: expiresAt || null,
+        notes: notes || null
+      }
+    ]);
       record = inserted;
     } catch (dbError) {
       const isDuplicateKey =
