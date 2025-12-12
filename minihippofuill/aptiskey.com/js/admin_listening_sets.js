@@ -599,7 +599,9 @@
 
     async function editListeningSet(setId) {
         try {
-            const response = await fetch(`/api/practice_sets/get?id=${setId}`);
+            const response = await fetch(`/api/practice_sets/get?id=${setId}`, {
+                headers: buildAuthHeaders()
+            });
             const result = await response.json();
             if (!response.ok) {
                 throw new Error(result.error || 'Không thể tải bộ đề');
@@ -704,12 +706,13 @@
             const correctAnswer = item.querySelector('.listening-part1-answer')?.value.trim();
             const transcript = item.querySelector('.listening-part1-transcript')?.value.trim();
             
-            if (!audioUrl || !question || options.length < 3 || !correctAnswer) {
-                throw new Error('Part 1: Mỗi câu cần đủ audio URL, câu hỏi, 3 options và đáp án đúng.');
+            // Chỉ validate câu hỏi, options và đáp án. Audio và transcript là tùy chọn
+            if (!question || options.length < 3 || !correctAnswer) {
+                throw new Error('Part 1: Mỗi câu cần đủ câu hỏi, 3 options và đáp án đúng.');
             }
             
             return {
-                audioUrl,
+                audioUrl: audioUrl || '', // Audio là tùy chọn
                 question,
                 options: options.slice(0, 3),
                 correctAnswer,
@@ -737,8 +740,9 @@
             .filter(Boolean);
         const part2Transcript = refs.part2Transcript.value.trim();
         
-        if (part2Topic && (!part2Audio || part2Options.length < 6 || part2Answers.length !== 4)) {
-            throw new Error('Part 2: Cần đủ audio URL, 6 options và 4 đáp án đúng.');
+        // Chỉ validate options và answers. Audio và transcript là tùy chọn
+        if (part2Topic && (part2Options.length < 6 || part2Answers.length !== 4)) {
+            throw new Error('Part 2: Cần đủ 6 options và 4 đáp án đúng.');
         }
 
         // Part 3: Question 15
@@ -757,8 +761,9 @@
             .filter(Boolean);
         const part3Transcript = refs.part3Transcript.value.trim();
         
-        if (part3Topic && (!part3Audio || part3Questions.length !== 4 || part3Answers.length !== 4)) {
-            throw new Error('Part 3: Cần đủ audio URL, 4 câu hỏi và 4 đáp án đúng (Man/Woman/Both).');
+        // Chỉ validate questions và answers. Audio và transcript là tùy chọn
+        if (part3Topic && (part3Questions.length !== 4 || part3Answers.length !== 4)) {
+            throw new Error('Part 3: Cần đủ 4 câu hỏi và 4 đáp án đúng (Man/Woman/Both).');
         }
 
         // Part 4: Questions 16-17
@@ -788,12 +793,13 @@
                 };
             });
             
-            if (!audioUrl || !topic || subQuestions.length < 1) {
-                throw new Error('Part 4: Mỗi câu hỏi cần đủ audio URL, topic và ít nhất 1 câu hỏi con.');
+            // Chỉ validate topic và sub-questions. Audio và transcript là tùy chọn
+            if (!topic || subQuestions.length < 1) {
+                throw new Error('Part 4: Mỗi câu hỏi cần đủ topic và ít nhất 1 câu hỏi con.');
             }
             
             return {
-                audioUrl,
+                audioUrl: audioUrl || '', // Audio là tùy chọn
                 topic,
                 transcript: transcript || '',
                 questions: subQuestions

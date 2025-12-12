@@ -336,7 +336,9 @@
 
         try {
             refs.formTitle.textContent = 'Đang tải dữ liệu bộ đề...';
-            const response = await fetch(`/api/practice_sets/get?id=${setId}`);
+            const response = await fetch(`/api/practice_sets/get?id=${setId}`, {
+                headers: buildAuthHeaders()
+            });
             const result = await response.json();
             if (!response.ok) {
                 throw new Error(result.error || 'Không thể tải bộ đề');
@@ -457,8 +459,8 @@
         const part2Question3 = {
             topic: refs.part3Topic?.value.trim() || '',
             sentences: (refs.part3Sentences?.value || '')
-                .split(/\r?\n/)
-                .map(sentence => sentence.trim())
+            .split(/\r?\n/)
+            .map(sentence => sentence.trim())
                 .filter(Boolean)
         };
         if (!part2Question3.topic || part2Question3.sentences.length < 4) {

@@ -49,7 +49,8 @@
         part2OrderData: {
             question2: [],
             question3: []
-        }
+        },
+        part4ShuffledQuestions: []
     };
     let hasRendered = false;
 
@@ -191,6 +192,8 @@
         const container = document.getElementById('part1-questions');
         container.innerHTML = '';
         (part1.questions || []).forEach((q, idx) => {
+            // Xáo trộn thứ tự các đáp án
+            const shuffledOptions = q.options ? shuffleArray([...q.options]) : [];
             const row = document.createElement('div');
             row.className = 'border rounded-3 p-3 mb-3 bg-white shadow-sm';
             row.innerHTML = `
@@ -199,7 +202,7 @@
                         <span>${q.start || ''}</span>
                         <select class="form-select d-inline-block w-auto mx-2 part1-select" data-answer="${q.answer || ''}">
                             <option value="">-- Chọn --</option>
-                            ${(q.options || []).map(opt => `<option value="${opt}">${opt}</option>`).join('')}
+                            ${shuffledOptions.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
                         </select>
                         <span>${q.end || ''}</span>
                     </div>
@@ -372,7 +375,11 @@
 
         const form = document.getElementById('part4-form');
         form.innerHTML = '';
-        (part4.questions || []).forEach((q, idx) => {
+        // Xáo trộn thứ tự các câu hỏi, nhưng giữ nguyên thứ tự A, B, C, D trong dropdown
+        const shuffledQuestions = shuffleArray([...(part4.questions || [])]);
+        // Lưu thứ tự đã xáo trộn vào state để dùng khi đánh giá
+        state.part4ShuffledQuestions = shuffledQuestions;
+        shuffledQuestions.forEach((q, idx) => {
             const group = document.createElement('div');
             group.className = 'mb-3 card card-body';
             group.innerHTML = `
@@ -408,13 +415,15 @@
         refs.tipsKeyword.textContent = part5.tips?.keyword || 'Chưa có dữ liệu.';
         refs.tipsMemo.textContent = part5.tips?.meo || 'Chưa có dữ liệu.';
 
-        // Filter out empty, null, undefined values from options
+        // Filter out empty, null, undefined values from options và xáo trộn chúng
         const rawOptions = Array.isArray(part5.options) && part5.options.length 
             ? part5.options.filter(opt => opt && opt.trim && opt.trim() !== '' && opt !== null && opt !== undefined)
             : [];
-        const normalizedOptions = rawOptions.length > 0 && rawOptions[0] !== '-- Chọn --' 
-            ? ['-- Chọn --', ...rawOptions] 
-            : (rawOptions.length > 0 ? rawOptions : ['-- Chọn --']);
+        // Đảm bảo placeholder ở đầu, phần còn lại được xáo trộn
+        const shuffledOptions = rawOptions.length > 0 ? shuffleArray(rawOptions) : [];
+        const normalizedOptions = shuffledOptions.length > 0 && shuffledOptions[0] !== '-- Chọn --' 
+            ? ['-- Chọn --', ...shuffledOptions] 
+            : (shuffledOptions.length > 0 ? shuffledOptions : ['-- Chọn --']);
         const container = document.getElementById('part5-paragraphs');
         container.innerHTML = '';
         
@@ -613,7 +622,10 @@
     }
 
     function evaluatePart4(part4 = {}) {
-        const questions = part4.questions || [];
+        // Sử dụng thứ tự đã xáo trộn từ state thay vì thứ tự gốc
+        const questions = state.part4ShuffledQuestions.length > 0 
+            ? state.part4ShuffledQuestions 
+            : (part4.questions || []);
         const selects = document.querySelectorAll('#part4-form .part4-select');
         let score = 0;
         const rows = questions.map((question, index) => {

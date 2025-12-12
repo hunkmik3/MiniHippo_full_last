@@ -31,6 +31,16 @@
     const checkHandlers = {};
     const audioPlayCounts = {}; // Track play counts for each audio
 
+    // Fisher-Yates shuffle function
+    function shuffleArray(array) {
+        const shuffled = [...array];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+    }
+
     const state = {
         data: null,
         currentStep: 1,
@@ -47,7 +57,9 @@
             part2: [], // Array of 4 answers for question 14
             part3: [], // Array of 4 answers for question 15
             part4: []  // Array of answers for questions 16-17
-        }
+        },
+        part3QuestionMapping: null, // Mapping cho câu hỏi đã xáo trộn ở Part 3
+        part4OptionMapping: null // Mapping cho options đã xáo trộn ở Part 4
     };
     let hasRendered = false;
 
@@ -406,21 +418,24 @@
         const questionNum = index + 1;
         const questions = state.data?.data?.part1?.questions || [];
         
+        // Xáo trộn đáp án cho Question 1
+        const shuffledOptions = question.options ? shuffleArray([...question.options]) : [];
+        
         // Create question HTML
         const questionHTML = `
             <h5 class="mb-3">Question ${questionNum} of ${total}</h5>
             <p class="mb-4"><strong id="part1-questionText">${(question.question || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</strong></p>
             <div class="form-check mb-2">
-                <input class="form-check-input" type="radio" name="part1-answer" id="part1-option0" value="${(question.options?.[0] || '').replace(/"/g, '&quot;')}">
-                <label class="form-check-label" for="part1-option0">${(question.options?.[0] || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</label>
+                <input class="form-check-input" type="radio" name="part1-answer" id="part1-option0" value="${(shuffledOptions[0] || '').replace(/"/g, '&quot;')}">
+                <label class="form-check-label" for="part1-option0">${(shuffledOptions[0] || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</label>
             </div>
             <div class="form-check mb-2">
-                <input class="form-check-input" type="radio" name="part1-answer" id="part1-option1" value="${(question.options?.[1] || '').replace(/"/g, '&quot;')}">
-                <label class="form-check-label" for="part1-option1">${(question.options?.[1] || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</label>
+                <input class="form-check-input" type="radio" name="part1-answer" id="part1-option1" value="${(shuffledOptions[1] || '').replace(/"/g, '&quot;')}">
+                <label class="form-check-label" for="part1-option1">${(shuffledOptions[1] || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</label>
             </div>
             <div class="form-check mb-2">
-                <input class="form-check-input" type="radio" name="part1-answer" id="part1-option2" value="${(question.options?.[2] || '').replace(/"/g, '&quot;')}">
-                <label class="form-check-label" for="part1-option2">${(question.options?.[2] || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</label>
+                <input class="form-check-input" type="radio" name="part1-answer" id="part1-option2" value="${(shuffledOptions[2] || '').replace(/"/g, '&quot;')}">
+                <label class="form-check-label" for="part1-option2">${(shuffledOptions[2] || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</label>
             </div>
         `;
         
@@ -429,18 +444,29 @@
 
         // Set audio source and setup player
         const audio = document.getElementById('part1-audioPlayer');
-        if (audio) {
-            // Stop and reset audio first
-            audio.pause();
-            audio.currentTime = 0;
-            
-            if (question.audioUrl) {
-                // Use audioUrl as-is (should be GitHub raw URL from admin)
-                audio.src = question.audioUrl;
+        const audioBar = document.querySelector('#part1-section .top-bar');
+        
+        // Ẩn thanh audio nếu câu hỏi này không có audio
+        if (audioBar) {
+            if (question.audioUrl && question.audioUrl.trim()) {
+                audioBar.style.display = 'flex';
+                if (audio) {
+                    // Stop and reset audio first
+                    audio.pause();
+                    audio.currentTime = 0;
+                    // Use audioUrl as-is (should be GitHub raw URL from admin)
+                    audio.src = question.audioUrl;
+                    // Setup audio player again for new question
+                    setupAudioPlayer('part1-audioPlayer', 'part1-playButton', 'part1-playIcon', 'part1-playCountLabel');
+                }
+            } else {
+                audioBar.style.display = 'none';
+                if (audio) {
+                    audio.pause();
+                    audio.currentTime = 0;
+                    audio.src = '';
+                }
             }
-            
-            // Setup audio player again for new question
-            setupAudioPlayer('part1-audioPlayer', 'part1-playButton', 'part1-playIcon', 'part1-playCountLabel');
         }
 
         // Set transcript
@@ -502,16 +528,23 @@
 
         const options = part2.options || [];
         const correctAnswers = part2.correctAnswers || [];
+        
+        // Xáo trộn đáp án cho Question 2 (mỗi dropdown sẽ có thứ tự khác nhau)
+        const shuffledOptionsForDropdowns = [];
 
         // Create 4 person selects
         for (let i = 0; i < 4; i++) {
+            // Xáo trộn options cho mỗi dropdown
+            const shuffledOptions = shuffleArray([...options]);
+            shuffledOptionsForDropdowns.push(shuffledOptions);
+            
             const row = document.createElement('div');
             row.className = 'd-flex align-items-center mb-3 gap-3';
             row.innerHTML = `
                 <label for="part2-person${i + 1}" class="form-label mb-0" style="width: 80px;">Person ${i + 1}</label>
                 <select id="part2-person${i + 1}" class="form-select part2-select" style="border: 1px solid #cccc99;">
                     <option value="">-- Select an answer --</option>
-                    ${options.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
+                    ${shuffledOptions.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
                 </select>
             `;
             container.appendChild(row);
@@ -530,8 +563,24 @@
 
         // Set audio
         const audio = document.getElementById('part2-audioPlayer');
-        if (audio && part2.audioUrl) {
-            audio.src = part2.audioUrl;
+        const audioBar = document.querySelector('#part2-section .top-bar');
+        
+        // Ẩn thanh audio nếu không có audio URL
+        if (audioBar) {
+            if (part2.audioUrl && part2.audioUrl.trim()) {
+                audioBar.style.display = 'flex';
+                if (audio) {
+                    audio.src = part2.audioUrl;
+                    setupAudioPlayer('part2-audioPlayer', 'part2-playButton', 'part2-playIcon', 'part2-playCountLabel');
+                }
+            } else {
+                audioBar.style.display = 'none';
+                if (audio) {
+                    audio.pause();
+                    audio.currentTime = 0;
+                    audio.src = '';
+                }
+            }
         }
 
         // Set transcript
@@ -539,8 +588,6 @@
         if (transcriptContent) {
             transcriptContent.textContent = part2.transcript || '';
         }
-
-        setupAudioPlayer('part2-audioPlayer', 'part2-playButton', 'part2-playIcon', 'part2-playCountLabel');
 
         const showTranscriptBtn = document.getElementById('part2-showTranscriptButton');
         const transcriptBox = document.getElementById('part2-transcriptBox');
@@ -576,8 +623,17 @@
 
         const questions = part3.questions || [];
         const correctAnswers = part3.correctAnswers || [];
+        
+        // Xáo trộn thứ tự các câu hỏi cho Question 3
+        const shuffledQuestions = shuffleArray([...questions]);
+        // Lưu mapping để đánh giá đúng
+        const questionMapping = shuffledQuestions.map((q, idx) => {
+            const originalIndex = questions.indexOf(q);
+            return { originalIndex, shuffledIndex: idx };
+        });
+        state.part3QuestionMapping = questionMapping;
 
-        questions.forEach((question, index) => {
+        shuffledQuestions.forEach((question, index) => {
             const row = document.createElement('div');
             row.className = 'd-flex align-items-center mb-3 gap-3';
             row.innerHTML = `
@@ -603,8 +659,24 @@
 
         // Set audio
         const audio = document.getElementById('part3-audioPlayer');
-        if (audio && part3.audioUrl) {
-            audio.src = part3.audioUrl;
+        const audioBar = document.querySelector('#part3-section .top-bar');
+        
+        // Ẩn thanh audio nếu không có audio URL
+        if (audioBar) {
+            if (part3.audioUrl && part3.audioUrl.trim()) {
+                audioBar.style.display = 'flex';
+                if (audio) {
+                    audio.src = part3.audioUrl;
+                    setupAudioPlayer('part3-audioPlayer', 'part3-playButton', 'part3-playIcon', 'part3-playCountLabel');
+                }
+            } else {
+                audioBar.style.display = 'none';
+                if (audio) {
+                    audio.pause();
+                    audio.currentTime = 0;
+                    audio.src = '';
+                }
+            }
         }
 
         // Set transcript
@@ -612,8 +684,6 @@
         if (transcriptContent) {
             transcriptContent.textContent = part3.transcript || '';
         }
-
-        setupAudioPlayer('part3-audioPlayer', 'part3-playButton', 'part3-playIcon', 'part3-playCountLabel');
 
         const showTranscriptBtn = document.getElementById('part3-showTranscriptButton');
         const transcriptBox = document.getElementById('part3-transcriptBox');
@@ -627,10 +697,14 @@
 
         const feedback = document.getElementById('part3-feedback');
         checkHandlers.part3 = () => {
-            const correct = state.userAnswers.part3.filter((ans, idx) => 
-                ans === correctAnswers[idx]
-            ).length;
-            feedback.textContent = `Bạn trả lời đúng ${correct}/${questions.length} câu.`;
+            // Sử dụng mapping để đánh giá đúng với thứ tự gốc
+            const correct = state.userAnswers.part3.filter((ans, shuffledIdx) => {
+                if (!state.part3QuestionMapping) return false;
+                const mapping = state.part3QuestionMapping.find(m => m.shuffledIndex === shuffledIdx);
+                if (!mapping) return false;
+                return ans === correctAnswers[mapping.originalIndex];
+            }).length;
+            feedback.textContent = `Bạn trả lời đúng ${correct}/${shuffledQuestions.length} câu.`;
             feedback.classList.remove('d-none');
         };
     }
@@ -721,21 +795,34 @@
         // Render sub-questions
         const subQuestionsContainer = questionDiv.querySelector(`.part4-subquestions${questionNum}`);
         question.questions?.forEach((subQ, subIndex) => {
+            // Xáo trộn đáp án cho Question 4
+            const shuffledOptions = subQ.options ? shuffleArray([...subQ.options]) : [];
+            // Lưu mapping để đánh giá đúng
+            const optionMapping = {};
+            shuffledOptions.forEach((opt, idx) => {
+                const originalIndex = subQ.options.indexOf(opt);
+                const letter = ['A', 'B', 'C'][idx];
+                optionMapping[letter] = ['A', 'B', 'C'][originalIndex];
+            });
+            if (!state.part4OptionMapping) state.part4OptionMapping = {};
+            if (!state.part4OptionMapping[qIndex]) state.part4OptionMapping[qIndex] = {};
+            state.part4OptionMapping[qIndex][subIndex] = optionMapping;
+            
             const subQDiv = document.createElement('div');
             subQDiv.className = 'mb-4';
             subQDiv.innerHTML = `
                 <label class="form-label mb-2 fw-bold">${subQ.id || `${questionNum}.${subIndex + 1}`} ${subQ.question || ''}</label>
                 <div class="form-check">
                     <input class="form-check-input part4-radio" type="radio" name="part4-q${questionNum}-sub${subIndex}" id="part4-q${questionNum}-sub${subIndex}-A" value="A">
-                    <label class="form-check-label" for="part4-q${questionNum}-sub${subIndex}-A">${subQ.options?.[0] || ''}</label>
+                    <label class="form-check-label" for="part4-q${questionNum}-sub${subIndex}-A">${shuffledOptions[0] || ''}</label>
                 </div>
                 <div class="form-check">
                     <input class="form-check-input part4-radio" type="radio" name="part4-q${questionNum}-sub${subIndex}" id="part4-q${questionNum}-sub${subIndex}-B" value="B">
-                    <label class="form-check-label" for="part4-q${questionNum}-sub${subIndex}-B">${subQ.options?.[1] || ''}</label>
+                    <label class="form-check-label" for="part4-q${questionNum}-sub${subIndex}-B">${shuffledOptions[1] || ''}</label>
                 </div>
                 <div class="form-check">
                     <input class="form-check-input part4-radio" type="radio" name="part4-q${questionNum}-sub${subIndex}" id="part4-q${questionNum}-sub${subIndex}-C" value="C">
-                    <label class="form-check-label" for="part4-q${questionNum}-sub${subIndex}-C">${subQ.options?.[2] || ''}</label>
+                    <label class="form-check-label" for="part4-q${questionNum}-sub${subIndex}-C">${shuffledOptions[2] || ''}</label>
                 </div>
             `;
             subQuestionsContainer.appendChild(subQDiv);
@@ -760,8 +847,25 @@
 
         // Set audio
         const audio = document.getElementById(audioId);
-        if (audio && question.audioUrl) {
-            audio.src = question.audioUrl;
+        const audioBar = questionDiv.querySelector('.top-bar');
+        
+        // Ẩn thanh audio nếu không có audio URL
+        if (audioBar) {
+            if (question.audioUrl && question.audioUrl.trim()) {
+                audioBar.style.display = 'flex';
+                if (audio) {
+                    audio.src = question.audioUrl;
+                    // Setup audio player
+                    setupAudioPlayer(audioId, playButtonId, playIconId, playCountLabelId);
+                }
+            } else {
+                audioBar.style.display = 'none';
+                if (audio) {
+                    audio.pause();
+                    audio.currentTime = 0;
+                    audio.src = '';
+                }
+            }
         }
 
         // Set transcript
@@ -769,9 +873,6 @@
         if (transcriptContent) {
             transcriptContent.textContent = question.transcript || '';
         }
-
-        // Setup audio player
-        setupAudioPlayer(audioId, playButtonId, playIconId, playCountLabelId);
 
         // Setup transcript toggle
         const showTranscriptBtn = document.getElementById(`part4-showTranscript${questionNum}`);
@@ -828,19 +929,40 @@
         const questions = part3.questions || [];
         const correctAnswers = part3.correctAnswers || [];
         let score = 0;
-        const rows = questions.map((question, index) => {
-            const userAnswer = state.userAnswers.part3[index] || '(không chọn)';
-            const isCorrect = userAnswer === correctAnswers[index];
-            if (isCorrect) {
-                score += 1;
-            }
-            return {
-                question: question,
-                user: userAnswer,
-                correct: correctAnswers[index] || '',
-                isCorrect
-            };
-        });
+        const rows = [];
+        
+        // Sử dụng mapping để đánh giá đúng với thứ tự gốc
+        if (state.part3QuestionMapping) {
+            state.part3QuestionMapping.forEach((mapping, shuffledIdx) => {
+                const userAnswer = state.userAnswers.part3[shuffledIdx] || '(không chọn)';
+                const isCorrect = userAnswer === correctAnswers[mapping.originalIndex];
+                if (isCorrect) {
+                    score += 1;
+                }
+                rows.push({
+                    question: questions[mapping.originalIndex],
+                    user: userAnswer,
+                    correct: correctAnswers[mapping.originalIndex] || '',
+                    isCorrect
+                });
+            });
+        } else {
+            // Fallback nếu không có mapping
+            questions.forEach((question, index) => {
+                const userAnswer = state.userAnswers.part3[index] || '(không chọn)';
+                const isCorrect = userAnswer === correctAnswers[index];
+                if (isCorrect) {
+                    score += 1;
+                }
+                rows.push({
+                    question: question,
+                    user: userAnswer,
+                    correct: correctAnswers[index] || '',
+                    isCorrect
+                });
+            });
+        }
+        
         return { score, total: questions.length, rows };
     }
 
@@ -850,7 +972,13 @@
         const rows = [];
         questions.forEach((question, qIndex) => {
             question.questions?.forEach((subQ, subIndex) => {
-                const userAnswer = state.userAnswers.part4[qIndex]?.[subIndex] || '(không chọn)';
+                const userAnswerShuffled = state.userAnswers.part4[qIndex]?.[subIndex] || '(không chọn)';
+                // Map lại về đáp án gốc nếu có mapping
+                let userAnswer = userAnswerShuffled;
+                if (state.part4OptionMapping && state.part4OptionMapping[qIndex] && state.part4OptionMapping[qIndex][subIndex]) {
+                    const mapping = state.part4OptionMapping[qIndex][subIndex];
+                    userAnswer = mapping[userAnswerShuffled] || userAnswerShuffled;
+                }
                 const isCorrect = userAnswer === subQ.correctAnswer;
                 if (isCorrect) {
                     score += 1;
