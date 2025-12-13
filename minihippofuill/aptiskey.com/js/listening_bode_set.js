@@ -797,51 +797,57 @@
         question.questions?.forEach((subQ, subIndex) => {
             // Xáo trộn đáp án cho Question 4
             const shuffledOptions = subQ.options ? shuffleArray([...subQ.options]) : [];
-            // Lưu mapping để đánh giá đúng
-            const optionMapping = {};
-            shuffledOptions.forEach((opt, idx) => {
-                const originalIndex = subQ.options.indexOf(opt);
-                const letter = ['A', 'B', 'C'][idx];
-                optionMapping[letter] = ['A', 'B', 'C'][originalIndex];
-            });
-            if (!state.part4OptionMapping) state.part4OptionMapping = {};
-            if (!state.part4OptionMapping[qIndex]) state.part4OptionMapping[qIndex] = {};
-            state.part4OptionMapping[qIndex][subIndex] = optionMapping;
             
             const subQDiv = document.createElement('div');
             subQDiv.className = 'mb-4';
             subQDiv.innerHTML = `
                 <label class="form-label mb-2 fw-bold">${subQ.id || `${questionNum}.${subIndex + 1}`} ${subQ.question || ''}</label>
                 <div class="form-check">
-                    <input class="form-check-input part4-radio" type="radio" name="part4-q${questionNum}-sub${subIndex}" id="part4-q${questionNum}-sub${subIndex}-A" value="A">
+                    <input class="form-check-input part4-radio" type="radio" name="part4-q${questionNum}-sub${subIndex}" id="part4-q${questionNum}-sub${subIndex}-A" value="${shuffledOptions[0] || ''}">
                     <label class="form-check-label" for="part4-q${questionNum}-sub${subIndex}-A">${shuffledOptions[0] || ''}</label>
                 </div>
                 <div class="form-check">
-                    <input class="form-check-input part4-radio" type="radio" name="part4-q${questionNum}-sub${subIndex}" id="part4-q${questionNum}-sub${subIndex}-B" value="B">
+                    <input class="form-check-input part4-radio" type="radio" name="part4-q${questionNum}-sub${subIndex}" id="part4-q${questionNum}-sub${subIndex}-B" value="${shuffledOptions[1] || ''}">
                     <label class="form-check-label" for="part4-q${questionNum}-sub${subIndex}-B">${shuffledOptions[1] || ''}</label>
                 </div>
                 <div class="form-check">
-                    <input class="form-check-input part4-radio" type="radio" name="part4-q${questionNum}-sub${subIndex}" id="part4-q${questionNum}-sub${subIndex}-C" value="C">
+                    <input class="form-check-input part4-radio" type="radio" name="part4-q${questionNum}-sub${subIndex}" id="part4-q${questionNum}-sub${subIndex}-C" value="${shuffledOptions[2] || ''}">
                     <label class="form-check-label" for="part4-q${questionNum}-sub${subIndex}-C">${shuffledOptions[2] || ''}</label>
                 </div>
             `;
             subQuestionsContainer.appendChild(subQDiv);
 
-            // Store answer
+            // Store answer (lưu text của option thay vì A/B/C)
             subQDiv.querySelectorAll('input[type="radio"]').forEach(radio => {
                 radio.addEventListener('change', () => {
                     if (!state.userAnswers.part4[qIndex]) {
                         state.userAnswers.part4[qIndex] = {};
                     }
-                    state.userAnswers.part4[qIndex][subIndex] = radio.value;
+                    state.userAnswers.part4[qIndex][subIndex] = radio.value; // Lưu text của option
                 });
             });
 
-            // Restore saved answer
+            // Restore saved answer (tương thích với data cũ A/B/C và data mới text)
             if (state.userAnswers.part4[qIndex] && state.userAnswers.part4[qIndex][subIndex]) {
                 const savedValue = state.userAnswers.part4[qIndex][subIndex];
-                const radio = subQDiv.querySelector(`input[value="${savedValue}"]`);
-                if (radio) radio.checked = true;
+                // Nếu là A/B/C (data cũ), convert sang text của option
+                if (['A', 'B', 'C'].includes(savedValue)) {
+                    const optionIndex = savedValue.charCodeAt(0) - 65; // A=0, B=1, C=2
+                    const originalOptions = subQ.options || [];
+                    if (originalOptions[optionIndex]) {
+                        const textValue = originalOptions[optionIndex];
+                        const radio = subQDiv.querySelector(`input[value="${textValue}"]`);
+                        if (radio) {
+                            radio.checked = true;
+                            // Cập nhật lại state với text
+                            state.userAnswers.part4[qIndex][subIndex] = textValue;
+                        }
+                    }
+                } else {
+                    // Data mới: tìm theo text
+                    const radio = subQDiv.querySelector(`input[value="${savedValue}"]`);
+                    if (radio) radio.checked = true;
+                }
             }
         });
 
@@ -972,21 +978,39 @@
         const rows = [];
         questions.forEach((question, qIndex) => {
             question.questions?.forEach((subQ, subIndex) => {
-                const userAnswerShuffled = state.userAnswers.part4[qIndex]?.[subIndex] || '(không chọn)';
-                // Map lại về đáp án gốc nếu có mapping
-                let userAnswer = userAnswerShuffled;
-                if (state.part4OptionMapping && state.part4OptionMapping[qIndex] && state.part4OptionMapping[qIndex][subIndex]) {
-                    const mapping = state.part4OptionMapping[qIndex][subIndex];
-                    userAnswer = mapping[userAnswerShuffled] || userAnswerShuffled;
+                const userAnswerText = state.userAnswers.part4[qIndex]?.[subIndex] || '(không chọn)';
+                
+                // Xử lý tương thích với data cũ (A/B/C) và data mới (text)
+                let correctAnswerText = subQ.correctAnswer || '';
+                
+                // Nếu correctAnswer là A/B/C (data cũ), convert sang text
+                if (['A', 'B', 'C'].includes(correctAnswerText)) {
+                    const optionIndex = correctAnswerText.charCodeAt(0) - 65; // A=0, B=1, C=2
+                    const options = subQ.options || [];
+                    if (options[optionIndex]) {
+                        correctAnswerText = options[optionIndex];
+                    }
                 }
-                const isCorrect = userAnswer === subQ.correctAnswer;
+                
+                // Nếu userAnswer là A/B/C (data cũ), convert sang text
+                let userAnswerFinal = userAnswerText;
+                if (['A', 'B', 'C'].includes(userAnswerText)) {
+                    const optionIndex = userAnswerText.charCodeAt(0) - 65;
+                    const options = subQ.options || [];
+                    if (options[optionIndex]) {
+                        userAnswerFinal = options[optionIndex];
+                    }
+                }
+                
+                // So sánh text với text
+                const isCorrect = userAnswerFinal === correctAnswerText;
                 if (isCorrect) {
                     score += 1;
                 }
                 rows.push({
                     question: subQ.id || `${16 + qIndex}.${subIndex + 1}`,
-                    user: userAnswer,
-                    correct: subQ.correctAnswer || '',
+                    user: userAnswerFinal,
+                    correct: correctAnswerText || '',
                     isCorrect
                 });
             });

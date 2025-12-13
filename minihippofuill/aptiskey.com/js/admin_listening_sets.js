@@ -431,6 +431,16 @@
     }
 
     function createPart4SubQuestionRow(data = {}) {
+        // Xử lý tương thích với data cũ (A/B/C) và data mới (text)
+        let correctAnswerValue = data.correctAnswer || '';
+        if (['A', 'B', 'C'].includes(correctAnswerValue)) {
+            // Convert A/B/C sang text của option
+            const optionIndex = correctAnswerValue.charCodeAt(0) - 65; // A=0, B=1, C=2
+            if (data.options && data.options[optionIndex]) {
+                correctAnswerValue = data.options[optionIndex];
+            }
+        }
+        
         const wrapper = document.createElement('div');
         wrapper.className = 'border rounded p-3 mb-2 bg-light';
         wrapper.innerHTML = `
@@ -472,10 +482,13 @@
                            placeholder="Option C">
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label small">Đáp án đúng (A/B/C)</label>
-                    <input type="text" class="form-control form-control-sm listening-part4-sub-answer" 
-                           value="${data.correctAnswer || ''}" 
-                           placeholder="A">
+                    <label class="form-label small">Đáp án đúng (chọn option)</label>
+                    <select class="form-control form-control-sm listening-part4-sub-answer">
+                        <option value="">-- Chọn đáp án --</option>
+                        <option value="${data.options?.[0] || ''}" ${correctAnswerValue === data.options?.[0] ? 'selected' : ''}>Option A: ${data.options?.[0] || ''}</option>
+                        <option value="${data.options?.[1] || ''}" ${correctAnswerValue === data.options?.[1] ? 'selected' : ''}>Option B: ${data.options?.[1] || ''}</option>
+                        <option value="${data.options?.[2] || ''}" ${correctAnswerValue === data.options?.[2] ? 'selected' : ''}>Option C: ${data.options?.[2] || ''}</option>
+                    </select>
                 </div>
             </div>
         `;
@@ -483,6 +496,31 @@
         wrapper.querySelector('.btn-outline-danger').addEventListener('click', () => {
             wrapper.remove();
         });
+        
+        // Cập nhật dropdown khi options thay đổi
+        const optionInputs = wrapper.querySelectorAll('.listening-part4-sub-option');
+        const answerSelect = wrapper.querySelector('.listening-part4-sub-answer');
+        
+        function updateAnswerDropdown() {
+            const options = Array.from(optionInputs).map(input => input.value.trim()).filter(Boolean);
+            const currentValue = answerSelect.value;
+            
+            answerSelect.innerHTML = '<option value="">-- Chọn đáp án --</option>';
+            options.forEach((opt, idx) => {
+                const option = document.createElement('option');
+                option.value = opt;
+                option.textContent = `Option ${String.fromCharCode(65 + idx)}: ${opt}`;
+                if (opt === currentValue) {
+                    option.selected = true;
+                }
+                answerSelect.appendChild(option);
+            });
+        }
+        
+        optionInputs.forEach(input => {
+            input.addEventListener('input', updateAnswerDropdown);
+        });
+        
         return wrapper;
     }
 
@@ -779,10 +817,15 @@
                 const options = Array.from(subItem.querySelectorAll('.listening-part4-sub-option'))
                     .map(input => input.value.trim())
                     .filter(Boolean);
-                const correctAnswer = subItem.querySelector('.listening-part4-sub-answer')?.value.trim().toUpperCase();
+                const correctAnswer = subItem.querySelector('.listening-part4-sub-answer')?.value.trim();
                 
-                if (!id || !question || options.length < 3 || !['A', 'B', 'C'].includes(correctAnswer)) {
-                    throw new Error('Part 4: Mỗi câu hỏi con cần đủ ID, câu hỏi, 3 options và đáp án A/B/C.');
+                if (!id || !question || options.length < 3 || !correctAnswer) {
+                    throw new Error('Part 4: Mỗi câu hỏi con cần đủ ID, câu hỏi, 3 options và đáp án đúng.');
+                }
+                
+                // Kiểm tra đáp án đúng phải là một trong các options
+                if (!options.includes(correctAnswer)) {
+                    throw new Error(`Part 4: Đáp án đúng phải là một trong các options đã nhập.`);
                 }
                 
                 return {
