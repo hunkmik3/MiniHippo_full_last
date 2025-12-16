@@ -1,9 +1,11 @@
 import submitResult from '../../server/api/practice_results/submit.js';
 import listResults from '../../server/api/practice_results/list.js';
+import deleteResult from '../../server/api/practice_results/delete.js';
 
 const handlers = {
   submit: submitResult,
-  list: listResults
+  list: listResults,
+  delete: deleteResult
 };
 
 export default async function handler(req, res) {

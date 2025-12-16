@@ -80,6 +80,13 @@
                 return;
             }
 
+            // Sắp xếp theo thứ tự alphabet (title)
+            sets.sort((a, b) => {
+                const titleA = (a.title || '').toLowerCase();
+                const titleB = (b.title || '').toLowerCase();
+                return titleA.localeCompare(titleB, 'vi', { numeric: true, sensitivity: 'base' });
+            });
+
             hidePlaceholder();
             sets.forEach(set => listContainer.appendChild(createSetCard(set)));
         } catch (error) {

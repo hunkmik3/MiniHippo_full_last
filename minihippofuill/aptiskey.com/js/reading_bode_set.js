@@ -556,7 +556,7 @@
             const rawValue = select ? select.value : '';
             const isCorrect = rawValue && rawValue === question.answer;
             if (isCorrect) {
-                score += 1;
+                score += 2; // Each question worth 2 points
             }
             return {
                 start: question.start || '',
@@ -566,7 +566,7 @@
                 isCorrect
             };
         });
-        return { score, total: questions.length || 0, rows };
+        return { score, total: (questions.length || 0) * 2, rows };
     }
 
     function evaluateOrderingQuestion(label, containerId, correctOrder = []) {
@@ -577,7 +577,7 @@
 
         const cards = container.querySelectorAll('[data-correct-index]');
         const rows = [];
-        let score = 0;
+        let allCorrect = true;
 
         cards.forEach((card, displayIndex) => {
             const span = card.querySelector('span');
@@ -586,8 +586,8 @@
             const normalizedUserText = userText.trim();
             const normalizedCorrectText = correctSentence.trim();
             const isCorrect = normalizedUserText === normalizedCorrectText;
-            if (isCorrect) {
-                score += 1;
+            if (!isCorrect) {
+                allCorrect = false;
             }
             rows.push({
                 user: formatAnswer(userText),
@@ -596,7 +596,10 @@
             });
         });
 
-        return { label, score, total: correctOrder.length, rows };
+        // Nếu đúng hết cả 5 câu thì được 5 điểm, nếu sai 1 câu bất kỳ thì mất điểm toàn bộ topic
+        const score = allCorrect ? 5 : 0;
+
+        return { label, score, total: 5, rows };
     }
 
     function evaluatePart2() {
@@ -611,7 +614,7 @@
         }
 
         const score = breakdown.reduce((sum, section) => sum + section.score, 0);
-        const total = breakdown.reduce((sum, section) => sum + section.total, 0);
+        const total = breakdown.reduce((sum, section) => sum + section.total, 0); // Should be 10 (5 + 5)
 
         return {
             score,
@@ -627,14 +630,23 @@
             ? state.part4ShuffledQuestions 
             : (part4.questions || []);
         const selects = document.querySelectorAll('#part4-form .part4-select');
-        let score = 0;
+        
+        // Nhóm các câu hỏi theo đáp án đúng (A, B, C, D)
+        const questionsByParagraph = { A: [], B: [], C: [], D: [] };
         const rows = questions.map((question, index) => {
             const select = selects[index];
             const rawValue = select ? select.value : '';
             const isCorrect = rawValue && rawValue === question.answer;
-            if (isCorrect) {
-                score += 1;
+            
+            // Nhóm câu hỏi theo đáp án đúng
+            const correctAnswer = question.answer || '';
+            if (correctAnswer && ['A', 'B', 'C', 'D'].includes(correctAnswer)) {
+                questionsByParagraph[correctAnswer].push({
+                    index,
+                    isCorrect
+                });
             }
+            
             return {
                 prompt: question.prompt || '',
                 user: formatAnswer(rawValue),
@@ -642,7 +654,23 @@
                 isCorrect
             };
         });
-        return { score, total: questions.length || 0, rows };
+        
+        // Tính điểm cho mỗi đoạn văn
+        // Mỗi đoạn (A/B/C/D) có tổng 4 điểm, chia đều cho số câu thuộc đoạn đó
+        let score = 0;
+        ['A', 'B', 'C', 'D'].forEach(paragraph => {
+            const paragraphQuestions = questionsByParagraph[paragraph];
+            if (paragraphQuestions.length === 0) return;
+
+            const pointsPerQuestion = 4 / paragraphQuestions.length;
+            paragraphQuestions.forEach(q => {
+                if (q.isCorrect) {
+                    score += pointsPerQuestion;
+                }
+            });
+        });
+        
+        return { score, total: 16, rows }; // Tổng part 3 là 16 điểm
     }
 
     function evaluatePart5(part5 = {}) {
@@ -655,7 +683,7 @@
             const correctAnswer = paragraph.answer || '';
             const isCorrect = rawValue && rawValue === correctAnswer;
             if (isCorrect) {
-                score += 1;
+                score += 2; // Each answer worth 2 points
             }
             return {
                 label: `Đoạn ${index + 1}`,
@@ -664,7 +692,7 @@
                 isCorrect
             };
         });
-        return { score, total: paragraphs.length || 0, rows };
+        return { score, total: (paragraphs.length || 0) * 2, rows };
     }
 
     function renderPart1Comparison(result) {
@@ -780,15 +808,14 @@
         totalEl.innerHTML = `<strong>Your score: ${result.score} / ${result.total || result.rows.length}</strong>`;
     }
 
-    function determineGrade(score, total) {
-        if (!total || total === 0) return 'A1';
-        const percent = score / total;
-        if (percent >= 0.9) return 'C2';
-        if (percent >= 0.75) return 'C1';
-        if (percent >= 0.6) return 'B2';
-        if (percent >= 0.45) return 'B1';
-        if (percent >= 0.3) return 'A2';
-        return 'A1';
+    // Reading band thresholds (absolute score)
+    // A2: >=16, B1: >=26, B2: >=38, C: >=46, below 16: below A2
+    function determineGrade(score) {
+        if (score >= 46) return 'C';
+        if (score >= 38) return 'B2';
+        if (score >= 26) return 'B1';
+        if (score >= 16) return 'A2';
+        return 'Below A2';
     }
 
     function showComparisonSection(targetId) {
@@ -821,7 +848,7 @@
             refs.totalScore.textContent = `Total Score: ${totalScore} / ${totalPossible}`;
         }
         if (refs.scoreClassification) {
-            refs.scoreClassification.textContent = `Your grade: ${determineGrade(totalScore, totalPossible)}`;
+            refs.scoreClassification.textContent = `Your band: ${determineGrade(totalScore)}`;
         }
 
         refs.content.style.display = 'none';

@@ -177,10 +177,9 @@
                     
                     if (response.ok && result.lesson) {
                         const lesson = result.lesson;
-                        const scriptResponse = await fetch(`/api/lessons/get-script-url?filePath=${encodeURIComponent(lesson.file_path)}`);
-                        const scriptResult = await scriptResponse.json();
                         
                         // Fetch script content and execute directly (handles DOMContentLoaded issue)
+                        // Bỏ qua bước get-script-url vì không cần thiết, gọi get-script trực tiếp
                         const scriptPath = `/api/lessons/get-script?filePath=${encodeURIComponent(lesson.file_path)}&v=${new Date().getTime()}`;
                         console.log('Fetching script content from API proxy:', scriptPath);
                         
@@ -278,26 +277,45 @@
                             return;
                         } catch (error) {
                             console.error('Failed to fetch/execute script from API proxy:', error);
-                            if (scriptResponse.ok && scriptResult.scriptUrl) {
-                                const rawScript = document.createElement('script');
-                                rawScript.src = scriptResult.scriptUrl + '?v=' + new Date().getTime();
-                                rawScript.defer = true;
-                                rawScript.onerror = function() {
-                                    const localPath = lesson.file_path;
-                                    const localScript = document.createElement('script');
-                                    localScript.src = (localPath.startsWith('js/') ? localPath : 'js/' + localPath) + '?v=' + new Date().getTime();
-                                    localScript.defer = true;
-                                    localScript.onerror = function() {
-                                        loadDefaultScript();
-                                    };
-                                    document.head.appendChild(localScript);
-                                };
-                                document.head.appendChild(rawScript);
-                                return;
-                            } else {
-                                loadDefaultScript();
-                                return;
+                            // Fallback: thử load từ GitHub raw URL trực tiếp
+                            try {
+                                const owner = 'hunkmik3'; // Có thể lấy từ env hoặc config
+                                const repo = 'MiniHippo_full_last';
+                                const branch = 'main';
+                                const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${lesson.file_path}?v=${new Date().getTime()}`;
+                                console.log('Trying to load from GitHub raw URL:', rawUrl);
+                                
+                                const rawResponse = await fetch(rawUrl);
+                                if (rawResponse.ok) {
+                                    const rawContent = await rawResponse.text();
+                                    const scriptElement = document.createElement('script');
+                                    scriptElement.textContent = rawContent;
+                                    document.head.appendChild(scriptElement);
+                                    console.log('Loaded from GitHub raw URL successfully');
+                                    // Trigger render after a delay
+                                    setTimeout(() => {
+                                        const renderFn = window.renderQuestion2;
+                                        const qSets = window.questionSets;
+                                        if (qSets && qSets.length > 0 && renderFn) {
+                                            renderFn(qSets[0]);
+                                            setLoadingState(false);
+                                            const loadingIndicator = document.getElementById('lesson-loading-indicator');
+                                            if (loadingIndicator) loadingIndicator.style.display = 'none';
+                                            if (window.startCountdown) {
+                                                window.startCountdown();
+                                            }
+                                        }
+                                    }, 200);
+                                    return;
+                                }
+                            } catch (rawError) {
+                                console.error('Failed to load from GitHub raw URL:', rawError);
                             }
+                            
+                            // Final fallback: load default script
+                            console.log('All methods failed, loading default script');
+                            loadDefaultScript();
+                            return;
                         }
                     } else {
                         // Lesson not found, fallback to default

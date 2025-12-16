@@ -18,7 +18,8 @@
         users: [],
         filteredUsers: [],
         selectedUser: null,
-        loadingUsers: false
+        loadingUsers: false,
+        selectedResultIds: new Set()
     };
 
     function getAuthHeaders(extra = {}) {
@@ -117,16 +118,57 @@
         renderUsers(state.filteredUsers);
     }
 
+    function calculateBand(practiceType, totalScore) {
+        if (!practiceType || totalScore === undefined || totalScore === null) {
+            return '—';
+        }
+        
+        const type = practiceType.toLowerCase();
+        let band = '';
+        
+        if (type === 'listening') {
+            if (totalScore >= 42) {
+                band = 'C';
+            } else if (totalScore >= 34) {
+                band = 'B2';
+            } else if (totalScore >= 24) {
+                band = 'B1';
+            } else if (totalScore >= 16) {
+                band = 'A2';
+            } else {
+                band = 'Chưa đạt A2';
+            }
+        } else if (type === 'reading') {
+            if (totalScore >= 46) {
+                band = 'C';
+            } else if (totalScore >= 38) {
+                band = 'B2';
+            } else if (totalScore >= 26) {
+                band = 'B1';
+            } else if (totalScore >= 16) {
+                band = 'A2';
+            } else {
+                band = 'Chưa đạt A2';
+            }
+        } else {
+            return '—';
+        }
+        
+        return band;
+    }
+
     function renderResults(results) {
         if (!refs.resultsBody) return;
         if (!results.length) {
             refs.resultsBody.innerHTML = `
                 <tr>
-                    <td colspan="5" class="text-center text-muted py-3">Chưa có kết quả nào.</td>
+                    <td colspan="7" class="text-center text-muted py-3">Chưa có kết quả nào.</td>
                 </tr>
             `;
+            updateBulkDeleteButton();
             return;
         }
+        
         refs.resultsBody.innerHTML = results
             .map(item => {
                 const submittedAt = item.submitted_at
@@ -139,6 +181,8 @@
                 const duration = item.duration_seconds
                     ? `${Math.round(item.duration_seconds / 60)}p`
                     : '—';
+                const band = calculateBand(item.practice_type, item.total_score);
+                const isChecked = state.selectedResultIds.has(item.id);
                 const detailBtn = item.id
                     ? `<button class="btn btn-sm btn-outline-primary" onclick="window.viewResultDetail('${item.id}')">
                         <i class="bi bi-eye"></i>
@@ -146,15 +190,99 @@
                     : '—';
                 return `
                     <tr>
+                        <td>
+                            <input type="checkbox" class="form-check-input result-checkbox" 
+                                   data-result-id="${item.id}" 
+                                   ${isChecked ? 'checked' : ''}>
+                        </td>
                         <td>${submittedAt}</td>
                         <td>${practiceType}</td>
                         <td><strong>${score}</strong></td>
+                        <td><span class="badge bg-info">${band}</span></td>
                         <td>${duration}</td>
                         <td>${detailBtn}</td>
                     </tr>
                 `;
             })
             .join('');
+        
+        // Attach checkbox event listeners
+        refs.resultsBody.querySelectorAll('.result-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                const resultId = e.target.dataset.resultId;
+                if (e.target.checked) {
+                    state.selectedResultIds.add(resultId);
+                } else {
+                    state.selectedResultIds.delete(resultId);
+                }
+                updateSelectAllCheckbox();
+                updateBulkDeleteButton();
+            });
+        });
+        
+        updateSelectAllCheckbox();
+        updateBulkDeleteButton();
+    }
+    
+    function updateSelectAllCheckbox() {
+        const selectAllCheckbox = document.getElementById('select-all-results');
+        if (!selectAllCheckbox) return;
+        
+        const checkboxes = refs.resultsBody?.querySelectorAll('.result-checkbox') || [];
+        const checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+        
+        if (checkedCount === 0) {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+        } else if (checkedCount === checkboxes.length) {
+            selectAllCheckbox.checked = true;
+            selectAllCheckbox.indeterminate = false;
+        } else {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = true;
+        }
+    }
+    
+    function updateBulkDeleteButton() {
+        const bulkDeleteBtn = document.getElementById('bulk-delete-results-btn');
+        if (!bulkDeleteBtn) return;
+        
+        const selectedCount = state.selectedResultIds.size;
+        if (selectedCount > 0) {
+            bulkDeleteBtn.style.display = 'block';
+            bulkDeleteBtn.innerHTML = `<i class="bi bi-trash me-1"></i>Xóa đã chọn (${selectedCount})`;
+        } else {
+            bulkDeleteBtn.style.display = 'none';
+        }
+    }
+    
+    async function bulkDeleteResults() {
+        const selectedIds = Array.from(state.selectedResultIds);
+        if (!selectedIds.length) {
+            alert('Vui lòng chọn ít nhất một kết quả để xóa.');
+            return;
+        }
+        
+        const confirmed = confirm(`Bạn có chắc chắn muốn xóa ${selectedIds.length} kết quả đã chọn?`);
+        if (!confirmed) return;
+        
+        try {
+            const response = await fetchJson('/api/practice_results/delete', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: selectedIds })
+            });
+            
+            alert(`Đã xóa thành công ${selectedIds.length} kết quả.`);
+            state.selectedResultIds.clear();
+            
+            // Reload results
+            if (state.selectedUser) {
+                loadResults(state.selectedUser.id);
+            }
+        } catch (error) {
+            alert(error.message || 'Không thể xóa kết quả');
+        }
     }
 
     async function loadResults(userId) {
@@ -236,6 +364,30 @@
             }
         });
     }
+    
+    // Select all checkbox handler
+    const selectAllCheckbox = document.getElementById('select-all-results');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', (e) => {
+            const checkboxes = refs.resultsBody?.querySelectorAll('.result-checkbox') || [];
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = e.target.checked;
+                const resultId = checkbox.dataset.resultId;
+                if (e.target.checked) {
+                    state.selectedResultIds.add(resultId);
+                } else {
+                    state.selectedResultIds.delete(resultId);
+                }
+            });
+            updateBulkDeleteButton();
+        });
+    }
+    
+    // Bulk delete button handler
+    const bulkDeleteBtn = document.getElementById('bulk-delete-results-btn');
+    if (bulkDeleteBtn) {
+        bulkDeleteBtn.addEventListener('click', bulkDeleteResults);
+    }
 
     // Initialize module
     window.initStudentLessonsModule = function() {
@@ -250,10 +402,12 @@
         if (refs.resultsBody) {
             refs.resultsBody.innerHTML = `
                 <tr>
-                    <td colspan="5" class="text-center text-muted">Chọn học viên để xem kết quả bài học.</td>
+                    <td colspan="7" class="text-center text-muted">Chọn học viên để xem kết quả bài học.</td>
                 </tr>
             `;
         }
+        state.selectedResultIds.clear();
+        updateBulkDeleteButton();
     };
 })();
 

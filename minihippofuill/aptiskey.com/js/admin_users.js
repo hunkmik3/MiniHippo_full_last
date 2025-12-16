@@ -38,14 +38,17 @@
         bulkTemplateBtn: document.getElementById('bulk-user-template-btn'),
         devicesPanel: document.getElementById('user-devices-panel'),
         devicesBody: document.getElementById('user-devices-body'),
-        refreshDevicesBtn: document.getElementById('refreshDevicesBtn')
+        refreshDevicesBtn: document.getElementById('refreshDevicesBtn'),
+        selectAllCheckbox: document.getElementById('user-select-all'),
+        bulkDeleteBtn: document.getElementById('bulkDeleteUsersBtn')
     };
 
     const state = {
         users: [],
         filteredUsers: [],
         selectedUser: null,
-        loadingUsers: false
+        loadingUsers: false,
+        selectedUserIds: new Set()
     };
 
     function showCreateAlert(message, type = 'info') {
@@ -83,12 +86,27 @@
         return response.json();
     }
 
+    function updateSelectAllState() {
+        if (!refs.selectAllCheckbox) return;
+        const visibleUsers = state.filteredUsers.length ? state.filteredUsers : state.users;
+        if (!visibleUsers.length) {
+            refs.selectAllCheckbox.checked = false;
+            refs.selectAllCheckbox.indeterminate = false;
+            return;
+        }
+        const totalVisible = visibleUsers.length;
+        const selectedVisible = visibleUsers.filter(u => state.selectedUserIds.has(u.id)).length;
+        refs.selectAllCheckbox.checked = selectedVisible === totalVisible;
+        refs.selectAllCheckbox.indeterminate =
+            selectedVisible > 0 && selectedVisible < totalVisible;
+    }
+
     function renderUsers(users) {
         if (!refs.userTableBody) return;
         if (!users.length) {
             refs.userTableBody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="text-center text-muted py-4">
+                    <td colspan="7" class="text-center text-muted py-4">
                         <i class="bi bi-inboxes me-2"></i>Chưa có học viên nào.
                     </td>
                 </tr>
@@ -104,6 +122,11 @@
                     : '<span class="badge bg-danger-subtle text-danger">Locked</span>';
                 return `
                     <tr data-user-id="${user.id}">
+                        <td>
+                            <input type="checkbox" class="form-check-input user-select-checkbox" data-user-id="${user.id}" ${
+                                state.selectedUserIds.has(user.id) ? 'checked' : ''
+                            }>
+                        </td>
                         <td class="fw-semibold">${user.account_code || '-'}</td>
                         <td>${user.full_name || '-'}</td>
                         <td>${user.email || '-'}</td>
@@ -119,11 +142,28 @@
             })
             .join('');
 
+        // Row action buttons
         refs.userTableBody.querySelectorAll('[data-action="select-user"]').forEach(btn => {
             btn.addEventListener('click', () => {
                 selectUser(btn.dataset.userId);
             });
         });
+
+        // Row checkboxes
+        refs.userTableBody.querySelectorAll('.user-select-checkbox').forEach(cb => {
+            cb.addEventListener('change', () => {
+                const id = cb.dataset.userId;
+                if (!id) return;
+                if (cb.checked) {
+                    state.selectedUserIds.add(id);
+                } else {
+                    state.selectedUserIds.delete(id);
+                }
+                updateSelectAllState();
+            });
+        });
+
+        updateSelectAllState();
     }
 
     function applySearchFilter() {
@@ -133,7 +173,7 @@
             renderUsers(state.filteredUsers);
             return;
         }
-        state.filteredUsers = state.users.filter(user => {
+            state.filteredUsers = state.users.filter(user => {
             const targets = [
                 user.account_code,
                 user.full_name,
@@ -149,6 +189,7 @@
     async function loadUsers() {
         if (state.loadingUsers) return;
         state.loadingUsers = true;
+        state.selectedUserIds.clear();
         renderUsers([]);
         try {
             const data = await fetchJson('/api/users/list');
@@ -163,6 +204,51 @@
             `;
         } finally {
             state.loadingUsers = false;
+        }
+    }
+
+    async function bulkDeleteSelectedUsers() {
+        if (!state.selectedUserIds.size) {
+            alert('Vui lòng chọn ít nhất một tài khoản để xóa.');
+            return;
+        }
+        const count = state.selectedUserIds.size;
+        const confirmed = confirm(
+            `Bạn có chắc chắn muốn xóa ${count} tài khoản đã chọn? Hành động này không thể hoàn tác.`
+        );
+        if (!confirmed) return;
+
+        try {
+            if (refs.bulkDeleteBtn) {
+                refs.bulkDeleteBtn.disabled = true;
+                refs.bulkDeleteBtn.innerHTML =
+                    '<span class="spinner-border spinner-border-sm me-1"></span>Đang xóa...';
+            }
+
+            const ids = Array.from(state.selectedUserIds);
+            for (const id of ids) {
+                try {
+                    await fetchJson(`/api/users/delete?id=${encodeURIComponent(id)}`, {
+                        method: 'DELETE'
+                    });
+                } catch (error) {
+                    console.error('bulk delete user error', id, error);
+                }
+            }
+
+            state.selectedUserIds.clear();
+            if (refs.selectAllCheckbox) {
+                refs.selectAllCheckbox.checked = false;
+                refs.selectAllCheckbox.indeterminate = false;
+            }
+            await loadUsers();
+            showCreateAlert(`Đã xóa xong ${count} tài khoản đã chọn.`, 'success');
+        } finally {
+            if (refs.bulkDeleteBtn) {
+                refs.bulkDeleteBtn.disabled = false;
+                refs.bulkDeleteBtn.innerHTML =
+                    '<i class="bi bi-trash me-1"></i>Xóa đã chọn';
+            }
         }
     }
 
@@ -606,6 +692,24 @@
         }
         if (refs.bulkImportBtn) {
             refs.bulkImportBtn.addEventListener('click', bulkImportUsers);
+        }
+        if (refs.selectAllCheckbox) {
+            refs.selectAllCheckbox.addEventListener('change', () => {
+                const visibleUsers = state.filteredUsers.length ? state.filteredUsers : state.users;
+                if (!visibleUsers.length) return;
+                const shouldSelectAll = refs.selectAllCheckbox.checked;
+                visibleUsers.forEach(user => {
+                    if (shouldSelectAll) {
+                        state.selectedUserIds.add(user.id);
+                    } else {
+                        state.selectedUserIds.delete(user.id);
+                    }
+                });
+                renderUsers(visibleUsers);
+            });
+        }
+        if (refs.bulkDeleteBtn) {
+            refs.bulkDeleteBtn.addEventListener('click', bulkDeleteSelectedUsers);
         }
         if (refs.refreshDevicesBtn) {
             refs.refreshDevicesBtn.addEventListener('click', () => {

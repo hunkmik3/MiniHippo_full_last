@@ -472,7 +472,9 @@
         // Set transcript
         const transcriptContent = document.getElementById('part1-transcriptContent');
         if (transcriptContent) {
-            transcriptContent.textContent = question.transcript || '';
+            // Preserve line breaks from admin textarea
+            const formattedTranscript = (question.transcript || '').replace(/\n/g, '<br>');
+            transcriptContent.innerHTML = formattedTranscript;
         }
 
         // Restore saved answer
@@ -586,7 +588,9 @@
         // Set transcript
         const transcriptContent = document.getElementById('part2-transcriptContent');
         if (transcriptContent) {
-            transcriptContent.textContent = part2.transcript || '';
+            // Preserve line breaks from admin textarea
+            const formattedTranscript = (part2.transcript || '').replace(/\n/g, '<br>');
+            transcriptContent.innerHTML = formattedTranscript;
         }
 
         const showTranscriptBtn = document.getElementById('part2-showTranscriptButton');
@@ -624,13 +628,13 @@
         const questions = part3.questions || [];
         const correctAnswers = part3.correctAnswers || [];
         
-        // Xáo trộn thứ tự các câu hỏi cho Question 3
-        const shuffledQuestions = shuffleArray([...questions]);
-        // Lưu mapping để đánh giá đúng
-        const questionMapping = shuffledQuestions.map((q, idx) => {
-            const originalIndex = questions.indexOf(q);
-            return { originalIndex, shuffledIndex: idx };
-        });
+        // Giữ nguyên thứ tự câu hỏi (không xáo trộn)
+        const shuffledQuestions = [...questions];
+        // Mapping giữ nguyên thứ tự gốc
+        const questionMapping = shuffledQuestions.map((_, idx) => ({
+            originalIndex: idx,
+            shuffledIndex: idx
+        }));
         state.part3QuestionMapping = questionMapping;
 
         shuffledQuestions.forEach((question, index) => {
@@ -682,7 +686,9 @@
         // Set transcript
         const transcriptContent = document.getElementById('part3-transcriptContent');
         if (transcriptContent) {
-            transcriptContent.textContent = part3.transcript || '';
+            // Preserve line breaks from admin textarea
+            const formattedTranscript = (part3.transcript || '').replace(/\n/g, '<br>');
+            transcriptContent.innerHTML = formattedTranscript;
         }
 
         const showTranscriptBtn = document.getElementById('part3-showTranscriptButton');
@@ -726,8 +732,32 @@
                 questions.forEach((q, qIndex) => {
                     q.questions?.forEach((subQ, subIndex) => {
                         totalQuestions++;
-                        const userAnswer = state.userAnswers.part4[qIndex]?.[subIndex];
-                        if (userAnswer === subQ.correctAnswer) {
+                        const userAnswerText = state.userAnswers.part4[qIndex]?.[subIndex];
+                        
+                        // Xử lý tương thích với data cũ (A/B/C) và data mới (text)
+                        let correctAnswerText = subQ.correctAnswer || '';
+                        
+                        // Nếu correctAnswer là A/B/C (data cũ), convert sang text
+                        if (['A', 'B', 'C'].includes(correctAnswerText)) {
+                            const optionIndex = correctAnswerText.charCodeAt(0) - 65; // A=0, B=1, C=2
+                            const options = subQ.options || [];
+                            if (options[optionIndex]) {
+                                correctAnswerText = options[optionIndex];
+                            }
+                        }
+                        
+                        // Nếu userAnswer là A/B/C (data cũ), convert sang text
+                        let userAnswerFinal = userAnswerText;
+                        if (userAnswerText && ['A', 'B', 'C'].includes(userAnswerText)) {
+                            const optionIndex = userAnswerText.charCodeAt(0) - 65;
+                            const options = subQ.options || [];
+                            if (options[optionIndex]) {
+                                userAnswerFinal = options[optionIndex];
+                            }
+                        }
+                        
+                        // So sánh text với text
+                        if (userAnswerFinal === correctAnswerText) {
                             totalCorrect++;
                         }
                     });
@@ -877,7 +907,9 @@
         // Set transcript
         const transcriptContent = document.getElementById(`part4-transcriptContent${questionNum}`);
         if (transcriptContent) {
-            transcriptContent.textContent = question.transcript || '';
+            // Preserve line breaks from admin textarea
+            const formattedTranscript = (question.transcript || '').replace(/\n/g, '<br>');
+            transcriptContent.innerHTML = formattedTranscript;
         }
 
         // Setup transcript toggle
@@ -919,7 +951,7 @@
             const userAnswer = state.userAnswers.part2[index] || '(không chọn)';
             const isCorrect = userAnswer === correct;
             if (isCorrect) {
-                score += 1;
+                score += 2; // Each question worth 2 points
             }
             return {
                 person: `Person ${index + 1}`,
@@ -928,7 +960,7 @@
                 isCorrect
             };
         });
-        return { score, total: correctAnswers.length, rows };
+        return { score, total: correctAnswers.length * 2, rows };
     }
 
     function evaluatePart3(part3 = {}) {
@@ -943,7 +975,7 @@
                 const userAnswer = state.userAnswers.part3[shuffledIdx] || '(không chọn)';
                 const isCorrect = userAnswer === correctAnswers[mapping.originalIndex];
                 if (isCorrect) {
-                    score += 1;
+                    score += 2; // Each question worth 2 points
                 }
                 rows.push({
                     question: questions[mapping.originalIndex],
@@ -958,7 +990,7 @@
                 const userAnswer = state.userAnswers.part3[index] || '(không chọn)';
                 const isCorrect = userAnswer === correctAnswers[index];
                 if (isCorrect) {
-                    score += 1;
+                    score += 2; // Each question worth 2 points
                 }
                 rows.push({
                     question: question,
@@ -969,7 +1001,7 @@
             });
         }
         
-        return { score, total: questions.length, rows };
+        return { score, total: questions.length * 2, rows };
     }
 
     function evaluatePart4(part4 = {}) {
@@ -1005,7 +1037,7 @@
                 // So sánh text với text
                 const isCorrect = userAnswerFinal === correctAnswerText;
                 if (isCorrect) {
-                    score += 1;
+                    score += 2; // Each question worth 2 points
                 }
                 rows.push({
                     question: subQ.id || `${16 + qIndex}.${subIndex + 1}`,
@@ -1015,7 +1047,7 @@
                 });
             });
         });
-        return { score, total: rows.length, rows };
+        return { score, total: rows.length * 2, rows };
     }
 
     // Render comparison results
@@ -1126,13 +1158,21 @@
             refs.totalScore.textContent = `Total Score: ${totalScore} / ${totalPossible}`;
         }
         if (refs.scoreClassification) {
-            const percentage = (totalScore / totalPossible) * 100;
-            let grade = 'F';
-            if (percentage >= 90) grade = 'A';
-            else if (percentage >= 80) grade = 'B';
-            else if (percentage >= 70) grade = 'C';
-            else if (percentage >= 60) grade = 'D';
-            refs.scoreClassification.textContent = `Your grade: ${grade}`;
+            // Band điểm Listening: A2, B1, B2, C
+            // Ngưỡng: 16 (A2), 24 (B1), 34 (B2), 42 (C)
+            let band = '';
+            if (totalScore >= 42) {
+                band = 'C';
+            } else if (totalScore >= 34) {
+                band = 'B2';
+            } else if (totalScore >= 24) {
+                band = 'B1';
+            } else if (totalScore >= 16) {
+                band = 'A2';
+            } else {
+                band = 'Chưa đạt A2';
+            }
+            refs.scoreClassification.textContent = `Your band: ${band}`;
         }
 
         refs.content.style.display = 'none';

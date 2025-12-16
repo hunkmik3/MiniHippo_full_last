@@ -2555,12 +2555,15 @@
                             <div class="card-body">
                                 <div class="d-flex flex-column flex-md-row justify-content-between gap-2 mb-3">
                                     <input type="text" class="form-control" id="user-search-input" placeholder="Tìm theo mã, tên hoặc email">
-                                    <div class="d-flex gap-2">
+                                    <div class="d-flex gap-2 flex-wrap">
                                         <button class="btn btn-outline-secondary" id="clearUserSearchBtn">
                                             <i class="bi bi-eraser me-1"></i>Xóa tìm
                                         </button>
                                         <button class="btn btn-outline-primary" id="refreshUsersBtn">
                                             <i class="bi bi-arrow-clockwise"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger" id="bulkDeleteUsersBtn">
+                                            <i class="bi bi-trash me-1"></i>Xóa đã chọn
                                         </button>
                                     </div>
                                 </div>
@@ -2568,6 +2571,9 @@
                                     <table class="table table-hover align-middle">
                                         <thead>
                                             <tr>
+                                                <th style="width: 40px;">
+                                                    <input type="checkbox" class="form-check-input" id="user-select-all">
+                                                </th>
                                                 <th>Mã</th>
                                                 <th>Họ tên</th>
                                                 <th>Email</th>
@@ -2578,7 +2584,7 @@
                                         </thead>
                                         <tbody id="user-table-body">
                                             <tr>
-                                                <td colspan="6" class="text-center text-muted">
+                                                <td colspan="7" class="text-center text-muted">
                                                     <i class="spinner-border spinner-border-sm me-2"></i>Đang tải danh sách học viên...
                                                 </td>
                                             </tr>
@@ -2736,20 +2742,30 @@
                                         <i class="bi bi-arrow-clockwise"></i>
                                     </button>
                                 </div>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div></div>
+                                    <button class="btn btn-sm btn-outline-danger" id="bulk-delete-results-btn" style="display: none;">
+                                        <i class="bi bi-trash me-1"></i>Xóa đã chọn
+                                    </button>
+                                </div>
                                 <div class="table-responsive">
                                     <table class="table table-hover align-middle">
                                         <thead>
                                             <tr>
+                                                <th style="width: 40px;">
+                                                    <input type="checkbox" id="select-all-results" class="form-check-input">
+                                                </th>
                                                 <th>Ngày</th>
                                                 <th>Loại</th>
                                                 <th>Điểm</th>
+                                                <th>Band</th>
                                                 <th>Thời gian</th>
                                                 <th>Chi tiết</th>
                                             </tr>
                                         </thead>
                                         <tbody id="student-lessons-results-body">
                                             <tr>
-                                                <td colspan="5" class="text-center text-muted">Chọn học viên để xem kết quả bài học.</td>
+                                                <td colspan="7" class="text-center text-muted">Chọn học viên để xem kết quả bài học.</td>
                                             </tr>
                                         </tbody>
                                     </table>

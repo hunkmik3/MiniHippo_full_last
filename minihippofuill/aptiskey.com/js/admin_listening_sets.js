@@ -573,7 +573,9 @@
             if (!response.ok) {
                 throw new Error(result.error || 'Không thể tải danh sách');
             }
-            state.sets = result.sets || [];
+            state.sets = (result.sets || []).slice().sort((a, b) =>
+                (a.title || '').localeCompare(b.title || '', 'vi', { sensitivity: 'base', numeric: true })
+            );
             renderListeningSetList();
         } catch (error) {
             console.error('Load listening sets error:', error);
