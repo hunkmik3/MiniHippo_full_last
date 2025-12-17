@@ -239,9 +239,218 @@ document.addEventListener('DOMContentLoaded', function() {
             renderQuestionSets(5);
         }
         
+        // Attach handler for generating aggregate lessons from Reading practice sets
+        const generateBtn = document.getElementById('generate-reading-lessons-btn');
+        if (generateBtn) {
+            generateBtn.addEventListener('click', generateReadingLessonsFromPracticeSets);
+        }
+        
         console.log('All question sets rendered');
     }, 100);
 });
+
+async function generateReadingLessonsFromPracticeSets() {
+    if (!confirm('Bạn có chắc muốn tạo các bài học Reading (Part 1, 2&3, 4, 5) từ toàn bộ bộ đề Reading hiện có?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/practice_sets/list?type=reading', {
+            method: 'GET',
+            headers: getJsonAuthHeaders()
+        });
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || 'Không thể tải danh sách bộ đề Reading');
+        }
+
+        const sets = result.sets || [];
+        if (!sets.length) {
+            alert('Chưa có bộ đề Reading nào trong hệ thống.');
+            return;
+        }
+
+        const aggregated = {
+            1: [],
+            2: [],
+            4: [],
+            5: []
+        };
+
+        // Simple Fisher-Yates shuffle helper
+        function shuffleArray(array) {
+            const arr = Array.isArray(array) ? [...array] : [];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        sets.forEach((set, setIndex) => {
+            const titleBase = set.title || `Bộ đề ${setIndex + 1}`;
+            const data = set.data || {};
+
+            // Part 1: Fill in the blank (Question 1)
+            const p1 = data.part1;
+            if (p1 && Array.isArray(p1.questions) && p1.questions.length) {
+                const questions = p1.questions
+                    .map(q => {
+                        let answerOptions = Array.isArray(q.answerOptions)
+                            ? q.answerOptions
+                            : Array.isArray(q.options)
+                                ? q.options
+                                : [];
+                        const questionStart = q.questionStart || q.start || '';
+                        const questionEnd = q.questionEnd || q.end || '';
+                        const correctAnswer = q.correctAnswer || q.answer || (answerOptions[0] || '');
+                        // Đảm bảo đáp án đúng luôn nằm trong options
+                        if (correctAnswer && !answerOptions.includes(correctAnswer)) {
+                            answerOptions = [...answerOptions, correctAnswer];
+                        }
+                        // Xáo trộn thứ tự đáp án như ở bộ đề
+                        const shuffledOptions = shuffleArray(answerOptions);
+                        if (!questionStart && !questionEnd && !answerOptions.length) return null;
+                        return {
+                            questionStart,
+                            answerOptions: shuffledOptions,
+                            questionEnd,
+                            correctAnswer
+                        };
+                    })
+                    .filter(Boolean);
+
+                if (questions.length) {
+                    // Xáo trộn nhẹ thứ tự câu hỏi trong từng bộ đề
+                    const shuffledQuestions = shuffleArray(questions);
+                    aggregated[1].push({
+                        id: aggregated[1].length + 1,
+                        title: `${titleBase} - Question 1`,
+                        data: { questions: shuffledQuestions }
+                    });
+                }
+            }
+
+            // Part 2 & 3: Sentence ordering (Question 2 & 3)
+            const p2 = data.part2 || {};
+            const addOrderingSet = (src, label) => {
+                if (!src || !Array.isArray(src.sentences) || !src.sentences.length) return;
+                aggregated[2].push({
+                    id: aggregated[2].length + 1,
+                    title: `${titleBase} - Question ${label}`,
+                    data: {
+                        part: 2,
+                        title: `${titleBase} - Question ${label}`,
+                        topic: src.topic || p2.topic || titleBase,
+                        sentences: src.sentences
+                    }
+                });
+            };
+            if (p2.question2) addOrderingSet(p2.question2, '2');
+            if (p2.question3) addOrderingSet(p2.question3, '3');
+
+            // Part 4: Reading comprehension (Question 4)
+            const p4 = data.part4;
+            if (p4 && Array.isArray(p4.questions) && p4.questions.length) {
+                const texts = [];
+                texts.push(p4.intro || '');
+                const paragraphs = p4.paragraphs || {};
+                ['A', 'B', 'C', 'D'].forEach(letter => {
+                    texts.push(paragraphs[letter] || '');
+                });
+
+                const questions4 = (p4.questions || [])
+                    .map(q => {
+                        const prompt = q.prompt || q.question || '';
+                        const answer = (q.answer || '').toUpperCase();
+                        if (!prompt || !['A', 'B', 'C', 'D'].includes(answer)) return null;
+                        return {
+                            question: prompt,
+                            options: ['', 'A', 'B', 'C', 'D'],
+                            correctAnswer: answer
+                        };
+                    })
+                    .filter(Boolean);
+
+                if (texts.some(t => t) && questions4.length) {
+                    aggregated[4].push({
+                        id: aggregated[4].length + 1,
+                        title: `${titleBase} - Question 4`,
+                        data: {
+                            topic: p4.topic || titleBase,
+                            texts,
+                            questions: questions4
+                        }
+                    });
+                }
+            }
+
+            // Part 5: Paragraph matching (Question 5)
+            const p5 = data.part5;
+            if (p5 && Array.isArray(p5.paragraphs) && p5.paragraphs.length) {
+                const paragraphsSource = p5.paragraphs || [];
+                const paragraphs = [];
+                const options = [''];
+                paragraphsSource.forEach(p => {
+                    if (!p) return;
+                    const text = p.text || p.paragraph || '';
+                    const ans = p.answer || '';
+                    if (text) {
+                        paragraphs.push(text);
+                        options.push(ans || '');
+                    }
+                });
+
+                if (paragraphs.length && options.length > 1) {
+                    aggregated[5].push({
+                        id: aggregated[5].length + 1,
+                        title: `${titleBase} - Question 5`,
+                        data: {
+                            topic: p5.topic || titleBase,
+                            options,
+                            paragraphs,
+                            tips: {
+                                keyword: (p5.tips && p5.tips.keyword) || '',
+                                meo: (p5.tips && p5.tips.meo) || ''
+                            }
+                        }
+                    });
+                }
+            }
+        });
+
+        async function uploadForPart(part, title) {
+            const setsForPart = aggregated[part] || [];
+            if (!setsForPart.length) {
+                console.warn('Không có dữ liệu cho Part', part);
+                return;
+            }
+            questionSets[part] = setsForPart;
+            window.currentPart = part;
+            window.currentLessonType = 'reading';
+            window.editingLessonId = null;
+            window.editingLessonFilePath = null;
+
+            // Đảm bảo set đầu tiên có title đẹp để dùng cho commit
+            if (questionSets[part][0] && !questionSets[part][0].title) {
+                questionSets[part][0].title = title;
+            }
+
+            console.log('Uploading aggregated lesson for part', part, 'with', setsForPart.length, 'sets');
+            await uploadLessonToGitHub();
+        }
+
+        await uploadForPart(1, 'Reading Question 1 - Tổng hợp bộ đề');
+        await uploadForPart(2, 'Reading Question 2 & 3 - Tổng hợp bộ đề');
+        await uploadForPart(4, 'Reading Question 4 - Tổng hợp bộ đề');
+        await uploadForPart(5, 'Reading Question 5 - Tổng hợp bộ đề');
+
+        alert('Đã tạo xong các bài học Reading tổng hợp từ bộ đề. Vui lòng vào trang \"Bảng quản lý bài học\" để kiểm tra.');
+    } catch (error) {
+        console.error('generateReadingLessonsFromPracticeSets error:', error);
+        alert('Lỗi khi tạo bài học tổng hợp: ' + (error.message || 'Không xác định'));
+    }
+}
 
 // Load existing lesson for editing
 async function loadExistingLesson(lessonId, requestedPart) {

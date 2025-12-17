@@ -26,9 +26,197 @@ document.addEventListener('DOMContentLoaded', function() {
     // Setup audio upload listeners
     setupAudioUploadListeners();
     
+    // Attach generator button (Listening lessons from practice sets)
+    const generateListeningBtn = document.getElementById('generate-listening-lessons-btn');
+    if (generateListeningBtn) {
+        generateListeningBtn.addEventListener('click', generateListeningLessonsFromPracticeSets);
+    }
+    
     // Render initial state
     renderListeningQuestionSets('14');
 });
+
+// Generate Listening lessons (Question 1-13, 14, 15, 16-17) from existing Listening practice sets
+async function generateListeningLessonsFromPracticeSets() {
+    if (!confirm('Bạn có chắc muốn tạo các bài học Listening (1-13, 14, 15, 16-17) từ toàn bộ bộ đề Listening hiện có?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/practice_sets/list?type=listening', {
+            method: 'GET',
+            headers: window.buildAuthorizedHeaders ? window.buildAuthorizedHeaders({ 'Content-Type': 'application/json' }) : { 'Content-Type': 'application/json' }
+        });
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || 'Không thể tải danh sách bộ đề Listening');
+        }
+
+        const sets = result.sets || [];
+        if (!sets.length) {
+            alert('Chưa có bộ đề Listening nào trong hệ thống.');
+            return;
+        }
+
+        const aggregated = {
+            '1_13': [],
+            '14': [],
+            '15': [],
+            '16_17': []
+        };
+
+        sets.forEach((set, setIndex) => {
+            const titleBase = set.title || `Bộ đề ${setIndex + 1}`;
+            const data = set.data || {};
+
+            // Part 1: Questions 1-13 -> Listening Question 1-13
+            const p1 = data.part1;
+            if (p1 && Array.isArray(p1.questions) && p1.questions.length) {
+                const questions = p1.questions
+                    .map((q, qIndex) => {
+                        const options = Array.isArray(q.options) ? q.options.slice(0, 3) : [];
+                        const questionText = q.question || '';
+                        const correctAnswer = q.correctAnswer || '';
+                        if (!questionText || !options.length || !correctAnswer) return null;
+                        return {
+                            heading: q.heading || `Question ${qIndex + 1} of ${p1.questions.length}`,
+                            audioUrl: q.audioUrl || '',
+                            question: questionText,
+                            options,
+                            correctAnswer,
+                            transcript: q.transcript || ''
+                        };
+                    })
+                    .filter(Boolean);
+
+                if (questions.length) {
+                    aggregated['1_13'].push({
+                        title: `${titleBase} - Question 1-13`,
+                        part: '1_13',
+                        questions
+                    });
+                }
+            }
+
+            // Part 2: Question 14
+            const p2 = data.part2;
+            if (p2 && Array.isArray(p2.options) && p2.options.length) {
+                aggregated['14'].push({
+                    title: `${titleBase} - Question 14`,
+                    part: '14',
+                    topic: p2.topic || titleBase,
+                    audioUrl: p2.audioUrl || '',
+                    options: p2.options,
+                    transcript: p2.transcript || ''
+                });
+            }
+
+            // Part 3: Question 15
+            const p3 = data.part3;
+            if (
+                p3 &&
+                Array.isArray(p3.questions) &&
+                Array.isArray(p3.correctAnswers) &&
+                p3.questions.length === p3.correctAnswers.length &&
+                p3.questions.length > 0
+            ) {
+                aggregated['15'].push({
+                    title: `${titleBase} - Question 15`,
+                    part: '15',
+                    topic: p3.topic || titleBase,
+                    audioUrl: p3.audioUrl || '',
+                    questions: p3.questions,
+                    correctAnswer: p3.correctAnswers,
+                    transcript: p3.transcript || ''
+                });
+            }
+
+            // Part 4: Questions 16-17
+            const p4 = data.part4;
+            if (p4 && Array.isArray(p4.questions) && p4.questions.length >= 2) {
+                const q16 = p4.questions[0] || {};
+                const q17 = p4.questions[1] || {};
+
+                const mapGroup = (groupData, fallbackId) => {
+                    const subQuestions = Array.isArray(groupData.questions)
+                        ? groupData.questions
+                              .map(sub => {
+                                  const options = Array.isArray(sub.options) ? sub.options.slice(0, 3) : [];
+                                  if (!sub.id || !sub.question || !options.length) return null;
+                                  return {
+                                      id: sub.id,
+                                      question: sub.question,
+                                      options
+                                  };
+                              })
+                              .filter(Boolean)
+                        : [];
+
+                    return {
+                        topic: groupData.topic || `${titleBase} - Question ${fallbackId}`,
+                        audioUrl: groupData.audioUrl || '',
+                        questions: subQuestions,
+                        transcript: groupData.transcript || ''
+                    };
+                };
+
+                const question16 = mapGroup(q16, 16);
+                const question17 = mapGroup(q17, 17);
+
+                if (question16.questions.length && question17.questions.length) {
+                    aggregated['16_17'].push({
+                        title: `${titleBase} - Question 16 & 17`,
+                        part: '16_17',
+                        question16,
+                        question17
+                    });
+                }
+            }
+        });
+
+        async function uploadAggregatedListeningPart(partKey, defaultTitle) {
+            const setsForPart = aggregated[partKey] || [];
+            if (!setsForPart.length) {
+                console.warn('Không có dữ liệu cho Listening part', partKey);
+                return;
+            }
+
+            // Gán vào listeningQuestionSets để tái sử dụng luồng upload hiện tại
+            window.listeningQuestionSets = window.listeningQuestionSets || {
+                '1_13': [],
+                '14': [],
+                '15': [],
+                '16_17': []
+            };
+            window.listeningQuestionSets[partKey] = setsForPart;
+            window.currentListeningPart = partKey;
+            window.currentLessonType = 'listening';
+
+            // Đảm bảo set đầu tiên có title đẹp cho commit message
+            if (window.listeningQuestionSets[partKey][0] && !window.listeningQuestionSets[partKey][0].title) {
+                window.listeningQuestionSets[partKey][0].title = defaultTitle;
+            }
+
+            if (typeof window.uploadListeningLessonToGitHub === 'function') {
+                console.log('Uploading aggregated Listening lesson for part', partKey, 'with', setsForPart.length, 'sets');
+                await window.uploadListeningLessonToGitHub();
+            } else {
+                console.error('uploadListeningLessonToGitHub is not available');
+            }
+        }
+
+        // Upload aggregated lessons for all Listening parts
+        await uploadAggregatedListeningPart('1_13', 'Listening Question 1-13 - Tổng hợp bộ đề');
+        await uploadAggregatedListeningPart('14', 'Listening Question 14 - Tổng hợp bộ đề');
+        await uploadAggregatedListeningPart('15', 'Listening Question 15 - Tổng hợp bộ đề');
+        await uploadAggregatedListeningPart('16_17', 'Listening Question 16 & 17 - Tổng hợp bộ đề');
+
+        alert('Đã tạo xong các bài học Listening tổng hợp từ bộ đề. Vui lòng vào trang "Bảng quản lý bài học" để kiểm tra.');
+    } catch (error) {
+        console.error('generateListeningLessonsFromPracticeSets error:', error);
+        alert('Lỗi khi tạo bài học Listening tổng hợp: ' + (error.message || 'Không xác định'));
+    }
+}
 
 // Setup audio upload event listeners
 function setupAudioUploadListeners() {
@@ -1304,18 +1492,33 @@ function generateListeningJS1_13(sets) {
     code += `// ===============================================================================================================\n\n`;
     code += `window.listeningQuestions1 = [\n`;
     
-    if (sets.length > 0 && sets[0].questions) {
-        sets[0].questions.forEach((q, index) => {
-            code += `  {\n`;
-            code += `    heading: "${q.heading || `Question ${index + 1} of 17`}",\n`;
-            code += `    audioUrl: "${q.audioUrl || `audio/question1_13/audio_q${index + 1}.mp3`}",\n`;
-            code += `    question: "${escapeJS(q.question)}",\n`;
-            code += `    options: [${q.options.map(opt => `"${escapeJS(opt)}"`).join(', ')}],\n`;
-            code += `    correctAnswer: "${escapeJS(q.correctAnswer)}",\n`;
-            code += `    transcript: "${escapeJS(q.transcript)}"\n`;
-            code += `  }${index < sets[0].questions.length - 1 ? ',' : ''}\n`;
-        });
-    }
+    // Gộp tất cả câu hỏi Question 1-13 từ TẤT CẢ bộ đề Listening
+    const allQuestions = [];
+    sets.forEach((set, setIndex) => {
+        if (set.questions && Array.isArray(set.questions)) {
+            set.questions.forEach((q, index) => {
+                allQuestions.push({
+                    heading: q.heading || `Đề ${setIndex + 1} - Question ${index + 1}`,
+                    audioUrl: q.audioUrl || `audio/question1_13/audio_q${index + 1}.mp3`,
+                    question: q.question,
+                    options: q.options,
+                    correctAnswer: q.correctAnswer,
+                    transcript: q.transcript
+                });
+            });
+        }
+    });
+
+    allQuestions.forEach((q, index) => {
+        code += `  {\n`;
+        code += `    heading: "${escapeJS(q.heading || `Question ${index + 1}`)}",\n`;
+        code += `    audioUrl: "${escapeJS(q.audioUrl || `audio/question1_13/audio_q${index + 1}.mp3`)}",\n`;
+        code += `    question: "${escapeJS(q.question || '')}",\n`;
+        code += `    options: [${(q.options || []).map(opt => `"${escapeJS(opt)}"`).join(', ')}],\n`;
+        code += `    correctAnswer: "${escapeJS(q.correctAnswer || '')}",\n`;
+        code += `    transcript: "${escapeJS(q.transcript || '')}"\n`;
+        code += `  }${index < allQuestions.length - 1 ? ',' : ''}\n`;
+    });
     
     code += `];\n\n`;
     
@@ -1328,7 +1531,10 @@ function generateListeningJS1_13(sets) {
     code += `  radioButtons.forEach(button => {\n`;
     code += `    button.checked = false;\n`;
     code += `  });\n\n`;
-    code += `  document.getElementById("question1_13_id").innerText = data.heading;\n\n`;
+    // Hiển thị dạng: Question X of TOTAL (ví dụ: Question 1 of 156)
+    code += `  const totalQuestions = window.listeningQuestions1 ? window.listeningQuestions1.length : 0;\n`;
+    code += `  const currentNumber = (typeof window.currentIndex !== 'undefined' ? window.currentIndex + 1 : 1);\n`;
+    code += `  document.getElementById("question1_13_id").innerText = 'Question ' + currentNumber + ' of ' + totalQuestions;\n\n`;
     code += `  const audio = document.getElementById("audioPlayer");\n`;
     code += `  const questionText = document.getElementById("questionText");\n`;
     code += `  audio.src = data.audioUrl;\n`;
@@ -1502,6 +1708,68 @@ function generateListeningJS1_13(sets) {
     code += `}\n\n`;
     
     // Add Countdown Timer (only initialize once to prevent multiple timers)
+    // Add renderQuestionByIndex function
+    code += `function renderQuestionByIndex(index) {\n`;
+    code += `  if (index >= 0 && index < window.listeningQuestions1.length) {\n`;
+    code += `    window.currentIndex = index;\n`;
+    code += `    window.renderQuestion1_13(window.listeningQuestions1[index]);\n`;
+    code += `  }\n`;
+    code += `  // Update Next button text if last question\n`;
+    code += `  if (index === window.listeningQuestions1.length - 1) {\n`;
+    code += `    const nextBtn = document.getElementById('nextButton');\n`;
+    code += `    if (nextBtn) nextBtn.textContent = 'The end';\n`;
+    code += `  } else {\n`;
+    code += `    const nextBtn = document.getElementById('nextButton');\n`;
+    code += `    if (nextBtn) nextBtn.textContent = 'Next';\n`;
+    code += `  }\n`;
+    code += `}\n\n`;
+    
+    // Add Next button handler
+    code += `const nextBtn = document.getElementById('nextButton');\n`;
+    code += `if (nextBtn) {\n`;
+    code += `  nextBtn.addEventListener('click', function() {\n`;
+    code += `    // Pause all audio\n`;
+    code += `    document.querySelectorAll('audio').forEach(audio => {\n`;
+    code += `      if (!audio.paused) {\n`;
+    code += `        audio.pause();\n`;
+    code += `        audio.currentTime = 0;\n`;
+    code += `      }\n`;
+    code += `    });\n`;
+    code += `    // Reset play icons\n`;
+    code += `    document.querySelectorAll('i[id^="playIcon"]').forEach(icon => {\n`;
+    code += `      icon.classList.remove('bi-pause-fill');\n`;
+    code += `      icon.classList.add('bi-play-fill');\n`;
+    code += `    });\n`;
+    code += `    if (window.currentIndex < window.listeningQuestions1.length - 1) {\n`;
+    code += `      renderQuestionByIndex(window.currentIndex + 1);\n`;
+    code += `    } else if (this.textContent === 'The end') {\n`;
+    code += `      window.location.href = 'listening_question.html';\n`;
+    code += `    }\n`;
+    code += `  });\n`;
+    code += `}\n\n`;
+    
+    // Add Back button handler
+    code += `const backBtn = document.getElementById('backButton');\n`;
+    code += `if (backBtn) {\n`;
+    code += `  backBtn.addEventListener('click', function() {\n`;
+    code += `    // Pause all audio\n`;
+    code += `    document.querySelectorAll('audio').forEach(audio => {\n`;
+    code += `      if (!audio.paused) {\n`;
+    code += `        audio.pause();\n`;
+    code += `        audio.currentTime = 0;\n`;
+    code += `      }\n`;
+    code += `    });\n`;
+    code += `    // Reset play icons\n`;
+    code += `    document.querySelectorAll('i[id^="playIcon"]').forEach(icon => {\n`;
+    code += `      icon.classList.remove('bi-pause-fill');\n`;
+    code += `      icon.classList.add('bi-play-fill');\n`;
+    code += `    });\n`;
+    code += `    if (window.currentIndex > 0) {\n`;
+    code += `      renderQuestionByIndex(window.currentIndex - 1);\n`;
+    code += `    }\n`;
+    code += `  });\n`;
+    code += `}\n\n`;
+    
     code += `// ===============================================================================================================\n`;
     code += `// ////////////// ĐẾM NGƯỢC THỜI GIAN --- COUNT DOWN ///////////////\n`;
     code += `// ===============================================================================================================\n`;
