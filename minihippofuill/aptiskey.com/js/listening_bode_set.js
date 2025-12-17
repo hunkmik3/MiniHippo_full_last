@@ -100,13 +100,21 @@
         const trimmed = url.trim();
         if (!trimmed) return '';
 
-        // Build absolute URL + encode spaces/unsafe chars
+        // Decode once (nếu URL đã encode sẵn), rồi encode lại 1 lần
+        const decodeOnce = (value) => {
+            try {
+                return decodeURI(value);
+            } catch {
+                return value;
+            }
+        };
+
         let absolute = '';
         if (/^https?:\/\//i.test(trimmed)) {
-            absolute = encodeURI(trimmed);
+            absolute = encodeURI(decodeOnce(trimmed));
         } else {
             const relative = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-            absolute = `${window.location.origin}${encodeURI(relative)}`;
+            absolute = `${window.location.origin}${encodeURI(decodeOnce(relative))}`;
         }
 
         // Strip ephemeral token query from githubusercontent/raw URLs (prevents expiring links)
