@@ -11,14 +11,25 @@ const question2Content_1 = [
     'Attendees enjoyed networking over coffee and exploring interactive displays.',
 ];
 
+// bộ đề 2 - Topic: movie
+const question2Content_2 = [
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+];
+
 const questionSets = [
     question2Content_1,
+    question2Content_2,
 ];
 
 window.questionSets = questionSets;
 
 const questheader1 = {
     question2Content_1: "Đề dự phòng thêm: Tech Innovation Expo",
+    question2Content_2: "movie",
 };
 
 function getQuestHeaders(obj) {
@@ -256,6 +267,20 @@ if (document.readyState === 'loading') {
           "After the presentations, awards were given for the most creative prototype.",
           "Activities included 3D printing demos, Al workshops, and virtual reality trials.",
           "Attendees enjoyed networking over coffee and exploring interactive displays."
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "title": "bộ đề 2",
+      "data": {
+        "topic": "movie",
+        "sentences": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
         ]
       }
     }
