@@ -94,6 +94,20 @@
         return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
     }
 
+    // Normalize audio URL (support relative paths and encode spaces)
+    function normalizeAudioUrl(url) {
+        if (!url) return '';
+        const trimmed = url.trim();
+        if (!trimmed) return '';
+        // If absolute http/https, just encode URI
+        if (/^https?:\/\//i.test(trimmed)) {
+            return encodeURI(trimmed);
+        }
+        // Otherwise, treat as relative to current origin
+        const relative = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+        return `${window.location.origin}${encodeURI(relative)}`;
+    }
+
     // Stop all audio players
     function stopAllAudio() {
         // Stop all audio elements on the page
@@ -455,7 +469,7 @@
                     audio.pause();
                     audio.currentTime = 0;
                     // Use audioUrl as-is (should be GitHub raw URL from admin)
-                    audio.src = question.audioUrl;
+                    audio.src = normalizeAudioUrl(question.audioUrl);
                     // Setup audio player again for new question
                     setupAudioPlayer('part1-audioPlayer', 'part1-playButton', 'part1-playIcon', 'part1-playCountLabel');
                 }
@@ -572,7 +586,7 @@
             if (part2.audioUrl && part2.audioUrl.trim()) {
                 audioBar.style.display = 'flex';
                 if (audio) {
-                    audio.src = part2.audioUrl;
+                    audio.src = normalizeAudioUrl(part2.audioUrl);
                     setupAudioPlayer('part2-audioPlayer', 'part2-playButton', 'part2-playIcon', 'part2-playCountLabel');
                 }
             } else {
@@ -670,7 +684,7 @@
             if (part3.audioUrl && part3.audioUrl.trim()) {
                 audioBar.style.display = 'flex';
                 if (audio) {
-                    audio.src = part3.audioUrl;
+                    audio.src = normalizeAudioUrl(part3.audioUrl);
                     setupAudioPlayer('part3-audioPlayer', 'part3-playButton', 'part3-playIcon', 'part3-playCountLabel');
                 }
             } else {
@@ -890,7 +904,7 @@
             if (question.audioUrl && question.audioUrl.trim()) {
                 audioBar.style.display = 'flex';
                 if (audio) {
-                    audio.src = question.audioUrl;
+                    audio.src = normalizeAudioUrl(question.audioUrl);
                     // Setup audio player
                     setupAudioPlayer(audioId, playButtonId, playIconId, playCountLabelId);
                 }
