@@ -11,25 +11,72 @@ const question2Content_1 = [
     'Attendees enjoyed networking over coffee and exploring interactive displays.',
 ];
 
-// bộ đề 2 - Topic: movie
+// READING EXTRA P2-2 - Topic: Music festivals
 const question2Content_2 = [
-    '1',
-    '2',
-    '3',
-    '4',
-    '5',
+    '0. Last Saturday, a live music show was held in town park',
+    'The local government planned, funded and paid for everything',
+    'Because it was free, more than 5,000 people attended',
+    'People came early and sat in nearby shops waiting for the start time',
+    'The staff were very busy but still closed the shop early to watch the singer',
+    'The singer performed for 2 hours, everyone had great fun.',
+];
+
+// READING EXTRA P2-3 - Topic: Family sports day
+const question2Content_3 = [
+    '0. Last week, the weather was great. The town organized a ten-mile race.',
+    'It took place on Sunday morning in the park, there was a race for adults.',
+    'Sixty people took part, and among them, Ms. Kamus kept the fastest pace and won the race.',
+    'After she got her prize, children\'s activities and competitions began.',
+    'The activities were football, swimming, skipping, and more, and the kids had fun playing together.',
+    'After the games, the kids were really hungry and ate with their parents.',
+];
+
+// READING EXTRA P2-4 - Topic: Means of transportation
+const question2Content_4 = [
+    'In the past, transportation was primarily accessible to the wealthy.',
+    'Later, air travel became popular among business professionals.',
+    'Eventually, buses and trains were introduced as affordable alternatives.',
+    'These made traveling more accessible to everyone.',
+    'Today, buses and trains are among the most common transportation options.',
+];
+
+// READING EXTRA P2-5 - Topic: A new coffee shop (2)
+const question2Content_5 = [
+    'I arrived at the shop early in the morning, but it was crowded with people.',
+    'A waiter assisted me in finding a table and handed me the menu.',
+    'The menu was not as good as expected and quite pricey, so I decided to order a sandwich.',
+    'The sandwich was both delicious and beautifully presented.',
+    'I might return to try different types of drinks next time.',
+];
+
+// READING EXTRA P2-6 - Topic: Making films
+const question2Content_6 = [
+    '0. In 1895, the Grand Place cafe in France showed the first commercial film.',
+    'Old movies were very different from today\'s movies.',
+    'That\'s because the movies were only in black and white, and sometimes without sound.',
+    'Not only did these technological limitations exist, the movies were also low budget.',
+    'Due to the lack of money, actors also had few opportunities to earn money through acting.',
+    'Now things have changed, actors and filmmakers can earn millions of dollars from film production.',
 ];
 
 const questionSets = [
     question2Content_1,
     question2Content_2,
+    question2Content_3,
+    question2Content_4,
+    question2Content_5,
+    question2Content_6,
 ];
 
 window.questionSets = questionSets;
 
 const questheader1 = {
     question2Content_1: "Đề dự phòng thêm: Tech Innovation Expo",
-    question2Content_2: "movie",
+    question2Content_2: "Music festivals",
+    question2Content_3: "Family sports day",
+    question2Content_4: "Means of transportation",
+    question2Content_5: "A new coffee shop (2)",
+    question2Content_6: "Making films",
 };
 
 function getQuestHeaders(obj) {
@@ -272,15 +319,74 @@ if (document.readyState === 'loading') {
     },
     {
       "id": 2,
-      "title": "bộ đề 2",
+      "title": "READING EXTRA P2-2",
       "data": {
-        "topic": "movie",
+        "topic": "Music festivals",
         "sentences": [
-          "1",
-          "2",
-          "3",
-          "4",
-          "5"
+          "0. Last Saturday, a live music show was held in town park",
+          "The local government planned, funded and paid for everything",
+          "Because it was free, more than 5,000 people attended",
+          "People came early and sat in nearby shops waiting for the start time",
+          "The staff were very busy but still closed the shop early to watch the singer",
+          "The singer performed for 2 hours, everyone had great fun."
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "title": "READING EXTRA P2-3",
+      "data": {
+        "topic": "Family sports day",
+        "sentences": [
+          "0. Last week, the weather was great. The town organized a ten-mile race.",
+          "It took place on Sunday morning in the park, there was a race for adults.",
+          "Sixty people took part, and among them, Ms. Kamus kept the fastest pace and won the race.",
+          "After she got her prize, children's activities and competitions began.",
+          "The activities were football, swimming, skipping, and more, and the kids had fun playing together.",
+          "After the games, the kids were really hungry and ate with their parents."
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "title": "READING EXTRA P2-4",
+      "data": {
+        "topic": "Means of transportation",
+        "sentences": [
+          "In the past, transportation was primarily accessible to the wealthy.",
+          "Later, air travel became popular among business professionals.",
+          "Eventually, buses and trains were introduced as affordable alternatives.",
+          "These made traveling more accessible to everyone.",
+          "Today, buses and trains are among the most common transportation options."
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "title": "READING EXTRA P2-5",
+      "data": {
+        "topic": "A new coffee shop (2)",
+        "sentences": [
+          "I arrived at the shop early in the morning, but it was crowded with people.",
+          "A waiter assisted me in finding a table and handed me the menu.",
+          "The menu was not as good as expected and quite pricey, so I decided to order a sandwich.",
+          "The sandwich was both delicious and beautifully presented.",
+          "I might return to try different types of drinks next time."
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "title": "READING EXTRA P2-6",
+      "data": {
+        "topic": "Making films",
+        "sentences": [
+          "0. In 1895, the Grand Place cafe in France showed the first commercial film.",
+          "Old movies were very different from today's movies.",
+          "That's because the movies were only in black and white, and sometimes without sound.",
+          "Not only did these technological limitations exist, the movies were also low budget.",
+          "Due to the lack of money, actors also had few opportunities to earn money through acting.",
+          "Now things have changed, actors and filmmakers can earn millions of dollars from film production."
         ]
       }
     }
