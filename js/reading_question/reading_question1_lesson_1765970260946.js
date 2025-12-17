@@ -2,7 +2,7 @@
 // ////////////// DANH SÁCH CÂU HỎI PART 1 ///////////////
 // ===============================================================================================================
 
-// READING ĐỀ 4 - Question 1
+// Part 1 - Reading Question
 const questions1_1 = [
     { questionStart: "I imagine you don’t want to", answerOptions: ["love", "remember", "miss"], questionEnd: "this.", correctAnswer: "miss" },
     { questionStart: "I", answerOptions: ["called", "told", "said"], questionEnd: "you earlier but you were not home.", correctAnswer: "called" },
@@ -345,7 +345,7 @@ updateCountdown();
   "sets": [
     {
       "id": 1,
-      "title": "READING ĐỀ 4 - Question 1",
+      "title": "Part 1 - Reading Question",
       "data": {
         "questions": [
           {
