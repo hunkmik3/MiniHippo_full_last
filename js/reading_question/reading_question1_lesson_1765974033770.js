@@ -2,7 +2,7 @@
 // ////////////// DANH SÁCH CÂU HỎI PART 1 ///////////////
 // ===============================================================================================================
 
-// READING TỔNG HỢP - Question 1
+// READING TỔNG HỢP - PART 1
 const questions1_1 = [
     { questionStart: "Don’t have too much", answerOptions: ["talk", "dinner", "pencil"], questionEnd: "because we’re going to eat cake.", correctAnswer: "dinner" },
     { questionStart: "I imagine you don’t want to", answerOptions: ["love", "miss", "remember"], questionEnd: "this.", correctAnswer: "miss" },
@@ -345,7 +345,7 @@ updateCountdown();
   "sets": [
     {
       "id": 1,
-      "title": "READING TỔNG HỢP - Question 1",
+      "title": "READING TỔNG HỢP - PART 1",
       "data": {
         "questions": [
           {
