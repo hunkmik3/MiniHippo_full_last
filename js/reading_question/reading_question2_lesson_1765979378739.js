@@ -59,7 +59,7 @@ const question2Content_6 = [
     'Now things have changed, actors and filmmakers can earn millions of dollars from film production.',
 ];
 
-// READING EXTRA P2.2 - Topic: Tech fair
+// READING EXTRA P2-7 - Topic: Tech fair
 const question2Content_7 = [
     'The tech fair took place on Saturday morning, showcasing a variety of exciting new gadgets.',
     'More than 60 exhibitors participated, with Mr. A presenting an impressive robot demonstration.',
@@ -68,7 +68,7 @@ const question2Content_7 = [
     'Visitors enjoyed complimentary coffee and snacks while exploring the interactive exhibits.',
 ];
 
-// READING EXTRA P2.2-2 - Topic: The famous singer (2)
+// READING EXTRA P2-8 - Topic: The famous singer (2)
 const question2Content_8 = [
     'He is a famous singer.',
     'Before becoming famous, he studied music at school when he was 15.',
@@ -77,7 +77,7 @@ const question2Content_8 = [
     'He eventually became famous among audiences around the world.',
 ];
 
-// Bộ đề 10 - Topic: The famous singer (3)
+// READING EXTRA P2-9 - Topic: The famous singer (3)
 const question2Content_9 = [
     'Jaden Nobelton is only 18 years old and he is a famous singer',
     'Before becoming famous at his age, he studied art and music in high school.',
@@ -85,6 +85,42 @@ const question2Content_9 = [
     'In these performances, he often wears bright clothes and paints his face.',
     'The uniqueness in his way of dressing and his songs makes him attract attention.',
     'Many people follow him on social media and he becomes a famous singer.',
+];
+
+// READING EXTRA P2-10 - Topic: Writing about a place (2)
+const question2Content_10 = [
+    'Before writing, it is important to research the place thoroughly.',
+    'To prepare well, you should learn about the people and the history of the area.',
+    'Sometimes you may not be able to visit the place, but you can still find similar information from other sources.',
+    'Comparing that place with your own country can be very helpful.',
+    'This comparison will help you gain a deeper understanding and write more effectively.',
+];
+
+// READING EXTRA P2-11 - Topic: My visit to a new coffee shop
+const question2Content_11 = [
+    'It was my first time visiting a new local coffee shop.',
+    'At first, I didn’t think it would be good, but I decided to give it a try.',
+    'I looked at the menu and saw many different kinds of food and drinks.',
+    'I chose one dish to try for myself.',
+    'When I tasted it, I found it really delicious and knew I would come back again.',
+];
+
+// READING EXTRA P2-12 - Topic: History to travel
+const question2Content_12 = [
+    'In the past, only very rich people could afford to travel long distances.',
+    'The invention of cars and trains had changed everything and made travelling cheaper.',
+    'After these two means of transport, travelling becomes even easier with aeroplanes.',
+    'Because flying with them is so fast, more people now go abroad for holiday and business.',
+    'It is more convenient to travel to other part of the world due to the improvement in transports',
+];
+
+// READING EXTRA P2-13 - Topic: University open day
+const question2Content_13 = [
+    'Before the open day, please contact us by phone or email so we can record your personal details.',
+    'Using this information, we’ll prepare an identification card for you to collect upon arrival.',
+    'You’ll need to show this card to enter the introductory talk and morning lectures.',
+    'Every visitor will have the chance to join a Q&A session with current students.',
+    'After the presentations, you’ll be able to explore different departments across the campus.',
 ];
 
 const questionSets = [
@@ -97,6 +133,10 @@ const questionSets = [
     question2Content_7,
     question2Content_8,
     question2Content_9,
+    question2Content_10,
+    question2Content_11,
+    question2Content_12,
+    question2Content_13,
 ];
 
 window.questionSets = questionSets;
@@ -111,6 +151,10 @@ const questheader1 = {
     question2Content_7: "Tech fair",
     question2Content_8: "The famous singer (2)",
     question2Content_9: "The famous singer (3)",
+    question2Content_10: "Writing about a place (2)",
+    question2Content_11: "My visit to a new coffee shop",
+    question2Content_12: "History to travel",
+    question2Content_13: "University open day",
 };
 
 function getQuestHeaders(obj) {
@@ -426,7 +470,7 @@ if (document.readyState === 'loading') {
     },
     {
       "id": 7,
-      "title": "READING EXTRA P2.2",
+      "title": "READING EXTRA P2-7",
       "data": {
         "topic": "Tech fair",
         "sentences": [
@@ -440,7 +484,7 @@ if (document.readyState === 'loading') {
     },
     {
       "id": 8,
-      "title": "READING EXTRA P2.2-2",
+      "title": "READING EXTRA P2-8",
       "data": {
         "topic": "The famous singer (2)",
         "sentences": [
@@ -454,7 +498,7 @@ if (document.readyState === 'loading') {
     },
     {
       "id": 9,
-      "title": "Bộ đề 10",
+      "title": "READING EXTRA P2-9",
       "data": {
         "topic": "The famous singer (3)",
         "sentences": [
@@ -464,6 +508,62 @@ if (document.readyState === 'loading') {
           "In these performances, he often wears bright clothes and paints his face.",
           "The uniqueness in his way of dressing and his songs makes him attract attention.",
           "Many people follow him on social media and he becomes a famous singer."
+        ]
+      }
+    },
+    {
+      "id": 10,
+      "title": "READING EXTRA P2-10",
+      "data": {
+        "topic": "Writing about a place (2)",
+        "sentences": [
+          "Before writing, it is important to research the place thoroughly.",
+          "To prepare well, you should learn about the people and the history of the area.",
+          "Sometimes you may not be able to visit the place, but you can still find similar information from other sources.",
+          "Comparing that place with your own country can be very helpful.",
+          "This comparison will help you gain a deeper understanding and write more effectively."
+        ]
+      }
+    },
+    {
+      "id": 11,
+      "title": "READING EXTRA P2-11",
+      "data": {
+        "topic": "My visit to a new coffee shop",
+        "sentences": [
+          "It was my first time visiting a new local coffee shop.",
+          "At first, I didn’t think it would be good, but I decided to give it a try.",
+          "I looked at the menu and saw many different kinds of food and drinks.",
+          "I chose one dish to try for myself.",
+          "When I tasted it, I found it really delicious and knew I would come back again."
+        ]
+      }
+    },
+    {
+      "id": 12,
+      "title": "READING EXTRA P2-12",
+      "data": {
+        "topic": "History to travel",
+        "sentences": [
+          "In the past, only very rich people could afford to travel long distances.",
+          "The invention of cars and trains had changed everything and made travelling cheaper.",
+          "After these two means of transport, travelling becomes even easier with aeroplanes.",
+          "Because flying with them is so fast, more people now go abroad for holiday and business.",
+          "It is more convenient to travel to other part of the world due to the improvement in transports"
+        ]
+      }
+    },
+    {
+      "id": 13,
+      "title": "READING EXTRA P2-13",
+      "data": {
+        "topic": "University open day",
+        "sentences": [
+          "Before the open day, please contact us by phone or email so we can record your personal details.",
+          "Using this information, we’ll prepare an identification card for you to collect upon arrival.",
+          "You’ll need to show this card to enter the introductory talk and morning lectures.",
+          "Every visitor will have the chance to join a Q&A session with current students.",
+          "After the presentations, you’ll be able to explore different departments across the campus."
         ]
       }
     }
