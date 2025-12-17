@@ -2,7 +2,7 @@
 // ////////////// DANH SÁCH CÂU HỎI PART 2 & 3 ///////////////
 // ===============================================================================================================
 
-// READING ĐỀ 4 - Question 2 - Topic: My first car
+// READING TỔNG HỢP - PART 2 - Topic: My first car
 const question2Content_1 = [
     'I have just passed the test, and I am the proud owner of the driving license',
     'However, I did not have a car and my parents would not let me drive theirs',
@@ -612,10 +612,8 @@ if (document.readyState === 'loading') {
   "sets": [
     {
       "id": 1,
-      "title": "READING ĐỀ 4 - Question 2",
+      "title": "READING TỔNG HỢP - PART 2",
       "data": {
-        "part": 2,
-        "title": "READING ĐỀ 4 - Question 2",
         "topic": "My first car",
         "sentences": [
           "I have just passed the test, and I am the proud owner of the driving license",
