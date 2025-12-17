@@ -99,13 +99,27 @@
         if (!url) return '';
         const trimmed = url.trim();
         if (!trimmed) return '';
-        // If absolute http/https, just encode URI
+
+        // Build absolute URL + encode spaces/unsafe chars
+        let absolute = '';
         if (/^https?:\/\//i.test(trimmed)) {
-            return encodeURI(trimmed);
+            absolute = encodeURI(trimmed);
+        } else {
+            const relative = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+            absolute = `${window.location.origin}${encodeURI(relative)}`;
         }
-        // Otherwise, treat as relative to current origin
-        const relative = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-        return `${window.location.origin}${encodeURI(relative)}`;
+
+        // Strip ephemeral token query from githubusercontent/raw URLs (prevents expiring links)
+        try {
+            const u = new URL(absolute);
+            const host = u.hostname || '';
+            if (host.includes('githubusercontent.com') || host.includes('raw.githubusercontent.com')) {
+                u.search = ''; // drop ?token=... or other temp params
+            }
+            return u.toString();
+        } catch (err) {
+            return absolute;
+        }
     }
 
     // Stop all audio players
@@ -469,7 +483,8 @@
                     audio.pause();
                     audio.currentTime = 0;
                     // Use audioUrl as-is (should be GitHub raw URL from admin)
-                    audio.src = normalizeAudioUrl(question.audioUrl);
+                    const normalizedUrl = normalizeAudioUrl(question.audioUrl);
+                    audio.src = normalizedUrl;
                     // Setup audio player again for new question
                     setupAudioPlayer('part1-audioPlayer', 'part1-playButton', 'part1-playIcon', 'part1-playCountLabel');
                 }
