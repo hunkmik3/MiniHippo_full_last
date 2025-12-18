@@ -1510,7 +1510,7 @@ function generateListeningJS1_13(sets) {
     });
 
     allQuestions.forEach((q, index) => {
-        code += `  {\n`;
+            code += `  {\n`;
         code += `    heading: "${escapeJS(q.heading || `Question ${index + 1}`)}",\n`;
         code += `    audioUrl: "${escapeJS(q.audioUrl || `audio/question1_13/audio_q${index + 1}.mp3`)}",\n`;
         code += `    question: "${escapeJS(q.question || '')}",\n`;
@@ -1518,7 +1518,7 @@ function generateListeningJS1_13(sets) {
         code += `    correctAnswer: "${escapeJS(q.correctAnswer || '')}",\n`;
         code += `    transcript: "${escapeJS(q.transcript || '')}"\n`;
         code += `  }${index < allQuestions.length - 1 ? ',' : ''}\n`;
-    });
+        });
     
     code += `];\n\n`;
     

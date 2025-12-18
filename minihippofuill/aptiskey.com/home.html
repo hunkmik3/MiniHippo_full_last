@@ -371,43 +371,6 @@
 </div>
 
 
-<!-- Modal -->
-<div class="modal fade" id="facebooknotification_modal" tabindex="-1" aria-labelledby="facebookNotificationModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="facebookNotificationModalLabel">Thông báo từ admin</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <p>Hãy vào <a href="https://www.facebook.com/groups/1028046979512219" target="_blank">nhóm Facebook miễn phí</a> để cập nhật thông tin mới nhất nhé!</p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script>
-// Kiểm tra xem ngày hôm nay đã hiển thị modal chưa
-const hasSeenModal = localStorage.getItem('facebookNotificationShown');
-
-// Nếu chưa hiển thị, hiển thị modal và lưu lại trạng thái đã hiển thị vào localStorage
-if (!hasSeenModal) {
-  // Chờ DOM được tải hoàn toàn
-  window.addEventListener('load', function () {
-    // Mở modal
-    var myModal = new bootstrap.Modal(document.getElementById('facebooknotification_modal'));
-    myModal.show();
-
-    // Lưu trạng thái đã hiển thị modal trong ngày hôm nay
-    localStorage.setItem('facebookNotificationShown', 'true');
-  });
-}
-</script>
-
-
 
         <!--end::App Content-->
       </main>
