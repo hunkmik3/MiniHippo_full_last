@@ -1317,7 +1317,7 @@ function addListeningQuestion16Question() {
                 <input type="text" class="form-control" placeholder="Why hasn't he gone to college?" data-field="question">
             </div>
             <div class="mb-2">
-                <label class="form-label">Option 1 (Đáp án đúng)</label>
+                <label class="form-label">Option 1</label>
                 <input type="text" class="form-control" placeholder="He wasn't ready..." data-field="option1">
             </div>
             <div class="mb-2">
@@ -1327,6 +1327,14 @@ function addListeningQuestion16Question() {
             <div class="mb-2">
                 <label class="form-label">Option 3</label>
                 <input type="text" class="form-control" placeholder="He didn't get..." data-field="option3">
+            </div>
+            <div class="mb-2">
+                <label class="form-label">Correct Answer</label>
+                <select class="form-select" data-field="correctAnswerSelect">
+                    <option value="option1">Option 1</option>
+                    <option value="option2">Option 2</option>
+                    <option value="option3">Option 3</option>
+                </select>
             </div>
         </div>
     `;
@@ -1369,7 +1377,7 @@ function addListeningQuestion17Question() {
                 <input type="text" class="form-control" placeholder="Why do many readers find the book interesting?" data-field="question">
             </div>
             <div class="mb-2">
-                <label class="form-label">Option 1 (Đáp án đúng)</label>
+                <label class="form-label">Option 1</label>
                 <input type="text" class="form-control" placeholder="It uses simple language..." data-field="option1">
             </div>
             <div class="mb-2">
@@ -1379,6 +1387,14 @@ function addListeningQuestion17Question() {
             <div class="mb-2">
                 <label class="form-label">Option 3</label>
                 <input type="text" class="form-control" placeholder="It avoids explaining..." data-field="option3">
+            </div>
+             <div class="mb-2">
+                <label class="form-label">Correct Answer</label>
+                <select class="form-select" data-field="correctAnswerSelect">
+                    <option value="option1">Option 1</option>
+                    <option value="option2">Option 2</option>
+                    <option value="option3">Option 3</option>
+                </select>
             </div>
         </div>
     `;
@@ -3317,12 +3333,18 @@ function saveListeningPart16_17Set() {
             const option1 = item.querySelector('[data-field="option1"]')?.value.trim() || '';
             const option2 = item.querySelector('[data-field="option2"]')?.value.trim() || '';
             const option3 = item.querySelector('[data-field="option3"]')?.value.trim() || '';
+            const correctSelect = item.querySelector('[data-field="correctAnswerSelect"]')?.value || 'option1';
+
+            let correctAnswerString = option1;
+            if (correctSelect === 'option2') correctAnswerString = option2;
+            if (correctSelect === 'option3') correctAnswerString = option3;
 
             if (id && question && option1 && option2 && option3) {
                 questions16.push({
                     id: id,
                     question: question,
-                    options: [option1, option2, option3]
+                    options: [option1, option2, option3],
+                    correctAnswer: correctAnswerString
                 });
             }
         });
@@ -3343,12 +3365,18 @@ function saveListeningPart16_17Set() {
             const option1 = item.querySelector('[data-field="option1"]')?.value.trim() || '';
             const option2 = item.querySelector('[data-field="option2"]')?.value.trim() || '';
             const option3 = item.querySelector('[data-field="option3"]')?.value.trim() || '';
+            const correctSelect = item.querySelector('[data-field="correctAnswerSelect"]')?.value || 'option1';
+
+            let correctAnswerString = option1;
+            if (correctSelect === 'option2') correctAnswerString = option2;
+            if (correctSelect === 'option3') correctAnswerString = option3;
 
             if (id && question && option1 && option2 && option3) {
                 questions17.push({
                     id: id,
                     question: question,
-                    options: [option1, option2, option3]
+                    options: [option1, option2, option3],
+                    correctAnswer: correctAnswerString
                 });
             }
         });
