@@ -14,24 +14,24 @@ window.currentListeningSetIndex = null;
 window.currentListeningSetPart = null;
 
 // Initialize on page load
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     console.log('Admin upload listening initialized');
-    
+
     // Setup type selector (Reading/Listening)
     setupTypeSelector();
-    
+
     // Setup listening part selector
     setupListeningPartSelector();
-    
+
     // Setup audio upload listeners
     setupAudioUploadListeners();
-    
+
     // Attach generator button (Listening lessons from practice sets)
     const generateListeningBtn = document.getElementById('generate-listening-lessons-btn');
     if (generateListeningBtn) {
         generateListeningBtn.addEventListener('click', generateListeningLessonsFromPracticeSets);
     }
-    
+
     // Render initial state
     renderListeningQuestionSets('14');
 });
@@ -140,16 +140,30 @@ async function generateListeningLessonsFromPracticeSets() {
                 const mapGroup = (groupData, fallbackId) => {
                     const subQuestions = Array.isArray(groupData.questions)
                         ? groupData.questions
-                              .map(sub => {
-                                  const options = Array.isArray(sub.options) ? sub.options.slice(0, 3) : [];
-                                  if (!sub.id || !sub.question || !options.length) return null;
-                                  return {
-                                      id: sub.id,
-                                      question: sub.question,
-                                      options
-                                  };
-                              })
-                              .filter(Boolean)
+                            .map(sub => {
+                                let options = Array.isArray(sub.options) ? sub.options.slice(0, 3) : [];
+                                if (!sub.id || !sub.question || !options.length) return null;
+
+                                // Ensure correct answer is first (convention for Q16/17)
+                                if (sub.correctAnswer) {
+                                    const correctIndex = options.findIndex(o => o.trim() === sub.correctAnswer.trim());
+                                    if (correctIndex > 0) {
+                                        const correctOption = options[correctIndex];
+                                        options.splice(correctIndex, 1);
+                                        options.unshift(correctOption);
+                                    } else if (correctIndex === -1 && options.length < 3) {
+                                        // If correct answer missing from options but we have space? (Unlikely but safe)
+                                        options.unshift(sub.correctAnswer);
+                                    }
+                                }
+
+                                return {
+                                    id: sub.id,
+                                    question: sub.question,
+                                    options
+                                };
+                            })
+                            .filter(Boolean)
                         : [];
 
                     return {
@@ -223,7 +237,7 @@ function setupAudioUploadListeners() {
     // Question 14 audio - Form chính (Upload theo phần)
     const audio14 = document.getElementById('listening-part14-audio');
     if (audio14) {
-        audio14.addEventListener('change', async function() {
+        audio14.addEventListener('change', async function () {
             if (this.files && this.files[0]) {
                 const preview = document.getElementById('listening-part14-audio-preview');
                 if (preview) {
@@ -240,11 +254,11 @@ function setupAudioUploadListeners() {
             }
         });
     }
-    
+
     // Question 14 audio - Form nhập nhanh (Nhập câu hỏi)
     const audio14Input = document.getElementById('listening-part14-audio-input');
     if (audio14Input) {
-        audio14Input.addEventListener('change', async function() {
+        audio14Input.addEventListener('change', async function () {
             if (this.files && this.files[0]) {
                 const preview = document.getElementById('listening-part14-audio-status-input') || document.getElementById('listening-part14-audio-preview');
                 if (preview) {
@@ -261,11 +275,11 @@ function setupAudioUploadListeners() {
             }
         });
     }
-    
+
     // Question 15 audio - Form chính (Upload theo phần)
     const audio15 = document.getElementById('listening-part15-audio');
     if (audio15) {
-        audio15.addEventListener('change', async function() {
+        audio15.addEventListener('change', async function () {
             if (this.files && this.files[0]) {
                 const preview = document.getElementById('listening-part15-audio-preview');
                 if (preview) {
@@ -281,11 +295,11 @@ function setupAudioUploadListeners() {
             }
         });
     }
-    
+
     // Question 15 audio - Form nhập nhanh (Nhập câu hỏi)
     const audio15Input = document.getElementById('listening-part15-audio-input');
     if (audio15Input) {
-        audio15Input.addEventListener('change', async function() {
+        audio15Input.addEventListener('change', async function () {
             if (this.files && this.files[0]) {
                 const preview = document.getElementById('listening-part15-audio-status-input') || document.getElementById('listening-part15-audio-preview');
                 if (preview) {
@@ -301,11 +315,11 @@ function setupAudioUploadListeners() {
             }
         });
     }
-    
+
     // Question 16 audio - Form chính (Upload theo phần)
     const audio16 = document.getElementById('listening-part16-audio');
     if (audio16) {
-        audio16.addEventListener('change', async function() {
+        audio16.addEventListener('change', async function () {
             if (this.files && this.files[0]) {
                 const preview = document.getElementById('listening-part16-audio-preview');
                 if (preview) {
@@ -321,11 +335,11 @@ function setupAudioUploadListeners() {
             }
         });
     }
-    
+
     // Question 16 audio - Form nhập nhanh (Nhập câu hỏi)
     const audio16Input = document.getElementById('listening-part16-audio-input');
     if (audio16Input) {
-        audio16Input.addEventListener('change', async function() {
+        audio16Input.addEventListener('change', async function () {
             if (this.files && this.files[0]) {
                 const preview = document.getElementById('listening-part16-audio-status-input') || document.getElementById('listening-part16-audio-preview');
                 if (preview) {
@@ -341,11 +355,11 @@ function setupAudioUploadListeners() {
             }
         });
     }
-    
+
     // Question 17 audio - Form chính (Upload theo phần)
     const audio17 = document.getElementById('listening-part17-audio');
     if (audio17) {
-        audio17.addEventListener('change', async function() {
+        audio17.addEventListener('change', async function () {
             if (this.files && this.files[0]) {
                 const preview = document.getElementById('listening-part17-audio-preview');
                 if (preview) {
@@ -361,11 +375,11 @@ function setupAudioUploadListeners() {
             }
         });
     }
-    
+
     // Question 17 audio - Form nhập nhanh (Nhập câu hỏi)
     const audio17Input = document.getElementById('listening-part17-audio-input');
     if (audio17Input) {
-        audio17Input.addEventListener('change', async function() {
+        audio17Input.addEventListener('change', async function () {
             if (this.files && this.files[0]) {
                 const preview = document.getElementById('listening-part17-audio-status-input') || document.getElementById('listening-part17-audio-preview');
                 if (preview) {
@@ -387,24 +401,24 @@ function setupAudioUploadListeners() {
 function setupTypeSelector() {
     const typeSelectors = document.querySelectorAll('input[name="typeSelect"]');
     console.log('Setting up type selector, found', typeSelectors.length, 'selectors');
-    
+
     if (typeSelectors.length === 0) {
         console.error('No type selectors found!');
         return;
     }
-    
+
     typeSelectors.forEach(selector => {
         // Remove existing listeners to avoid duplicates
         const newSelector = selector.cloneNode(true);
         selector.parentNode.replaceChild(newSelector, selector);
-        
-        newSelector.addEventListener('change', function() {
+
+        newSelector.addEventListener('change', function () {
             console.log('Type selector changed to:', this.value);
             window.currentLessonType = this.value;
-            
+
             const readingPartSelector = document.getElementById('reading-part-selector');
             const listeningPartSelector = document.getElementById('listening-part-selector');
-            
+
             if (this.value === 'reading') {
                 console.log('Switching to Reading mode');
                 if (readingPartSelector) readingPartSelector.style.display = 'block';
@@ -430,14 +444,14 @@ function setupTypeSelector() {
                 switchListeningPart('14');
             }
         });
-        
+
         // Trigger change event if already selected
         if (newSelector.checked) {
             console.log('Type selector already checked:', newSelector.value);
             newSelector.dispatchEvent(new Event('change'));
         }
     });
-    
+
     // Set initial state
     const checkedSelector = document.querySelector('input[name="typeSelect"]:checked');
     if (checkedSelector) {
@@ -462,7 +476,7 @@ function setupTypeSelector() {
 function setupListeningPartSelector() {
     const partSelectors = document.querySelectorAll('input[name="listeningPartSelect"]');
     partSelectors.forEach(selector => {
-        selector.addEventListener('change', function() {
+        selector.addEventListener('change', function () {
             switchListeningPart(this.value);
         });
     });
@@ -471,21 +485,21 @@ function setupListeningPartSelector() {
 // Switch listening part
 function switchListeningPart(part) {
     window.currentListeningPart = part;
-    
+
     // Hide all listening forms
     document.querySelectorAll('[id^="listening-part"]').forEach(form => {
         if (form.id.endsWith('-form')) {
             form.style.display = 'none';
         }
     });
-    
+
     // Show selected form
     const formId = `listening-part${part}-form`;
     const form = document.getElementById(formId);
     if (form) {
         form.style.display = 'block';
     }
-    
+
     // Initialize form fields if empty (for direct input forms)
     if (part === '1_13') {
         const container = document.getElementById('listening-part1_13-questions-container');
@@ -518,7 +532,7 @@ function switchListeningPart(part) {
             addListeningQuestion17Question();
         }
     }
-    
+
     // Render question sets for this part
     renderListeningQuestionSets(part);
 }
@@ -528,14 +542,14 @@ function renderListeningQuestionSets(part) {
     const containerId = `listening-part${part}-sets-container`;
     const container = document.getElementById(containerId);
     if (!container) return;
-    
+
     const sets = window.listeningQuestionSets[part] || [];
-    
+
     if (sets.length === 0) {
         container.innerHTML = '<p class="text-muted">Chưa có bộ đề nào. Nhấn "Thêm bộ đề mới" để bắt đầu.</p>';
         return;
     }
-    
+
     container.innerHTML = sets.map((set, index) => {
         const title = set.title || `Bộ đề ${index + 1}`;
         return `
@@ -560,17 +574,17 @@ function renderListeningQuestionSets(part) {
 function addListeningQuestionSet(part) {
     window.currentListeningSetPart = part;
     window.currentListeningSetIndex = null;
-    
+
     // Clear form
     clearListeningForm(part);
-    
+
     // Show edit form
     const editFormId = `listening-part${part}-edit-form`;
     const editForm = document.getElementById(editFormId);
     if (editForm) {
         editForm.style.display = 'block';
     }
-    
+
     // Initialize form based on part
     initializeListeningForm(part);
 }
@@ -604,7 +618,7 @@ function clearListeningForm(part) {
     const formId = `listening-part${part}-edit-form`;
     const form = document.getElementById(formId);
     if (!form) return;
-    
+
     // Clear all inputs
     form.querySelectorAll('input[type="text"], input[type="file"], textarea').forEach(input => {
         if (input.type === 'file') {
@@ -613,7 +627,7 @@ function clearListeningForm(part) {
             input.value = '';
         }
     });
-    
+
     // Clear containers
     const containers = form.querySelectorAll('[id$="-container"]');
     containers.forEach(container => {
@@ -636,14 +650,14 @@ function cancelListeningEdit(part) {
 function editListeningSet(part, index) {
     window.currentListeningSetPart = part;
     window.currentListeningSetIndex = index;
-    
+
     const sets = window.listeningQuestionSets[part] || [];
     const set = sets[index];
     if (!set) return;
-    
+
     // Load data into form
     loadListeningSetIntoForm(part, set);
-    
+
     // Show edit form
     const editFormId = `listening-part${part}-edit-form`;
     const editForm = document.getElementById(editFormId);
@@ -667,10 +681,10 @@ function loadListeningSetIntoForm(part, set) {
 
 function loadListeningSet1_13(set) {
     document.getElementById('listening-part1_13-title').value = set.title || '';
-    
+
     const container = document.getElementById('listening-part1_13-questions-container');
     container.innerHTML = '';
-    
+
     if (set.questions && set.questions.length > 0) {
         set.questions.forEach((q, index) => {
             addListeningQuestion1_13();
@@ -696,7 +710,7 @@ function loadListeningSet14(set) {
     document.getElementById('listening-part14-title').value = set.title || '';
     document.getElementById('listening-part14-topic').value = set.topic || '';
     document.getElementById('listening-part14-transcript').value = set.transcript || '';
-    
+
     // Set audio URL if available (tìm cả 2 form: chính và nhập nhanh)
     const audioInput = document.getElementById('listening-part14-audio') || document.getElementById('listening-part14-audio-input');
     if (audioInput && set.audioUrl) {
@@ -706,10 +720,10 @@ function loadListeningSet14(set) {
             preview.innerHTML = `<div class="alert alert-info">Audio đã được upload<br><audio controls src="${set.audioUrl}" style="width: 100%; margin-top: 10px;"></audio></div>`;
         }
     }
-    
+
     const container = document.getElementById('listening-part14-options-container');
     container.innerHTML = '';
-    
+
     if (set.options && set.options.length > 0) {
         set.options.forEach((opt, index) => {
             addListeningQuestion14Option();
@@ -725,7 +739,7 @@ function loadListeningSet15(set) {
     document.getElementById('listening-part15-title').value = set.title || '';
     document.getElementById('listening-part15-topic').value = set.topic || '';
     document.getElementById('listening-part15-transcript').value = set.transcript || '';
-    
+
     // Set audio URL if available (tìm cả 2 form: chính và nhập nhanh)
     const audioInput = document.getElementById('listening-part15-audio') || document.getElementById('listening-part15-audio-input');
     if (audioInput && set.audioUrl) {
@@ -735,12 +749,12 @@ function loadListeningSet15(set) {
             preview.innerHTML = `<div class="alert alert-info">Audio đã được upload<br><audio controls src="${set.audioUrl}" style="width: 100%; margin-top: 10px;"></audio></div>`;
         }
     }
-    
+
     const questionsContainer = document.getElementById('listening-part15-questions-container');
     const answersContainer = document.getElementById('listening-part15-answers-container');
     questionsContainer.innerHTML = '';
     answersContainer.innerHTML = '';
-    
+
     if (set.questions && set.questions.length > 0) {
         set.questions.forEach((q, index) => {
             addListeningQuestion15Question();
@@ -756,12 +770,12 @@ function loadListeningSet15(set) {
 
 function loadListeningSet16_17(set) {
     document.getElementById('listening-part16_17-title').value = set.title || '';
-    
+
     // Question 16
     if (set.question16) {
         document.getElementById('listening-part16-topic').value = set.question16.topic || '';
         document.getElementById('listening-part16-transcript').value = set.question16.transcript || '';
-        
+
         // Set audio URL if available (tìm cả 2 form: chính và nhập nhanh)
         const audio16Input = document.getElementById('listening-part16-audio') || document.getElementById('listening-part16-audio-input');
         if (audio16Input && set.question16.audioUrl) {
@@ -771,10 +785,10 @@ function loadListeningSet16_17(set) {
                 preview.innerHTML = `<div class="alert alert-info">Audio đã được upload<br><audio controls src="${set.question16.audioUrl}" style="width: 100%; margin-top: 10px;"></audio></div>`;
             }
         }
-        
+
         const container16 = document.getElementById('listening-part16-questions-container');
         container16.innerHTML = '';
-        
+
         if (set.question16.questions && set.question16.questions.length > 0) {
             set.question16.questions.forEach((q) => {
                 addListeningQuestion16Question();
@@ -789,12 +803,12 @@ function loadListeningSet16_17(set) {
             });
         }
     }
-    
+
     // Question 17
     if (set.question17) {
         document.getElementById('listening-part17-topic').value = set.question17.topic || '';
         document.getElementById('listening-part17-transcript').value = set.question17.transcript || '';
-        
+
         // Set audio URL if available (tìm cả 2 form: chính và nhập nhanh)
         const audio17Input = document.getElementById('listening-part17-audio') || document.getElementById('listening-part17-audio-input');
         if (audio17Input && set.question17.audioUrl) {
@@ -804,10 +818,10 @@ function loadListeningSet16_17(set) {
                 preview.innerHTML = `<div class="alert alert-info">Audio đã được upload<br><audio controls src="${set.question17.audioUrl}" style="width: 100%; margin-top: 10px;"></audio></div>`;
             }
         }
-        
+
         const container17 = document.getElementById('listening-part17-questions-container');
         container17.innerHTML = '';
-        
+
         if (set.question17.questions && set.question17.questions.length > 0) {
             set.question17.questions.forEach((q) => {
                 addListeningQuestion17Question();
@@ -827,10 +841,10 @@ function loadListeningSet16_17(set) {
 // Delete set
 function deleteListeningSet(part, index) {
     if (!confirm('Bạn có chắc muốn xóa bộ đề này?')) return;
-    
+
     const sets = window.listeningQuestionSets[part] || [];
     sets.splice(index, 1);
-    
+
     renderListeningQuestionSets(part);
 }
 
@@ -841,9 +855,9 @@ function saveListeningCurrentSet(part) {
         alert('Vui lòng điền đầy đủ thông tin!');
         return;
     }
-    
+
     const sets = window.listeningQuestionSets[part] || [];
-    
+
     if (window.currentListeningSetIndex !== null && window.currentListeningSetIndex >= 0) {
         // Update existing
         sets[window.currentListeningSetIndex] = set;
@@ -851,12 +865,12 @@ function saveListeningCurrentSet(part) {
         // Add new
         sets.push(set);
     }
-    
+
     window.listeningQuestionSets[part] = sets;
-    
+
     // Hide form
     cancelListeningEdit(part);
-    
+
     // Re-render
     renderListeningQuestionSets(part);
 }
@@ -881,10 +895,10 @@ function collectListeningSet1_13() {
         alert('Vui lòng nhập tiêu đề bộ đề!');
         return null;
     }
-    
+
     const container = document.getElementById('listening-part1_13-questions-container');
     const questions = [];
-    
+
     container.querySelectorAll('.question-item').forEach((item, index) => {
         const heading = item.querySelector('[data-field="heading"]').value.trim();
         const question = item.querySelector('[data-field="question"]').value.trim();
@@ -893,11 +907,11 @@ function collectListeningSet1_13() {
         const option3 = item.querySelector('[data-field="option3"]').value.trim();
         const correctAnswerField = item.querySelector('[data-field="correctAnswer"]').value;
         const transcript = item.querySelector('[data-field="transcript"]').value.trim();
-        
+
         if (!question || !option1 || !option2 || !option3 || !correctAnswerField) {
             return; // Skip incomplete questions
         }
-        
+
         // Get correct answer text - correctAnswerField contains the option value (e.g., "Furniture")
         // We need to find which option matches
         let correctAnswer = '';
@@ -908,16 +922,16 @@ function collectListeningSet1_13() {
             // Fallback: use the field value directly if it doesn't match any option
             correctAnswer = correctAnswerField;
         }
-        
+
         // Get audio URL if uploaded
         const audioInput = item.querySelector('[data-field="audio"]');
         let audioUrl = audioInput?.dataset.audioUrl || `audio/question1_13/audio_q${index + 1}.mp3`;
-        
+
         // If audioUrl is a local path but we have a GitHub raw URL in dataset, use the raw URL
         if (audioUrl.startsWith('audio/') && audioInput?.dataset.audioUrl && audioInput.dataset.audioUrl.startsWith('http')) {
             audioUrl = audioInput.dataset.audioUrl;
         }
-        
+
         questions.push({
             heading: heading || `Question ${index + 1} of 17`,
             audioUrl: audioUrl,
@@ -927,12 +941,12 @@ function collectListeningSet1_13() {
             transcript: transcript
         });
     });
-    
+
     if (questions.length === 0) {
         alert('Vui lòng thêm ít nhất 1 câu hỏi!');
         return null;
     }
-    
+
     return {
         title: title,
         part: '1_13',
@@ -944,25 +958,25 @@ function collectListeningSet14() {
     const title = document.getElementById('listening-part14-title').value.trim();
     const topic = document.getElementById('listening-part14-topic').value.trim();
     const transcript = document.getElementById('listening-part14-transcript').value.trim();
-    
+
     // Bỏ validation bắt buộc: không yêu cầu title, topic, transcript và 6 options
-    
+
     const container = document.getElementById('listening-part14-options-container');
     const options = [];
-    
+
     container.querySelectorAll('input[data-field^="option"]').forEach(input => {
         const value = input.value.trim();
         if (value) {
             options.push(value);
         }
     });
-    
+
     // Bỏ validation bắt buộc 6 options
-    
+
     // Get audio URL if uploaded (tìm cả 2 form: chính và nhập nhanh)
     const audioInput = document.getElementById('listening-part14-audio') || document.getElementById('listening-part14-audio-input');
     const audioUrl = audioInput?.dataset.audioUrl || `audio/question14/audio_${Date.now()}.mp3`;
-    
+
     return {
         title: title,
         part: '14',
@@ -977,38 +991,38 @@ function collectListeningSet15() {
     const title = document.getElementById('listening-part15-title').value.trim();
     const topic = document.getElementById('listening-part15-topic').value.trim();
     const transcript = document.getElementById('listening-part15-transcript').value.trim();
-    
+
     // Bỏ validation bắt buộc: không yêu cầu title, topic, transcript
-    
+
     const questionsContainer = document.getElementById('listening-part15-questions-container');
     const answersContainer = document.getElementById('listening-part15-answers-container');
-    
+
     const questions = [];
     const correctAnswer = [];
-    
+
     questionsContainer.querySelectorAll('input[data-field^="question"]').forEach((input, index) => {
         const question = input.value.trim();
         if (question) {
             questions.push(question);
         }
     });
-    
+
     answersContainer.querySelectorAll('select[data-field^="answer"]').forEach((select, index) => {
         const answer = select.value;
         if (answer) {
             correctAnswer.push(answer);
         }
     });
-    
+
     if (questions.length !== 4 || correctAnswer.length !== 4) {
         alert('Vui lòng thêm đủ 4 câu hỏi và 4 đáp án!');
         return null;
     }
-    
+
     // Get audio URL if uploaded (tìm cả 2 form: chính và nhập nhanh)
     const audioInput = document.getElementById('listening-part15-audio') || document.getElementById('listening-part15-audio-input');
     const audioUrl = audioInput?.dataset.audioUrl || `audio/question15/audio_${Date.now()}.mp3`;
-    
+
     return {
         title: title,
         part: '15',
@@ -1026,12 +1040,12 @@ function collectListeningSet16_17() {
         alert('Vui lòng nhập tiêu đề bộ đề!');
         return null;
     }
-    
+
     // Question 16
     const topic16 = document.getElementById('listening-part16-topic').value.trim();
     const transcript16 = document.getElementById('listening-part16-transcript').value.trim();
     const container16 = document.getElementById('listening-part16-questions-container');
-    
+
     const questions16 = [];
     container16.querySelectorAll('.question-item').forEach(item => {
         const id = item.querySelector('[data-field="id"]').value.trim();
@@ -1039,7 +1053,7 @@ function collectListeningSet16_17() {
         const option1 = item.querySelector('[data-field="option1"]').value.trim();
         const option2 = item.querySelector('[data-field="option2"]').value.trim();
         const option3 = item.querySelector('[data-field="option3"]').value.trim();
-        
+
         if (id && question && option1 && option2 && option3) {
             questions16.push({
                 id: id,
@@ -1048,12 +1062,12 @@ function collectListeningSet16_17() {
             });
         }
     });
-    
+
     // Question 17
     const topic17 = document.getElementById('listening-part17-topic').value.trim();
     const transcript17 = document.getElementById('listening-part17-transcript').value.trim();
     const container17 = document.getElementById('listening-part17-questions-container');
-    
+
     const questions17 = [];
     container17.querySelectorAll('.question-item').forEach(item => {
         const id = item.querySelector('[data-field="id"]').value.trim();
@@ -1061,7 +1075,7 @@ function collectListeningSet16_17() {
         const option1 = item.querySelector('[data-field="option1"]').value.trim();
         const option2 = item.querySelector('[data-field="option2"]').value.trim();
         const option3 = item.querySelector('[data-field="option3"]').value.trim();
-        
+
         if (id && question && option1 && option2 && option3) {
             questions17.push({
                 id: id,
@@ -1070,18 +1084,18 @@ function collectListeningSet16_17() {
             });
         }
     });
-    
+
     if (questions16.length < 2 || questions17.length < 2) {
         alert('Vui lòng thêm đủ 2 câu hỏi cho mỗi Question 16 và 17!');
         return null;
     }
-    
+
     // Get audio URLs if uploaded (tìm cả 2 form: chính và nhập nhanh)
     const audio16Input = document.getElementById('listening-part16-audio') || document.getElementById('listening-part16-audio-input');
     const audio17Input = document.getElementById('listening-part17-audio') || document.getElementById('listening-part17-audio-input');
     const audio16Url = audio16Input?.dataset.audioUrl || 'audio/question16/no_audio.mp3';
     const audio17Url = audio17Input?.dataset.audioUrl || 'audio/question17/no_audio.mp3';
-    
+
     return {
         title: title,
         part: '16_17',
@@ -1107,13 +1121,13 @@ function collectListeningSet16_17() {
 function addListeningQuestion1_13() {
     const container = document.getElementById('listening-part1_13-questions-container');
     if (!container) return;
-    
+
     const questionCount = container.children.length;
     if (questionCount >= 13) {
         alert('Tối đa 13 câu hỏi!');
         return;
     }
-    
+
     const questionIndex = questionCount + 1;
     const questionHtml = `
         <div class="question-item mb-3" data-question-index="${questionIndex}">
@@ -1160,14 +1174,14 @@ function addListeningQuestion1_13() {
             </div>
         </div>
     `;
-    
+
     container.insertAdjacentHTML('beforeend', questionHtml);
-    
+
     // Setup audio upload listener for this question
     const questionItem = container.lastElementChild;
     const audioInput = questionItem.querySelector('.listening-audio-upload');
     if (audioInput) {
-        audioInput.addEventListener('change', async function() {
+        audioInput.addEventListener('change', async function () {
             if (this.files && this.files[0]) {
                 const preview = questionItem.querySelector(`.listening-audio-preview-${questionIndex}`);
                 if (preview) {
@@ -1199,16 +1213,16 @@ function removeListeningQuestion1_13(button) {
 function addListeningQuestion14Option() {
     const container = document.getElementById('listening-part14-options-container');
     if (!container) return;
-    
+
     const optionCount = container.children.length;
     if (optionCount >= 6) {
         alert('Tối đa 6 options!');
         return;
     }
-    
+
     const optionIndex = optionCount + 1;
     const isCorrect = optionIndex <= 4; // First 4 are correct
-    
+
     const optionHtml = `
         <div class="mb-2 d-flex align-items-center gap-2">
             <input type="text" class="form-control" placeholder="Option ${optionIndex}" data-field="option${optionIndex}" data-is-correct="${isCorrect}">
@@ -1218,7 +1232,7 @@ function addListeningQuestion14Option() {
             </button>
         </div>
     `;
-    
+
     container.insertAdjacentHTML('beforeend', optionHtml);
 }
 
@@ -1236,13 +1250,13 @@ function removeListeningQuestion14Option(button) {
 function addListeningQuestion15Question() {
     const container = document.getElementById('listening-part15-questions-container');
     if (!container) return;
-    
+
     const questionCount = container.children.length;
     if (questionCount >= 4) {
         alert('Tối đa 4 câu hỏi!');
         return;
     }
-    
+
     const questionIndex = questionCount + 1;
     const questionHtml = `
         <div class="mb-3" data-question-index="${questionIndex}">
@@ -1250,9 +1264,9 @@ function addListeningQuestion15Question() {
             <input type="text" class="form-control" placeholder="1. Continuity is important when planning a career" data-field="question${questionIndex}">
         </div>
     `;
-    
+
     container.insertAdjacentHTML('beforeend', questionHtml);
-    
+
     // Add corresponding answer select
     const answersContainer = document.getElementById('listening-part15-answers-container');
     if (answersContainer) {
@@ -1278,13 +1292,13 @@ function addListeningQuestion15Question() {
 function addListeningQuestion16Question() {
     const container = document.getElementById('listening-part16-questions-container');
     if (!container) return;
-    
+
     const questionCount = container.children.length;
     if (questionCount >= 2) {
         alert('Tối đa 2 câu hỏi cho Question 16!');
         return;
     }
-    
+
     const questionIndex = questionCount + 1;
     const questionHtml = `
         <div class="question-item mb-3" data-question-index="${questionIndex}">
@@ -1316,7 +1330,7 @@ function addListeningQuestion16Question() {
             </div>
         </div>
     `;
-    
+
     container.insertAdjacentHTML('beforeend', questionHtml);
 }
 
@@ -1330,13 +1344,13 @@ function removeListeningQuestion16Question(button) {
 function addListeningQuestion17Question() {
     const container = document.getElementById('listening-part17-questions-container');
     if (!container) return;
-    
+
     const questionCount = container.children.length;
     if (questionCount >= 2) {
         alert('Tối đa 2 câu hỏi cho Question 17!');
         return;
     }
-    
+
     const questionIndex = questionCount + 1;
     const questionHtml = `
         <div class="question-item mb-3" data-question-index="${questionIndex}">
@@ -1368,7 +1382,7 @@ function addListeningQuestion17Question() {
             </div>
         </div>
     `;
-    
+
     container.insertAdjacentHTML('beforeend', questionHtml);
 }
 
@@ -1387,11 +1401,11 @@ function removeListeningQuestion17Question(button) {
 async function uploadAudioFile(file, filePath) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = async function(e) {
+        reader.onload = async function (e) {
             try {
                 // Convert to base64
                 const base64 = e.target.result.split(',')[1];
-                
+
                 const response = await fetch('/api/upload-audio', {
                     method: 'POST',
                     headers: getJsonAuthHeaders(),
@@ -1401,13 +1415,13 @@ async function uploadAudioFile(file, filePath) {
                         message: `Upload audio file: ${filePath}`
                     })
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (!response.ok) {
                     throw new Error(result.error || 'Upload failed');
                 }
-                
+
                 resolve(result);
             } catch (error) {
                 reject(error);
@@ -1421,24 +1435,24 @@ async function uploadAudioFile(file, filePath) {
 async function handleAudioUpload(part, audioInput, questionIndex = null) {
     const file = audioInput.files[0];
     if (!file) return null;
-    
+
     // Validate file size (10MB)
     if (file.size > 10 * 1024 * 1024) {
         alert('File size vượt quá 10MB!');
         return null;
     }
-    
+
     // Validate file type
     if (!file.type.includes('audio/mpeg') && !file.name.endsWith('.mp3')) {
         alert('Chỉ chấp nhận file MP3!');
         return null;
     }
-    
+
     // Generate file path
     let filePath = '';
     const timestamp = Date.now();
     const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    
+
     if (part === '1_13') {
         filePath = `audio/question1_13/audio_q${questionIndex || timestamp}.mp3`;
     } else if (part === '14') {
@@ -1454,14 +1468,14 @@ async function handleAudioUpload(part, audioInput, questionIndex = null) {
             filePath = `audio/question16_17/audio_${timestamp}.mp3`;
         }
     }
-    
+
     try {
         const result = await uploadAudioFile(file, filePath);
         return result.rawUrl; // Return the raw URL for use in JS code
     } catch (error) {
         console.error('Upload audio error:', error);
         if (error.message !== 'AUTH_TOKEN_MISSING') {
-        alert('Lỗi khi upload audio: ' + error.message);
+            alert('Lỗi khi upload audio: ' + error.message);
         }
         return null;
     }
@@ -1491,7 +1505,7 @@ function generateListeningJS1_13(sets) {
     code += `// ////////////// DANH SÁCH CÂU HỎI ///////////////\n`;
     code += `// ===============================================================================================================\n\n`;
     code += `window.listeningQuestions1 = [\n`;
-    
+
     // Gộp tất cả câu hỏi Question 1-13 từ TẤT CẢ bộ đề Listening
     const allQuestions = [];
     sets.forEach((set, setIndex) => {
@@ -1510,7 +1524,7 @@ function generateListeningJS1_13(sets) {
     });
 
     allQuestions.forEach((q, index) => {
-            code += `  {\n`;
+        code += `  {\n`;
         code += `    heading: "${escapeJS(q.heading || `Question ${index + 1}`)}",\n`;
         code += `    audioUrl: "${escapeJS(q.audioUrl || `audio/question1_13/audio_q${index + 1}.mp3`)}",\n`;
         code += `    question: "${escapeJS(q.question || '')}",\n`;
@@ -1518,10 +1532,10 @@ function generateListeningJS1_13(sets) {
         code += `    correctAnswer: "${escapeJS(q.correctAnswer || '')}",\n`;
         code += `    transcript: "${escapeJS(q.transcript || '')}"\n`;
         code += `  }${index < allQuestions.length - 1 ? ',' : ''}\n`;
-        });
-    
+    });
+
     code += `];\n\n`;
-    
+
     // Add render function
     code += `// ===============================================================================================================\n`;
     code += `// ////////////// CÂU HỎI 1_13 ///////////////\n`;
@@ -1564,7 +1578,7 @@ function generateListeningJS1_13(sets) {
     code += `  showTranscriptButton.removeEventListener("click", window.toggleTranscript);\n`;
     code += `  showTranscriptButton.addEventListener("click", window.toggleTranscript);\n`;
     code += `}\n\n`;
-    
+
     // Add toggle transcript function
     code += `window.toggleTranscript = function() {\n`;
     code += `  const transcriptBox = document.getElementById("transcriptBox");\n`;
@@ -1577,7 +1591,7 @@ function generateListeningJS1_13(sets) {
     code += `    showTranscriptButton.innerText = "Show paragraph";\n`;
     code += `  }\n`;
     code += `}\n\n`;
-    
+
     // Add setup play button function
     code += `window.setupPlayButton = function(audio, playBtn, playIcon) {\n`;
     code += `  if (playBtn.dataset.bound === "true") return;\n`;
@@ -1599,26 +1613,26 @@ function generateListeningJS1_13(sets) {
     code += `    playIcon.classList.add("bi-play-fill");\n`;
     code += `  });\n`;
     code += `}\n\n`;
-    
+
     // Add variables and event listeners (expose to global scope)
     code += `window.currentIndex = 0;\n`;
     code += `window.userAnswers = [];\n\n`;
-    
+
     code += `window.storeUserAnswer = function(questionIndex, answer) {\n`;
     code += `  window.userAnswers[questionIndex] = answer;\n`;
     code += `}\n\n`;
-    
+
     code += `document.querySelectorAll('input[name="answer"]').forEach((input, index) => {\n`;
     code += `  input.addEventListener('change', function() {\n`;
     code += `    window.storeUserAnswer(window.currentIndex, this.value);\n`;
     code += `  });\n`;
     code += `});\n\n`;
-    
+
     // Add window.onload to render first question
     code += `window.onload = function() {\n`;
     code += `  window.renderQuestion1_13(window.listeningQuestions1[0]);\n`;
     code += `};\n\n`;
-    
+
     // Add showResults function (expose to global scope) - only show in modal, not on page
     code += `window.showResults_question1_13 = function() {\n`;
     code += `  const comparisonTableBody = document.getElementById('comparisonTableBody');\n`;
@@ -1646,7 +1660,7 @@ function generateListeningJS1_13(sets) {
     code += `  // const resultContainer = document.getElementById('comparisonResult_question1');\n`;
     code += `  // if (resultContainer) resultContainer.style.display = "block";\n`;
     code += `}\n\n`;
-    
+
     // Add calculateTotalScore function (expose to global scope)
     code += `window.question1_13Score = 0;\n`;
     code += `window.calculateTotalScore = function() {\n`;
@@ -1655,7 +1669,7 @@ function generateListeningJS1_13(sets) {
     code += `  if (totalScoreEl) totalScoreEl.innerText = 'Your Score: ' + totalScore;\n`;
     code += `  window.classifyScore(totalScore);\n`;
     code += `}\n\n`;
-    
+
     code += `window.classifyScore = function(score) {\n`;
     code += `  let classification = '';\n`;
     code += `  const totalQuestions = window.listeningQuestions1 ? window.listeningQuestions1.length : 13;\n`;
@@ -1671,7 +1685,7 @@ function generateListeningJS1_13(sets) {
     code += `  const scoreEl = document.getElementById('scoreClassification');\n`;
     code += `  if (scoreEl) scoreEl.innerText = 'Classification: ' + classification;\n`;
     code += `}\n\n`;
-    
+
     // Add Check result button event listener
     code += `const checkResultBtn = document.getElementById('checkResultButton');\n`;
     code += `if (checkResultBtn) {\n`;
@@ -1706,7 +1720,7 @@ function generateListeningJS1_13(sets) {
     code += `    }\n`;
     code += `  });\n`;
     code += `}\n\n`;
-    
+
     // Add Countdown Timer (only initialize once to prevent multiple timers)
     // Add renderQuestionByIndex function
     code += `function renderQuestionByIndex(index) {\n`;
@@ -1723,7 +1737,7 @@ function generateListeningJS1_13(sets) {
     code += `    if (nextBtn) nextBtn.textContent = 'Next';\n`;
     code += `  }\n`;
     code += `}\n\n`;
-    
+
     // Add Next button handler
     code += `const nextBtn = document.getElementById('nextButton');\n`;
     code += `if (nextBtn) {\n`;
@@ -1747,7 +1761,7 @@ function generateListeningJS1_13(sets) {
     code += `    }\n`;
     code += `  });\n`;
     code += `}\n\n`;
-    
+
     // Add Back button handler
     code += `const backBtn = document.getElementById('backButton');\n`;
     code += `if (backBtn) {\n`;
@@ -1769,7 +1783,7 @@ function generateListeningJS1_13(sets) {
     code += `    }\n`;
     code += `  });\n`;
     code += `}\n\n`;
-    
+
     code += `// ===============================================================================================================\n`;
     code += `// ////////////// ĐẾM NGƯỢC THỜI GIAN --- COUNT DOWN ///////////////\n`;
     code += `// ===============================================================================================================\n`;
@@ -1793,9 +1807,9 @@ function generateListeningJS1_13(sets) {
     code += `  }\n\n`;
     code += `  window.updateCountdown();\n`;
     code += `}\n`;
-    
+
     code += `})();\n`;
-    
+
     return code;
 }
 
@@ -1807,7 +1821,7 @@ function generateListeningJS14(sets) {
     code += `// ===============================================================================================================\n`;
     code += `// ////////////// DANH SÁCH CÂU HỎI ///////////////\n`;
     code += `// ===============================================================================================================\n\n`;
-    
+
     // Generate individual data objects
     sets.forEach((set, setIndex) => {
         const varName = setIndex === 0 ? 'question14Data_1' : `question14Data_${setIndex + 1}`;
@@ -1822,17 +1836,17 @@ function generateListeningJS14(sets) {
         code += `  transcript: \`${escapeJS(set.transcript)}\`\n`;
         code += `};\n\n`;
     });
-    
+
     // Always create question14Data array and expose to window
-        code += `const question14Data = [\n`;
-        sets.forEach((set, index) => {
+    code += `const question14Data = [\n`;
+    sets.forEach((set, index) => {
         const varName = `question14Data_${index + 1}`;
-            code += `  ${varName}${index < sets.length - 1 ? ',' : ''}\n`;
-        });
-        code += `];\n\n`;
+        code += `  ${varName}${index < sets.length - 1 ? ',' : ''}\n`;
+    });
+    code += `];\n\n`;
     code += `// Expose to window scope for external access\n`;
     code += `window.question14Data = question14Data;\n\n`;
-    
+
     // Include full render code from template
     code += `// ===============================================================================================================\n`;
     code += `// ////////////// CÂU HỎI 2 (14 of 17) ///////////////\n`;
@@ -2010,7 +2024,7 @@ function generateListeningJS14(sets) {
     code += `    init();\n`;
     code += `  }\n`;
     code += `})();\n`;
-    
+
     return code;
 }
 
@@ -2022,7 +2036,7 @@ function generateListeningJS15(sets) {
     code += `// ===============================================================================================================\n`;
     code += `// ////////////// DANH SÁCH CÂU HỎI ///////////////\n`;
     code += `// ===============================================================================================================\n\n`;
-    
+
     // Generate individual data objects
     sets.forEach((set, setIndex) => {
         const varName = `question15Data_${setIndex + 1}`;
@@ -2038,17 +2052,17 @@ function generateListeningJS15(sets) {
         code += `  correctAnswer: [${set.correctAnswer.map(ans => `"${ans}"`).join(', ')}]\n`;
         code += `};\n\n`;
     });
-    
+
     // Always create question15Data array and expose to window
-        code += `const question15Data = [\n`;
-        sets.forEach((set, index) => {
+    code += `const question15Data = [\n`;
+    sets.forEach((set, index) => {
         const varName = `question15Data_${index + 1}`;
-            code += `  ${varName}${index < sets.length - 1 ? ',' : ''}\n`;
-        });
-        code += `];\n\n`;
+        code += `  ${varName}${index < sets.length - 1 ? ',' : ''}\n`;
+    });
+    code += `];\n\n`;
     code += `// Expose to window scope for external access\n`;
     code += `window.question15Data = question15Data;\n\n`;
-    
+
     // Include full render code
     code += `// ===============================================================================================================\n`;
     code += `// ////////////// CÂU HỎI 15 ///////////////\n`;
@@ -2214,7 +2228,7 @@ function generateListeningJS15(sets) {
     code += `    init();\n`;
     code += `  }\n`;
     code += `})();\n`;
-    
+
     return code;
 }
 
@@ -2227,7 +2241,7 @@ function generateListeningJS16_17(sets) {
     code += `// ////////////// DANH SÁCH CÂU HỎI ///////////////\n`;
     code += `// ===============================================================================================================\n`;
     code += `const question16Data = [\n`;
-    
+
     sets.forEach((set, setIndex) => {
         code += `  {\n`;
         code += `    audioUrl: "${set.question16?.audioUrl || `audio/question16/no_audio.mp3`}",\n`;
@@ -2270,11 +2284,11 @@ function generateListeningJS16_17(sets) {
         code += `    transcript: "${escapeJS(set.question17?.transcript || '')}"\n`;
         code += `  }${setIndex < sets.length - 1 ? ',' : ''}\n`;
     });
-    
+
     code += `];\n\n`;
     code += `// Expose to window scope for external access\n`;
     code += `window.question16Data = question16Data;\n\n`;
-    
+
     // Include full render code
     code += `// ===============================================================================================================\n`;
     code += `// ////////////// CÂU HỎI 16 ///////////////\n`;
@@ -2437,7 +2451,7 @@ function generateListeningJS16_17(sets) {
     code += `    init();\n`;
     code += `  }\n`;
     code += `})();\n`;
-    
+
     return code;
 }
 
@@ -2459,10 +2473,10 @@ async function uploadListeningLessonToGitHub() {
         alert('Vui lòng chọn Listening trước!');
         return;
     }
-    
+
     // Try to get current part from window.currentListeningPart
     let part = window.currentListeningPart;
-    
+
     // If not set, try to detect from visible form
     if (!part) {
         const visibleForm = document.querySelector('[id^="listening-part"][id$="-form"][style*="block"], [id^="listening-part"][id$="-form"]:not([style*="none"])');
@@ -2476,7 +2490,7 @@ async function uploadListeningLessonToGitHub() {
             }
         }
     }
-    
+
     // If still not set, try to find any part with data
     if (!part) {
         const possibleParts = ['1_13', '14', '15', '16_17'];
@@ -2489,24 +2503,24 @@ async function uploadListeningLessonToGitHub() {
             }
         }
     }
-    
+
     if (!part) {
         alert('Vui lòng chọn một phần Listening trước!');
         return;
     }
-    
+
     const sets = window.listeningQuestionSets[part] || [];
-    
+
     if (sets.length === 0) {
         alert(`Chưa có bộ đề nào cho phần ${part}. Vui lòng thêm và lưu bộ đề trước!`);
         return;
     }
-    
+
     // Generate file path and part number first
     const timestamp = Date.now();
     let filePath = '';
     let partNumber = '';
-    
+
     if (part === '1_13') {
         filePath = `js/listening_question/listening_question1_13_lesson_${timestamp}.js`;
         partNumber = 'listening_1_13';
@@ -2520,27 +2534,27 @@ async function uploadListeningLessonToGitHub() {
         filePath = `js/listening_question/listening_question16_17_lesson_${timestamp}.js`;
         partNumber = 'listening_16_17';
     }
-    
+
     // Generate JS code
     let jsCode = generateListeningJSCode(part, sets);
-    
+
     if (!jsCode) {
         alert('Không thể generate JS code!');
         return;
     }
-    
+
     jsCode = appendLessonDataComment(jsCode, {
         version: 1,
         lessonType: 'listening',
         part: partNumber,
         sets
     });
-    
+
     // Get title from first set
     const title = sets[0]?.title || `Listening ${part} Lesson`;
     const topic = sets[0]?.topic || '';
     const numSets = sets.length;
-    
+
     try {
         const response = await fetch('/api/upload-lesson', {
             method: 'POST',
@@ -2556,7 +2570,7 @@ async function uploadListeningLessonToGitHub() {
                 numSets: numSets
             })
         });
-        
+
         const rawResponse = await response.text();
         let result = null;
         try {
@@ -2564,19 +2578,19 @@ async function uploadListeningLessonToGitHub() {
         } catch (parseError) {
             console.warn('Không parse được JSON từ /api/upload-lesson:', parseError, rawResponse);
         }
-        
+
         if (!response.ok) {
             const errorMessage = result?.error || result?.details || rawResponse || 'Upload failed';
             throw new Error(errorMessage);
         }
-        
+
         alert('Upload thành công!');
         console.log('Upload result:', result || rawResponse);
-        
+
     } catch (error) {
         console.error('Upload error:', error);
         if (error.message !== 'AUTH_TOKEN_MISSING') {
-        alert('Lỗi khi upload: ' + error.message);
+            alert('Lỗi khi upload: ' + error.message);
         }
     }
 }
@@ -2585,9 +2599,9 @@ async function uploadListeningLessonToGitHub() {
 window.uploadListeningLessonToGitHub = uploadListeningLessonToGitHub;
 
 // Global upload handler that routes to correct function
-window.handleUploadToGitHub = async function() {
+window.handleUploadToGitHub = async function () {
     const currentLessonType = window.currentLessonType || 'reading';
-    
+
     if (currentLessonType === 'listening') {
         return await uploadListeningLessonToGitHub();
     } else {
@@ -2603,26 +2617,26 @@ window.handleUploadToGitHub = async function() {
 function previewListeningLessonInterface() {
     const part = window.currentListeningPart || '14';
     const sets = window.listeningQuestionSets[part] || [];
-    
+
     if (sets.length === 0) {
         alert('Chưa có bộ đề nào. Vui lòng thêm bộ đề trước khi preview.');
         return;
     }
-    
+
     // Initialize preview state
     window.previewCurrentSetIndex = 0;
     window.previewSets = sets;
     window.previewPart = part;
     window.previewUserAnswers = {}; // Reset user answers
-    
+
     // Show modal
     const modal = new bootstrap.Modal(document.getElementById('lessonPreviewModal'));
     const partLabel = part === '1_13' ? '1-13' : part === '16_17' ? '16-17' : part;
     document.getElementById('preview-part-number').textContent = `Listening ${partLabel}`;
-    
+
     // Render preview content
     renderListeningPreview();
-    
+
     modal.show();
 }
 
@@ -2630,16 +2644,16 @@ function previewListeningLessonInterface() {
 function renderListeningPreview() {
     const previewContent = document.getElementById('lesson-preview-content');
     previewContent.innerHTML = '';
-    
+
     const currentIndex = window.previewCurrentSetIndex || 0;
     const sets = window.previewSets || [];
     const part = window.previewPart || '14';
-    
+
     if (sets.length === 0) {
         previewContent.innerHTML = '<div class="alert alert-warning">Không có bộ đề để hiển thị.</div>';
         return;
     }
-    
+
     // Render based on part
     if (part === '1_13') {
         renderListening1_13Preview(previewContent, sets, currentIndex);
@@ -2655,10 +2669,10 @@ function renderListeningPreview() {
 // Render Listening Question 1-13 Preview
 function renderListening1_13Preview(container, sets, currentIndex) {
     if (sets.length === 0) return;
-    
+
     const currentSet = sets[currentIndex] || sets[0];
     const questions = currentSet.questions || [];
-    
+
     let html = `
         <div class="container-fluid p-4">
             <div class="row">
@@ -2667,7 +2681,7 @@ function renderListening1_13Preview(container, sets, currentIndex) {
                     <div class="card">
                         <div class="card-body">
     `;
-    
+
     questions.forEach((q, index) => {
         html += `
             <div class="mb-4 p-3 border rounded" data-question-index="${index}">
@@ -2682,7 +2696,7 @@ function renderListening1_13Preview(container, sets, currentIndex) {
                 <p class="fw-bold mb-3">${q.question || ''}</p>
                 <div class="mb-3">
         `;
-        
+
         q.options.forEach((option, optIndex) => {
             html += `
                 <div class="form-check mb-2">
@@ -2693,7 +2707,7 @@ function renderListening1_13Preview(container, sets, currentIndex) {
                 </div>
             `;
         });
-        
+
         html += `
                 </div>
                 <button class="btn btn-sm btn-outline-secondary" onclick="toggleTranscript(${index})">
@@ -2705,7 +2719,7 @@ function renderListening1_13Preview(container, sets, currentIndex) {
             </div>
         `;
     });
-    
+
     html += `
                         </div>
                     </div>
@@ -2713,16 +2727,16 @@ function renderListening1_13Preview(container, sets, currentIndex) {
             </div>
         </div>
     `;
-    
+
     container.innerHTML = html;
 }
 
 // Render Listening Question 14 Preview
 function renderListening14Preview(container, sets, currentIndex) {
     if (sets.length === 0) return;
-    
+
     const currentSet = sets[currentIndex] || sets[0];
-    
+
     let html = `
         <div class="container-fluid p-4">
             <div class="row">
@@ -2741,7 +2755,7 @@ function renderListening14Preview(container, sets, currentIndex) {
                             <p class="mb-3">Select 4 correct answers from the options below:</p>
                             <div class="row">
     `;
-    
+
     currentSet.options.forEach((option, index) => {
         html += `
             <div class="col-md-6 mb-2">
@@ -2754,7 +2768,7 @@ function renderListening14Preview(container, sets, currentIndex) {
             </div>
         `;
     });
-    
+
     html += `
                             </div>
                             <button class="btn btn-sm btn-outline-secondary mt-3" onclick="toggleTranscript14()">
@@ -2769,16 +2783,16 @@ function renderListening14Preview(container, sets, currentIndex) {
             </div>
         </div>
     `;
-    
+
     container.innerHTML = html;
 }
 
 // Render Listening Question 15 Preview
 function renderListening15Preview(container, sets, currentIndex) {
     if (sets.length === 0) return;
-    
+
     const currentSet = sets[currentIndex] || sets[0];
-    
+
     let html = `
         <div class="container-fluid p-4">
             <div class="row">
@@ -2795,7 +2809,7 @@ function renderListening15Preview(container, sets, currentIndex) {
                                 </div>
                             ` : ''}
     `;
-    
+
     currentSet.questions.forEach((question, index) => {
         html += `
             <div class="mb-3">
@@ -2809,7 +2823,7 @@ function renderListening15Preview(container, sets, currentIndex) {
             </div>
         `;
     });
-    
+
     html += `
                             <button class="btn btn-sm btn-outline-secondary mt-3" onclick="toggleTranscript15()">
                                 Show Transcript
@@ -2823,23 +2837,23 @@ function renderListening15Preview(container, sets, currentIndex) {
             </div>
         </div>
     `;
-    
+
     container.innerHTML = html;
 }
 
 // Render Listening Question 16-17 Preview
 function renderListening16_17Preview(container, sets, currentIndex) {
     if (sets.length === 0) return;
-    
+
     const currentSet = sets[currentIndex] || sets[0];
-    
+
     let html = `
         <div class="container-fluid p-4">
             <div class="row">
                 <div class="col-12">
                     <h3 class="mb-4">${currentSet.title || 'Listening Question 16-17'}</h3>
     `;
-    
+
     // Question 16
     if (currentSet.question16) {
         html += `
@@ -2857,7 +2871,7 @@ function renderListening16_17Preview(container, sets, currentIndex) {
                         </div>
                     ` : ''}
         `;
-        
+
         currentSet.question16.questions.forEach((q, index) => {
             html += `
                 <div class="mb-3">
@@ -2879,7 +2893,7 @@ function renderListening16_17Preview(container, sets, currentIndex) {
                 </div>
             `;
         });
-        
+
         html += `
                     <button class="btn btn-sm btn-outline-secondary" onclick="toggleTranscript16()">
                         Show Transcript
@@ -2891,7 +2905,7 @@ function renderListening16_17Preview(container, sets, currentIndex) {
             </div>
         `;
     }
-    
+
     // Question 17
     if (currentSet.question17) {
         html += `
@@ -2909,7 +2923,7 @@ function renderListening16_17Preview(container, sets, currentIndex) {
                         </div>
                     ` : ''}
         `;
-        
+
         currentSet.question17.questions.forEach((q, index) => {
             html += `
                 <div class="mb-3">
@@ -2931,7 +2945,7 @@ function renderListening16_17Preview(container, sets, currentIndex) {
                 </div>
             `;
         });
-        
+
         html += `
                     <button class="btn btn-sm btn-outline-secondary" onclick="toggleTranscript17()">
                         Show Transcript
@@ -2943,46 +2957,46 @@ function renderListening16_17Preview(container, sets, currentIndex) {
             </div>
         `;
     }
-    
+
     html += `
                 </div>
             </div>
         </div>
     `;
-    
+
     container.innerHTML = html;
 }
 
 // Helper functions for transcript toggle
-window.toggleTranscript = function(index) {
+window.toggleTranscript = function (index) {
     const transcript = document.getElementById(`transcript_${index}`);
     if (transcript) {
         transcript.style.display = transcript.style.display === 'none' ? 'block' : 'none';
     }
 };
 
-window.toggleTranscript14 = function() {
+window.toggleTranscript14 = function () {
     const transcript = document.getElementById('transcript_14');
     if (transcript) {
         transcript.style.display = transcript.style.display === 'none' ? 'block' : 'none';
     }
 };
 
-window.toggleTranscript15 = function() {
+window.toggleTranscript15 = function () {
     const transcript = document.getElementById('transcript_15');
     if (transcript) {
         transcript.style.display = transcript.style.display === 'none' ? 'block' : 'none';
     }
 };
 
-window.toggleTranscript16 = function() {
+window.toggleTranscript16 = function () {
     const transcript = document.getElementById('transcript_16');
     if (transcript) {
         transcript.style.display = transcript.style.display === 'none' ? 'block' : 'none';
     }
 };
 
-window.toggleTranscript17 = function() {
+window.toggleTranscript17 = function () {
     const transcript = document.getElementById('transcript_17');
     if (transcript) {
         transcript.style.display = transcript.style.display === 'none' ? 'block' : 'none';
@@ -3002,13 +3016,13 @@ if (!window._originalPreviousPreviewSet) {
 }
 
 // Override next/previous functions to support both reading and listening
-window.nextPreviewSet = function() {
+window.nextPreviewSet = function () {
     const currentLessonType = window.currentLessonType || 'reading';
-    
+
     if (currentLessonType === 'listening') {
         const currentIndex = window.previewCurrentSetIndex || 0;
         const sets = window.previewSets || [];
-        
+
         if (currentIndex < sets.length - 1) {
             window.previewCurrentSetIndex = currentIndex + 1;
             renderListeningPreview();
@@ -3025,12 +3039,12 @@ window.nextPreviewSet = function() {
     }
 };
 
-window.previousPreviewSet = function() {
+window.previousPreviewSet = function () {
     const currentLessonType = window.currentLessonType || 'reading';
-    
+
     if (currentLessonType === 'listening') {
         const currentIndex = window.previewCurrentSetIndex || 0;
-        
+
         if (currentIndex > 0) {
             window.previewCurrentSetIndex = currentIndex - 1;
             renderListeningPreview();
@@ -3054,10 +3068,10 @@ window.previousPreviewSet = function() {
 function saveListeningPart1_13Set() {
     // Ensure currentListeningPart is set
     window.currentListeningPart = '1_13';
-    
+
     const titleInput = document.getElementById('listening-part1_13-title-input');
     const title = titleInput ? titleInput.value.trim() : '';
-    
+
     // Collect questions from the direct input form
     const questions = [];
     const container = document.getElementById('listening-part1_13-questions-container');
@@ -3065,7 +3079,7 @@ function saveListeningPart1_13Set() {
         alert('Không tìm thấy container câu hỏi!');
         return;
     }
-    
+
     container.querySelectorAll('.question-item').forEach((item, index) => {
         const heading = item.querySelector('[data-field="heading"]')?.value.trim() || `Question ${index + 1} of 17`;
         const question = item.querySelector('[data-field="question"]')?.value.trim() || '';
@@ -3074,22 +3088,22 @@ function saveListeningPart1_13Set() {
         const option3 = item.querySelector('[data-field="option3"]')?.value.trim() || '';
         const correctAnswerField = item.querySelector('[data-field="correctAnswer"]')?.value.trim() || '';
         const transcript = item.querySelector('[data-field="transcript"]')?.value.trim() || '';
-        
+
         if (!question || !option1 || !option2 || !option3 || !correctAnswerField) {
             return; // Skip incomplete questions
         }
-        
+
         // Determine correct answer
         let correctAnswer = '';
         if (correctAnswerField === option1) correctAnswer = option1;
         else if (correctAnswerField === option2) correctAnswer = option2;
         else if (correctAnswerField === option3) correctAnswer = option3;
         else correctAnswer = correctAnswerField;
-        
+
         // Get audio URL if uploaded
         const audioInput = item.querySelector('[data-field="audio"]');
         let audioUrl = audioInput?.dataset.audioUrl || `audio/question1_13/audio_q${index + 1}.mp3`;
-        
+
         questions.push({
             heading: heading,
             audioUrl: audioUrl,
@@ -3099,51 +3113,51 @@ function saveListeningPart1_13Set() {
             transcript: transcript
         });
     });
-    
+
     if (questions.length === 0) {
         alert('Vui lòng nhập ít nhất một câu hỏi!');
         return;
     }
-    
+
     // Create new set
     const newSet = {
         id: window.listeningQuestionSets['1_13'].length + 1,
         title: title || `Bộ đề ${window.listeningQuestionSets['1_13'].length + 1}`,
         questions: questions
     };
-    
+
     // Add to storage
     window.listeningQuestionSets['1_13'].push(newSet);
-    
+
     // Clear form
     if (titleInput) titleInput.value = '';
     container.innerHTML = '';
     addListeningQuestion1_13();
-    
+
     // Render sets
     renderListeningQuestionSets('1_13');
-    
+
     alert('Đã lưu bộ đề thành công!');
 }
 
 function saveListeningPart14Set() {
     // Ensure currentListeningPart is set
     window.currentListeningPart = '14';
-    
+
     const titleInput = document.getElementById('listening-part14-title-input');
     const topicInput = document.getElementById('listening-part14-topic-input');
     const transcriptInput = document.getElementById('listening-part14-transcript-input');
     const title = titleInput ? titleInput.value.trim() : '';
     const topic = topicInput ? topicInput.value.trim() : '';
     const transcript = transcriptInput ? transcriptInput.value.trim() : '';
-    
+
     // Collect options
     const container = document.getElementById('listening-part14-options-container');
     if (!container) {
         alert('Không tìm thấy container options!');
         return;
     }
-    
+
     const options = [];
     container.querySelectorAll('input[data-field^="option"]').forEach(input => {
         const value = input.value.trim();
@@ -3151,14 +3165,14 @@ function saveListeningPart14Set() {
             options.push(value);
         }
     });
-    
+
     // Bỏ validation bắt buộc: không yêu cầu topic, transcript và 6 options
-    
+
     // Get audio URL if uploaded
     const audioInput = document.getElementById('listening-part14-audio-input');
     const audioUrlInput = document.getElementById('listening-part14-audio-url-input');
     let audioUrl = audioInput?.dataset.audioUrl || audioUrlInput?.value.trim() || `audio/question14/audio_${Date.now()}.mp3`;
-    
+
     // Create new set
     const newSet = {
         id: window.listeningQuestionSets['14'].length + 1,
@@ -3168,10 +3182,10 @@ function saveListeningPart14Set() {
         options: options,
         transcript: transcript
     };
-    
+
     // Add to storage
     window.listeningQuestionSets['14'].push(newSet);
-    
+
     // Clear form
     if (titleInput) titleInput.value = '';
     if (topicInput) topicInput.value = '';
@@ -3185,62 +3199,62 @@ function saveListeningPart14Set() {
     for (let i = 0; i < 6; i++) {
         addListeningQuestion14Option();
     }
-    
+
     // Render sets
     renderListeningQuestionSets('14');
-    
+
     alert('Đã lưu bộ đề thành công!');
 }
 
 function saveListeningPart15Set() {
     // Ensure currentListeningPart is set
     window.currentListeningPart = '15';
-    
+
     const titleInput = document.getElementById('listening-part15-title-input');
     const topicInput = document.getElementById('listening-part15-topic-input');
     const transcriptInput = document.getElementById('listening-part15-transcript-input');
     const title = titleInput ? titleInput.value.trim() : '';
     const topic = topicInput ? topicInput.value.trim() : '';
     const transcript = transcriptInput ? transcriptInput.value.trim() : '';
-    
+
     // Bỏ validation bắt buộc: không yêu cầu topic và transcript
-    
+
     // Collect questions
     const questionsContainer = document.getElementById('listening-part15-questions-container');
     const answersContainer = document.getElementById('listening-part15-answers-container');
-    
+
     if (!questionsContainer || !answersContainer) {
         alert('Không tìm thấy container câu hỏi hoặc đáp án!');
         return;
     }
-    
+
     const questions = [];
     const correctAnswer = [];
-    
+
     questionsContainer.querySelectorAll('input[data-field^="question"]').forEach((input, index) => {
         const question = input.value.trim();
         if (question) {
             questions.push(question);
         }
     });
-    
+
     answersContainer.querySelectorAll('select[data-field^="answer"]').forEach((select, index) => {
         const answer = select.value;
         if (answer) {
             correctAnswer.push(answer);
         }
     });
-    
+
     if (questions.length !== 4 || correctAnswer.length !== 4) {
         alert('Vui lòng thêm đủ 4 câu hỏi và 4 đáp án!');
         return;
     }
-    
+
     // Get audio URL if uploaded (tìm cả 2 form: chính và nhập nhanh)
     const audioInput = document.getElementById('listening-part15-audio-input') || document.getElementById('listening-part15-audio');
     const audioUrlInput = document.getElementById('listening-part15-audio-url-input');
     let audioUrl = audioInput?.dataset.audioUrl || audioUrlInput?.value.trim() || `audio/question15/audio_${Date.now()}.mp3`;
-    
+
     // Create new set
     const newSet = {
         id: window.listeningQuestionSets['15'].length + 1,
@@ -3251,10 +3265,10 @@ function saveListeningPart15Set() {
         correctAnswer: correctAnswer,
         transcript: transcript
     };
-    
+
     // Add to storage
     window.listeningQuestionSets['15'].push(newSet);
-    
+
     // Clear form
     if (titleInput) titleInput.value = '';
     if (topicInput) topicInput.value = '';
@@ -3269,32 +3283,32 @@ function saveListeningPart15Set() {
     for (let i = 0; i < 4; i++) {
         addListeningQuestion15Question();
     }
-    
+
     // Render sets
     renderListeningQuestionSets('15');
-    
+
     alert('Đã lưu bộ đề thành công!');
 }
 
 function saveListeningPart16_17Set() {
     // Ensure currentListeningPart is set
     window.currentListeningPart = '16_17';
-    
+
     const titleInput = document.getElementById('listening-part16_17-title-input');
     const title = titleInput ? titleInput.value.trim() : '';
-    
+
     if (!title) {
         alert('Vui lòng nhập tiêu đề bộ đề!');
         return;
     }
-    
+
     // Question 16
     const topic16Input = document.getElementById('listening-part16-topic-input');
     const transcript16Input = document.getElementById('listening-part16-transcript-input');
     const container16 = document.getElementById('listening-part16-questions-container');
     const topic16 = topic16Input ? topic16Input.value.trim() : '';
     const transcript16 = transcript16Input ? transcript16Input.value.trim() : '';
-    
+
     const questions16 = [];
     if (container16) {
         container16.querySelectorAll('.question-item').forEach(item => {
@@ -3303,7 +3317,7 @@ function saveListeningPart16_17Set() {
             const option1 = item.querySelector('[data-field="option1"]')?.value.trim() || '';
             const option2 = item.querySelector('[data-field="option2"]')?.value.trim() || '';
             const option3 = item.querySelector('[data-field="option3"]')?.value.trim() || '';
-            
+
             if (id && question && option1 && option2 && option3) {
                 questions16.push({
                     id: id,
@@ -3313,14 +3327,14 @@ function saveListeningPart16_17Set() {
             }
         });
     }
-    
+
     // Question 17
     const topic17Input = document.getElementById('listening-part17-topic-input');
     const transcript17Input = document.getElementById('listening-part17-transcript-input');
     const container17 = document.getElementById('listening-part17-questions-container');
     const topic17 = topic17Input ? topic17Input.value.trim() : '';
     const transcript17 = transcript17Input ? transcript17Input.value.trim() : '';
-    
+
     const questions17 = [];
     if (container17) {
         container17.querySelectorAll('.question-item').forEach(item => {
@@ -3329,7 +3343,7 @@ function saveListeningPart16_17Set() {
             const option1 = item.querySelector('[data-field="option1"]')?.value.trim() || '';
             const option2 = item.querySelector('[data-field="option2"]')?.value.trim() || '';
             const option3 = item.querySelector('[data-field="option3"]')?.value.trim() || '';
-            
+
             if (id && question && option1 && option2 && option3) {
                 questions17.push({
                     id: id,
@@ -3339,21 +3353,21 @@ function saveListeningPart16_17Set() {
             }
         });
     }
-    
+
     if (questions16.length < 2 || questions17.length < 2) {
         alert('Vui lòng thêm đủ 2 câu hỏi cho mỗi Question 16 và 17!');
         return;
     }
-    
+
     // Get audio URLs if uploaded (tìm cả 2 form: chính và nhập nhanh)
     const audio16Input = document.getElementById('listening-part16-audio-input') || document.getElementById('listening-part16-audio');
     const audio16UrlInput = document.getElementById('listening-part16-audio-url-input');
     const audio17Input = document.getElementById('listening-part17-audio-input') || document.getElementById('listening-part17-audio');
     const audio17UrlInput = document.getElementById('listening-part17-audio-url-input');
-    
+
     const audio16Url = audio16Input?.dataset.audioUrl || audio16UrlInput?.value.trim() || 'audio/question16/no_audio.mp3';
     const audio17Url = audio17Input?.dataset.audioUrl || audio17UrlInput?.value.trim() || 'audio/question17/no_audio.mp3';
-    
+
     // Create new set
     const newSet = {
         id: window.listeningQuestionSets['16_17'].length + 1,
@@ -3371,10 +3385,10 @@ function saveListeningPart16_17Set() {
             transcript: transcript17
         }
     };
-    
+
     // Add to storage
     window.listeningQuestionSets['16_17'].push(newSet);
-    
+
     // Clear form
     if (titleInput) titleInput.value = '';
     if (topic16Input) topic16Input.value = '';
@@ -3393,16 +3407,16 @@ function saveListeningPart16_17Set() {
         audio17Input.dataset.audioUrl = '';
     }
     if (audio17UrlInput) audio17UrlInput.value = '';
-    
+
     // Reinitialize
     addListeningQuestion16Question();
     addListeningQuestion16Question();
     addListeningQuestion17Question();
     addListeningQuestion17Question();
-    
+
     // Render sets
     renderListeningQuestionSets('16_17');
-    
+
     alert('Đã lưu bộ đề thành công!');
 }
 

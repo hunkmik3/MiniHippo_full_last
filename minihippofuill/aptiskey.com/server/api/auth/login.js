@@ -2,15 +2,19 @@ import parseBody from '../_utils/parseBody.js';
 import { selectFrom, updateTable } from '../_utils/supabase.js';
 import { ensureDeviceAccess, resolveDeviceLimit } from '../_utils/device.js';
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY?.trim();
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
+  const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY?.trim();
+
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    console.error('Missing Supabase vars');
     return res.status(500).json({ error: 'Supabase environment variables are missing' });
   }
 

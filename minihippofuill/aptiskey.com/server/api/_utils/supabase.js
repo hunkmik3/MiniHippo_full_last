@@ -1,12 +1,17 @@
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY?.trim();
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY?.trim();
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   console.warn(
     '[supabase] Missing SUPABASE_URL or SUPABASE_SERVICE_KEY. API routes will fail until these are configured.'
   );
 }
+
+// DEBUG LOG
+console.log('[Supabase Init] URL:', SUPABASE_URL);
+console.log('[Supabase Init] Service Key Length:', SUPABASE_SERVICE_KEY?.length);
+console.log('[Supabase Init] Service Key Start:', SUPABASE_SERVICE_KEY?.substring(0, 10));
 
 async function supabaseFetch(path, options = {}) {
   const url = `${SUPABASE_URL}${path}`;
