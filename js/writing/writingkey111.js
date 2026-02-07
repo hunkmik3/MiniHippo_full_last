@@ -1,44 +1,44 @@
 const key_id = "Bộ đề #111";
-const club_name = "ssadasdas";
+const club_name = "hk";
 //----------------------------------------------------------------------
 const questions1 = {
-    "question1_1": "1321312",
-    "question1_2": "fvsđfdsfdsf",
-    "question1_3": "gưfwefewr",
-    "question1_4": "212312312",
-    "question1_5": "12312312",
+    "question1_1": "kjưqe",
+    "question1_2": "hkhưeq",
+    "question1_3": "kjhưqe",
+    "question1_4": "kjhưeqweqwe",
+    "question1_5": "kjhưqe",
 };
 const questions1_answer = {
-    "question1_1_answer": "213123123 123",
-    "question1_2_answer": "gwfw",
-    "question1_3_answer": "fewdfwefewf",
-    "question1_4_answer": "fdgsfgdf",
-    "question1_5_answer": "gregegfgf",
+    "question1_1_answer": "hkjưqe",
+    "question1_2_answer": "ưqekjh",
+    "question1_3_answer": "kjhưe",
+    "question1_4_answer": "kjhqưe",
+    "question1_5_answer": "kjhưqe",
 };
 //----------------------------------------------------------------------
 const questions2 = {
-    "question2": "dfdsfdsfsdfsdf",
+    "question2": "kjh",
 };
 const questions2_answer = {
-    "question2": "yhrtgrehgertg",
+    "question2": "ưqewqeqweqwe",
 };
 //----------------------------------------------------------------------
 const questions3 = {
-    "question3_1": "123423r4324324",
-    "question3_2": "21321312312",
-    "question3_3": "123123123",
+    "question3_1": "ouyioưeqweqwe",
+    "question3_2": "uoeqweqwe",
+    "question3_3": "gkheqweqweqweqwe",
 };
 const questions3_answer = {
-    "question3_1_answer": "124123123123",
-    "question3_2_answer": "123123123",
-    "question3_3_answer": "123123123123123",
+    "question3_1_answer": "uoiưqewqeqwe",
+    "question3_2_answer": "giuqưeqweqwewqeqweqweqeqwewq",
+    "question3_3_answer": "gklhưeqqweqwewq",
 };
 //----------------------------------------------------------------------
-const questions4_main = "3122131221442112";
-const question4_1_text = "214121231231Write a short email to your friend. Tell your friend your feelings about this and what you plan to do.";
-const question4_2_text = "Write an email to the president of the club. Tell them your thoughts about this and what you would like to do.";
-const question4_1_text_answer = `RRETERTRETERT1`;
-const question4_2_text_answer = `FGEFGEGERG`;
+const questions4_main = "glưqeqweqw";
+const question4_1_text = "giyWrite a short email to your friend. Tell your friend your feelings about this and what you plan to do.";
+const question4_2_text = "yiuWrite an email to the president of the club. Tell them your thoughts about this and what you would like to do.";
+const question4_1_text_answer = `giumbkbkje`;
+const question4_2_text_answer = `hgiul`;
 
 // Hàm để render câu hỏi cho câu hỏi 1
 function renderQuestions1() {
