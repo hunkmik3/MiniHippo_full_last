@@ -335,7 +335,7 @@ async function handleSubmitAllQuestions() {
 
     // Gửi tất cả câu hỏi và đáp án cho server
     try {
-        const response = await fetch('/ask', {
+        const response = await fetch('/api/ask', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

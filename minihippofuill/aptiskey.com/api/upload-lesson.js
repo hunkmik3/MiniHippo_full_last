@@ -1,10 +1,17 @@
 import parseBody from './_utils/parseBody.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { verifyAdminRequest } from './_utils/auth.js';
 import {
   insertInto,
   updateTable,
   selectFrom,
   putGithubContent
 } from './_utils/supabase.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 function getPartFromFilePath(filePath) {
   if (!filePath) return null;
@@ -16,12 +23,20 @@ function getPartFromFilePath(filePath) {
   if (filePath.includes('listening_question14')) return 'listening_14';
   if (filePath.includes('listening_question15')) return 'listening_15';
   if (filePath.includes('listening_question16_17')) return 'listening_16_17';
+  if (filePath.includes('writing/writingkey')) return 'writing';
   return null;
 }
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const adminCheck = await verifyAdminRequest(req);
+  if (!adminCheck.success) {
+    return res
+      .status(adminCheck.status || 401)
+      .json({ error: adminCheck.error || 'Unauthorized' });
   }
 
   let body;
@@ -56,6 +71,19 @@ export default async function handler(req, res) {
       message: message || `Update ${filePath}`,
       encoding: append ? 'base64' : 'utf8'
     });
+
+    // Save locally for development if running locally
+    if (process.env.NODE_ENV === 'development' || !process.env.VERCEL || process.env.VERCEL_ENV === 'development') {
+      try {
+        const localPath = path.join(__dirname, '..', filePath);
+        const dir = path.dirname(localPath);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(localPath, content);
+        console.log('Saved locally to:', localPath);
+      } catch (err) {
+        console.error('Failed to save locally:', err);
+      }
+    }
 
     const lessonPayload = {
       part: derivedPart,
@@ -96,5 +124,4 @@ export default async function handler(req, res) {
     });
   }
 }
-
 

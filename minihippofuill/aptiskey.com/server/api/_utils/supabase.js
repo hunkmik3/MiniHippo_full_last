@@ -35,7 +35,13 @@ async function supabaseFetch(path, options = {}) {
     } catch {
       parsed = { error: text || 'Unknown Supabase error' };
     }
-    const error = new Error(parsed.error || 'Supabase request failed');
+    const message =
+      parsed.error ||
+      parsed.message ||
+      parsed.details ||
+      text ||
+      'Supabase request failed';
+    const error = new Error(message);
     error.status = response.status;
     error.details = parsed;
     throw error;
@@ -255,4 +261,3 @@ export async function putGithubContent(
 
   return response.json();
 }
-

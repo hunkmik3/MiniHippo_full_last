@@ -1,11 +1,15 @@
 import submitResult from '../../server/api/practice_results/submit.js';
 import listResults from '../../server/api/practice_results/list.js';
 import deleteResult from '../../server/api/practice_results/delete.js';
+import updateResult from '../../server/api/practice_results/update.js';
+import myListResult from '../../server/api/practice_results/my-list.js';
 
 const handlers = {
   submit: submitResult,
   list: listResults,
-  delete: deleteResult
+  delete: deleteResult,
+  update: updateResult,
+  'my-list': myListResult
 };
 
 export default async function handler(req, res) {
@@ -18,8 +22,6 @@ export default async function handler(req, res) {
 
   return fn(req, res);
 }
-
-
 
 
 

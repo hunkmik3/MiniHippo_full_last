@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Hippo - Writing Practice</title>
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon">
+    <!-- CSS Links -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="css/writingkey.css" rel="stylesheet">
+
+    <!-- Dynamic Script Loader & Event Shim -->
+    <script>
+        // SHIM: Intercept DOMContentLoaded and window.onload to force execution for dynamically loaded scripts
+        (function () {
+            // 1. Handle addEventListener('DOMContentLoaded')
+            const originalAddEventListener = document.addEventListener;
+            document.addEventListener = function (type, listener, options) {
+                if (type === 'DOMContentLoaded') {
+                    if (document.readyState === 'loading') {
+                        originalAddEventListener.call(document, type, listener, options);
+                    } else {
+                        // If document is ready, run listener immediately (async)
+                        setTimeout(listener, 10);
+                    }
+                } else {
+                    originalAddEventListener.call(document, type, listener, options);
+                }
+            };
+        })();
+
+        // Check for lesson parameter and add inline style to hide content immediately
+        (function () {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('lesson')) {
+                const style = document.createElement('style');
+                style.id = 'lesson-loading-style';
+                style.textContent = 'div[id^="question"] { display: none !important; }';
+                document.head.appendChild(style);
+
+                if (document.body) {
+                    document.body.classList.add('lesson-loading');
+                } else {
+                    document.addEventListener('DOMContentLoaded', function () {
+                        document.body.classList.add('lesson-loading');
+                    });
+                }
+            }
+        })();
+
+        // Dynamic JS loading based on lesson ID parameter
+        (function () {
+            const urlParams = new URLSearchParams(window.location.search);
+            const lessonId = urlParams.get('lesson');
+
+            async function loadLessonScript() {
+                // If no lesson ID, load default script
+                if (!lessonId) {
+                    console.log('No lesson parameter - loading default lesson');
+                    loadScript('js/writing/writingkey001.js');
+                    return;
+                }
+
+                try {
+                    // Try to load the requested lesson
+                    const scriptUrl = `js/writing/${lessonId}.js`;
+                    loadScript(scriptUrl);
+                } catch (error) {
+                    console.error('Error loading lesson:', error);
+                    loadScript('js/writing/writingkey001.js');
+                }
+            }
+
+            function loadScript(url) {
+                console.log('Loading script from:', url);
+                const script = document.createElement('script');
+                script.src = url;
+
+                script.onload = function () {
+                    console.log('Script loaded successfully');
+
+                    // 2. Handle window.onload assignments in the script
+                    if (typeof window.onload === 'function') {
+                        console.log('Triggering window.onload manually');
+                        window.onload();
+                    }
+
+                    // Remove loading style
+                    const loadingStyle = document.getElementById('lesson-loading-style');
+                    if (loadingStyle) loadingStyle.remove();
+                    if (window._lessonLoadingStyle) window._lessonLoadingStyle.remove();
+
+                    document.body.classList.remove('lesson-loading');
+                    const loadingIndicator = document.getElementById('lesson-loading-indicator');
+                    if (loadingIndicator) loadingIndicator.style.display = 'none';
+
+                    // Delay slightly to ensure parsing is complete and DOM is ready
+                    setTimeout(() => {
+                        if (typeof renderQuestions1 === 'function') renderQuestions1();
+                        if (typeof renderQuestions2 === 'function') renderQuestions2();
+                        if (typeof renderQuestions3 === 'function') renderQuestions3();
+                        if (typeof renderQuestions4 === 'function') renderQuestions4();
+
+                        if (typeof showCurrentQuestion === 'function') {
+                            showCurrentQuestion();
+                        } else {
+                            console.error("showCurrentQuestion is not defined after script load.");
+                        }
+                    }, 50);
+
+                    // OVERRIDE: Update descriptions to match new requirements
+                    const updateDescriptions = () => {
+                        const clubNameElem = document.querySelector('h1[id^="topic-title_q1"]');
+                        let clubName = "Club";
+                        if (clubNameElem) {
+                            const parts = clubNameElem.textContent.split('-');
+                            if (parts.length > 1) clubName = parts[1].trim();
+                        }
+
+                        const d1 = document.getElementById('description_q1');
+                        if (d1) d1.textContent = `You are joining a ${clubName}. Fill out the form. Write short answers (1-10 words) for each message (5 questions).`;
+
+                        const d2 = document.getElementById('description_q2');
+                        if (d2) d2.textContent = `You are a new member of the ${clubName}. Fill in the form. Write in sentences. Use 20-45 words.`;
+
+                        const d3 = document.getElementById('description_q3');
+                        if (d3) d3.textContent = `You are speaking to fellow members of the ${clubName} in a group chat. Respond to them in full sentences (30-60 words per answer).`;
+
+                        const d4 = document.getElementById('description_q4');
+                        if (d4) d4.textContent = `Write a short email (about 50-75 words) to your friend, and a longer email (120-225 words) to the president of the club.`;
+                    };
+
+                    // Run update immediately and after a short delay to ensure elements are rendered
+                    updateDescriptions();
+                    setTimeout(() => {
+                        updateDescriptions();
+                        if (window.setupNavigationHelper) window.setupNavigationHelper();
+                    }, 500);
+                };
+
+                script.onerror = function () {
+                    console.error('Failed to load script:', url);
+                    // Only fallback if we weren't already trying the default
+                    if (url !== 'js/writing/writingkey001.js') {
+                        loadScript('js/writing/writingkey001.js');
+                    }
+                };
+
+                document.head.appendChild(script);
+            }
+
+            loadLessonScript();
+
+            const writingSessionStartedAt = Date.now();
+            let writingResultSubmitted = false;
+
+            function normalizeAnswer(value) {
+                if (value === undefined || value === null) return '';
+                return String(value).trim();
+            }
+
+            function getInputValueByKey(key, formSelector) {
+                if (!key) return '';
+                const byId = document.getElementById(key);
+                if (byId && typeof byId.value === 'string') {
+                    return normalizeAnswer(byId.value);
+                }
+                const form = document.querySelector(formSelector);
+                if (!form) return '';
+                const byName = form.querySelector(`[name="${key}"]`);
+                if (byName && typeof byName.value === 'string') {
+                    return normalizeAnswer(byName.value);
+                }
+                return '';
+            }
+
+            function collectQuestionItems(questionMap, formSelector) {
+                const items = [];
+                if (questionMap && typeof questionMap === 'object') {
+                    Object.keys(questionMap).forEach((key) => {
+                        items.push({
+                            key,
+                            prompt: normalizeAnswer(questionMap[key]),
+                            answer: getInputValueByKey(key, formSelector)
+                        });
+                    });
+                    return items;
+                }
+                const form = document.querySelector(formSelector);
+                if (!form) return items;
+                form.querySelectorAll('input[type="text"], textarea').forEach((el, idx) => {
+                    const key = el.name || el.id || `field_${idx + 1}`;
+                    items.push({
+                        key,
+                        prompt: '',
+                        answer: normalizeAnswer(el.value)
+                    });
+                });
+                return items;
+            }
+
+            function collectWritingSubmission() {
+                const q1Map = (typeof questions1 !== 'undefined') ? questions1 : window.questions1;
+                const q2Map = (typeof questions2 !== 'undefined') ? questions2 : window.questions2;
+                const q3Map = (typeof questions3 !== 'undefined') ? questions3 : window.questions3;
+                const loadedQ4Map = (typeof questions4 !== 'undefined') ? questions4 : window.questions4;
+                const q4Text1 = (typeof question4_1_text !== 'undefined') ? question4_1_text : window.question4_1_text;
+                const q4Text2 = (typeof question4_2_text !== 'undefined') ? question4_2_text : window.question4_2_text;
+
+                const q4Map = (typeof loadedQ4Map === 'object' && loadedQ4Map)
+                    ? loadedQ4Map
+                    : {
+                        question4_1: q4Text1 || '',
+                        question4_2: q4Text2 || ''
+                    };
+
+                const userAnswers = {
+                    part1: collectQuestionItems(q1Map, '#question1Form'),
+                    part2: collectQuestionItems(q2Map, '#question2Form'),
+                    part3: collectQuestionItems(q3Map, '#question3Form'),
+                    part4: collectQuestionItems(q4Map, '#question4Form')
+                };
+
+                let totalWords = 0;
+                Object.values(userAnswers).forEach((partItems) => {
+                    partItems.forEach((item) => {
+                        const words = normalizeAnswer(item.answer).split(/\s+/).filter(Boolean).length;
+                        item.word_count = words;
+                        totalWords += words;
+                    });
+                });
+
+                return {
+                    userAnswers,
+                    totalWords
+                };
+            }
+
+            function flattenAnswerTexts(userAnswers) {
+                const texts = [];
+                if (!userAnswers || typeof userAnswers !== 'object') return texts;
+                Object.values(userAnswers).forEach((partItems) => {
+                    if (!Array.isArray(partItems)) return;
+                    partItems.forEach((item) => {
+                        const answer = normalizeAnswer(item?.answer);
+                        if (answer) texts.push(answer);
+                    });
+                });
+                return texts;
+            }
+
+            function clamp(value, min, max) {
+                return Math.max(min, Math.min(max, value));
+            }
+
+            function detectAiUsageRisk(submission, durationSeconds) {
+                const THRESHOLD = 50;
+                const answers = flattenAnswerTexts(submission?.userAnswers || {});
+                const fullText = answers.join(' ').trim();
+                const wordList = fullText
+                    ? fullText.toLowerCase().match(/[a-z']+/g) || []
+                    : [];
+                const totalWords = Number(submission?.totalWords || 0);
+                const uniqueWords = new Set(wordList).size;
+                const uniqueRatio = wordList.length ? uniqueWords / wordList.length : 0;
+                const longWordCount = wordList.filter((word) => word.length >= 7).length;
+                const longWordRatio = wordList.length ? longWordCount / wordList.length : 0;
+                const totalChars = fullText.length;
+                const sentenceCount = (fullText.match(/[.!?]+/g) || []).length || 1;
+                const avgSentenceWords = wordList.length ? wordList.length / sentenceCount : 0;
+                const wpm = durationSeconds > 0 ? (totalWords / durationSeconds) * 60 : 0;
+
+                let risk = 10;
+                const reasons = [];
+
+                if (wpm >= 55 && totalWords >= 120) {
+                    risk += 24;
+                    reasons.push(`Tốc độ viết cao (${Math.round(wpm)} từ/phút) so với độ dài bài.`);
+                } else if (wpm >= 45 && totalWords >= 100) {
+                    risk += 16;
+                    reasons.push(`Tốc độ viết khá cao (${Math.round(wpm)} từ/phút).`);
+                }
+
+                if (totalWords >= 220) {
+                    risk += 10;
+                    reasons.push(`Độ dài bài lớn (${totalWords} từ).`);
+                } else if (totalWords <= 70) {
+                    risk -= 8;
+                    reasons.push(`Bài ngắn, mức độ nghi vấn giảm.`);
+                }
+
+                if (uniqueRatio >= 0.7) {
+                    risk += 12;
+                    reasons.push(`Từ vựng đa dạng cao (${Math.round(uniqueRatio * 100)}%).`);
+                } else if (uniqueRatio <= 0.42) {
+                    risk -= 8;
+                    reasons.push(`Từ vựng lặp lại nhiều, mức độ nghi vấn giảm.`);
+                }
+
+                if (longWordRatio >= 0.28) {
+                    risk += 10;
+                    reasons.push(`Tỷ lệ từ dài cao (${Math.round(longWordRatio * 100)}%).`);
+                }
+
+                if (avgSentenceWords >= 22) {
+                    risk += 10;
+                    reasons.push(`Câu trung bình dài (${avgSentenceWords.toFixed(1)} từ/câu).`);
+                } else if (avgSentenceWords <= 9) {
+                    risk -= 6;
+                    reasons.push(`Câu ngắn, gần văn phong tự nhiên trình độ thấp-trung bình.`);
+                }
+
+                const formalPhrases = [
+                    'furthermore',
+                    'moreover',
+                    'in addition',
+                    'on the other hand',
+                    'from my perspective',
+                    'it is undeniable',
+                    'i strongly believe',
+                    'in conclusion'
+                ];
+                let formalHits = 0;
+                const lowerText = fullText.toLowerCase();
+                formalPhrases.forEach((phrase) => {
+                    if (lowerText.includes(phrase)) formalHits += 1;
+                });
+                if (formalHits >= 3) {
+                    risk += 10;
+                    reasons.push(`Xuất hiện nhiều cụm văn phong học thuật (${formalHits} cụm).`);
+                } else if (formalHits === 0) {
+                    risk -= 4;
+                    reasons.push(`Ít dấu hiệu văn phong học thuật máy móc.`);
+                }
+
+                const typoLikeCount = (fullText.match(/([a-zA-Z])\1{2,}/g) || []).length;
+                if (typoLikeCount >= 2) {
+                    risk -= 8;
+                    reasons.push(`Có dấu hiệu lỗi gõ/đánh máy (${typoLikeCount} mẫu).`);
+                }
+
+                if (totalChars <= 0) {
+                    risk = 0;
+                    reasons.push('Không có nội dung để phân tích.');
+                }
+
+                const probability = clamp(Math.round(risk), 0, 100);
+                const label = probability > THRESHOLD ? 'Có thể dùng AI' : 'Không sử dụng AI';
+
+                return {
+                    probability,
+                    threshold: THRESHOLD,
+                    label,
+                    reasons,
+                    metrics: {
+                        total_words: totalWords,
+                        unique_ratio: Number(uniqueRatio.toFixed(3)),
+                        long_word_ratio: Number(longWordRatio.toFixed(3)),
+                        avg_sentence_words: Number(avgSentenceWords.toFixed(2)),
+                        wpm: Number(wpm.toFixed(2))
+                    }
+                };
+            }
+
+            function parseBandFromResultText(resultText) {
+                if (!resultText) return '';
+                const priorityRegex = /(?:overall|tổng thể|band|level|grade|cấp độ)[^\n:]*[:\-]?\s*(A0|A1|A2|B1|B2|C1|C)\b/i;
+                const fallbackRegex = /\b(A0|A1|A2|B1|B2|C1|C)\b/i;
+                const match = resultText.match(priorityRegex) || resultText.match(fallbackRegex);
+                return match ? match[1].toUpperCase() : '';
+            }
+
+            function parseScoreFromResultText(resultText) {
+                if (!resultText) return { total: null, max: null };
+                const pairMatch = resultText.match(/(\d+(?:\.\d+)?)\s*(?:\/|out of|trên)\s*(\d+(?:\.\d+)?)/i);
+                if (pairMatch) {
+                    return {
+                        total: Number(pairMatch[1]),
+                        max: Number(pairMatch[2])
+                    };
+                }
+                const singleMatch = resultText.match(/(?:overall score|total score|score|điểm tổng|tổng điểm)[^\d]*(\d+(?:\.\d+)?)/i);
+                if (singleMatch) {
+                    return {
+                        total: Number(singleMatch[1]),
+                        max: null
+                    };
+                }
+                return { total: null, max: null };
+            }
+
+            async function waitForAiResultText(timeoutMs = 5000) {
+                const startedAt = Date.now();
+                while (Date.now() - startedAt < timeoutMs) {
+                    const text = document.getElementById('modal-body-ai')?.textContent?.trim() || '';
+                    if (text) return text;
+                    await new Promise((resolve) => setTimeout(resolve, 250));
+                }
+                return document.getElementById('modal-body-ai')?.textContent?.trim() || '';
+            }
+
+            // Helper to fix navigation and submit logic
+            window.setupNavigationHelper = function () {
+                console.log('Applying Navigation Helper Fix');
+                const questions = Array.from(document.querySelectorAll('.question-container'));
+                if (questions.length === 0) return;
+
+                // Hide old button
+                const oldBtn = document.getElementById('btn_checkallquestions');
+                if (oldBtn) oldBtn.setAttribute('style', 'display: none !important');
+
+                const nextBtn = document.getElementById('nextButton');
+                const backBtn = document.getElementById('backButton');
+
+                if (!nextBtn || !backBtn) return;
+
+                // Clone to remove old listeners from poorly written key files
+                const newNextBtn = nextBtn.cloneNode(true);
+                const newBackBtn = backBtn.cloneNode(true);
+
+                nextBtn.parentNode.replaceChild(newNextBtn, nextBtn);
+                backBtn.parentNode.replaceChild(newBackBtn, backBtn);
+
+                let currentIdx = 0;
+
+                function updateState() {
+                    questions.forEach((q, idx) => {
+                        q.style.display = (idx === currentIdx) ? 'block' : 'none';
+                    });
+
+                    // Update Next Button
+                    if (currentIdx === questions.length - 1) {
+                        newNextBtn.textContent = 'Nộp bài';
+                        newNextBtn.classList.remove('btn-next');
+                        newNextBtn.classList.add('btn-primary');
+                    } else {
+                        newNextBtn.textContent = 'Next';
+                        newNextBtn.classList.add('btn-next');
+                        newNextBtn.classList.remove('btn-primary');
+                    }
+                }
+
+                newNextBtn.addEventListener('click', () => {
+                    if (currentIdx < questions.length - 1) {
+                        currentIdx++;
+                        updateState();
+                    } else {
+                        // Trigger Submit Modal
+                        const modalEl = document.getElementById('confirmationModal');
+                        if (modalEl && window.bootstrap) {
+                            new bootstrap.Modal(modalEl).show();
+                        } else if (modalEl) {
+                            // Fallback if bootstrap object not global yet (unlikely)
+                            const bsModal = new bootstrap.Modal(modalEl);
+                            bsModal.show();
+                        }
+                    }
+                });
+
+                newBackBtn.addEventListener('click', () => {
+                    if (currentIdx > 0) {
+                        currentIdx--;
+                        updateState();
+                    }
+                });
+
+                // Init
+                updateState();
+
+                // ---------------------------------------------------------
+                // NEW: Intercept Submit for Admin Saving
+                // ---------------------------------------------------------
+                const confirmBtn = document.getElementById('confirmButton');
+                if (confirmBtn) {
+                    // Clone to remove old listeners
+                    const newConfirmBtn = confirmBtn.cloneNode(true);
+                    confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+                    let savingInProgress = false;
+
+                    newConfirmBtn.addEventListener('click', async () => {
+                        if (savingInProgress) return;
+                        savingInProgress = true;
+                        newConfirmBtn.disabled = true;
+
+                        // Hide confirm modal first
+                        const confirmModalEl = document.getElementById('confirmationModal');
+                        const confirmModal = bootstrap.Modal.getInstance(confirmModalEl);
+                        if (confirmModal) confirmModal.hide();
+
+                        try {
+                            // Call original submit logic (AI Grading)
+                            if (typeof window.handleSubmitAllQuestions === 'function') {
+                                await window.handleSubmitAllQuestions();
+                            } else {
+                                console.warn('handleSubmitAllQuestions function not found');
+                                return;
+                            }
+
+                            // Save result once after grading
+                            if (!writingResultSubmitted && typeof window.submitPracticeResult === 'function') {
+                                const resultText = await waitForAiResultText();
+                                const band = parseBandFromResultText(resultText) || 'Pending';
+                                const scoreInfo = parseScoreFromResultText(resultText);
+                                const lessonId = new URLSearchParams(window.location.search).get('lesson') || 'unknown';
+                                const setTitle = document.getElementById('keys_id')?.textContent?.trim()
+                                    ? `Writing Practice ${document.getElementById('keys_id').textContent.trim()}`
+                                    : document.title;
+                                const durationSeconds = Math.max(0, Math.round((Date.now() - writingSessionStartedAt) / 1000));
+                                const submission = collectWritingSubmission();
+                                const aiUsage = detectAiUsageRisk(submission, durationSeconds);
+
+                                const metadata = {
+                                    band,
+                                    source: 'writing_question',
+                                    ai_feedback_preview: resultText.substring(0, 500),
+                                    ai_feedback: resultText.substring(0, 12000),
+                                    user_answers: submission.userAnswers,
+                                    total_words: submission.totalWords,
+                                    ai_usage_probability: aiUsage.probability,
+                                    ai_usage_threshold: aiUsage.threshold,
+                                    ai_usage_label: aiUsage.label,
+                                    ai_usage_reasons: aiUsage.reasons,
+                                    ai_usage_metrics: aiUsage.metrics
+                                };
+                                if (scoreInfo.total !== null) {
+                                    metadata.ai_score_extracted = scoreInfo;
+                                }
+
+                                const saved = await window.submitPracticeResult({
+                                    practiceType: 'writing',
+                                    mode: 'set',
+                                    setId: lessonId,
+                                    setTitle,
+                                    totalScore: scoreInfo.total !== null ? scoreInfo.total : 0,
+                                    maxScore: scoreInfo.max !== null ? scoreInfo.max : 0,
+                                    durationSeconds,
+                                    metadata
+                                });
+
+                                if (saved) {
+                                    writingResultSubmitted = true;
+                                    console.log('Writing Result Saved to Admin');
+                                }
+                            } else if (writingResultSubmitted) {
+                                console.log('Writing result already saved. Skip duplicate submit.');
+                            } else {
+                                console.warn('submitPracticeResult function not found');
+                            }
+                        } catch (error) {
+                            console.error('Writing submit/save failed:', error);
+                        } finally {
+                            savingInProgress = false;
+                            newConfirmBtn.disabled = false;
+                        }
+                    });
+                }
+            };
+        })();
+    </script>
+</head>
+
+<body>
+    <!-- Loading Indicator -->
+    <div id="lesson-loading-indicator"
+        style="display:none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 9999; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2);">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <div class="mt-2 text-center">Đang tải bài học...</div>
+    </div>
+
+    <!-- Header -->
+    <div class="header d-flex justify-content-between align-items-center shadow-sm">
+        <div class="d-flex align-items-center">
+            <a href="index.html" class="me-3 text-decoration-none fs-4">
+                <i class="bi bi-house-door-fill me-2"></i>
+                <span>Mini Hippo</span>
+            </a>
+        </div>
+        <div class="d-flex align-items-center">
+            <span class="time-remaining-label fs-6">Time remaining:</span>
+            <span class="countdown fs-4" id="countdownTimer">50:00</span>
+        </div>
+        <div id="question_step" class="fs-5 fw-bold">
+            Writing Practice <span id="keys_id"></span>
+        </div>
+    </div>
+
+    <div class="container py-5">
+        <!-- Question 1 -->
+        <div id="question1" class="question-container">
+            <h1 id="topic-title_q1">Question 1</h1>
+            <h6 id="description_q1">loading...</h6>
+            <form id="question1Form">
+                <div id="questions-container1"></div>
+            </form>
+            <div class="text-end mt-3">
+                <button id="question1_showanswer" class="btn btn-secondary btn-sm">Xem đáp án gợi ý</button>
+            </div>
+        </div>
+
+        <!-- Question 2 -->
+        <div id="question2" class="question-container" style="display:none;">
+            <h1 id="topic-title_q2">Question 2</h1>
+            <h6 id="description_q2">loading...</h6>
+            <form id="question2Form">
+                <div id="questions-container2"></div>
+            </form>
+            <div class="text-end mt-3">
+                <button id="question2_showanswer" class="btn btn-secondary btn-sm">Xem đáp án gợi ý</button>
+            </div>
+            <div id="wordCountLabel" class="word-count mt-2">Số từ: 0 / 45</div>
+        </div>
+
+        <!-- Question 3 -->
+        <div id="question3" class="question-container" style="display:none;">
+            <h1 id="topic-title_q3">Question 3</h1>
+            <h6 id="description_q3">loading...</h6>
+            <form id="question3Form">
+                <div id="questions-container3"></div>
+            </form>
+            <div class="text-end mt-3">
+                <button id="question3_showanswer" class="btn btn-secondary btn-sm">Xem đáp án gợi ý</button>
+            </div>
+        </div>
+
+        <!-- Question 4 -->
+        <div id="question4" class="question-container" style="display:none;">
+            <h1 id="topic-title_q4">Question 4</h1>
+            <h6 id="description_q4">loading...</h6>
+            <form id="question4Form">
+                <div id="questions-container4"></div>
+            </form>
+            <div class="text-end mt-3">
+                <button id="question4_showanswer" class="btn btn-secondary btn-sm">Xem đáp án gợi ý</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Footer Navigation -->
+    <div class="footer">
+        <button class="btn btn-back" id="backButton">Back</button>
+        <button class="btn btn-check-all d-none" id="btn_checkallquestions" style="display: none !important;">Chấm
+            điểm</button>
+        <button class="btn btn-next" id="nextButton">Next</button>
+    </div>
+
+    <!-- Modals (Result, Confirmation, etc.) -->
+    <!-- Confirmation Modal -->
+    <div class="modal fade" id="confirmationModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Xác nhận nộp bài</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    Bạn có chắc chắn muốn nộp bài để chấm điểm không?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Không</button>
+                    <button type="button" class="btn btn-primary" id="confirmButton">Có, chấm điểm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading AI Modal -->
+    <div class="modal fade" id="loadingModal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-body text-center">
+                    <div class="spinner-border text-primary mb-3" role="status"></div>
+                    <h5>Đang chấm điểm...</h5>
+                    <p>Vui lòng đợi trong giây lát.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Result Modal (AI Feedback) -->
+    <div class="modal fade" id="resultModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Kết quả chấm điểm AI</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="modal-body-ai">
+                    <!-- AI response goes here -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Answer Modals for each question -->
+    <!-- Question 1 Answer Modal -->
+    <div class="modal fade" id="question1_answerModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Đáp án Câu hỏi 1</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="modal-body"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Question 2 Answer Modal -->
+    <div class="modal fade" id="question2_answerModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Đáp án Câu hỏi 2</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="modal-body2"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Question 3 Answer Modal -->
+    <div class="modal fade" id="question3_answerModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Đáp án Câu hỏi 3</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="modal-body3"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Question 4 Answer Modal -->
+    <div class="modal fade" id="question4_answerModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Đáp án Câu hỏi 4</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="modal-body4"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/home.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>
