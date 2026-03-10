@@ -1,17 +1,14 @@
 import parseBody from './_utils/parseBody.js';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { verifyAdminRequest } from './_utils/auth.js';
 import {
   insertInto,
   updateTable,
-  selectFrom,
   putGithubContent
 } from './_utils/supabase.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const GITHUB_SITE_PREFIX = 'minihippofuill/aptiskey.com/';
 
 function getPartFromFilePath(filePath) {
   if (!filePath) return null;
@@ -27,12 +24,70 @@ function getPartFromFilePath(filePath) {
   return null;
 }
 
+function normalizeLessonPaths(filePath) {
+  const normalized = String(filePath || '')
+    .trim()
+    .replace(/^\/+/, '')
+    .replace(/\\/g, '/');
+
+  if (!normalized) {
+    return {
+      publicPath: '',
+      githubPath: ''
+    };
+  }
+
+  if (normalized.startsWith(GITHUB_SITE_PREFIX)) {
+    return {
+      publicPath: normalized.slice(GITHUB_SITE_PREFIX.length),
+      githubPath: normalized
+    };
+  }
+
+  return {
+    publicPath: normalized,
+    githubPath: `${GITHUB_SITE_PREFIX}${normalized}`
+  };
+}
+
+function saveLocalCopy(publicPath, content) {
+  const isLocalDev =
+    process.env.NODE_ENV === 'development' ||
+    !process.env.VERCEL ||
+    process.env.VERCEL_ENV === 'development';
+
+  if (!isLocalDev || !publicPath) return;
+
+  const cwd = process.cwd();
+  const candidates = [
+    path.join(cwd, publicPath),
+    path.join(cwd, GITHUB_SITE_PREFIX, publicPath)
+  ];
+
+  const localPath =
+    candidates.find(candidate => fs.existsSync(path.dirname(candidate))) || candidates[0];
+  const dir = path.dirname(localPath);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(localPath, content);
+  console.log('Saved locally to:', localPath);
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const adminCheck = await verifyAdminRequest(req);
+  let adminCheck;
+  try {
+    adminCheck = await verifyAdminRequest(req);
+  } catch (error) {
+    console.error('verifyAdminRequest crashed:', error);
+    return res.status(500).json({
+      error: 'Không thể xác thực admin',
+      details: error?.message || 'Unknown auth error'
+    });
+  }
+
   if (!adminCheck.success) {
     return res
       .status(adminCheck.status || 401)
@@ -42,7 +97,7 @@ export default async function handler(req, res) {
   let body;
 
   try {
-    body = await parseBody(req);
+    body = req.body && typeof req.body === 'object' ? req.body : await parseBody(req);
   } catch (error) {
     return res.status(400).json({ error: error.message || 'Invalid JSON payload' });
   }
@@ -63,31 +118,29 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Thiếu filePath hoặc content' });
   }
 
-  const derivedPart = providedPart || getPartFromFilePath(filePath);
+  const { publicPath, githubPath } = normalizeLessonPaths(filePath);
+  if (!publicPath || !githubPath) {
+    return res.status(400).json({ error: 'filePath không hợp lệ' });
+  }
+
+  const derivedPart = providedPart || getPartFromFilePath(publicPath);
 
   try {
-    const uploadResult = await putGithubContent(filePath, {
+    const uploadResult = await putGithubContent(githubPath, {
       content,
-      message: message || `Update ${filePath}`,
+      message: message || `Update ${githubPath}`,
       encoding: append ? 'base64' : 'utf8'
     });
 
-    // Save locally for development if running locally
-    if (process.env.NODE_ENV === 'development' || !process.env.VERCEL || process.env.VERCEL_ENV === 'development') {
-      try {
-        const localPath = path.join(__dirname, '..', filePath);
-        const dir = path.dirname(localPath);
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(localPath, content);
-        console.log('Saved locally to:', localPath);
-      } catch (err) {
-        console.error('Failed to save locally:', err);
-      }
+    try {
+      saveLocalCopy(publicPath, content);
+    } catch (err) {
+      console.error('Failed to save locally:', err);
     }
 
     const lessonPayload = {
       part: derivedPart,
-      file_path: filePath,
+      file_path: publicPath,
       title: title || null,
       topic: topic || null,
       num_sets: numSets || null,
@@ -124,4 +177,3 @@ export default async function handler(req, res) {
     });
   }
 }
-
