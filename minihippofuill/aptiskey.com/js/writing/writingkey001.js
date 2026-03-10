@@ -1,50 +1,50 @@
 const key_id = "Bộ đề #001";
-const club_name = "lkhjlkjlk";
+const club_name = "NATURE CLUB";
 //----------------------------------------------------------------------
 const questions1 = {
-    "question1_1": "lk",
-    "question1_2": "jlk",
-    "question1_3": "jlkj",
-    "question1_4": "j",
-    "question1_5": "lkj",
+    "question1_1": "What’s your favorite sport?",
+    "question1_2": "How many people are in your family?",
+    "question1_3": "What did you do yesterday?",
+    "question1_4": "How do you go to school?",
+    "question1_5": "What’s your hobby?",
 };
 const questions1_answer = {
-    "question1_1_answer": "jlk",
-    "question1_2_answer": "jlk",
-    "question1_3_answer": "lk",
-    "question1_4_answer": "lkj",
-    "question1_5_answer": "lkj",
+    "question1_1_answer": "",
+    "question1_2_answer": "",
+    "question1_3_answer": "",
+    "question1_4_answer": "",
+    "question1_5_answer": "",
 };
 //----------------------------------------------------------------------
 const questions2 = {
-    "question2": "lkk",
+    "question2": "Please tell me about your free time and hobbies?",
 };
 const questions2_answer = {
-    "question2": "jjkl",
+    "question2": "",
 };
 //----------------------------------------------------------------------
 const questions3 = {
-    "question3_1": "lkjlkjkljkllk",
-    "question3_2": "lkj",
-    "question3_3": "kjhkjhkjvb",
+    "question3_1": "Hi! Welcome to the club. Where do you like to visit?",
+    "question3_2": "Hi! Why did you decide to join the club?",
+    "question3_3": "The bigger the club, the more environmentally conscious people are, right?",
 };
 const questions3_answer = {
-    "question3_1_answer": "jlk",
-    "question3_2_answer": "hkkjhkjhkj",
-    "question3_3_answer": "nbvnbvnb",
+    "question3_1_answer": "",
+    "question3_2_answer": "",
+    "question3_3_answer": "",
 };
 //----------------------------------------------------------------------
-const questions4_main = "65876587";
-const question4_1_text = "7868768Write a short email to your friend. Tell your friend your feelings about this and what you plan to do.";
-const question4_2_text = "987987987Write an email to the president of the club. Tell them your thoughts about this and what you would like to do.";
-const question4_1_text_answer = `98798797`;
-const question4_2_text_answer = `9798798665`;
+const questions4_main = "“Dear member,\nThe club wants to make a plan for the young people because they just love to stay home and play games.”\n";
+const question4_1_text = "Write an email to your friend. Write about 50 words.";
+const question4_2_text = "Write an email to the manager of the club. Write about 120 - 150 words.";
+const question4_1_text_answer = ``;
+const question4_2_text_answer = ``;
 
 // Static Render Functions
-function renderQuestions1(){const t=document.getElementById("topic-title_q1");if(t)t.textContent=`Question 1 of 4 - ${club_name}`;const d=document.getElementById("description_q1");if(d)d.textContent=`You are joining a ${club_name}. Fill out the form. Write short answers (1-10 words) for each message (5 questions).`;const c=document.getElementById("questions-container1");if(!c)return;let h="";for(let k in questions1)h+=`<div class="mb-4"><label class="form-label">${questions1[k]}</label><input type="text" class="form-control" id="${k}"></div>`;c.innerHTML=h}
-function renderQuestions2(){const t=document.getElementById("topic-title_q2");if(t)t.textContent=`Question 2 of 4 - ${club_name}`;const d=document.getElementById("description_q2");if(d)d.textContent=`Now you've become a new member of the ${club_name}. Fill in the form. Write in sentences. Use 20-45 words.`;const c=document.getElementById("questions-container2");if(!c)return;let h="";for(let k in questions2)h+=`<div class="mb-4"><label class="form-label">${questions2[k]}</label><textarea class="form-control" id="${k}" rows="3"></textarea></div>`;c.innerHTML=h;for(let k in questions2){document.getElementById(k)?.addEventListener("input",e=>{const c=e.target.value.split(/\s+/).filter(Boolean).length;document.getElementById("wordCountLabel").textContent=`Word Count: ${c}`})}}
-function renderQuestions3(){const t=document.getElementById("topic-title_q3");if(t)t.textContent=`Question 3 of 4 - ${club_name}`;const d=document.getElementById("description_q3");if(d)d.textContent=`You are speaking to fellow members of the ${club_name} in a group chat. Respond to them in full sentences (30-60 words per answer).`;const c=document.getElementById("questions-container3");if(!c)return;let h="";for(let k in questions3)h+=`<div class="mb-4"><label class="form-label">${questions3[k]}</label><textarea class="form-control" id="${k}" rows="3"></textarea><div id="${k}-wordCount" class="text-muted text-end mt-1">Word Count: 0</div></div>`;c.innerHTML=h;for(let k in questions3){document.getElementById(k)?.addEventListener("input",e=>{const c=e.target.value.split(/\s+/).filter(Boolean).length;document.getElementById(`${k}-wordCount`).textContent=`Word Count: ${c}`})}}
-function renderQuestions4(){const t=document.getElementById("topic-title_q4");if(t)t.textContent="Question 4 of 4 - Email Writing";const d=document.getElementById("description_q4");if(d)d.textContent="Write a short email (about 50-75 words) to your friend, and a longer email (120-225 words) to the president of the club.";const c=document.getElementById("questions-container4");if(!c)return;const q4={"question4_1":`${questions4_main} <br><strong>${question4_1_text}</strong>`,"question4_2":`${questions4_main} <br><strong>${question4_2_text}</strong>`};let h="";for(let k in q4)h+=`<div class="mb-4"><label class="form-label">${q4[k]}</label><textarea class="form-control" id="${k}" rows="4"></textarea><div id="${k}-wordCount" class="text-muted text-end mt-1">Word Count: 0</div></div>`;c.innerHTML=h;for(let k in q4){document.getElementById(k)?.addEventListener("input",e=>{const c=(e.target.value||"").trim().split(/\s+/).filter(Boolean).length;document.getElementById(`${k}-wordCount`).textContent=`Word Count: ${c}`})}}
+function renderQuestions1(){const t=document.getElementById("topic-title_q1");if(t)t.textContent=`Question 1 of 4 - ${club_name}`;const d=document.getElementById("description_q1");if(d)d.textContent=`You are joining a ${club_name}. Fill out the form. Write short answers (1-10 words) for each message (5 questions).`;const c=document.getElementById("questions-container1");if(!c)return;let h="";for(let k in questions1)h+=`<div class="mb-4"><label class="form-label">${questions1[k]}</label><input type="text" class="form-control" id="${k}"></div>`;c.innerHTML=h;for(let k in questions1){document.getElementById(k)?.addEventListener("input",e=>{const w=e.target.value.split(/\s+/).filter(Boolean);if(w.length>10)e.target.value=w.slice(0,10).join(' ')+' '})}}
+function renderQuestions2(){const t=document.getElementById("topic-title_q2");if(t)t.textContent=`Question 2 of 4 - ${club_name}`;const d=document.getElementById("description_q2");if(d)d.textContent=`Now you've become a new member of the ${club_name}. Fill in the form. Write in sentences. Use 20-45 words.`;const c=document.getElementById("questions-container2");if(!c)return;let h="";for(let k in questions2)h+=`<div class="mb-4"><label class="form-label">${questions2[k]}</label><textarea class="form-control" id="${k}" rows="3"></textarea></div>`;c.innerHTML=h;for(let k in questions2){document.getElementById(k)?.addEventListener("input",e=>{const w=e.target.value.split(/\s+/).filter(Boolean);if(w.length>45)e.target.value=w.slice(0,45).join(' ')+' ';const c=e.target.value.split(/\s+/).filter(Boolean).length;document.getElementById("wordCountLabel").textContent=`Số từ: ${c} / 45`})}}
+function renderQuestions3(){const t=document.getElementById("topic-title_q3");if(t)t.textContent=`Question 3 of 4 - ${club_name}`;const d=document.getElementById("description_q3");if(d)d.textContent=`You are speaking to fellow members of the ${club_name} in a group chat. Respond to them in full sentences (30-60 words per answer).`;const c=document.getElementById("questions-container3");if(!c)return;let h="";for(let k in questions3)h+=`<div class="mb-4"><label class="form-label">${questions3[k]}</label><textarea class="form-control" id="${k}" rows="3"></textarea><div id="${k}-wordCount" class="text-muted text-end mt-1">Số từ: 0 / 60</div></div>`;c.innerHTML=h;for(let k in questions3){document.getElementById(k)?.addEventListener("input",e=>{const w=e.target.value.split(/\s+/).filter(Boolean);if(w.length>60)e.target.value=w.slice(0,60).join(' ')+' ';const c=e.target.value.split(/\s+/).filter(Boolean).length;document.getElementById(`${k}-wordCount`).textContent=`Số từ: ${c} / 60`})}}
+function renderQuestions4(){const t=document.getElementById("topic-title_q4");if(t)t.textContent="Question 4 of 4 - Email Writing";const d=document.getElementById("description_q4");if(d)d.textContent="Write a short email (about 50-75 words) to your friend, and a longer email (120-225 words) to the president of the club.";const c=document.getElementById("questions-container4");if(!c)return;const q4={"question4_1":`${questions4_main} <br><strong>${question4_1_text}</strong>`,"question4_2":`${questions4_main} <br><strong>${question4_2_text}</strong>`};let h="";for(let k in q4)h+=`<div class="mb-4"><label class="form-label">${q4[k]}</label><textarea class="form-control" id="${k}" rows="4"></textarea><div id="${k}-wordCount" class="text-muted text-end mt-1">Số từ: 0</div></div>`;c.innerHTML=h;for(let k in q4){const mx=k==='question4_1'?75:225;document.getElementById(`${k}-wordCount`).textContent=`Số từ: 0 / ${mx}`;document.getElementById(k)?.addEventListener("input",e=>{const w=(e.target.value||"").trim().split(/\s+/).filter(Boolean);if(w.length>mx)e.target.value=w.slice(0,mx).join(' ')+' ';const c=e.target.value.split(/\s+/).filter(Boolean).length;document.getElementById(`${k}-wordCount`).textContent=`Số từ: ${c} / ${mx}`})}}
 
 // Prompt variables
 const promptText_question1 = "Người này đang là thành viên của câu lạc bộ " + club_name + " Hãy chấm điểm 5 câu sau theo khung aptis mức độ A0 đến C1, tiêu chí chấm điểm là trả lời 1-10 từ, đơn giản và viết hoa chữ đầu dấu chấm cuối câu, kết quả trả về có giải thích.\n\n";
@@ -62,7 +62,8 @@ document.addEventListener("DOMContentLoaded",()=>{if(typeof key_id!=='undefined'
 async function handleSubmitAllQuestions(){
     const ans={question1:{},question2:{},question3:{},question4:{}};
     for(let i=1;i<=5;i++)ans.question1[`question1_${i}`]=document.getElementById(`question1_${i}`)?.value||"";
-    ans.question2.question2=document.getElementById('question2')?.value||"";
+    const q2Key=Object.keys(questions2)[0]||"question2";
+    ans.question2[q2Key]=document.getElementById(q2Key)?.value||"";
     for(let i=1;i<=3;i++)ans.question3[`question3_${i}`]=document.getElementById(`question3_${i}`)?.value||"";
     ans.question4.question4_1=document.getElementById('question4_1')?.value||"";
     ans.question4.question4_2=document.getElementById('question4_2')?.value||"";
@@ -71,7 +72,7 @@ async function handleSubmitAllQuestions(){
 ${Object.entries(ans.question1).map(([k,v])=>`${questions1[k]}: ${v}`).join('\n')}
 
 ${promptText_question2}
-${questions2.question2}: ${ans.question2.question2}
+${questions2[q2Key]}: ${ans.question2[q2Key]}
 
 ${promptText_question3}
 ${Object.entries(ans.question3).map(([k,v])=>`${questions3[k]}: ${v}`).join('\n')}
