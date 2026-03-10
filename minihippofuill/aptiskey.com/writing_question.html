@@ -137,6 +137,7 @@
                     setTimeout(() => {
                         updateDescriptions();
                         if (window.setupNavigationHelper) window.setupNavigationHelper();
+                        ensureWritingCountdownRunning();
                     }, 500);
                 };
 
@@ -155,6 +156,68 @@
 
             const writingSessionStartedAt = Date.now();
             let writingResultSubmitted = false;
+            const WRITING_DURATION_SECONDS = 50 * 60;
+            let writingCountdownInterval = null;
+            let writingCountdownStarted = false;
+
+            function formatCountdown(seconds) {
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            }
+
+            function startWritingCountdown(initialSeconds = WRITING_DURATION_SECONDS) {
+                if (writingCountdownStarted) return;
+                const countdownElement = document.getElementById('countdownTimer');
+                if (!countdownElement) return;
+
+                writingCountdownStarted = true;
+                let timeLeft = Math.max(0, Number(initialSeconds) || WRITING_DURATION_SECONDS);
+
+                const tick = () => {
+                    countdownElement.textContent = formatCountdown(timeLeft);
+                    if (timeLeft <= 300) {
+                        countdownElement.style.color = '#dc3545';
+                    } else {
+                        countdownElement.style.color = '';
+                    }
+                };
+
+                tick();
+                writingCountdownInterval = setInterval(() => {
+                    if (timeLeft <= 0) {
+                        clearInterval(writingCountdownInterval);
+                        writingCountdownInterval = null;
+                        return;
+                    }
+                    timeLeft -= 1;
+                    tick();
+                }, 1000);
+            }
+
+            function ensureWritingCountdownRunning() {
+                const countdownElement = document.getElementById('countdownTimer');
+                if (!countdownElement || writingCountdownStarted) return;
+
+                const initialText = (countdownElement.textContent || '').trim() || '50:00';
+                let attempts = 0;
+                const probe = setInterval(() => {
+                    attempts += 1;
+                    const currentText = (countdownElement.textContent || '').trim();
+                    const isAlreadyRunning = currentText !== initialText && currentText !== '50:00';
+                    if (isAlreadyRunning) {
+                        clearInterval(probe);
+                        writingCountdownStarted = true;
+                        return;
+                    }
+                    if (attempts >= 6) {
+                        clearInterval(probe);
+                        startWritingCountdown(WRITING_DURATION_SECONDS);
+                    }
+                }, 500);
+            }
+
+            document.addEventListener('DOMContentLoaded', ensureWritingCountdownRunning);
 
             function normalizeAnswer(value) {
                 if (value === undefined || value === null) return '';
@@ -596,9 +659,6 @@
             <form id="question1Form">
                 <div id="questions-container1"></div>
             </form>
-            <div class="text-end mt-3">
-                <button id="question1_showanswer" class="btn btn-secondary btn-sm">Xem đáp án gợi ý</button>
-            </div>
         </div>
 
         <!-- Question 2 -->
@@ -608,9 +668,6 @@
             <form id="question2Form">
                 <div id="questions-container2"></div>
             </form>
-            <div class="text-end mt-3">
-                <button id="question2_showanswer" class="btn btn-secondary btn-sm">Xem đáp án gợi ý</button>
-            </div>
             <div id="wordCountLabel" class="word-count mt-2">Số từ: 0 / 45</div>
         </div>
 
@@ -621,9 +678,6 @@
             <form id="question3Form">
                 <div id="questions-container3"></div>
             </form>
-            <div class="text-end mt-3">
-                <button id="question3_showanswer" class="btn btn-secondary btn-sm">Xem đáp án gợi ý</button>
-            </div>
         </div>
 
         <!-- Question 4 -->
@@ -633,9 +687,6 @@
             <form id="question4Form">
                 <div id="questions-container4"></div>
             </form>
-            <div class="text-end mt-3">
-                <button id="question4_showanswer" class="btn btn-secondary btn-sm">Xem đáp án gợi ý</button>
-            </div>
         </div>
 
     </div>

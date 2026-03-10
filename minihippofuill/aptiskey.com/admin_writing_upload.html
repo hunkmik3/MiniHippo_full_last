@@ -62,10 +62,6 @@
                     <label class="form-label">Question</label>
                     <textarea class="form-control" id="q2_question" rows="2" required></textarea>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Sample Answer</label>
-                    <textarea class="form-control" id="q2_answer" rows="3"></textarea>
-                </div>
             </div>
 
             <!-- Part 3 -->
@@ -92,10 +88,6 @@
                             <textarea class="form-control" id="q4_1_text"
                                 rows="2">Write a short email to your friend. Tell your friend your feelings about this and what you plan to do.</textarea>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">Sample Answer</label>
-                            <textarea class="form-control" id="q4_1_answer" rows="5"></textarea>
-                        </div>
                     </div>
                     <div class="col-md-6">
                         <h5>4.2: Email to President (120-225 words)</h5>
@@ -103,10 +95,6 @@
                             <label class="form-label">Requirement</label>
                             <textarea class="form-control" id="q4_2_text"
                                 rows="2">Write an email to the president of the club. Tell them your thoughts about this and what you would like to do.</textarea>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Sample Answer</label>
-                            <textarea class="form-control" id="q4_2_answer" rows="5"></textarea>
                         </div>
                     </div>
                 </div>
@@ -128,13 +116,9 @@
             for (let i = 1; i <= 5; i++) {
                 p1.innerHTML += `
                     <div class="row mb-3 border-bottom pb-2">
-                        <div class="col-md-6">
+                        <div class="col-12">
                             <label class="form-label">Question 1.${i}</label>
                             <input type="text" class="form-control" id="q1_${i}" required>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Sample Answer 1.${i}</label>
-                            <input type="text" class="form-control" id="q1_${i}_ans">
                         </div>
                     </div>
                 `;
@@ -148,10 +132,6 @@
                         <div class="col-md-12">
                             <label class="form-label">Question 3.${i}</label>
                             <textarea class="form-control" id="q3_${i}" rows="2" required></textarea>
-                        </div>
-                        <div class="col-md-12 mt-2">
-                            <label class="form-label">Sample Answer 3.${i}</label>
-                             <textarea class="form-control" id="q3_${i}_ans" rows="2"></textarea>
                         </div>
                     </div>
                 `;
@@ -177,14 +157,14 @@
 
             jsContent += `const questions1_answer = {\n`;
             for (let i = 1; i <= 5; i++) {
-                jsContent += `    "question1_${i}_answer": "${escapeStr(document.getElementById(`q1_${i}_ans`).value)}",\n`;
+                jsContent += `    "question1_${i}_answer": "",\n`;
             }
             jsContent += `};\n`;
 
             // Part 2
             jsContent += `//----------------------------------------------------------------------\n`;
             jsContent += `const questions2 = {\n    "question2": "${escapeStr(document.getElementById('q2_question').value)}",\n};\n`;
-            jsContent += `const questions2_answer = {\n    "question2": "${escapeStr(document.getElementById('q2_answer').value)}",\n};\n`;
+            jsContent += `const questions2_answer = {\n    "question2": "",\n};\n`;
 
             // Part 3
             jsContent += `//----------------------------------------------------------------------\n`;
@@ -196,7 +176,7 @@
 
             jsContent += `const questions3_answer = {\n`;
             for (let i = 1; i <= 3; i++) {
-                jsContent += `    "question3_${i}_answer": "${escapeStr(document.getElementById(`q3_${i}_ans`).value)}",\n`;
+                jsContent += `    "question3_${i}_answer": "",\n`;
             }
             jsContent += `};\n`;
 
@@ -206,8 +186,8 @@
             jsContent += `const question4_1_text = "${escapeStr(document.getElementById('q4_1_text').value)}";\n`;
             jsContent += `const question4_2_text = "${escapeStr(document.getElementById('q4_2_text').value)}";\n`;
 
-            jsContent += `const question4_1_text_answer = \`${document.getElementById('q4_1_answer').value}\`;\n`;
-            jsContent += `const question4_2_text_answer = \`${document.getElementById('q4_2_answer').value}\`;\n`;
+            jsContent += `const question4_1_text_answer = \`\`;\n`;
+            jsContent += `const question4_2_text_answer = \`\`;\n`;
 
             // FIXED STATIC LOGIC (Copied from original template)
             jsContent += `

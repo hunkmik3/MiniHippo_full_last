@@ -163,13 +163,9 @@ function initWritingForm() {
         for (let i = 1; i <= 5; i++) {
             p1.innerHTML += `
                 <div class="row mb-2 pb-2 border-bottom border-light">
-                    <div class="col-md-6">
+                    <div class="col-12">
                         <label class="form-label small fw-bold">Question 1.${i}</label>
                         <input type="text" class="form-control form-control-sm" id="w-q1_${i}" required>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label small fw-bold">Sample Answer 1.${i}</label>
-                        <input type="text" class="form-control form-control-sm" id="w-q1_${i}_ans">
                     </div>
                 </div>
             `;
@@ -184,9 +180,6 @@ function initWritingForm() {
                 <div class="mb-3 border-bottom pb-2">
                     <label class="form-label small fw-bold">Question 3.${i}</label>
                     <textarea class="form-control mb-2" id="w-q3_${i}" rows="2" required></textarea>
-                    
-                    <label class="form-label small text-muted">Sample Answer 3.${i}</label>
-                    <textarea class="form-control" id="w-q3_${i}_ans" rows="2"></textarea>
                 </div>
             `;
         }
@@ -222,18 +215,16 @@ async function generateAndUploadWriting() {
 
     jsContent += `const questions1_answer = {\n`;
     for (let i = 1; i <= 5; i++) {
-        const aVal = document.getElementById(`w-q1_${i}_ans`).value || "";
-        jsContent += `    "question1_${i}_answer": "${escapeStr(aVal)}",\n`;
+        jsContent += `    "question1_${i}_answer": "",\n`;
     }
     jsContent += `};\n`;
 
     // Part 2
     const q2Val = document.getElementById('w-q2-question').value || "";
-    const a2Val = document.getElementById('w-q2-answer').value || "";
 
     jsContent += `//----------------------------------------------------------------------\n`;
     jsContent += `const questions2 = {\n    "question2": "${escapeStr(q2Val)}",\n};\n`;
-    jsContent += `const questions2_answer = {\n    "question2": "${escapeStr(a2Val)}",\n};\n`;
+    jsContent += `const questions2_answer = {\n    "question2": "",\n};\n`;
 
     // Part 3
     jsContent += `//----------------------------------------------------------------------\n`;
@@ -246,8 +237,7 @@ async function generateAndUploadWriting() {
 
     jsContent += `const questions3_answer = {\n`;
     for (let i = 1; i <= 3; i++) {
-        const aVal = document.getElementById(`w-q3_${i}_ans`).value || "";
-        jsContent += `    "question3_${i}_answer": "${escapeStr(aVal)}",\n`;
+        jsContent += `    "question3_${i}_answer": "",\n`;
     }
     jsContent += `};\n`;
 
@@ -256,8 +246,8 @@ async function generateAndUploadWriting() {
     jsContent += `const questions4_main = "${escapeStr(document.getElementById('w-q4-main').value || "")}";\n`;
     jsContent += `const question4_1_text = "${escapeStr(document.getElementById('w-q4-1-text').value || "")}";\n`;
     jsContent += `const question4_2_text = "${escapeStr(document.getElementById('w-q4-2-text').value || "")}";\n`;
-    jsContent += `const question4_1_text_answer = \`${(document.getElementById('w-q4-1-answer').value || "")}\`;\n`;
-    jsContent += `const question4_2_text_answer = \`${(document.getElementById('w-q4-2-answer').value || "")}\`;\n`;
+    jsContent += `const question4_1_text_answer = \`\`;\n`;
+    jsContent += `const question4_2_text_answer = \`\`;\n`;
 
     // ADDED CONSTANTS & FUNCTIONS FOR RENDER (Compact Version)
     jsContent += `

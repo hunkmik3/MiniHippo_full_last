@@ -126,9 +126,15 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error('practice_results update error:', error);
+    const rawMessage = error?.message || '';
+    if (/record\s+"new"\s+has\s+no\s+field\s+"updated_at"/i.test(rawMessage)) {
+      return res.status(500).json({
+        error: 'Schema Supabase đang thiếu cột updated_at trên practice_results. Vui lòng chạy SUPABASE_PRACTICE_TABLES.sql để đồng bộ schema.',
+        code: 'MISSING_UPDATED_AT_COLUMN'
+      });
+    }
     return res.status(error.status || 500).json({
       error: error.message || 'Không thể cập nhật kết quả luyện tập'
     });
   }
 }
-

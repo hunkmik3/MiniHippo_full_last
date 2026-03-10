@@ -28,6 +28,10 @@ CREATE TABLE IF NOT EXISTS public.practice_sets (
   updated_at timestamptz NOT NULL DEFAULT NOW()
 );
 
+-- Backfill for older deployments where table existed before updated_at was introduced.
+ALTER TABLE public.practice_sets
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT NOW();
+
 -- Ensure duration is valid
 DO $$
 BEGIN
@@ -94,6 +98,10 @@ CREATE TABLE IF NOT EXISTS public.practice_results (
   created_at timestamptz NOT NULL DEFAULT NOW(),
   updated_at timestamptz NOT NULL DEFAULT NOW()
 );
+
+-- Backfill for older deployments where table existed before updated_at was introduced.
+ALTER TABLE public.practice_results
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT NOW();
 
 DO $$
 BEGIN

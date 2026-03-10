@@ -115,6 +115,20 @@
         };
     }
 
+    function getQuestionFeedbackMap(metadata = {}) {
+        const raw = metadata.admin_question_feedback || metadata.question_feedback;
+        if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+            return raw;
+        }
+        return {};
+    }
+
+    function buildQuestionFeedbackId(partKey, itemKey, idx) {
+        const safePart = String(partKey || 'part').trim() || 'part';
+        const safeKey = String(itemKey || `item_${idx + 1}`).trim() || `item_${idx + 1}`;
+        return `${safePart}:${safeKey}`;
+    }
+
     function renderTable(results) {
         if (!refs.tableBody) return;
         if (!results.length) {
@@ -203,12 +217,14 @@
         }
     }
 
-    function renderAnswerItems(items = []) {
+    function renderAnswerItems(items = [], partKey = '', questionFeedbackMap = {}) {
         if (!Array.isArray(items) || !items.length) {
             return '<div class="text-muted small">Không có dữ liệu câu trả lời.</div>';
         }
         return items.map((item, idx) => {
             const key = item.key || `item_${idx + 1}`;
+            const questionId = buildQuestionFeedbackId(partKey, key, idx);
+            const savedFeedback = questionFeedbackMap[questionId] || questionFeedbackMap[key] || '';
             const prompt = item.prompt ? `<div class="small text-muted mb-1">${escapeHtml(item.prompt)}</div>` : '';
             const answerText = escapeHtml(item.answer || '—').replace(/\n/g, '<br>');
             const words = Number(item.word_count || 0);
@@ -220,6 +236,15 @@
                     </div>
                     ${prompt}
                     <div>${answerText}</div>
+                    <div class="mt-2">
+                        <label class="form-label small mb-1">Nhận xét câu này</label>
+                        <textarea
+                            class="form-control form-control-sm wr-question-feedback-input"
+                            data-question-id="${escapeHtml(questionId)}"
+                            rows="2"
+                            placeholder="Nhập nhận xét cho câu này..."
+                        >${escapeHtml(savedFeedback)}</textarea>
+                    </div>
                 </div>
             `;
         }).join('');
@@ -227,6 +252,7 @@
 
     function renderWritingAnswers(metadata = {}) {
         const userAnswers = metadata.user_answers;
+        const questionFeedbackMap = getQuestionFeedbackMap(metadata);
         if (!userAnswers || typeof userAnswers !== 'object') {
             return '<div class="text-muted small">Không có dữ liệu bài làm Writing chi tiết.</div>';
         }
@@ -237,9 +263,22 @@
         return sections.map((partKey) => `
             <div class="mb-3">
                 <h6 class="small text-primary mb-2">${escapeHtml(partKey.toUpperCase())}</h6>
-                ${renderAnswerItems(userAnswers[partKey])}
+                ${renderAnswerItems(userAnswers[partKey], partKey, questionFeedbackMap)}
             </div>
         `).join('');
+    }
+
+    function collectQuestionFeedbackFromModal() {
+        const feedbackMap = {};
+        document.querySelectorAll('#writing-result-answers .wr-question-feedback-input').forEach((inputEl) => {
+            const questionId = (inputEl?.dataset?.questionId || '').trim();
+            if (!questionId) return;
+            const value = String(inputEl.value || '').trim();
+            if (value) {
+                feedbackMap[questionId] = value;
+            }
+        });
+        return feedbackMap;
     }
 
     function ensureDetailModal() {
@@ -355,12 +394,15 @@
         const note = (document.getElementById('wr-admin-note')?.value || '').trim();
         const scoreValue = document.getElementById('wr-admin-score')?.value;
         const maxValue = document.getElementById('wr-admin-max-score')?.value;
+        const questionFeedbackMap = collectQuestionFeedbackFromModal();
+        const hasQuestionFeedback = Object.keys(questionFeedbackMap).length > 0;
 
         const payload = {
             id: state.selectedResult.id,
             metadataPatch: {
                 band: band || null,
-                admin_note: note || null
+                admin_note: note || null,
+                admin_question_feedback: hasQuestionFeedback ? questionFeedbackMap : null
             }
         };
         if (scoreValue !== '' && scoreValue !== undefined) payload.totalScore = Number(scoreValue);

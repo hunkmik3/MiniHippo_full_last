@@ -83,6 +83,80 @@
         };
     }
 
+    function getQuestionFeedbackMap(metadata = {}) {
+        const raw = metadata.admin_question_feedback || metadata.question_feedback;
+        if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+            return raw;
+        }
+        return {};
+    }
+
+    function getPartLabel(partKey) {
+        if (!partKey) return '';
+        const normalized = String(partKey).replace(/^part/i, '').trim();
+        return normalized ? `Part ${normalized}` : String(partKey);
+    }
+
+    function buildQuestionFeedbackId(partKey, itemKey, idx) {
+        const safePart = String(partKey || 'part').trim() || 'part';
+        const safeKey = String(itemKey || `item_${idx + 1}`).trim() || `item_${idx + 1}`;
+        return `${safePart}:${safeKey}`;
+    }
+
+    function renderWritingAnswerItemsWithFeedback(items = [], partKey = '', questionFeedbackMap = {}) {
+        if (!Array.isArray(items) || !items.length) {
+            return '<div class="text-muted small">Không có dữ liệu câu trả lời.</div>';
+        }
+
+        return items.map((item, idx) => {
+            const key = item.key || `item_${idx + 1}`;
+            const questionId = buildQuestionFeedbackId(partKey, key, idx);
+            const prompt = item.prompt ? `<div class="small text-muted mb-1">${escapeHtml(item.prompt)}</div>` : '';
+            const answerText = escapeHtml(item.answer || '—').replace(/\n/g, '<br>');
+            const words = Number(item.word_count || 0);
+            const feedbackText = (questionFeedbackMap[questionId] || questionFeedbackMap[key] || '').trim();
+            const feedbackHtml = feedbackText
+                ? escapeHtml(feedbackText).replace(/\n/g, '<br>')
+                : '<span class="text-muted">Chưa có nhận xét cho câu này.</span>';
+
+            return `
+                <div class="border rounded p-2 mb-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <strong class="small">${escapeHtml(key)}</strong>
+                        <span class="badge bg-light text-dark">${words} từ</span>
+                    </div>
+                    ${prompt}
+                    <div class="mb-2">${answerText}</div>
+                    <div class="small">
+                        <strong>Nhận xét admin:</strong>
+                        <div>${feedbackHtml}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function renderWritingFeedbackDetail(metadata = {}) {
+        const userAnswers = metadata.user_answers;
+        if (!userAnswers || typeof userAnswers !== 'object') {
+            return '<div class="text-muted small">Không có dữ liệu bài làm Writing chi tiết.</div>';
+        }
+
+        const sections = Object.keys(userAnswers);
+        if (!sections.length) {
+            return '<div class="text-muted small">Không có dữ liệu bài làm Writing chi tiết.</div>';
+        }
+
+        const questionFeedbackMap = getQuestionFeedbackMap(metadata);
+
+        return sections.map((partKey) => `
+            <div class="mb-3">
+                <h6 class="small text-primary mb-2">${escapeHtml(getPartLabel(partKey))}</h6>
+                ${renderWritingAnswerItemsWithFeedback(userAnswers[partKey], partKey, questionFeedbackMap)}
+            </div>
+        `).join('');
+    }
+
     function getAuthHeaders(extra = {}) {
         const token = typeof getAuthToken === 'function'
             ? getAuthToken()
@@ -130,6 +204,10 @@
                             <div>
                                 <h6 class="mb-2">Nhận xét admin</h6>
                                 <div id="history-detail-admin-note" class="border rounded p-2 small"></div>
+                            </div>
+                            <div class="mt-3" id="history-detail-writing-feedback-wrap" style="display: none;">
+                                <h6 class="mb-2">Nhận xét theo từng câu</h6>
+                                <div id="history-detail-writing-feedback"></div>
                             </div>
                         </div>
                     </div>
@@ -251,6 +329,17 @@
                 : 'Chưa có ghi chú từ admin.';
             const gradedAt = metadata.admin_graded_at ? `\n\nCập nhật: ${formatDateTime(metadata.admin_graded_at)}` : '';
             adminNoteEl.textContent = `${note}${gradedAt}`;
+        }
+        const writingFeedbackWrapEl = document.getElementById('history-detail-writing-feedback-wrap');
+        const writingFeedbackEl = document.getElementById('history-detail-writing-feedback');
+        if (result.practice_type === 'writing') {
+            if (writingFeedbackWrapEl) writingFeedbackWrapEl.style.display = 'block';
+            if (writingFeedbackEl) {
+                writingFeedbackEl.innerHTML = renderWritingFeedbackDetail(metadata);
+            }
+        } else {
+            if (writingFeedbackWrapEl) writingFeedbackWrapEl.style.display = 'none';
+            if (writingFeedbackEl) writingFeedbackEl.innerHTML = '';
         }
 
         if (window.bootstrap && modalEl) {

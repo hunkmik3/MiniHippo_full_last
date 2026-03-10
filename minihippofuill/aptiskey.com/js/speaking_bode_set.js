@@ -44,7 +44,6 @@
         startAt: Date.now(),
         timeLeft: 15 * 60,
         timerInterval: null,
-        autoAdvanceTimeout: null,
         autoAdvanceInterval: null,
         audioList: [],
         audioIndex: 0,
@@ -60,6 +59,24 @@
         'Each part of the test will appear automatically.',
         'The test will take about 12 minutes.'
     ];
+    const COMPLETE_PAGE_TITLE = 'Bạn đã hoàn thành bài Speaking.';
+    const COMPLETE_PAGE_MESSAGE = 'Tất cả câu hỏi đã hoàn tất. Vui lòng nhấn "Nộp bài" để gửi kết quả.';
+    const PAGE_AUTO_ADVANCE_SECONDS = {
+        1: 5,
+        2: 5,
+        3: 30,
+        4: 30,
+        5: 30,
+        6: 45,
+        7: 45,
+        8: 45,
+        9: 45,
+        10: 45,
+        11: 45,
+        12: 5,
+        13: 60,
+        14: 120
+    };
 
     function safeText(value) {
         return typeof value === 'string' ? value.trim() : '';
@@ -194,8 +211,11 @@
             part3: {
                 introText: safeText(firstValue(part3, ['introText', 'instruction'], 'Part 3: So sánh 2 bức ảnh và trả lời 2 câu hỏi.')),
                 introAudioUrl: normalizeUrl(firstValue(part3, ['introAudioUrl', 'audioUrl', 'introAudio'], '')),
-                leftImageUrl: normalizeUrl(firstValue(part3, ['leftImageUrl', 'imageLeft', 'image1'], '')),
-                rightImageUrl: normalizeUrl(firstValue(part3, ['rightImageUrl', 'imageRight', 'image2'], '')),
+                imageUrl: normalizeUrl(firstValue(
+                    part3,
+                    ['imageUrl', 'image', 'mergedImageUrl', 'leftImageUrl', 'imageLeft', 'image1'],
+                    ''
+                )),
                 questions: normalizeQuestions(part3.questions, 2, 'Câu hỏi Part 3')
             },
             part4: {
@@ -294,7 +314,7 @@
             part: 3,
             title: 'Part 3 - Bắt đầu',
             instruction: data.part3.introText,
-            images: [data.part3.leftImageUrl, data.part3.rightImageUrl].filter(Boolean),
+            images: data.part3.imageUrl ? [data.part3.imageUrl] : [],
             audioUrls: data.part3.introAudioUrl ? [data.part3.introAudioUrl] : [],
             answerKey: null,
             prompt: '',
@@ -355,6 +375,19 @@
             autoAdvance: false
         });
 
+        pages.push({
+            id: 'pg15',
+            kind: 'completion',
+            part: 4,
+            title: COMPLETE_PAGE_TITLE,
+            instruction: COMPLETE_PAGE_MESSAGE,
+            images: [],
+            audioUrls: [],
+            answerKey: null,
+            prompt: '',
+            autoAdvance: false
+        });
+
         return pages;
     }
 
@@ -364,10 +397,6 @@
             refs.audio.removeAttribute('src');
             refs.audio.load();
             refs.audio.onended = null;
-        }
-        if (state.autoAdvanceTimeout) {
-            clearTimeout(state.autoAdvanceTimeout);
-            state.autoAdvanceTimeout = null;
         }
         if (state.autoAdvanceInterval) {
             clearInterval(state.autoAdvanceInterval);
@@ -441,55 +470,64 @@
         refs.step.textContent = `${page?.id?.toUpperCase() || 'PG'} (${state.currentPage}/${state.totalPages})${setTitle}`;
     }
 
-    function startAutoAdvanceCountdown() {
-        const page = state.pages[state.currentPage - 1];
-        if (!page || !page.autoAdvance || state.currentPage >= state.totalPages) {
+    function getPageAutoAdvanceSeconds(page) {
+        const id = safeText(page?.id || '').toLowerCase();
+        const match = id.match(/^pg(\d+)$/);
+        if (!match) return 0;
+        const pageNumber = Number(match[1]);
+        return Number(PAGE_AUTO_ADVANCE_SECONDS[pageNumber]) || 0;
+    }
+
+    function startAutoAdvanceCountdown(page, seconds) {
+        if (!page || !seconds || seconds <= 0) {
             return;
         }
 
-        let remain = 5;
-        if (refs.autoHint) {
-            refs.autoHint.textContent = `Audio đã chạy xong. Tự chuyển sau ${remain}s.`;
-        }
-        if (refs.audioStatus) {
-            refs.audioStatus.textContent = `Tự chuyển trang sau ${remain} giây...`;
-        }
+        const isLastPage = state.currentPage >= state.totalPages;
+        let remain = seconds;
+        const updateCountdownText = () => {
+            if (refs.autoHint) {
+                refs.autoHint.textContent = isLastPage
+                    ? `Tự nộp bài sau ${remain}s.`
+                    : `Tự chuyển trang sau ${remain}s.`;
+            }
+            if (refs.audioStatus && Array.isArray(page.audioUrls) && page.audioUrls.length) {
+                refs.audioStatus.textContent = isLastPage
+                    ? `Tự nộp bài sau ${remain} giây...`
+                    : `Tự chuyển trang sau ${remain} giây...`;
+            }
+        };
+        updateCountdownText();
 
         state.autoAdvanceInterval = setInterval(() => {
             remain -= 1;
             if (remain <= 0) {
                 clearInterval(state.autoAdvanceInterval);
                 state.autoAdvanceInterval = null;
-                showPage(state.currentPage + 1);
+                if (state.currentPage >= state.totalPages) {
+                    submitResult();
+                } else {
+                    showPage(state.currentPage + 1);
+                }
                 return;
             }
-            if (refs.autoHint) {
-                refs.autoHint.textContent = `Audio đã chạy xong. Tự chuyển sau ${remain}s.`;
-            }
-            if (refs.audioStatus) {
-                refs.audioStatus.textContent = `Tự chuyển trang sau ${remain} giây...`;
-            }
+            updateCountdownText();
         }, 1000);
     }
 
-    function playAudioSequence(page) {
+    function playAudioSequence(page, options = {}) {
         if (!refs.audio || !refs.audioCard) {
-            return;
+            return false;
         }
 
+        const onComplete = typeof options.onComplete === 'function' ? options.onComplete : null;
         const validAudio = (page.audioUrls || []).map(normalizeUrl).filter(Boolean);
         state.audioList = validAudio;
         state.audioIndex = 0;
 
         if (!validAudio.length) {
             refs.audioCard.style.display = 'none';
-            if (page.autoAdvance) {
-                if (refs.autoHint) refs.autoHint.textContent = 'Không có audio cho trang này. Tự chuyển sau 5s.';
-                state.autoAdvanceTimeout = setTimeout(() => showPage(state.currentPage + 1), 5000);
-            } else if (refs.autoHint) {
-                refs.autoHint.textContent = 'Trang này chờ thao tác thủ công.';
-            }
-            return;
+            return false;
         }
 
         refs.audioCard.style.display = 'block';
@@ -515,11 +553,8 @@
                 if (index + 1 < validAudio.length) {
                     await runAudioAt(index + 1);
                 } else {
-                    if (page.autoAdvance) {
-                        startAutoAdvanceCountdown();
-                    } else if (refs.autoHint) {
-                        refs.autoHint.textContent = 'Trang này chờ thao tác thủ công.';
-                    }
+                    if (refs.audioStatus) refs.audioStatus.textContent = 'Audio đã phát xong.';
+                    if (onComplete) onComplete();
                 }
             };
 
@@ -530,20 +565,20 @@
                     refs.audioStatus.textContent = 'Trình duyệt đang chặn autoplay. Vui lòng bấm Play để tiếp tục.';
                 }
                 if (refs.autoHint) {
-                    refs.autoHint.textContent = page.autoAdvance
-                        ? 'Sau khi audio chạy xong, trang sẽ tự chuyển sau 5s.'
-                        : 'Trang này chờ thao tác thủ công.';
+                    refs.autoHint.textContent = 'Thời gian sẽ bắt đầu đếm sau khi audio phát xong.';
                 }
             }
         };
 
         runAudioAt(0);
+        return true;
     }
 
     function renderPage(page) {
         if (!page) return;
 
         stopAudioAndTimers();
+        const autoAdvanceSeconds = getPageAutoAdvanceSeconds(page);
         const coverPage = isCoverPage(page);
         if (refs.questionContainer) {
             refs.questionContainer.classList.toggle('cover-wide', coverPage);
@@ -555,7 +590,6 @@
             if (refs.answerBlock) refs.answerBlock.style.display = 'none';
             if (refs.answerInput) refs.answerInput.value = '';
             setWordCount('');
-            if (refs.autoHint) refs.autoHint.textContent = 'Trang này chờ thao tác thủ công.';
         } else {
             if (refs.coverLayout) refs.coverLayout.style.display = 'none';
             if (refs.standardLayout) refs.standardLayout.style.display = 'block';
@@ -579,13 +613,30 @@
                 }
             }
 
-            if (refs.autoHint) {
-                refs.autoHint.textContent = page.autoAdvance
-                    ? 'Audio tự chạy. Sau khi audio kết thúc sẽ chờ 5s và chuyển trang.'
-                    : 'Trang này chờ thao tác thủ công.';
-            }
+            const shouldAutoAdvance = autoAdvanceSeconds > 0;
+            const hasAudio = playAudioSequence(page, {
+                onComplete: () => {
+                    const currentPage = state.pages[state.currentPage - 1];
+                    if (!currentPage || currentPage.id !== page.id) return;
+                    if (!shouldAutoAdvance) return;
+                    startAutoAdvanceCountdown(page, autoAdvanceSeconds);
+                }
+            });
 
-            playAudioSequence(page);
+            if (shouldAutoAdvance && hasAudio && refs.autoHint) {
+                refs.autoHint.textContent = 'Đang phát audio... thời gian sẽ bắt đầu đếm sau khi audio kết thúc.';
+            }
+        }
+
+        if (autoAdvanceSeconds > 0) {
+            const hasAudio = Array.isArray(page.audioUrls) && page.audioUrls.map(normalizeUrl).filter(Boolean).length > 0;
+            if (!hasAudio) {
+                startAutoAdvanceCountdown(page, autoAdvanceSeconds);
+            }
+        } else if (refs.autoHint) {
+            refs.autoHint.textContent = page.kind === 'completion'
+                ? 'Nhấn "Nộp bài" để hoàn tất.'
+                : 'Trang này chờ thao tác thủ công.';
         }
 
         if (refs.backBtn) refs.backBtn.disabled = state.currentPage === 1;
