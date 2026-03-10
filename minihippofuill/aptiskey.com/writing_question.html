@@ -159,6 +159,24 @@
             const WRITING_DURATION_SECONDS = 50 * 60;
             let writingCountdownInterval = null;
             let writingCountdownStarted = false;
+            let suppressAiResultModal = false;
+
+            function setupAiResultModalSuppression() {
+                const resultModalEl = document.getElementById('resultModal');
+                if (!resultModalEl) return;
+                if (resultModalEl.dataset.suppressBound === '1') return;
+                resultModalEl.dataset.suppressBound = '1';
+                resultModalEl.addEventListener('show.bs.modal', (event) => {
+                    if (!suppressAiResultModal) return;
+                    event.preventDefault();
+                });
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', setupAiResultModalSuppression);
+            } else {
+                setupAiResultModalSuppression();
+            }
 
             function formatCountdown(seconds) {
                 const mins = Math.floor(seconds / 60);
@@ -555,6 +573,7 @@
                         try {
                             // Call original submit logic (AI Grading)
                             if (typeof window.handleSubmitAllQuestions === 'function') {
+                                suppressAiResultModal = true;
                                 await window.handleSubmitAllQuestions();
                             } else {
                                 console.warn('handleSubmitAllQuestions function not found');
@@ -605,6 +624,7 @@
                                 if (saved) {
                                     writingResultSubmitted = true;
                                     console.log('Writing Result Saved to Admin');
+                                    alert('Đã nộp bài thành công.');
                                 }
                             } else if (writingResultSubmitted) {
                                 console.log('Writing result already saved. Skip duplicate submit.');
@@ -613,7 +633,9 @@
                             }
                         } catch (error) {
                             console.error('Writing submit/save failed:', error);
+                            alert('Nộp bài thất bại. Vui lòng thử lại.');
                         } finally {
+                            suppressAiResultModal = false;
                             savingInProgress = false;
                             newConfirmBtn.disabled = false;
                         }
