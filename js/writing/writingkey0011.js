@@ -1,12 +1,12 @@
 const key_id = "Bộ đề #0011";
-const club_name = "CCC";
+const club_name = "saddasdas";
 //----------------------------------------------------------------------
 const questions1 = {
-    "question1_1": "ưeqwe",
-    "question1_2": "ưqeqweqw",
-    "question1_3": "ưeqwe",
-    "question1_4": "ưqeqwe",
-    "question1_5": "ưqewqe",
+    "question1_1": "saddasdas",
+    "question1_2": "saddasdas",
+    "question1_3": "saddasdas",
+    "question1_4": "saddasdas",
+    "question1_5": "saddasdas",
 };
 const questions1_answer = {
     "question1_1_answer": "",
@@ -17,28 +17,28 @@ const questions1_answer = {
 };
 //----------------------------------------------------------------------
 const questions2 = {
-    "question2": "ưqeqwewqeqweqwewqeqweqwfdsfqewfdfdsfewfe",
+    "question2": "saddasdas",
 };
 const questions2_answer = {
-    "question2": "",
+    "question2": "saddasdas",
 };
 //----------------------------------------------------------------------
 const questions3 = {
-    "question3_1": "ềwfedfdsfasdafdsafsdf",
-    "question3_2": "dsfasfasdfasdfsadfasdf",
-    "question3_3": "dsfadsfsdfsdfsadfdsadsdsfadsfsdfsdfsadfdsadsdsfadsfsdfsdfsadfdsadsdsfadsfsdfsdfsadfdsads",
+    "question3_1": "saddasdas",
+    "question3_2": "saddasdas",
+    "question3_3": "saddasdas",
 };
 const questions3_answer = {
-    "question3_1_answer": "",
-    "question3_2_answer": "",
-    "question3_3_answer": "",
+    "question3_1_answer": "saddasdas",
+    "question3_2_answer": "saddasdas",
+    "question3_3_answer": "saddasdas",
 };
 //----------------------------------------------------------------------
-const questions4_main = "dsfadsfsdfsdfsadfdsads";
+const questions4_main = "saddasdas";
 const question4_1_text = "Write a short email to your friend. Tell your friend your feelings about this and what you plan to do.";
 const question4_2_text = "Write an email to the president of the club. Tell them your thoughts about this and what you would like to do.";
-const question4_1_text_answer = ``;
-const question4_2_text_answer = ``;
+const question4_1_text_answer = `saddasdas`;
+const question4_2_text_answer = `saddasdas`;
 
 // Static Render Functions
 function renderQuestions1(){const t=document.getElementById("topic-title_q1");if(t)t.textContent=`Question 1 of 4 - ${club_name}`;const d=document.getElementById("description_q1");if(d)d.textContent=`You are joining a ${club_name}. Fill out the form. Write short answers (1-10 words) for each message (5 questions).`;const c=document.getElementById("questions-container1");if(!c)return;let h="";for(let k in questions1)h+=`<div class="mb-4"><label class="form-label">${questions1[k]}</label><input type="text" class="form-control" id="${k}"></div>`;c.innerHTML=h;for(let k in questions1){document.getElementById(k)?.addEventListener("input",e=>{const w=e.target.value.split(/\s+/).filter(Boolean);if(w.length>10)e.target.value=w.slice(0,10).join(' ')+' '})}}
@@ -62,7 +62,8 @@ document.addEventListener("DOMContentLoaded",()=>{if(typeof key_id!=='undefined'
 async function handleSubmitAllQuestions(){
     const ans={question1:{},question2:{},question3:{},question4:{}};
     for(let i=1;i<=5;i++)ans.question1[`question1_${i}`]=document.getElementById(`question1_${i}`)?.value||"";
-    ans.question2.question2=document.getElementById('question2')?.value||"";
+    const q2Key=Object.keys(questions2)[0]||"question2";
+    ans.question2[q2Key]=document.getElementById(q2Key)?.value||"";
     for(let i=1;i<=3;i++)ans.question3[`question3_${i}`]=document.getElementById(`question3_${i}`)?.value||"";
     ans.question4.question4_1=document.getElementById('question4_1')?.value||"";
     ans.question4.question4_2=document.getElementById('question4_2')?.value||"";
@@ -71,7 +72,7 @@ async function handleSubmitAllQuestions(){
 ${Object.entries(ans.question1).map(([k,v])=>`${questions1[k]}: ${v}`).join('\n')}
 
 ${promptText_question2}
-${questions2.question2}: ${ans.question2.question2}
+${questions2[q2Key]}: ${ans.question2[q2Key]}
 
 ${promptText_question3}
 ${Object.entries(ans.question3).map(([k,v])=>`${questions3[k]}: ${v}`).join('\n')}
