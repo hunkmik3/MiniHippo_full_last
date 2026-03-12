@@ -1,12 +1,12 @@
 const key_id = "Bộ đề #001";
-const club_name = "NATURE CLUB";
+const club_name = "TRAVEL CLUB";
 //----------------------------------------------------------------------
 const questions1 = {
-    "question1_1": "What’s your favorite sport?",
-    "question1_2": "How many people are in your family?",
-    "question1_3": "What did you do yesterday?",
-    "question1_4": "How do you go to school?",
-    "question1_5": "What’s your hobby?",
+    "question1_1": "1.What country would you like to visit?",
+    "question1_2": "2.Who do you usually travel with?",
+    "question1_3": "3.What do you always take on holiday?",
+    "question1_4": "4.How often do you travel?",
+    "question1_5": "5.What kind of transport do you prefer?",
 };
 const questions1_answer = {
     "question1_1_answer": "",
@@ -17,16 +17,16 @@ const questions1_answer = {
 };
 //----------------------------------------------------------------------
 const questions2 = {
-    "question2": "Please tell me about your free time and hobbies?",
+    "question2": "Why are you interested in travel?\n\n",
 };
 const questions2_answer = {
     "question2": "",
 };
 //----------------------------------------------------------------------
 const questions3 = {
-    "question3_1": "Hi! Welcome to the club. Where do you like to visit?",
-    "question3_2": "Hi! Why did you decide to join the club?",
-    "question3_3": "The bigger the club, the more environmentally conscious people are, right?",
+    "question3_1": "1.Tell me a time you had a trip in bad weather.\n\n",
+    "question3_2": "2.Traveling a long distance by some means of transportation is not good for the environment? Do you agree?\n\n",
+    "question3_3": "3.What are the most interesting places to visit in your country?\n\n",
 };
 const questions3_answer = {
     "question3_1_answer": "",
@@ -34,9 +34,9 @@ const questions3_answer = {
     "question3_3_answer": "",
 };
 //----------------------------------------------------------------------
-const questions4_main = "“Dear member,\nThe club wants to make a plan for the young people because they just love to stay home and play games.”\n";
-const question4_1_text = "Write an email to your friend. Write about 50 words.";
-const question4_2_text = "Write an email to the manager of the club. Write about 120 - 150 words.";
+const questions4_main = "“Dear members, \nOur club is planning to encourage tourists to visit an area. We also want visitors coming to our areas to behave politely. Please raise your voice and give some suggestions for this plan.”\n";
+const question4_1_text = "Write a short email to your friend. Tell your friend your feelings about this and what you plan to do.";
+const question4_2_text = "Write an email to the president of the club. Tell them your thoughts about this and what you would like to do.";
 const question4_1_text_answer = ``;
 const question4_2_text_answer = ``;
 
