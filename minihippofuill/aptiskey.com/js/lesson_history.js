@@ -61,6 +61,23 @@
         return '—';
     }
 
+    function resolveDisplayBand(result, metadata = {}) {
+        const practiceType = String(result?.practice_type || '').toLowerCase();
+        if (practiceType === 'writing' || practiceType === 'speaking') {
+            const rawBand = typeof metadata.band === 'string' ? metadata.band.trim() : '';
+            if (!rawBand) return 'Pending';
+
+            const isLegacyDefaultC = practiceType === 'writing'
+                && rawBand.toUpperCase() === 'C'
+                && !metadata.admin_graded_at
+                && Number(result?.total_score || 0) === 0
+                && Number(result?.max_score || 0) === 0;
+
+            return isLegacyDefaultC ? 'Pending' : rawBand;
+        }
+        return calculateBand(result?.practice_type, result?.total_score);
+    }
+
     function getAiUsageInfo(metadata = {}) {
         const rawProbability = Number(metadata.ai_usage_probability);
         const probability = Number.isFinite(rawProbability)
@@ -237,9 +254,7 @@
             const score = `${item.total_score || 0}/${item.max_score || 0}`;
             const duration = formatDurationSeconds(item.duration_seconds);
             const metadata = item.metadata && typeof item.metadata === 'object' ? item.metadata : {};
-            const band = ((item.practice_type === 'writing' || item.practice_type === 'speaking') && metadata.band)
-                ? metadata.band
-                : calculateBand(item.practice_type, item.total_score);
+            const band = resolveDisplayBand(item, metadata);
             const aiUsage = item.practice_type === 'writing' ? getAiUsageInfo(metadata) : null;
             const aiUsageText = aiUsage
                 ? (aiUsage.probability !== null ? `${aiUsage.label} (${aiUsage.probability}%)` : aiUsage.label)
@@ -299,9 +314,7 @@
         const type = result.practice_type
             ? result.practice_type.charAt(0).toUpperCase() + result.practice_type.slice(1)
             : '—';
-        const band = ((result.practice_type === 'writing' || result.practice_type === 'speaking') && metadata.band)
-            ? metadata.band
-            : calculateBand(result.practice_type, result.total_score);
+        const band = resolveDisplayBand(result, metadata);
         const aiUsage = result.practice_type === 'writing' ? getAiUsageInfo(metadata) : null;
         const aiUsageText = aiUsage
             ? (aiUsage.probability !== null ? `${aiUsage.label} (${aiUsage.probability}%)` : aiUsage.label)

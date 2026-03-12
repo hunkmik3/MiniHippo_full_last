@@ -159,23 +159,43 @@
             const WRITING_DURATION_SECONDS = 50 * 60;
             let writingCountdownInterval = null;
             let writingCountdownStarted = false;
-            let suppressAiResultModal = false;
+            let writingAutoHomeTimer = null;
 
-            function setupAiResultModalSuppression() {
-                const resultModalEl = document.getElementById('resultModal');
-                if (!resultModalEl) return;
-                if (resultModalEl.dataset.suppressBound === '1') return;
-                resultModalEl.dataset.suppressBound = '1';
-                resultModalEl.addEventListener('show.bs.modal', (event) => {
-                    if (!suppressAiResultModal) return;
-                    event.preventDefault();
+            function scheduleWritingAutoBackHome(delayMs = 1800) {
+                if (writingAutoHomeTimer) {
+                    clearTimeout(writingAutoHomeTimer);
+                }
+                writingAutoHomeTimer = setTimeout(() => {
+                    window.location.href = 'home.html';
+                }, delayMs);
+            }
+
+            function showWritingSubmitSuccessModal() {
+                const doneModalEl = document.getElementById('writingDoneModal');
+                if (doneModalEl && window.bootstrap) {
+                    new bootstrap.Modal(doneModalEl).show();
+                } else {
+                    alert('Đã nộp bài thành công.');
+                }
+                scheduleWritingAutoBackHome();
+            }
+
+            function blockLegacyAiModals() {
+                ['loadingModal', 'resultModal'].forEach((modalId) => {
+                    const modalEl = document.getElementById(modalId);
+                    if (!modalEl) return;
+                    if (modalEl.dataset.legacyBlocked === '1') return;
+                    modalEl.dataset.legacyBlocked = '1';
+                    modalEl.addEventListener('show.bs.modal', (event) => {
+                        event.preventDefault();
+                    });
                 });
             }
 
             if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', setupAiResultModalSuppression);
+                document.addEventListener('DOMContentLoaded', blockLegacyAiModals);
             } else {
-                setupAiResultModalSuppression();
+                blockLegacyAiModals();
             }
 
             function formatCountdown(seconds) {
@@ -445,43 +465,6 @@
                 };
             }
 
-            function parseBandFromResultText(resultText) {
-                if (!resultText) return '';
-                const priorityRegex = /(?:overall|tổng thể|band|level|grade|cấp độ)[^\n:]*[:\-]?\s*(A0|A1|A2|B1|B2|C1|C)\b/i;
-                const fallbackRegex = /\b(A0|A1|A2|B1|B2|C1|C)\b/i;
-                const match = resultText.match(priorityRegex) || resultText.match(fallbackRegex);
-                return match ? match[1].toUpperCase() : '';
-            }
-
-            function parseScoreFromResultText(resultText) {
-                if (!resultText) return { total: null, max: null };
-                const pairMatch = resultText.match(/(\d+(?:\.\d+)?)\s*(?:\/|out of|trên)\s*(\d+(?:\.\d+)?)/i);
-                if (pairMatch) {
-                    return {
-                        total: Number(pairMatch[1]),
-                        max: Number(pairMatch[2])
-                    };
-                }
-                const singleMatch = resultText.match(/(?:overall score|total score|score|điểm tổng|tổng điểm)[^\d]*(\d+(?:\.\d+)?)/i);
-                if (singleMatch) {
-                    return {
-                        total: Number(singleMatch[1]),
-                        max: null
-                    };
-                }
-                return { total: null, max: null };
-            }
-
-            async function waitForAiResultText(timeoutMs = 5000) {
-                const startedAt = Date.now();
-                while (Date.now() - startedAt < timeoutMs) {
-                    const text = document.getElementById('modal-body-ai')?.textContent?.trim() || '';
-                    if (text) return text;
-                    await new Promise((resolve) => setTimeout(resolve, 250));
-                }
-                return document.getElementById('modal-body-ai')?.textContent?.trim() || '';
-            }
-
             // Helper to fix navigation and submit logic
             window.setupNavigationHelper = function () {
                 console.log('Applying Navigation Helper Fix');
@@ -571,20 +554,8 @@
                         if (confirmModal) confirmModal.hide();
 
                         try {
-                            // Call original submit logic (AI Grading)
-                            if (typeof window.handleSubmitAllQuestions === 'function') {
-                                suppressAiResultModal = true;
-                                await window.handleSubmitAllQuestions();
-                            } else {
-                                console.warn('handleSubmitAllQuestions function not found');
-                                return;
-                            }
-
                             // Save result once after grading
                             if (!writingResultSubmitted && typeof window.submitPracticeResult === 'function') {
-                                const resultText = await waitForAiResultText();
-                                const band = parseBandFromResultText(resultText) || 'Pending';
-                                const scoreInfo = parseScoreFromResultText(resultText);
                                 const lessonId = new URLSearchParams(window.location.search).get('lesson') || 'unknown';
                                 const setTitle = document.getElementById('keys_id')?.textContent?.trim()
                                     ? `Writing Practice ${document.getElementById('keys_id').textContent.trim()}`
@@ -594,29 +565,25 @@
                                 const aiUsage = detectAiUsageRisk(submission, durationSeconds);
 
                                 const metadata = {
-                                    band,
+                                    band: 'Pending',
                                     source: 'writing_question',
-                                    ai_feedback_preview: resultText.substring(0, 500),
-                                    ai_feedback: resultText.substring(0, 12000),
                                     user_answers: submission.userAnswers,
                                     total_words: submission.totalWords,
                                     ai_usage_probability: aiUsage.probability,
                                     ai_usage_threshold: aiUsage.threshold,
                                     ai_usage_label: aiUsage.label,
                                     ai_usage_reasons: aiUsage.reasons,
-                                    ai_usage_metrics: aiUsage.metrics
+                                    ai_usage_metrics: aiUsage.metrics,
+                                    writing_submitted_at: new Date().toISOString()
                                 };
-                                if (scoreInfo.total !== null) {
-                                    metadata.ai_score_extracted = scoreInfo;
-                                }
 
                                 const saved = await window.submitPracticeResult({
                                     practiceType: 'writing',
                                     mode: 'set',
                                     setId: lessonId,
                                     setTitle,
-                                    totalScore: scoreInfo.total !== null ? scoreInfo.total : 0,
-                                    maxScore: scoreInfo.max !== null ? scoreInfo.max : 0,
+                                    totalScore: 0,
+                                    maxScore: 0,
                                     durationSeconds,
                                     metadata
                                 });
@@ -624,7 +591,7 @@
                                 if (saved) {
                                     writingResultSubmitted = true;
                                     console.log('Writing Result Saved to Admin');
-                                    alert('Đã nộp bài thành công.');
+                                    showWritingSubmitSuccessModal();
                                 }
                             } else if (writingResultSubmitted) {
                                 console.log('Writing result already saved. Skip duplicate submit.');
@@ -635,7 +602,6 @@
                             console.error('Writing submit/save failed:', error);
                             alert('Nộp bài thất bại. Vui lòng thử lại.');
                         } finally {
-                            suppressAiResultModal = false;
                             savingInProgress = false;
                             newConfirmBtn.disabled = false;
                         }
@@ -727,15 +693,15 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Xác nhận nộp bài</h5>
+                    <h5 class="modal-title">Nộp bài Writing</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    Bạn có chắc chắn muốn nộp bài để chấm điểm không?
+                    Bạn đã tới trang cuối. Bạn có muốn nộp bài để admin chấm điểm không?
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Không</button>
-                    <button type="button" class="btn btn-primary" id="confirmButton">Có, chấm điểm</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Xem lại</button>
+                    <button type="button" class="btn btn-primary" id="confirmButton">Nộp bài</button>
                 </div>
             </div>
         </div>
@@ -767,6 +733,24 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="writingDoneModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Đã nộp bài thành công</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Kết quả Writing đã gửi cho admin. Hệ thống sẽ tự động trở lại trang chủ.
+                </div>
+                <div class="modal-footer">
+                    <a href="lesson_history.html" class="btn btn-outline-primary">Xem lịch sử</a>
+                    <a href="home.html" class="btn btn-primary">Về trang chủ</a>
                 </div>
             </div>
         </div>

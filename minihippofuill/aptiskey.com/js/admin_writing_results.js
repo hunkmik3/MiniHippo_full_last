@@ -88,7 +88,15 @@
         const metadata = result?.metadata && typeof result.metadata === 'object'
             ? result.metadata
             : {};
-        return metadata.band || 'Pending';
+        const rawBand = typeof metadata.band === 'string' ? metadata.band.trim() : '';
+        if (!rawBand) return 'Pending';
+
+        const isLegacyDefaultC = rawBand.toUpperCase() === 'C'
+            && !metadata.admin_graded_at
+            && Number(result?.total_score || 0) === 0
+            && Number(result?.max_score || 0) === 0;
+
+        return isLegacyDefaultC ? 'Pending' : rawBand;
     }
 
     function getAiUsageInfo(result) {
@@ -375,7 +383,7 @@
             }
         }
         const bandInput = document.getElementById('wr-admin-band');
-        if (bandInput) bandInput.value = metadata.band || '';
+        if (bandInput) bandInput.value = getBand(result);
         const scoreInput = document.getElementById('wr-admin-score');
         if (scoreInput) scoreInput.value = result.total_score ?? 0;
         const maxInput = document.getElementById('wr-admin-max-score');

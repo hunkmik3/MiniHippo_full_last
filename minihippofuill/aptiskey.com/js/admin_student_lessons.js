@@ -184,6 +184,23 @@
         return band;
     }
 
+    function resolveDisplayBand(result, metadata = {}) {
+        const practiceType = String(result?.practice_type || '').toLowerCase();
+        if (practiceType === 'writing' || practiceType === 'speaking') {
+            const rawBand = typeof metadata.band === 'string' ? metadata.band.trim() : '';
+            if (!rawBand) return 'Pending';
+
+            const isLegacyDefaultC = practiceType === 'writing'
+                && rawBand.toUpperCase() === 'C'
+                && !metadata.admin_graded_at
+                && Number(result?.total_score || 0) === 0
+                && Number(result?.max_score || 0) === 0;
+
+            return isLegacyDefaultC ? 'Pending' : rawBand;
+        }
+        return calculateBand(result?.practice_type, result?.total_score);
+    }
+
     function ensureResultDetailModal() {
         let modalEl = document.getElementById('student-result-detail-modal');
         if (modalEl) return modalEl;
@@ -355,9 +372,7 @@
         const type = result.practice_type
             ? result.practice_type.charAt(0).toUpperCase() + result.practice_type.slice(1)
             : '—';
-        const band = (result.practice_type === 'writing' && metadata.band)
-            ? metadata.band
-            : calculateBand(result.practice_type, result.total_score);
+        const band = resolveDisplayBand(result, metadata);
 
         const titleEl = document.getElementById('student-result-detail-title');
         if (titleEl) {
@@ -391,7 +406,7 @@
 
         const bandInput = document.getElementById('student-result-admin-band');
         if (bandInput) {
-            bandInput.value = metadata.band || '';
+            bandInput.value = band || '';
         }
         const scoreInput = document.getElementById('student-result-admin-score');
         if (scoreInput) {
@@ -494,7 +509,8 @@
                     ? item.practice_type.charAt(0).toUpperCase() + item.practice_type.slice(1)
                     : '—';
                 const duration = formatDurationSeconds(item.duration_seconds);
-                const band = calculateBand(item.practice_type, item.total_score);
+                const metadata = item.metadata && typeof item.metadata === 'object' ? item.metadata : {};
+                const band = resolveDisplayBand(item, metadata);
 
                 const isChecked = state.selectedResultIds.has(item.id);
                 const detailBtn = item.id
