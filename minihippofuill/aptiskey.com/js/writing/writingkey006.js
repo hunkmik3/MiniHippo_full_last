@@ -17,16 +17,16 @@ const questions1_answer = {
 };
 //----------------------------------------------------------------------
 const questions2 = {
-    "question2": "Why did you decide to join our Science Club? How often can you go to the club? \n\n\n\n\n\n",
+    "question2": "Why did you decide to join our Science Club? How often can you go to the club? \n\n\n\n\n",
 };
 const questions2_answer = {
     "question2": "",
 };
 //----------------------------------------------------------------------
 const questions3 = {
-    "question3_1": "A: Why do you like science?\n\n\n\n\n\n",
-    "question3_2": "B: In the past, you learned about Science in school. Do you remember something about Science?\n\n\n\n\n\n",
-    "question3_3": "C: Who is your favorite inventor or scientist? Why?\n\n\n\n\n\n",
+    "question3_1": "A: Why do you like science?\n\n\n\n\n\n\n\n",
+    "question3_2": "B: In the past, you learned about Science in school. Do you remember something about Science?\n\n\n\n\n\n\n\n",
+    "question3_3": "C: Who is your favorite inventor or scientist? Why?\n\n\n\n\n\n\n\n",
 };
 const questions3_answer = {
     "question3_1_answer": "",
@@ -34,7 +34,7 @@ const questions3_answer = {
     "question3_3_answer": "",
 };
 //----------------------------------------------------------------------
-const questions4_main = "exhibition next month.\n“Dear all members in our club, our club is preparing to organize the science exhibition next month. Both young people and elderly people can take part in our activities in the exhibition. We are planning for our exhibition. Could you contribute some ideas for our event team? Whether our club issues the ticket for participants? I would like to hear your contribution.” \n";
+const questions4_main = "“Dear all members in our club, our club is preparing to organize the science exhibition next month. Both young people and elderly people can take part in our activities in the exhibition. We are planning for our exhibition. Could you contribute some ideas for our event team? Whether our club issues the ticket for participants? I would like to hear your contribution.” \n";
 const question4_1_text = "Write a short email to your friend. Tell your friend your feelings about this and what you plan to do.";
 const question4_2_text = "Write an email to the president of the club. Tell them your thoughts about this and what you would like to do.";
 const question4_1_text_answer = ``;
