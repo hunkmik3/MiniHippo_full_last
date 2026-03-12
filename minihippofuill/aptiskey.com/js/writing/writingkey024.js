@@ -1,12 +1,12 @@
 const key_id = "Bộ đề #024";
-const club_name = "BOOK CLUB";
+const club_name = "BEAUTIFUL HOMES CLUB";
 //----------------------------------------------------------------------
 const questions1 = {
-    "question1_1": "1. What’s your favorite hobby?",
-    "question1_2": "2. How do you get to work?",
-    "question1_3": "3. What do you like to do in the evening?",
-    "question1_4": "4. What kinds of movies do you like?",
-    "question1_5": "5. What’s your favorite food?",
+    "question1_1": " 1. What kind of home do you live in?	",
+    "question1_2": " 2. What’s your favourite room at home?	",
+    "question1_3": " 3. Do you prefer modern or traditional houses?",
+    "question1_4": " 4. What colour is your bedroom?	",
+    "question1_5": " 5. Who do you live with?	",
 };
 const questions1_answer = {
     "question1_1_answer": "",
@@ -17,16 +17,16 @@ const questions1_answer = {
 };
 //----------------------------------------------------------------------
 const questions2 = {
-    "question2": "\nPlease tell me about your free time and hobbies?\n\n\n\n",
+    "question2": "Why do you want to join beautiful homes club\n\n\n\n\n",
 };
 const questions2_answer = {
     "question2": "",
 };
 //----------------------------------------------------------------------
 const questions3 = {
-    "question3_1": "\nA: Hi! Welcome to the club. When and where do you like reading books?\n\n\n\n",
-    "question3_2": "\nB: Hi! I would like to give my friend a book.  What would you suggest for me to buy?\n\n\n\n\n",
-    "question3_3": "\nC: Online books replace traditional books? What do you think about that?\n\n",
+    "question3_1": "\n\nA: I have a bad relationship with my neighbors because they often make noise. Tell me how is your relationship with your neighbors? \n\n\n\n\n",
+    "question3_2": "\n\nB: Do you prefer living in old buildings or modern buildings? Why?\n\n\n\n\n\n",
+    "question3_3": "\n\nC: The house should be designed in a way that is good for the environment. Do you agree?\n\n\n",
 };
 const questions3_answer = {
     "question3_1_answer": "",
@@ -34,7 +34,7 @@ const questions3_answer = {
     "question3_3_answer": "",
 };
 //----------------------------------------------------------------------
-const questions4_main = "“Dear member,\nThe club will hold a meeting. Who do you want to invite? What is the theme? Please give a suggestion for both young and old people.”\n\n";
+const questions4_main = "“Dear member,\nThe cost of maintaining old buildings is very high and these buildings take up a lot of space. The government has a proposal that we knock down old buildings and build more modern blocks.”\n\n\n";
 const question4_1_text = "Write a short email to your friend. Tell your friend your feelings about this and what you plan to do.";
 const question4_2_text = "Write an email to the manager of the club. Tell them your thoughts about this and what you would like to do.";
 const question4_1_text_answer = ``;
