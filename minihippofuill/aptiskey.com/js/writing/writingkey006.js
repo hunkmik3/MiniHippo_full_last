@@ -35,7 +35,7 @@ const questions3_answer = {
 };
 //----------------------------------------------------------------------
 const questions4_main = "exhibition next month.\n“Dear all members in our club, our club is preparing to organize the science exhibition next month. Both young people and elderly people can take part in our activities in the exhibition. We are planning for our exhibition. Could you contribute some ideas for our event team? Whether our club issues the ticket for participants? I would like to hear your contribution.” \n";
-const question4_1_text = "“Dear all members in our club, our club is preparing to organize the science exhibition next month. Both young people and elderly people can take part in our activities in the exhibition. We are planning for our exhibition. Could you contribute some ideas for our event team? Whether our club issues the ticket for participants? I would like to hear your contribution.” \n";
+const question4_1_text = "Write a short email to your friend. Tell your friend your feelings about this and what you plan to do.";
 const question4_2_text = "Write an email to the president of the club. Tell them your thoughts about this and what you would like to do.";
 const question4_1_text_answer = ``;
 const question4_2_text_answer = ``;
