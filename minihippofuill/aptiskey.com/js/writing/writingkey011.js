@@ -1,12 +1,12 @@
 const key_id = "Bộ đề #011";
-const club_name = "LANGUAGE CLUB";
+const club_name = "Home living Club";
 //----------------------------------------------------------------------
 const questions1 = {
-    "question1_1": "1.Where are you from?",
-    "question1_2": "2.What’s the weather like today?",
-    "question1_3": "3.What do you do in your free time?",
-    "question1_4": "4.First language? ",
-    "question1_5": "5.Who do you usually go to the movies with?",
+    "question1_1": "1. What do you enjoy doing at home?	",
+    "question1_2": "2. How do you decorate your home?	",
+    "question1_3": "3. What time do you usually wake up?	",
+    "question1_4": "4. What chores do you usually do?	",
+    "question1_5": "5. Do you like cooking at home?	",
 };
 const questions1_answer = {
     "question1_1_answer": "",
@@ -17,16 +17,16 @@ const questions1_answer = {
 };
 //----------------------------------------------------------------------
 const questions2 = {
-    "question2": "Tell me your free time and interests?\n\n\n\n\n\n\n\n\n\n\n",
+    "question2": "Describe where you live\n\n\n\n\n\n\n\n\n\n\n\n",
 };
 const questions2_answer = {
     "question2": "",
 };
 //----------------------------------------------------------------------
 const questions3 = {
-    "question3_1": "A: Why did you choose this course?\n\n\n\n\n\n\n\n\n\n\n\n",
-    "question3_2": "B: How have you found the course so far? What’s been difficult?\n\n\n\n\n\n\n\n\n\n\n\n\n",
-    "question3_3": "C: What are you hoping to do when you finish the course?\n\n\n\n\n\n\n\n\n\n\n\n",
+    "question3_1": "A: You have to stay in the bedroom but have to share with your brother. How do you feel?\n\n\n\n\n\n\n\n\n\n\n\n\n",
+    "question3_2": "B: It is better to live in the city or in the countryside. Do you agree? Why?\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+    "question3_3": "C: Nowadays, old buildings are demolished and replaced with modern buildings. I feel we should protect historic buildings. How do you think?\n\n\n\n\n\n\n\n\n\n\n\n\n",
 };
 const questions3_answer = {
     "question3_1_answer": "",
@@ -34,7 +34,7 @@ const questions3_answer = {
     "question3_3_answer": "",
 };
 //----------------------------------------------------------------------
-const questions4_main = "“Dear members,\nThe club will have a lecture soon. The club needs speakers.”\n\n\n\n";
+const questions4_main = "“Currently, there are many young families who want to buy a house or an apartment. The club wants the members to make suggestions to help them find homes.”\n\n\n\n\n";
 const question4_1_text = "Write a short email to your friend. Tell your friend your feelings about this and what you plan to do.";
 const question4_2_text = "Write an email to the president of the club. Tell them your thoughts about this and what you would like to do.";
 const question4_1_text_answer = ``;
