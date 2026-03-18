@@ -964,6 +964,11 @@
                     <i class="bi bi-mic"></i>
                     Bộ đề Speaking
                 </a>
+                <a href="#" class="menu-item" data-module="speaking-cauhoi-module"
+                    onclick="selectModule('speaking-cauhoi-module'); return false;">
+                    <i class="bi bi-mic-fill"></i>
+                    Speaking theo câu hỏi
+                </a>
             </div>
 
             <div class="menu-section">
@@ -2041,6 +2046,74 @@
                                 onclick="document.getElementById('cancelSpeakingSetBtn').click()">Hủy</button>
                             <button type="button" class="btn btn-primary" id="saveSpeakingSetBtn">
                                 <i class="bi bi-save me-2"></i>Lưu bộ đề Speaking
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Speaking Câu hỏi Module -->
+            <div id="speaking-cauhoi-module" class="form-section mt-4" style="display: none;">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-2">
+                    <div>
+                        <h3 class="mb-1" style="font-size: 1rem;"><i class="bi bi-mic-fill me-2"></i>Speaking theo câu hỏi (Part 1-4)</h3>
+                        <p class="text-muted small mb-0" style="font-size: 0.75rem;">Upload câu hỏi speaking riêng lẻ theo từng Part. Mỗi entry = 1 câu hỏi của 1 Part.</p>
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="refreshSpeakingCauhoiBtn">
+                            <i class="bi bi-arrow-repeat me-1"></i>Tải lại
+                        </button>
+                        <button type="button" class="btn btn-primary btn-sm" id="createSpeakingCauhoiBtn">
+                            <i class="bi bi-plus-circle me-1"></i>Tạo mới
+                        </button>
+                    </div>
+                </div>
+
+                <div id="speaking-cauhoi-list" class="mb-4"></div>
+                <div id="speaking-cauhoi-empty" class="empty-state-notice" style="display: none;">
+                    <i class="bi bi-info-circle me-2"></i>Chưa có câu hỏi Speaking nào.
+                </div>
+
+                <div id="speaking-cauhoi-form-card" class="card" style="display: none;">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0" id="speaking-cauhoi-form-title">Tạo câu hỏi Speaking</h5>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="cancelSpeakingCauhoiBtn">
+                            <i class="bi bi-x-lg me-1"></i>Đóng
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Tiêu đề</label>
+                                <input type="text" class="form-control" id="spch-title" placeholder="Ví dụ: Part 1 - Bộ câu hỏi cá nhân #1">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold">Chọn Part</label>
+                                <select class="form-select" id="spch-part">
+                                    <option value="1">Part 1 - Câu hỏi cá nhân</option>
+                                    <option value="2">Part 2 - Mô tả ảnh</option>
+                                    <option value="3">Part 3 - So sánh ảnh</option>
+                                    <option value="4">Part 4 - Trình bày quan điểm</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold">Mô tả ngắn</label>
+                                <input type="text" class="form-control" id="spch-description" placeholder="Mô tả tùy chọn">
+                            </div>
+                        </div>
+
+                        <!-- Pages container - rendered dynamically by JS -->
+                        <div id="spch-pages-container"></div>
+                        <div class="text-center mt-3 mb-3">
+                            <button type="button" class="btn btn-outline-success" id="spch-add-page-btn">
+                                <i class="bi bi-plus-circle me-1"></i>Thêm trang
+                            </button>
+                        </div>
+
+                        <div class="mt-4 d-flex justify-content-end gap-2">
+                            <button type="button" class="btn btn-secondary" onclick="document.getElementById('cancelSpeakingCauhoiBtn').click()">Hủy</button>
+                            <button type="button" class="btn btn-primary" id="saveSpeakingCauhoiBtn">
+                                <i class="bi bi-save me-2"></i>Lưu câu hỏi Speaking
                             </button>
                         </div>
                     </div>
@@ -3853,6 +3926,7 @@
     <script src="js/admin_writing_results.js"></script>
     <script src="js/admin_speaking_sets.js"></script>
     <script src="js/admin_speaking_results.js"></script>
+    <script src="js/admin_speaking_cauhoi.js"></script>
 
     <!-- Sidebar JavaScript -->
     <script>
@@ -4032,6 +4106,7 @@
             const listeningSetModule = document.getElementById('listening-set-module');
             const writingSetModule = document.getElementById('writing-set-module');
             const speakingSetModule = document.getElementById('speaking-set-module');
+            const speakingCauhoiModule = document.getElementById('speaking-cauhoi-module');
             const lessonsManagementModule = document.getElementById('lessons-management-module');
             const userManagementModule = document.getElementById('user-management-module');
             const studentLessonsModule = document.getElementById('student-lessons-module');
@@ -4043,6 +4118,7 @@
             if (listeningSetModule) listeningSetModule.style.display = 'none';
             if (writingSetModule) writingSetModule.style.display = 'none';
             if (speakingSetModule) speakingSetModule.style.display = 'none';
+            if (speakingCauhoiModule) speakingCauhoiModule.style.display = 'none';
             if (lessonsManagementModule) lessonsManagementModule.style.display = 'none';
             if (userManagementModule) userManagementModule.style.display = 'none';
             if (studentLessonsModule) studentLessonsModule.style.display = 'none';
@@ -4050,7 +4126,7 @@
             if (speakingResultsModule) speakingResultsModule.style.display = 'none';
 
             // Hide all part forms when selecting set modules or management modules
-            if (module === 'reading-set-module' || module === 'listening-set-module' || module === 'writing-set-module' || module === 'speaking-set-module' || module === 'lessons-management-module' || module === 'user-management-module' || module === 'student-lessons-module' || module === 'writing-results-module' || module === 'speaking-results-module') {
+            if (module === 'reading-set-module' || module === 'listening-set-module' || module === 'writing-set-module' || module === 'speaking-set-module' || module === 'speaking-cauhoi-module' || module === 'lessons-management-module' || module === 'user-management-module' || module === 'student-lessons-module' || module === 'writing-results-module' || module === 'speaking-results-module') {
                 // Hide all reading part forms
                 ['part1-form', 'part2-form', 'part4-form', 'part5-form'].forEach(id => {
                     const form = document.getElementById(id);
@@ -4067,7 +4143,7 @@
             const uploadHero = document.querySelector('.upload-hero');
             const actionButtonsSection = document.getElementById('action-buttons-section');
             // Only show header and tools for upload-related modules
-            const isUploadRelatedModule = module === 'single-part-module' || module === 'reading-set-module' || module === 'listening-set-module' || module === 'writing-set-module' || module === 'speaking-set-module';
+            const isUploadRelatedModule = module === 'single-part-module' || module === 'reading-set-module' || module === 'listening-set-module' || module === 'writing-set-module' || module === 'speaking-set-module' || module === 'speaking-cauhoi-module';
             // Hide for management modules
             const isManagementModule = module === 'user-management-module' || module === 'student-lessons-module' || module === 'lessons-management-module' || module === 'writing-results-module' || module === 'speaking-results-module';
 
@@ -4096,6 +4172,14 @@
                 setTimeout(() => {
                     if (typeof window.initSpeakingSetsModule === 'function') {
                         window.initSpeakingSetsModule();
+                    }
+                }, 150);
+            }
+
+            if (module === 'speaking-cauhoi-module') {
+                setTimeout(() => {
+                    if (typeof window.initSpeakingCauhoiModule === 'function') {
+                        window.initSpeakingCauhoiModule();
                     }
                 }, 150);
             }

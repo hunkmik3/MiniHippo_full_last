@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hệ thống Mini Hippo - Speaking Practice</title>
+    <title>Hệ thống Mini Hippo - Speaking theo câu hỏi</title>
     <link rel="icon" href="images/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/source-sans-3@5.0.12/index.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/styles/overlayscrollbars.min.css" />
@@ -108,13 +108,13 @@
                             </a>
                             <ul class="nav nav-treeview">
                                 <li class="nav-item">
-                                    <a href="speaking_cauhoi.html" class="nav-link">
+                                    <a href="speaking_cauhoi.html" class="nav-link active">
                                         <i class="nav-icon bi bi-question-circle"></i>
                                         <p>Học theo câu hỏi</p>
                                     </a>
                                 </li>
                                 <li class="nav-item">
-                                    <a href="speaking_bode.html" class="nav-link active">
+                                    <a href="speaking_bode.html" class="nav-link">
                                         <i class="nav-icon bi bi-stack"></i>
                                         <p>Học theo bộ đề</p>
                                     </a>
@@ -143,12 +143,47 @@
             <div class="app-content">
                 <div class="container-fluid">
                     <div class="container my-3">
-                        <h1 class="text-center mb-4">Speaking Practice - by set</h1>
+                        <h1 class="text-center mb-4">Speaking Practice - by question</h1>
 
-                        <div class="mb-4">
-                            <h2 class="text-primary fs-4 mb-3"><i class="bi bi-mic-fill me-2"></i>Bài Speaking upload</h2>
-                            <div class="row" id="speaking-upload-sets">
-                                <div class="col-12 text-center text-muted small" id="speaking-upload-placeholder">Đang tải dữ liệu...</div>
+                        <div class="row justify-content-center g-3">
+                            <div class="col-md-6 col-lg-3 mb-3">
+                                <div class="text-center mb-2">
+                                    <span class="badge bg-primary fs-6 px-3 py-2">Part 1</span>
+                                    <div class="small text-muted mt-1">Câu hỏi cá nhân</div>
+                                </div>
+                                <div id="part1-list">
+                                    <div class="text-center text-muted small"><i class="spinner-border spinner-border-sm me-2"></i>Đang tải...</div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 col-lg-3 mb-3">
+                                <div class="text-center mb-2">
+                                    <span class="badge bg-info fs-6 px-3 py-2">Part 2</span>
+                                    <div class="small text-muted mt-1">Mô tả ảnh</div>
+                                </div>
+                                <div id="part2-list">
+                                    <div class="text-center text-muted small"><i class="spinner-border spinner-border-sm me-2"></i>Đang tải...</div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 col-lg-3 mb-3">
+                                <div class="text-center mb-2">
+                                    <span class="badge bg-warning fs-6 px-3 py-2">Part 3</span>
+                                    <div class="small text-muted mt-1">So sánh ảnh</div>
+                                </div>
+                                <div id="part3-list">
+                                    <div class="text-center text-muted small"><i class="spinner-border spinner-border-sm me-2"></i>Đang tải...</div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 col-lg-3 mb-3">
+                                <div class="text-center mb-2">
+                                    <span class="badge bg-success fs-6 px-3 py-2">Part 4</span>
+                                    <div class="small text-muted mt-1">Trình bày quan điểm</div>
+                                </div>
+                                <div id="part4-list">
+                                    <div class="text-center text-muted small"><i class="spinner-border spinner-border-sm me-2"></i>Đang tải...</div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -177,7 +212,7 @@
             }
         });
     </script>
-    <script src="js/speaking_practice_sets.js"></script>
+    <script src="js/speaking_cauhoi_list.js"></script>
 </body>
 
 </html>
