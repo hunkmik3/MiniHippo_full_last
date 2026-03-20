@@ -61,23 +61,6 @@
     ];
     const COMPLETE_PAGE_TITLE = 'Bạn đã hoàn thành bài Speaking.';
     const COMPLETE_PAGE_MESSAGE = 'Tất cả câu hỏi đã hoàn tất. Vui lòng nhấn "Nộp bài" để gửi kết quả.';
-    const PAGE_AUTO_ADVANCE_SECONDS = {
-        1: 5,
-        2: 5,
-        3: 30,
-        4: 30,
-        5: 30,
-        6: 45,
-        7: 45,
-        8: 45,
-        9: 45,
-        10: 45,
-        11: 45,
-        12: 5,
-        13: 60,
-        14: 120
-    };
-
     function safeText(value) {
         return typeof value === 'string' ? value.trim() : '';
     }
@@ -247,6 +230,7 @@
             instruction: data.introPage.description,
             images: data.introPage.imageUrl ? [data.introPage.imageUrl] : [],
             audioUrls: [],
+            audioWaitSeconds: [],
             answerKey: null,
             prompt: '',
             autoAdvance: false
@@ -260,6 +244,7 @@
             instruction: data.part1.introText,
             images: [],
             audioUrls: data.part1.introAudioUrl ? [data.part1.introAudioUrl] : [],
+            audioWaitSeconds: data.part1.introAudioUrl ? [5] : [],
             answerKey: null,
             prompt: '',
             autoAdvance: true
@@ -274,6 +259,7 @@
                 instruction: item.prompt,
                 images: [],
                 audioUrls: item.audioUrl ? [item.audioUrl] : [],
+                audioWaitSeconds: item.audioUrl ? [30] : [],
                 answerKey: `part1_q${index + 1}`,
                 prompt: item.prompt,
                 autoAdvance: true
@@ -288,6 +274,7 @@
             instruction: data.part2.introText,
             images: data.part2.imageUrl ? [data.part2.imageUrl] : [],
             audioUrls: data.part2.introAudioUrl ? [data.part2.introAudioUrl] : [],
+            audioWaitSeconds: data.part2.introAudioUrl ? [45] : [],
             answerKey: null,
             prompt: '',
             autoAdvance: true
@@ -302,6 +289,7 @@
                 instruction: item.prompt,
                 images: [],
                 audioUrls: item.audioUrl ? [item.audioUrl] : [],
+                audioWaitSeconds: item.audioUrl ? [45] : [],
                 answerKey: `part2_q${index + 1}`,
                 prompt: item.prompt,
                 autoAdvance: true
@@ -316,6 +304,7 @@
             instruction: data.part3.introText,
             images: data.part3.imageUrl ? [data.part3.imageUrl] : [],
             audioUrls: data.part3.introAudioUrl ? [data.part3.introAudioUrl] : [],
+            audioWaitSeconds: data.part3.introAudioUrl ? [45] : [],
             answerKey: null,
             prompt: '',
             autoAdvance: true
@@ -330,6 +319,7 @@
                 instruction: item.prompt,
                 images: [],
                 audioUrls: item.audioUrl ? [item.audioUrl] : [],
+                audioWaitSeconds: item.audioUrl ? [45] : [],
                 answerKey: `part3_q${index + 1}`,
                 prompt: item.prompt,
                 autoAdvance: true
@@ -344,6 +334,7 @@
             instruction: data.part4.introText,
             images: [],
             audioUrls: data.part4.introAudioUrl ? [data.part4.introAudioUrl] : [],
+            audioWaitSeconds: data.part4.introAudioUrl ? [5] : [],
             answerKey: null,
             prompt: '',
             autoAdvance: true
@@ -357,6 +348,7 @@
             instruction: data.part4.prepPage.instruction,
             images: data.part4.prepPage.imageUrl ? [data.part4.prepPage.imageUrl] : [],
             audioUrls: [data.part4.prepPage.questionAudioUrl, data.part4.prepPage.prepAudioUrl].filter(Boolean),
+            audioWaitSeconds: [data.part4.prepPage.questionAudioUrl ? 5 : null, data.part4.prepPage.prepAudioUrl ? 60 : null].filter(value => value !== null),
             answerKey: `part4_q1`,
             prompt: data.part4.prepPage.instruction,
             autoAdvance: true
@@ -370,6 +362,7 @@
             instruction: data.part4.finalPage.prompt,
             images: data.part4.finalPage.imageUrl ? [data.part4.finalPage.imageUrl] : [],
             audioUrls: data.part4.finalPage.audioUrl ? [data.part4.finalPage.audioUrl] : [],
+            audioWaitSeconds: data.part4.finalPage.audioUrl ? [120] : [],
             answerKey: `part4_q2`,
             prompt: data.part4.finalPage.prompt,
             autoAdvance: false
@@ -383,6 +376,7 @@
             instruction: COMPLETE_PAGE_MESSAGE,
             images: [],
             audioUrls: [],
+            audioWaitSeconds: [],
             answerKey: null,
             prompt: '',
             autoAdvance: false
@@ -470,31 +464,22 @@
         refs.step.textContent = `${page?.id?.toUpperCase() || 'PG'} (${state.currentPage}/${state.totalPages})${setTitle}`;
     }
 
-    function getPageAutoAdvanceSeconds(page) {
-        const id = safeText(page?.id || '').toLowerCase();
-        const match = id.match(/^pg(\d+)$/);
-        if (!match) return 0;
-        const pageNumber = Number(match[1]);
-        return Number(PAGE_AUTO_ADVANCE_SECONDS[pageNumber]) || 0;
-    }
-
-    function startAutoAdvanceCountdown(page, seconds) {
+    function startAutoAdvanceCountdown(page, seconds, options = {}) {
         if (!page || !seconds || seconds <= 0) {
             return;
         }
 
-        const isLastPage = state.currentPage >= state.totalPages;
+        const onComplete = typeof options.onComplete === 'function' ? options.onComplete : null;
+        const completionLabel = safeText(options.completionLabel);
+        const defaultLabel = state.currentPage >= state.totalPages ? 'Tự nộp bài' : 'Tự chuyển trang';
+        const actionLabel = completionLabel || defaultLabel;
         let remain = seconds;
         const updateCountdownText = () => {
             if (refs.autoHint) {
-                refs.autoHint.textContent = isLastPage
-                    ? `Tự nộp bài sau ${remain}s.`
-                    : `Tự chuyển trang sau ${remain}s.`;
+                refs.autoHint.textContent = `${actionLabel} sau ${remain}s.`;
             }
             if (refs.audioStatus && Array.isArray(page.audioUrls) && page.audioUrls.length) {
-                refs.audioStatus.textContent = isLastPage
-                    ? `Tự nộp bài sau ${remain} giây...`
-                    : `Tự chuyển trang sau ${remain} giây...`;
+                refs.audioStatus.textContent = `${actionLabel} sau ${remain} giây...`;
             }
         };
         updateCountdownText();
@@ -504,7 +489,9 @@
             if (remain <= 0) {
                 clearInterval(state.autoAdvanceInterval);
                 state.autoAdvanceInterval = null;
-                if (state.currentPage >= state.totalPages) {
+                if (onComplete) {
+                    onComplete();
+                } else if (state.currentPage >= state.totalPages) {
                     submitResult();
                 } else {
                     showPage(state.currentPage + 1);
@@ -515,13 +502,13 @@
         }, 1000);
     }
 
-    function playAudioSequence(page, options = {}) {
+    function playAudioSequence(page) {
         if (!refs.audio || !refs.audioCard) {
             return false;
         }
 
-        const onComplete = typeof options.onComplete === 'function' ? options.onComplete : null;
         const validAudio = (page.audioUrls || []).map(normalizeUrl).filter(Boolean);
+        const waitPlan = Array.isArray(page.audioWaitSeconds) ? page.audioWaitSeconds : [];
         state.audioList = validAudio;
         state.audioIndex = 0;
 
@@ -550,12 +537,36 @@
                 if (state.currentPage < 1 || state.currentPage > state.totalPages) {
                     return;
                 }
-                if (index + 1 < validAudio.length) {
-                    await runAudioAt(index + 1);
-                } else {
-                    if (refs.audioStatus) refs.audioStatus.textContent = 'Audio đã phát xong.';
-                    if (onComplete) onComplete();
+                const currentPage = state.pages[state.currentPage - 1];
+                if (!currentPage || currentPage.id !== page.id) return;
+
+                const hasNextAudio = index + 1 < validAudio.length;
+                const waitSeconds = Number(waitPlan[index]) || 0;
+                const nextActionLabel = hasNextAudio
+                    ? 'Phát audio tiếp theo'
+                    : (state.currentPage >= state.totalPages ? 'Tự nộp bài' : 'Tự chuyển trang');
+                const finishSequence = async () => {
+                    const latestPage = state.pages[state.currentPage - 1];
+                    if (!latestPage || latestPage.id !== page.id) return;
+                    if (hasNextAudio) {
+                        await runAudioAt(index + 1);
+                    } else if (state.currentPage >= state.totalPages) {
+                        submitResult();
+                    } else {
+                        showPage(state.currentPage + 1);
+                    }
+                };
+
+                if (waitSeconds > 0) {
+                    startAutoAdvanceCountdown(page, waitSeconds, {
+                        completionLabel: nextActionLabel,
+                        onComplete: finishSequence
+                    });
+                    return;
                 }
+
+                if (refs.audioStatus) refs.audioStatus.textContent = 'Audio đã phát xong.';
+                await finishSequence();
             };
 
             try {
@@ -578,7 +589,6 @@
         if (!page) return;
 
         stopAudioAndTimers();
-        const autoAdvanceSeconds = getPageAutoAdvanceSeconds(page);
         const coverPage = isCoverPage(page);
         if (refs.questionContainer) {
             refs.questionContainer.classList.toggle('cover-wide', coverPage);
@@ -613,27 +623,15 @@
                 }
             }
 
-            const shouldAutoAdvance = autoAdvanceSeconds > 0;
-            const hasAudio = playAudioSequence(page, {
-                onComplete: () => {
-                    const currentPage = state.pages[state.currentPage - 1];
-                    if (!currentPage || currentPage.id !== page.id) return;
-                    if (!shouldAutoAdvance) return;
-                    startAutoAdvanceCountdown(page, autoAdvanceSeconds);
-                }
-            });
+            const hasAudio = playAudioSequence(page);
 
-            if (shouldAutoAdvance && hasAudio && refs.autoHint) {
-                refs.autoHint.textContent = 'Đang phát audio... thời gian sẽ bắt đầu đếm sau khi audio kết thúc.';
+            if (hasAudio && refs.autoHint) {
+                refs.autoHint.textContent = 'Đang phát audio... hệ thống sẽ chờ đúng theo mốc thời gian của từng audio.';
             }
         }
 
-        if (autoAdvanceSeconds > 0) {
-            const hasAudio = Array.isArray(page.audioUrls) && page.audioUrls.map(normalizeUrl).filter(Boolean).length > 0;
-            if (!hasAudio) {
-                startAutoAdvanceCountdown(page, autoAdvanceSeconds);
-            }
-        } else if (refs.autoHint) {
+        const hasAudio = Array.isArray(page.audioUrls) && page.audioUrls.length > 0;
+        if (refs.autoHint && !hasAudio) {
             refs.autoHint.textContent = page.kind === 'completion'
                 ? 'Nhấn "Nộp bài" để hoàn tất.'
                 : 'Trang này chờ thao tác thủ công.';
