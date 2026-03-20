@@ -10,7 +10,9 @@
         3: 'Part 3 - So sánh ảnh',
         4: 'Part 4 - Trình bày quan điểm'
     };
-    var RESPONSE_TIMERS = { 1: 30, 2: 45, 3: 60 };
+    var RESPONSE_TIMERS = { 1: 30, 2: 45, 3: 45 };
+    var INTRO_AUDIO_WAIT_SECONDS = { 1: 5, 2: 45, 3: 45, 4: 5 };
+    var PART4_AUDIO_WAIT_SECONDS = { intro: 5, question: 5, prep: 60, final: 120 };
     var PART4_RESPONSE_TIMERS = { prep: 60, final: 120 };
 
     var practiceState = {
@@ -93,7 +95,14 @@
 
     function updateCountdownDisplay(seconds) {
         var countdown = document.getElementById('countdownTimer');
-        if (countdown) countdown.textContent = formatTime(Math.max(0, seconds));
+        if (!countdown) return;
+
+        if (seconds === null || seconds === undefined || Number.isNaN(Number(seconds))) {
+            countdown.textContent = '--:--';
+            return;
+        }
+
+        countdown.textContent = formatTime(Math.max(0, Number(seconds) || 0));
     }
 
     function stopCurrentAudios() {
@@ -106,34 +115,38 @@
         practiceState.currentAudioElements = [];
     }
 
-    function startResponseTimer(seconds, onComplete) {
+    function startResponseTimer(seconds, onComplete, options) {
         clearTimer();
         practiceState.timerRemaining = Math.max(0, Number(seconds) || 0);
-        updateCountdownDisplay(practiceState.timerRemaining);
-
         var hintEl = document.getElementById('autoAdvanceHint');
-        if (hintEl && practiceState.timerRemaining > 0) {
-            hintEl.textContent = 'Thời gian trả lời: ' + practiceState.timerRemaining + ' giây';
-        }
-
         var statusLabel = document.getElementById('audioStatusLabel');
-        if (statusLabel) {
-            statusLabel.textContent = practiceState.timerRemaining > 0
-                ? 'Đang tính thời gian trả lời... ' + practiceState.timerRemaining + 's'
-                : '';
-        }
+        var config = options && typeof options === 'object' ? options : {};
+        var hintPrefix = safeText(config.hintPrefix) || 'Thời gian trả lời';
+        var statusPrefix = safeText(config.statusPrefix) || 'Đang tính thời gian trả lời...';
 
         if (practiceState.timerRemaining <= 0) {
+            updateCountdownDisplay(null);
+            if (statusLabel) statusLabel.textContent = '';
             if (typeof onComplete === 'function') onComplete();
             return;
+        }
+
+        updateCountdownDisplay(practiceState.timerRemaining);
+
+        if (hintEl) {
+            hintEl.textContent = hintPrefix + ': ' + practiceState.timerRemaining + ' giây';
+        }
+
+        if (statusLabel) {
+            statusLabel.textContent = statusPrefix + ' ' + practiceState.timerRemaining + 's';
         }
 
         practiceState.timerInterval = setInterval(function () {
             practiceState.timerRemaining -= 1;
             updateCountdownDisplay(practiceState.timerRemaining);
 
-            if (hintEl) hintEl.textContent = 'Thời gian trả lời: ' + practiceState.timerRemaining + ' giây';
-            if (statusLabel) statusLabel.textContent = 'Đang tính thời gian trả lời... ' + practiceState.timerRemaining + 's';
+            if (hintEl) hintEl.textContent = hintPrefix + ': ' + practiceState.timerRemaining + ' giây';
+            if (statusLabel) statusLabel.textContent = statusPrefix + ' ' + practiceState.timerRemaining + 's';
 
             if (practiceState.timerRemaining <= 0) {
                 clearTimer();
@@ -143,11 +156,41 @@
         }, 1000);
     }
 
-    function playAudiosSequentially(audioElements, responseSeconds, onComplete) {
+    function getTimerOptions(page, hasNextAudio) {
+        if (hasNextAudio) {
+            return {
+                hintPrefix: 'Thời gian chờ',
+                statusPrefix: 'Đang đếm thời gian chờ...'
+            };
+        }
+
+        if (page && page.kind === 'intro') {
+            return {
+                hintPrefix: 'Thời gian chờ',
+                statusPrefix: 'Đang đếm thời gian chờ...'
+            };
+        }
+
+        if (page && page.kind === 'prep') {
+            return {
+                hintPrefix: 'Thời gian chuẩn bị',
+                statusPrefix: 'Đang tính thời gian chuẩn bị...'
+            };
+        }
+
+        return {
+            hintPrefix: 'Thời gian trả lời',
+            statusPrefix: 'Đang tính thời gian trả lời...'
+        };
+    }
+
+    function playAudiosSequentially(page, audioElements, onComplete) {
         practiceState.currentAudioElements = audioElements.slice();
+        var waitPlan = Array.isArray(page.audioWaitSeconds) ? page.audioWaitSeconds : [];
+        var fallbackSeconds = Math.max(0, Number(page.responseSeconds) || 0);
 
         if (!audioElements.length) {
-            startResponseTimer(responseSeconds, onComplete);
+            startResponseTimer(fallbackSeconds, onComplete, getTimerOptions(page, false));
             return;
         }
 
@@ -163,7 +206,6 @@
         function playAt(index) {
             if (index >= audioElements.length) {
                 if (statusLabel) statusLabel.textContent = '';
-                startResponseTimer(responseSeconds, onComplete);
                 return;
             }
 
@@ -173,7 +215,28 @@
 
             audio.addEventListener('ended', function handleEnded() {
                 audio.removeEventListener('ended', handleEnded);
-                playAt(index + 1);
+                var hasNextAudio = index + 1 < audioElements.length;
+                var waitSeconds = Math.max(0, Number(waitPlan[index]) || 0);
+                var timerOptions = getTimerOptions(page, hasNextAudio);
+                var continueFlow = function () {
+                    if (hasNextAudio) {
+                        playAt(index + 1);
+                    } else if (typeof onComplete === 'function') {
+                        onComplete();
+                    }
+                };
+
+                if (waitSeconds > 0) {
+                    startResponseTimer(waitSeconds, continueFlow, timerOptions);
+                    return;
+                }
+
+                if (!hasNextAudio && fallbackSeconds > 0) {
+                    startResponseTimer(fallbackSeconds, continueFlow, timerOptions);
+                    return;
+                }
+
+                continueFlow();
             });
 
             try {
@@ -343,6 +406,27 @@
         return images;
     }
 
+    function getIntroImages(partNum, pageData) {
+        var images = [];
+        var introImageUrl = normalizeUrl(firstVal(pageData, ['introImageUrl', 'introImage'], ''));
+        if (introImageUrl) images.push(introImageUrl);
+
+        var introLeftImageUrl = normalizeUrl(firstVal(pageData, ['introLeftImageUrl', 'introImageLeft'], ''));
+        var introRightImageUrl = normalizeUrl(firstVal(pageData, ['introRightImageUrl', 'introImageRight'], ''));
+        if (introLeftImageUrl) images.push(introLeftImageUrl);
+        if (introRightImageUrl) images.push(introRightImageUrl);
+
+        if (images.length) {
+            return images;
+        }
+
+        if (partNum === 2 || partNum === 3) {
+            return getPartImages(partNum, pageData);
+        }
+
+        return [];
+    }
+
     function buildRuntimePages(partNum, rawData) {
         var pages = [];
         var data = rawData && typeof rawData === 'object' ? rawData : {};
@@ -352,9 +436,28 @@
         rawPages.forEach(function (pageData, pageIndex) {
             var introText = safeText(firstVal(pageData, ['introText', 'instruction'], ''));
             var introAudioUrl = normalizeUrl(firstVal(pageData, ['introAudioUrl', 'audioUrl', 'introAudio'], ''));
+            var introImages = getIntroImages(partNum, pageData);
+            var introSuffix = rawPages.length > 1 ? ' ' + String(pageIndex + 1) : '';
+            var hasIntroContent = Boolean(introText || introAudioUrl || introImages.length);
+
+            if (hasIntroContent) {
+                var introWaitSeconds = Number(INTRO_AUDIO_WAIT_SECONDS[partNum]) || 0;
+                pages.push({
+                    id: 'part' + partNum + '_page' + (pageIndex + 1) + '_intro',
+                    kind: 'intro',
+                    part: partNum,
+                    title: 'Part ' + partNum + ' - Giới thiệu' + introSuffix,
+                    instruction: introText || 'Lắng nghe hướng dẫn trước khi bắt đầu câu hỏi.',
+                    images: introImages.slice(),
+                    audioUrls: introAudioUrl ? [introAudioUrl] : [],
+                    audioWaitSeconds: introAudioUrl ? [introWaitSeconds] : [],
+                    responseSeconds: introAudioUrl ? introWaitSeconds : 0,
+                    autoAdvance: Boolean(introAudioUrl),
+                    answerItems: []
+                });
+            }
 
             if (partNum >= 1 && partNum <= 3) {
-                var imageUrls = getPartImages(partNum, pageData);
                 var rawQuestions = Array.isArray(pageData.questions) ? pageData.questions : [];
                 var normalizedQuestions = rawQuestions.map(function (question, index) {
                     var normalized = normalizeQuestion(question, 'Câu hỏi ' + (index + 1));
@@ -367,9 +470,9 @@
                 finalQuestions.forEach(function (question, questionIndex) {
                     questionCounter += 1;
                     var displayOrder = String(pageIndex + 1) + '.' + String(question.sourceIndex);
+                    var answerSeconds = Number(RESPONSE_TIMERS[partNum]) || 30;
 
                     var audioUrls = [];
-                    if (questionIndex === 0 && introAudioUrl) audioUrls.push(introAudioUrl);
                     if (question.audioUrl) audioUrls.push(question.audioUrl);
 
                     pages.push({
@@ -377,10 +480,13 @@
                         kind: 'question',
                         part: partNum,
                         title: 'Part ' + partNum + ' - Câu hỏi ' + displayOrder,
-                        instruction: introText || 'Lắng nghe audio và trả lời câu hỏi.',
-                        images: imageUrls.slice(),
+                        instruction: question.audioUrl
+                            ? 'Lắng nghe audio câu hỏi và trả lời.'
+                            : 'Đọc câu hỏi và nhập câu trả lời của bạn.',
+                        images: [],
                         audioUrls: audioUrls,
-                        responseSeconds: RESPONSE_TIMERS[partNum] || 30,
+                        audioWaitSeconds: question.audioUrl ? [answerSeconds] : [],
+                        responseSeconds: answerSeconds,
                         autoAdvance: true,
                         answerItems: [{
                             key: 'part' + partNum + '_page' + (pageIndex + 1) + '_q' + question.sourceIndex,
@@ -403,8 +509,20 @@
                 var finalPrompt = safeText(firstVal(finalPage, ['prompt', 'question', 'instruction'], ''));
                 var finalImage = normalizeUrl(firstVal(finalPage, ['imageUrl', 'image'], ''));
                 var finalAudio = normalizeUrl(firstVal(finalPage, ['audioUrl', 'audio'], ''));
+                var prepAudioUrls = [];
+                var prepAudioWaitSeconds = [];
 
-                var hasPrepContent = Boolean(introAudioUrl || prepInstruction || prepImage || prepQuestionAudio || prepAudio);
+                if (prepQuestionAudio) {
+                    prepAudioUrls.push(prepQuestionAudio);
+                    prepAudioWaitSeconds.push(PART4_AUDIO_WAIT_SECONDS.question);
+                }
+
+                if (prepAudio) {
+                    prepAudioUrls.push(prepAudio);
+                    prepAudioWaitSeconds.push(PART4_AUDIO_WAIT_SECONDS.prep);
+                }
+
+                var hasPrepContent = Boolean(prepInstruction || prepImage || prepQuestionAudio || prepAudio);
                 var hasFinalContent = Boolean(finalPrompt || finalImage || finalAudio);
 
                 if (hasPrepContent) {
@@ -413,10 +531,13 @@
                         kind: 'prep',
                         part: 4,
                         title: 'Part 4 - Chuẩn bị',
-                        instruction: prepInstruction || introText || 'Nghe hướng dẫn và chuẩn bị câu trả lời.',
+                        instruction: prepInstruction || 'Nghe hướng dẫn và chuẩn bị câu trả lời.',
                         images: prepImage ? [prepImage] : [],
-                        audioUrls: [introAudioUrl, prepQuestionAudio, prepAudio].filter(Boolean),
-                        responseSeconds: PART4_RESPONSE_TIMERS.prep,
+                        audioUrls: prepAudioUrls,
+                        audioWaitSeconds: prepAudioWaitSeconds,
+                        responseSeconds: prepAudio
+                            ? PART4_AUDIO_WAIT_SECONDS.prep
+                            : (prepQuestionAudio ? PART4_AUDIO_WAIT_SECONDS.question : PART4_RESPONSE_TIMERS.prep),
                         autoAdvance: hasFinalContent,
                         answerItems: []
                     });
@@ -429,9 +550,10 @@
                         kind: 'final',
                         part: 4,
                         title: 'Part 4 - Câu hỏi ' + questionCounter,
-                        instruction: introText || 'Nghe câu hỏi và trình bày quan điểm của bạn.',
+                        instruction: 'Nghe câu hỏi và trình bày quan điểm của bạn.',
                         images: finalImage ? [finalImage] : [],
-                        audioUrls: (!hasPrepContent && introAudioUrl ? [introAudioUrl] : []).concat(finalAudio ? [finalAudio] : []),
+                        audioUrls: finalAudio ? [finalAudio] : [],
+                        audioWaitSeconds: finalAudio ? [PART4_AUDIO_WAIT_SECONDS.final] : [],
                         responseSeconds: PART4_RESPONSE_TIMERS.final,
                         autoAdvance: false,
                         answerItems: [{
@@ -460,6 +582,7 @@
         var audioStatusLabel = document.getElementById('audioStatusLabel');
         var answerBlock = document.getElementById('answerBlock');
         var hintEl = document.getElementById('autoAdvanceHint');
+        var hasPageAudio = Array.isArray(page.audioUrls) && page.audioUrls.filter(Boolean).length > 0;
 
         if (stepLabel) stepLabel.textContent = practiceState.headerTitle || PART_LABELS[practiceState.partNum] || 'Speaking Practice';
         if (pageBadge) pageBadge.textContent = 'Trang ' + (practiceState.currentPage + 1) + ' / ' + practiceState.totalPages;
@@ -471,9 +594,21 @@
         }
 
         if (hintEl) {
-            hintEl.textContent = page.autoAdvance
-                ? 'Hệ thống sẽ tự chuyển sang câu tiếp theo sau khi hết thời gian.'
-                : 'Hoàn thành xong bạn có thể bấm Nộp bài.';
+            if (page.kind === 'intro') {
+                hintEl.textContent = hasPageAudio
+                    ? 'Hệ thống sẽ tự chuyển sang trang câu hỏi sau khi audio giới thiệu phát xong.'
+                    : 'Nhấn "Tiếp theo" để sang trang câu hỏi.';
+            } else if (page.kind === 'prep') {
+                hintEl.textContent = page.autoAdvance
+                    ? 'Hệ thống sẽ tự chuyển sang câu tiếp theo sau khi hết thời gian chuẩn bị.'
+                    : 'Nhấn "Tiếp theo" để sang câu hỏi cuối.';
+            } else if (hasPageAudio) {
+                hintEl.textContent = 'Đang phát audio... hệ thống sẽ chờ đúng theo mốc thời gian của từng audio.';
+            } else if (page.autoAdvance) {
+                hintEl.textContent = 'Hệ thống sẽ tự chuyển sang câu tiếp theo sau khi hết thời gian.';
+            } else {
+                hintEl.textContent = 'Hoàn thành xong bạn có thể bấm Nộp bài.';
+            }
         }
 
         if (imagesEl) {
@@ -498,6 +633,7 @@
         if (audioContainer) audioContainer.innerHTML = '';
         if (audioProgressLabel) audioProgressLabel.textContent = '';
         if (audioStatusLabel) audioStatusLabel.textContent = '';
+        updateCountdownDisplay(hasPageAudio ? null : (Number(page.responseSeconds) > 0 ? page.responseSeconds : null));
 
         var audioUrls = Array.isArray(page.audioUrls) ? page.audioUrls.filter(Boolean) : [];
         var audioElements = [];
@@ -525,7 +661,11 @@
                     answerBlock.appendChild(createAnswerBlock(item, index + 1));
                 });
             } else {
-                answerBlock.appendChild(createInfoBlock('Trang này dùng để nghe hướng dẫn và chuẩn bị. Hệ thống sẽ tự chuyển khi hết thời gian.'));
+                answerBlock.appendChild(createInfoBlock(
+                    page.kind === 'intro'
+                        ? 'Trang này chỉ hiển thị phần giới thiệu. Sau đó bạn sẽ sang trang câu hỏi riêng.'
+                        : 'Trang này dùng để nghe hướng dẫn và chuẩn bị. Hệ thống sẽ tự chuyển khi hết thời gian.'
+                ));
             }
         }
 
@@ -536,7 +676,7 @@
             card.classList.add('page-fade');
         }
 
-        playAudiosSequentially(audioElements, page.responseSeconds, function () {
+        playAudiosSequentially(page, audioElements, function () {
             if (page.autoAdvance && practiceState.currentPage < practiceState.totalPages - 1) {
                 goNext();
             }

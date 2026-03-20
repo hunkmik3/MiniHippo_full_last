@@ -218,16 +218,17 @@
                     <label class="form-label fw-bold">Audio giới thiệu</label>
                     <input type="text" class="form-control spch-pg-intro-audio" placeholder="audio/speaking/..." value="${escapeHtml(d.introAudioUrl || '')}">
                 </div>
-            </div>`;
+            </div>
+            <div class="form-text mb-3">Phần giới thiệu này sẽ hiển thị ở một trang riêng trước khi sang trang câu hỏi.</div>`;
         body.innerHTML = introHtml;
 
         // ── Images (Part 2) ──
         if (p === 2) {
             body.innerHTML += `
-                <h6 class="fw-semibold text-info mb-2"><i class="bi bi-image me-1"></i>Ảnh</h6>
+                <h6 class="fw-semibold text-info mb-2"><i class="bi bi-image me-1"></i>Ảnh giới thiệu</h6>
                 <div class="row g-3 mb-3">
                     <div class="col-md-6">
-                        <label class="form-label fw-bold">URL ảnh</label>
+                        <label class="form-label fw-bold">URL ảnh giới thiệu</label>
                         <input type="text" class="form-control spch-pg-image-url" placeholder="images/speaking/..." value="${escapeHtml(d.imageUrl || '')}">
                     </div>
                 </div>`;
@@ -236,14 +237,14 @@
         // ── Images (Part 3) ──
         if (p === 3) {
             body.innerHTML += `
-                <h6 class="fw-semibold text-warning mb-2"><i class="bi bi-images me-1"></i>Ảnh so sánh</h6>
+                <h6 class="fw-semibold text-warning mb-2"><i class="bi bi-images me-1"></i>Ảnh giới thiệu so sánh</h6>
                 <div class="row g-3 mb-3">
                     <div class="col-md-6">
-                        <label class="form-label fw-bold">Ảnh trái</label>
+                        <label class="form-label fw-bold">Ảnh trái giới thiệu</label>
                         <input type="text" class="form-control spch-pg-image-left" placeholder="images/speaking/part3/left.png" value="${escapeHtml(d.leftImageUrl || '')}">
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label fw-bold">Ảnh phải</label>
+                        <label class="form-label fw-bold">Ảnh phải giới thiệu</label>
                         <input type="text" class="form-control spch-pg-image-right" placeholder="images/speaking/part3/right.png" value="${escapeHtml(d.rightImageUrl || '')}">
                     </div>
                 </div>`;
@@ -253,7 +254,7 @@
         if (p >= 1 && p <= 3) {
             const count = PART_QUESTION_COUNTS[p] || 3;
             const questions = Array.isArray(d.questions) ? d.questions : [];
-            let qHtml = `<h6 class="fw-semibold text-success mb-2"><i class="bi bi-chat-dots me-1"></i>Câu hỏi (${count} câu)</h6>`;
+            let qHtml = `<h6 class="fw-semibold text-success mb-2"><i class="bi bi-chat-dots me-1"></i>Câu hỏi riêng (${count} câu)</h6>`;
             for (let i = 0; i < count; i++) {
                 const q = questions[i] || {};
                 qHtml += `
