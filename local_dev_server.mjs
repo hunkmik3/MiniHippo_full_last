@@ -26,12 +26,12 @@ const directApiRoutes = {
 };
 
 const dynamicApiRoutes = [
-  { regex: /^\/api\/auth\/([^/]+)\/?$/, modulePathPrefix: 'api/auth/', param: 'action' },
-  { regex: /^\/api\/devices\/([^/]+)\/?$/, modulePathPrefix: 'api/devices/', param: 'action' },
-  { regex: /^\/api\/lessons\/([^/]+)\/?$/, modulePathPrefix: 'api/lessons/', param: 'action' },
-  { regex: /^\/api\/practice_results\/([^/]+)\/?$/, modulePathPrefix: 'api/practice_results/', param: 'action' },
-  { regex: /^\/api\/practice_sets\/([^/]+)\/?$/, modulePathPrefix: 'api/practice_sets/', param: 'action' },
-  { regex: /^\/api\/users\/([^/]+)\/?$/, modulePathPrefix: 'api/users/', param: 'action' }
+  { regex: /^\/api\/auth\/([^/]+)\/?$/, modulePath: 'api/auth/[action].js', param: 'action' },
+  { regex: /^\/api\/devices\/([^/]+)\/?$/, modulePath: 'api/devices/[action].js', param: 'action' },
+  { regex: /^\/api\/lessons\/([^/]+)\/?$/, modulePath: 'api/lessons/[action].js', param: 'action' },
+  { regex: /^\/api\/practice_results\/([^/]+)\/?$/, modulePath: 'api/practice_results/[action].js', param: 'action' },
+  { regex: /^\/api\/practice_sets\/([^/]+)\/?$/, modulePath: 'api/practice_sets/[action].js', param: 'action' },
+  { regex: /^\/api\/users\/([^/]+)\/?$/, modulePath: 'api/users/[action].js', param: 'action' }
 ];
 
 const contentTypes = {
@@ -149,7 +149,7 @@ async function handleApi(req, res, url) {
       if (!match) continue;
       const action = decodeURIComponent(match[1]);
       query[route.param] = query[route.param] || action;
-      handler = await importHandler(`${route.modulePathPrefix}${action}.js`);
+      handler = await importHandler(route.modulePath);
       break;
     }
   }

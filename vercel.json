@@ -18,27 +18,27 @@
       "use": "@vercel/node"
     },
     {
-      "src": "minihippofuill/aptiskey.com/api/auth/*.js",
+      "src": "minihippofuill/aptiskey.com/api/auth/[action].js",
       "use": "@vercel/node"
     },
     {
-      "src": "minihippofuill/aptiskey.com/api/devices/*.js",
+      "src": "minihippofuill/aptiskey.com/api/devices/[action].js",
       "use": "@vercel/node"
     },
     {
-      "src": "minihippofuill/aptiskey.com/api/lessons/*.js",
+      "src": "minihippofuill/aptiskey.com/api/lessons/[action].js",
       "use": "@vercel/node"
     },
     {
-      "src": "minihippofuill/aptiskey.com/api/practice_results/*.js",
+      "src": "minihippofuill/aptiskey.com/api/practice_results/[action].js",
       "use": "@vercel/node"
     },
     {
-      "src": "minihippofuill/aptiskey.com/api/practice_sets/*.js",
+      "src": "minihippofuill/aptiskey.com/api/practice_sets/[action].js",
       "use": "@vercel/node"
     },
     {
-      "src": "minihippofuill/aptiskey.com/api/users/*.js",
+      "src": "minihippofuill/aptiskey.com/api/users/[action].js",
       "use": "@vercel/node"
     },
     {
@@ -48,28 +48,44 @@
   ],
   "rewrites": [
     {
-      "source": "/api/auth/(.*)",
-      "destination": "/minihippofuill/aptiskey.com/api/auth/$1.js"
+      "source": "/api/ask",
+      "destination": "/minihippofuill/aptiskey.com/api/ask.js"
     },
     {
-      "source": "/api/devices/(.*)",
-      "destination": "/minihippofuill/aptiskey.com/api/devices/$1.js"
+      "source": "/api/upload-audio",
+      "destination": "/minihippofuill/aptiskey.com/api/upload-audio.js"
     },
     {
-      "source": "/api/lessons/(.*)",
-      "destination": "/minihippofuill/aptiskey.com/api/lessons/$1.js"
+      "source": "/api/upload-lesson",
+      "destination": "/minihippofuill/aptiskey.com/api/upload-lesson.js"
     },
     {
-      "source": "/api/practice_results/(.*)",
-      "destination": "/minihippofuill/aptiskey.com/api/practice_results/$1.js"
+      "source": "/api/visitor-count",
+      "destination": "/minihippofuill/aptiskey.com/api/visitor-count.js"
     },
     {
-      "source": "/api/practice_sets/(.*)",
-      "destination": "/minihippofuill/aptiskey.com/api/practice_sets/$1.js"
+      "source": "/api/auth/:action",
+      "destination": "/minihippofuill/aptiskey.com/api/auth/[action].js?action=:action"
     },
     {
-      "source": "/api/users/(.*)",
-      "destination": "/minihippofuill/aptiskey.com/api/users/$1.js"
+      "source": "/api/devices/:action",
+      "destination": "/minihippofuill/aptiskey.com/api/devices/[action].js?action=:action"
+    },
+    {
+      "source": "/api/lessons/:action",
+      "destination": "/minihippofuill/aptiskey.com/api/lessons/[action].js?action=:action"
+    },
+    {
+      "source": "/api/practice_results/:action",
+      "destination": "/minihippofuill/aptiskey.com/api/practice_results/[action].js?action=:action"
+    },
+    {
+      "source": "/api/practice_sets/:action",
+      "destination": "/minihippofuill/aptiskey.com/api/practice_sets/[action].js?action=:action"
+    },
+    {
+      "source": "/api/users/:action",
+      "destination": "/minihippofuill/aptiskey.com/api/users/[action].js?action=:action"
     },
     {
       "source": "/(.*)",
