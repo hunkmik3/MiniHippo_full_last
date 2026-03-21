@@ -310,6 +310,10 @@
                                         <h6 class="mb-2">Nội dung bài viết</h6>
                                         <div id="writing-result-answers"></div>
                                         <hr>
+                                        <h6 class="mb-2">Sửa lỗi tự động</h6>
+                                        <div id="writing-result-auto-feedback-summary"></div>
+                                        <div id="writing-result-auto-feedback"></div>
+                                        <hr>
                                         <h6 class="mb-2">Phản hồi AI</h6>
                                         <div id="writing-result-feedback" class="small" style="white-space: pre-wrap; max-height: 280px; overflow-y: auto;"></div>
                                     </div>
@@ -371,6 +375,18 @@
         const answersEl = document.getElementById('writing-result-answers');
         if (answersEl) {
             answersEl.innerHTML = renderWritingAnswers(metadata);
+        }
+        const autoSummaryEl = document.getElementById('writing-result-auto-feedback-summary');
+        if (autoSummaryEl) {
+            autoSummaryEl.innerHTML = window.WritingAutoFeedback
+                ? window.WritingAutoFeedback.renderOverallSummary(metadata)
+                : '';
+        }
+        const autoFeedbackEl = document.getElementById('writing-result-auto-feedback');
+        if (autoFeedbackEl) {
+            autoFeedbackEl.innerHTML = window.WritingAutoFeedback
+                ? window.WritingAutoFeedback.renderSections(metadata)
+                : '<div class="text-muted small">Chưa có dữ liệu sửa lỗi tự động.</div>';
         }
         const feedbackEl = document.getElementById('writing-result-feedback');
         if (feedbackEl) {

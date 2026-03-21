@@ -800,7 +800,7 @@
             practiceState.totalPages = runtimePages.length;
             practiceState.currentPage = 0;
             practiceState.setTitle = set.title || 'Speaking Practice';
-            practiceState.headerTitle = practiceState.setTitle + ' - ' + (PART_LABELS[partNum] || 'Speaking Practice');
+            practiceState.headerTitle = PART_LABELS[partNum] || 'Speaking Practice';
             practiceState.startAt = Date.now();
 
             var loading = document.getElementById('loadingState');

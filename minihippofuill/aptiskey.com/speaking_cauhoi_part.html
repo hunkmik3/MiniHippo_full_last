@@ -17,8 +17,57 @@
         .audio-panel { border: 1px solid #dbe2ea; border-radius: 0.75rem; padding: 1rem; }
         .page-hint { font-size: 0.875rem; color: #475569; }
 
+        .speaking-part-header {
+            display: grid;
+            grid-template-columns: minmax(180px, 1fr) auto minmax(220px, 1fr);
+            align-items: center;
+            gap: 1rem 1.5rem;
+        }
+
+        .speaking-header-home {
+            min-width: 0;
+        }
+
+        .speaking-header-home a {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.65rem;
+        }
+
+        .speaking-header-center {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.55rem;
+            min-width: 0;
+        }
+
+        .speaking-header-timer {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            text-align: center;
+        }
+
+        .speaking-header-title {
+            justify-self: end;
+            max-width: 320px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            text-align: right;
+        }
+
         /* Page dots */
-        .page-dots { display: flex; gap: 0.3rem; align-items: center; }
+        .page-dots {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.3rem;
+            align-items: center;
+            max-width: min(760px, 60vw);
+        }
         .page-dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,0.35); transition: all 0.3s; }
         .page-dot.active { background: #fbbf24; transform: scale(1.4); }
         .page-dot.done { background: #4ade80; }
@@ -26,26 +75,49 @@
         /* Smooth page transition */
         .page-fade { animation: fadeInUp 0.4s ease-out; }
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+        @media (max-width: 991.98px) {
+            .speaking-part-header {
+                grid-template-columns: 1fr;
+                justify-items: center;
+                text-align: center;
+            }
+
+            .speaking-header-home,
+            .speaking-header-title {
+                justify-self: center;
+                text-align: center;
+            }
+
+            .speaking-header-title {
+                max-width: 100%;
+                white-space: normal;
+            }
+
+            .page-dots {
+                max-width: 100%;
+            }
+        }
     </style>
 </head>
 
 <body>
     <!-- Header giống speaking bộ đề -->
-    <div class="header d-flex justify-content-between align-items-center p-3 bg-primary text-white shadow">
-        <div class="d-flex align-items-center">
-            <a href="speaking_cauhoi.html" class="me-3 text-decoration-none text-white fs-4 d-flex align-items-center">
+    <div class="header speaking-part-header p-3 bg-primary text-white shadow">
+        <div class="speaking-header-home">
+            <a href="speaking_cauhoi.html" class="text-decoration-none text-white fs-4">
                 <i class="bi bi-house-door-fill me-2 fs-5"></i>
                 <span class="fw-bold">Mini Hippo</span>
             </a>
         </div>
-        <div class="d-flex align-items-center">
-            <span class="time-remaining-label me-2 fs-6">Time remaining:</span>
-            <span class="countdown fs-4 fw-bold" id="countdownTimer">--:--</span>
-        </div>
-        <div class="d-flex align-items-center gap-3">
+        <div class="speaking-header-center">
+            <div class="speaking-header-timer">
+                <span class="time-remaining-label fs-6">Time remaining:</span>
+                <span class="countdown fs-4 fw-bold" id="countdownTimer">--:--</span>
+            </div>
             <div class="page-dots" id="pageDots"></div>
-            <div id="question_step" class="fs-5 fw-bold text-light">Speaking Practice</div>
         </div>
+        <div id="question_step" class="speaking-header-title fs-5 fw-bold text-light">Speaking Practice</div>
     </div>
 
     <main class="py-4">

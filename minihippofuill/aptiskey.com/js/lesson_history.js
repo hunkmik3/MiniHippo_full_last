@@ -222,6 +222,11 @@
                                 <h6 class="mb-2">Nhận xét admin</h6>
                                 <div id="history-detail-admin-note" class="border rounded p-2 small"></div>
                             </div>
+                            <div class="mt-3" id="history-detail-writing-auto-wrap" style="display: none;">
+                                <h6 class="mb-2">Sửa lỗi tự động</h6>
+                                <div id="history-detail-writing-auto-summary"></div>
+                                <div id="history-detail-writing-auto"></div>
+                            </div>
                             <div class="mt-3" id="history-detail-writing-feedback-wrap" style="display: none;">
                                 <h6 class="mb-2">Nhận xét theo từng câu</h6>
                                 <div id="history-detail-writing-feedback"></div>
@@ -345,12 +350,29 @@
         }
         const writingFeedbackWrapEl = document.getElementById('history-detail-writing-feedback-wrap');
         const writingFeedbackEl = document.getElementById('history-detail-writing-feedback');
+        const writingAutoWrapEl = document.getElementById('history-detail-writing-auto-wrap');
+        const writingAutoSummaryEl = document.getElementById('history-detail-writing-auto-summary');
+        const writingAutoEl = document.getElementById('history-detail-writing-auto');
         if (result.practice_type === 'writing') {
+            if (writingAutoWrapEl) writingAutoWrapEl.style.display = 'block';
+            if (writingAutoSummaryEl) {
+                writingAutoSummaryEl.innerHTML = window.WritingAutoFeedback
+                    ? window.WritingAutoFeedback.renderOverallSummary(metadata)
+                    : '';
+            }
+            if (writingAutoEl) {
+                writingAutoEl.innerHTML = window.WritingAutoFeedback
+                    ? window.WritingAutoFeedback.renderSections(metadata)
+                    : '<div class="text-muted small">Chưa có dữ liệu sửa lỗi tự động.</div>';
+            }
             if (writingFeedbackWrapEl) writingFeedbackWrapEl.style.display = 'block';
             if (writingFeedbackEl) {
                 writingFeedbackEl.innerHTML = renderWritingFeedbackDetail(metadata);
             }
         } else {
+            if (writingAutoWrapEl) writingAutoWrapEl.style.display = 'none';
+            if (writingAutoSummaryEl) writingAutoSummaryEl.innerHTML = '';
+            if (writingAutoEl) writingAutoEl.innerHTML = '';
             if (writingFeedbackWrapEl) writingFeedbackWrapEl.style.display = 'none';
             if (writingFeedbackEl) writingFeedbackEl.innerHTML = '';
         }

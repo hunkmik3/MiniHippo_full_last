@@ -34,3 +34,4 @@ hts-log.txt
 *.temp
 
 .vercel
+.env*.local

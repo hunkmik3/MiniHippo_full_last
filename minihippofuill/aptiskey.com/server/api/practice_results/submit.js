@@ -1,6 +1,7 @@
 import parseBody from '../_utils/parseBody.js';
 import { insertInto } from '../_utils/supabase.js';
 import { verifyUserRequest } from '../_utils/auth.js';
+import { autoGradeWritingSubmission } from '../_utils/writingAutoGrade.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -37,14 +38,34 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Thiếu loại bài luyện tập' });
   }
 
-  const numericTotal = Number(totalScore) || 0;
-  const numericMax = Number(maxScore) || 0;
+  let numericTotal = Number(totalScore) || 0;
+  let numericMax = Number(maxScore) || 0;
   const numericDuration =
     typeof durationSeconds === 'number' && durationSeconds >= 0
       ? Math.round(durationSeconds)
       : null;
+  let mergedMetadata = metadata && typeof metadata === 'object' ? { ...metadata } : metadata || null;
 
   try {
+    if (String(practiceType || '').toLowerCase() === 'writing') {
+      const autoGrade = await autoGradeWritingSubmission({
+        metadata: mergedMetadata || {},
+        setTitle
+      });
+
+      if (autoGrade?.status === 'completed') {
+        numericTotal = Number(autoGrade.totalScore) || 0;
+        numericMax = Number(autoGrade.maxScore) || 0;
+      }
+
+      if (autoGrade?.metadataPatch && typeof autoGrade.metadataPatch === 'object') {
+        mergedMetadata = {
+          ...(mergedMetadata && typeof mergedMetadata === 'object' ? mergedMetadata : {}),
+          ...autoGrade.metadataPatch
+        };
+      }
+    }
+
     const [record] = await insertInto('practice_results', [
       {
         user_id: authResult.user.id,
@@ -57,7 +78,7 @@ export default async function handler(req, res) {
         part_scores: partScores || null,
         duration_seconds: numericDuration,
         device_id: req.headers['x-device-id'] || req.headers['X-Device-Id'] || null,
-        metadata: metadata || null
+        metadata: mergedMetadata || null
       }
     ]);
 
@@ -72,7 +93,6 @@ export default async function handler(req, res) {
     });
   }
 }
-
 
 
 

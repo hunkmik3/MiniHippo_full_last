@@ -170,7 +170,25 @@
                 }, delayMs);
             }
 
-            function showWritingSubmitSuccessModal() {
+            function showWritingSubmitSuccessModal(savedResult = null) {
+                const doneBodyEl = document.getElementById('writingDoneModalBody');
+                const metadata = savedResult?.metadata && typeof savedResult.metadata === 'object'
+                    ? savedResult.metadata
+                    : {};
+                const autoStatus = String(metadata.auto_grading_status || '').trim();
+                if (doneBodyEl) {
+                    if (autoStatus === 'completed') {
+                        const band = metadata.band || '—';
+                        const score = `${savedResult?.total_score ?? 0}/${savedResult?.max_score ?? 0}`;
+                        doneBodyEl.textContent = `Bài Writing đã được chấm tự động. Kết quả hiện tại: ${score}, band ${band}. Hệ thống sẽ tự động trở lại trang chủ.`;
+                    } else if (autoStatus === 'unavailable') {
+                        doneBodyEl.textContent = 'Bài Writing đã được lưu, nhưng môi trường hiện chưa có AI key nên chưa chấm tự động. Bạn vẫn có thể xem lại lịch sử bài học sau.';
+                    } else if (autoStatus === 'failed') {
+                        doneBodyEl.textContent = 'Bài Writing đã được lưu nhưng lần chấm tự động này chưa thành công. Admin vẫn có thể xem và chấm lại trong hệ thống.';
+                    } else {
+                        doneBodyEl.textContent = 'Kết quả Writing đã được lưu. Hệ thống sẽ tự động trở lại trang chủ.';
+                    }
+                }
                 const doneModalEl = document.getElementById('writingDoneModal');
                 if (doneModalEl && window.bootstrap) {
                     new bootstrap.Modal(doneModalEl).show();
@@ -542,11 +560,13 @@
                     const newConfirmBtn = confirmBtn.cloneNode(true);
                     confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
                     let savingInProgress = false;
+                    const defaultConfirmButtonHtml = newConfirmBtn.innerHTML;
 
                     newConfirmBtn.addEventListener('click', async () => {
                         if (savingInProgress) return;
                         savingInProgress = true;
                         newConfirmBtn.disabled = true;
+                        newConfirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang nộp...';
 
                         // Hide confirm modal first
                         const confirmModalEl = document.getElementById('confirmationModal');
@@ -591,7 +611,7 @@
                                 if (saved) {
                                     writingResultSubmitted = true;
                                     console.log('Writing Result Saved to Admin');
-                                    showWritingSubmitSuccessModal();
+                                    showWritingSubmitSuccessModal(saved);
                                 }
                             } else if (writingResultSubmitted) {
                                 console.log('Writing result already saved. Skip duplicate submit.');
@@ -604,6 +624,7 @@
                         } finally {
                             savingInProgress = false;
                             newConfirmBtn.disabled = false;
+                            newConfirmBtn.innerHTML = defaultConfirmButtonHtml;
                         }
                     });
                 }
@@ -697,7 +718,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    Bạn đã tới trang cuối. Bạn có muốn nộp bài để admin chấm điểm không?
+                    Bạn đã tới trang cuối. Bạn có muốn nộp bài để hệ thống chấm Writing tự động và lưu vào lịch sử bài học không?
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Xem lại</button>
@@ -745,8 +766,8 @@
                     <h5 class="modal-title">Đã nộp bài thành công</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body">
-                    Kết quả Writing đã gửi cho admin. Hệ thống sẽ tự động trở lại trang chủ.
+                <div class="modal-body" id="writingDoneModalBody">
+                    Kết quả Writing đã được lưu. Hệ thống sẽ tự động trở lại trang chủ.
                 </div>
                 <div class="modal-footer">
                     <a href="lesson_history.html" class="btn btn-outline-primary">Xem lịch sử</a>

@@ -174,8 +174,15 @@
                     },
                     body: JSON.stringify({ email, password, deviceId, deviceName, deviceInfo })
                 });
-                
-                const result = await response.json();
+
+                const rawResult = await response.text();
+                let result = {};
+
+                try {
+                    result = rawResult ? JSON.parse(rawResult) : {};
+                } catch (parseError) {
+                    throw new Error('Máy chủ API trả về dữ liệu không hợp lệ. Hãy kiểm tra local server đang chạy đúng.');
+                }
                 
                 if (!response.ok) {
                     throw new Error(result.error || 'Đăng nhập thất bại');

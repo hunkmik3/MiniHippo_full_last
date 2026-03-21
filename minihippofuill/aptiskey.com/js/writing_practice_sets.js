@@ -13,6 +13,27 @@
         }
     }
 
+    function extractSetOrder(lesson) {
+        const sources = [
+            lesson && lesson.title ? lesson.title : '',
+            lesson && lesson.file_path ? lesson.file_path : '',
+            lesson && lesson.topic ? lesson.topic : ''
+        ];
+
+        for (const source of sources) {
+            const sharpMatch = String(source).match(/#\s*(\d+)/i);
+            if (sharpMatch) return Number(sharpMatch[1]);
+
+            const setMatch = String(source).match(/set\s*(\d+)/i);
+            if (setMatch) return Number(setMatch[1]);
+
+            const fileMatch = String(source).match(/(\d{1,4})/);
+            if (fileMatch) return Number(fileMatch[1]);
+        }
+
+        return Number.MAX_SAFE_INTEGER;
+    }
+
     function createSetCard(lesson) {
         const col = document.createElement('div');
         col.className = 'col-sm-6 col-lg-4 col-xl-3 mb-3';
@@ -77,8 +98,15 @@
                 return;
             }
 
-            // Sort by created_at desc (newest first)
-            lessons.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            lessons.sort((a, b) => {
+                const orderDiff = extractSetOrder(a) - extractSetOrder(b);
+                if (orderDiff !== 0) return orderDiff;
+
+                return String(a.title || '').localeCompare(String(b.title || ''), 'vi', {
+                    numeric: true,
+                    sensitivity: 'base'
+                });
+            });
 
             if (placeholder) placeholder.style.display = 'none';
             lessons.forEach(lesson => listContainer.appendChild(createSetCard(lesson)));

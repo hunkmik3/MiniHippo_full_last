@@ -1,0 +1,93 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/ask.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/upload-audio.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/upload-lesson.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/visitor-count.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/auth/*.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/devices/*.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/lessons/*.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/practice_results/*.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/practice_sets/*.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/users/*.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "**/*",
+      "use": "@vercel/static"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/ask",
+      "destination": "/api/ask.js"
+    },
+    {
+      "source": "/api/upload-audio",
+      "destination": "/api/upload-audio.js"
+    },
+    {
+      "source": "/api/upload-lesson",
+      "destination": "/api/upload-lesson.js"
+    },
+    {
+      "source": "/api/visitor-count",
+      "destination": "/api/visitor-count.js"
+    },
+    {
+      "source": "/api/auth/:action",
+      "destination": "/api/auth/:action.js"
+    },
+    {
+      "source": "/api/devices/:action",
+      "destination": "/api/devices/:action.js"
+    },
+    {
+      "source": "/api/lessons/:action",
+      "destination": "/api/lessons/:action.js"
+    },
+    {
+      "source": "/api/practice_results/:action",
+      "destination": "/api/practice_results/:action.js"
+    },
+    {
+      "source": "/api/practice_sets/:action",
+      "destination": "/api/practice_sets/:action.js"
+    },
+    {
+      "source": "/api/users/:action",
+      "destination": "/api/users/:action.js"
+    }
+  ],
+  "cleanUrls": true,
+  "trailingSlash": false
+}

@@ -2,7 +2,43 @@
   "version": 2,
   "builds": [
     {
-      "src": "minihippofuill/aptiskey.com/api/**/*.js",
+      "src": "minihippofuill/aptiskey.com/api/ask.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "minihippofuill/aptiskey.com/api/upload-audio.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "minihippofuill/aptiskey.com/api/upload-lesson.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "minihippofuill/aptiskey.com/api/visitor-count.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "minihippofuill/aptiskey.com/api/auth/*.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "minihippofuill/aptiskey.com/api/devices/*.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "minihippofuill/aptiskey.com/api/lessons/*.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "minihippofuill/aptiskey.com/api/practice_results/*.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "minihippofuill/aptiskey.com/api/practice_sets/*.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "minihippofuill/aptiskey.com/api/users/*.js",
       "use": "@vercel/node"
     },
     {
@@ -12,8 +48,28 @@
   ],
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "/minihippofuill/aptiskey.com/api/$1"
+      "source": "/api/auth/(.*)",
+      "destination": "/minihippofuill/aptiskey.com/api/auth/$1.js"
+    },
+    {
+      "source": "/api/devices/(.*)",
+      "destination": "/minihippofuill/aptiskey.com/api/devices/$1.js"
+    },
+    {
+      "source": "/api/lessons/(.*)",
+      "destination": "/minihippofuill/aptiskey.com/api/lessons/$1.js"
+    },
+    {
+      "source": "/api/practice_results/(.*)",
+      "destination": "/minihippofuill/aptiskey.com/api/practice_results/$1.js"
+    },
+    {
+      "source": "/api/practice_sets/(.*)",
+      "destination": "/minihippofuill/aptiskey.com/api/practice_sets/$1.js"
+    },
+    {
+      "source": "/api/users/(.*)",
+      "destination": "/minihippofuill/aptiskey.com/api/users/$1.js"
     },
     {
       "source": "/(.*)",
@@ -23,4 +79,3 @@
   "cleanUrls": false,
   "trailingSlash": false
 }
-

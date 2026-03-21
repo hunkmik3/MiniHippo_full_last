@@ -223,7 +223,8 @@ async function submitPracticeResult(payload = {}) {
             const error = await response.json().catch(() => ({}));
             throw new Error(error.error || 'Không thể lưu kết quả luyện tập');
         }
-        return true;
+        const data = await response.json().catch(() => ({}));
+        return data?.result || true;
     } catch (error) {
         console.error('submitPracticeResult error:', error);
         return false;
@@ -270,4 +271,3 @@ if (document.readyState === 'loading') {
         requireAuth();
     }
 }
-

@@ -224,6 +224,10 @@
                                         <h6 class="mb-2">Nội dung Writing</h6>
                                         <div id="student-result-writing-answers"></div>
                                         <hr>
+                                        <h6 class="mb-2">Sửa lỗi tự động</h6>
+                                        <div id="student-result-auto-writing-summary"></div>
+                                        <div id="student-result-auto-writing"></div>
+                                        <hr>
                                         <h6 class="mb-2">Nhận xét AI</h6>
                                         <div id="student-result-ai-feedback" class="small" style="white-space: pre-wrap; max-height: 280px; overflow-y: auto;"></div>
                                     </div>
@@ -397,6 +401,23 @@
             } else {
                 answersEl.innerHTML = '<div class="text-muted small">Chi tiết bài làm hiện hỗ trợ tốt nhất cho Writing.</div>';
             }
+        }
+        const autoSummaryEl = document.getElementById('student-result-auto-writing-summary');
+        const autoWritingEl = document.getElementById('student-result-auto-writing');
+        if (result.practice_type === 'writing') {
+            if (autoSummaryEl) {
+                autoSummaryEl.innerHTML = window.WritingAutoFeedback
+                    ? window.WritingAutoFeedback.renderOverallSummary(metadata)
+                    : '';
+            }
+            if (autoWritingEl) {
+                autoWritingEl.innerHTML = window.WritingAutoFeedback
+                    ? window.WritingAutoFeedback.renderSections(metadata)
+                    : '<div class="text-muted small">Chưa có dữ liệu sửa lỗi tự động.</div>';
+            }
+        } else {
+            if (autoSummaryEl) autoSummaryEl.innerHTML = '';
+            if (autoWritingEl) autoWritingEl.innerHTML = '';
         }
 
         const feedbackEl = document.getElementById('student-result-ai-feedback');
