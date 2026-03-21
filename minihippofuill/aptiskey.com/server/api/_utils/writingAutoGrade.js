@@ -1,6 +1,7 @@
 import { extractJsonObject, generateAIText, getConfiguredAIProvider } from './ai.js';
 
 const WRITING_MAX_SCORE = 100;
+const AUTO_GRADE_MAX_ATTEMPTS = 3;
 const VALID_BANDS = new Set(['CHUA DAT A2', 'A2', 'B1', 'B2', 'C']);
 const WRITING_RESPONSE_JSON_SCHEMA = {
   type: 'object',
@@ -107,46 +108,62 @@ export async function autoGradeWritingSubmission({
   });
 
   try {
-    const response = await generateAIText({
-      systemPrompt,
-      userPrompt,
-      maxTokens: 5000,
-      temperature: 0.2,
-      responseMimeType: 'application/json',
-      responseJsonSchema: WRITING_RESPONSE_JSON_SCHEMA
-    });
-    const parsed = extractJsonObject(response.text);
-    const normalized = normalizeAIWritingResponse(parsed, writingItems);
+    let lastError = null;
 
-    return {
-      status: 'completed',
-      totalScore: normalized.overallScore,
-      maxScore: WRITING_MAX_SCORE,
-      metadataPatch: {
-        band: normalized.band,
-        ai_feedback: normalized.overallFeedback,
-        ai_feedback_preview: normalized.overallFeedback,
-        auto_grading_status: 'completed',
-        auto_grading_provider: response.provider,
-        auto_grading_model: response.model,
-        auto_graded_at: new Date().toISOString(),
-        auto_writing_feedback: {
-          overall_score: normalized.overallScore,
-          max_score: WRITING_MAX_SCORE,
-          band: normalized.band,
-          overall_feedback: normalized.overallFeedback,
-          strengths: normalized.strengths,
-          common_errors: normalized.commonErrors,
-          items: normalized.items
-        }
+    for (let attempt = 1; attempt <= AUTO_GRADE_MAX_ATTEMPTS; attempt += 1) {
+      try {
+        const response = await generateAIText({
+          systemPrompt,
+          userPrompt:
+            attempt === 1
+              ? userPrompt
+              : `${userPrompt}\n\nIMPORTANT: Return strictly valid JSON only. Escape all double quotes inside strings. Do not include any explanatory text.`,
+          maxTokens: 5000,
+          temperature: attempt === 1 ? 0.2 : 0,
+          responseMimeType: 'application/json',
+          responseJsonSchema: WRITING_RESPONSE_JSON_SCHEMA
+        });
+        const parsed = extractJsonObject(response.text);
+        const normalized = normalizeAIWritingResponse(parsed, writingItems);
+
+        return {
+          status: 'completed',
+          totalScore: normalized.overallScore,
+          maxScore: WRITING_MAX_SCORE,
+          metadataPatch: {
+            band: normalized.band,
+            ai_feedback: normalized.overallFeedback,
+            ai_feedback_preview: normalized.overallFeedback,
+            auto_grading_status: 'completed',
+            auto_grading_provider: response.provider,
+            auto_grading_model: response.model,
+            auto_grading_attempts: attempt,
+            auto_graded_at: new Date().toISOString(),
+            auto_writing_feedback: {
+              overall_score: normalized.overallScore,
+              max_score: WRITING_MAX_SCORE,
+              band: normalized.band,
+              overall_feedback: normalized.overallFeedback,
+              strengths: normalized.strengths,
+              common_errors: normalized.commonErrors,
+              items: normalized.items
+            }
+          }
+        };
+      } catch (error) {
+        lastError = error;
+        console.warn(`auto grade writing attempt ${attempt}/${AUTO_GRADE_MAX_ATTEMPTS} failed:`, error?.message || error);
       }
-    };
+    }
+
+    throw lastError || new Error('Unknown auto grading error');
   } catch (error) {
     console.error('auto grade writing error:', error);
     return {
       status: 'failed',
       metadataPatch: {
         auto_grading_status: 'failed',
+        auto_grading_attempts: AUTO_GRADE_MAX_ATTEMPTS,
         auto_grading_message: 'Hệ thống chưa thể chấm Writing tự động ở lần nộp này.',
         auto_grading_error: sanitizeText(error?.message || '', 280),
         ai_feedback_preview: 'Lần nộp này chưa chấm Writing tự động thành công.',

@@ -1,29 +1,39 @@
-const DEFAULT_OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-const DEFAULT_ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
-const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+function cleanEnvValue(value) {
+  const raw = String(value ?? '').trim();
+  if (
+    (raw.startsWith('"') && raw.endsWith('"')) ||
+    (raw.startsWith("'") && raw.endsWith("'"))
+  ) {
+    return raw.slice(1, -1).trim();
+  }
+  return raw;
+}
+
+const DEFAULT_OPENAI_MODEL = cleanEnvValue(process.env.OPENAI_MODEL) || 'gpt-4o-mini';
+const DEFAULT_ANTHROPIC_MODEL =
+  cleanEnvValue(process.env.ANTHROPIC_MODEL) || 'claude-sonnet-4-20250514';
+const DEFAULT_GEMINI_MODEL = cleanEnvValue(process.env.GEMINI_MODEL) || 'gemini-2.5-flash';
 
 export function getConfiguredAIProvider() {
   const providers = [
     {
       provider: 'anthropic',
-      apiKey: process.env.ANTHROPIC_API_KEY,
+      apiKey: cleanEnvValue(process.env.ANTHROPIC_API_KEY),
       model: DEFAULT_ANTHROPIC_MODEL
     },
     {
       provider: 'openai',
-      apiKey: process.env.OPENAI_API_KEY,
+      apiKey: cleanEnvValue(process.env.OPENAI_API_KEY),
       model: DEFAULT_OPENAI_MODEL
     },
     {
       provider: 'gemini',
-      apiKey: process.env.GEMINI_API_KEY,
+      apiKey: cleanEnvValue(process.env.GEMINI_API_KEY),
       model: DEFAULT_GEMINI_MODEL
     }
   ];
 
-  const preferredProvider = String(process.env.AI_PROVIDER || '')
-    .trim()
-    .toLowerCase();
+  const preferredProvider = cleanEnvValue(process.env.AI_PROVIDER).toLowerCase();
 
   if (preferredProvider) {
     const preferred = providers.find((item) => item.provider === preferredProvider && item.apiKey);
