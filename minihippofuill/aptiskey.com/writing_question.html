@@ -178,9 +178,7 @@
                 const autoStatus = String(metadata.auto_grading_status || '').trim();
                 if (doneBodyEl) {
                     if (autoStatus === 'completed') {
-                        const band = metadata.band || '—';
-                        const score = `${savedResult?.total_score ?? 0}/${savedResult?.max_score ?? 0}`;
-                        doneBodyEl.textContent = `Bài Writing đã được chấm tự động. Kết quả hiện tại: ${score}, band ${band}. Hệ thống sẽ tự động trở lại trang chủ.`;
+                        doneBodyEl.textContent = 'Bài Writing đã được sửa lỗi tự động và lưu thành công. Band và điểm hiện để Pending chờ admin xác nhận. Hệ thống sẽ tự động trở lại trang chủ.';
                     } else if (autoStatus === 'unavailable') {
                         doneBodyEl.textContent = 'Bài Writing đã được lưu, nhưng môi trường hiện chưa có AI key nên chưa chấm tự động. Bạn vẫn có thể xem lại lịch sử bài học sau.';
                     } else if (autoStatus === 'failed') {
@@ -282,15 +280,27 @@
 
             function getInputValueByKey(key, formSelector) {
                 if (!key) return '';
+                // Search inside the form first to avoid duplicate-ID issues
+                // (e.g. div#question2 vs textarea#question2)
+                const form = document.querySelector(formSelector);
+                if (form) {
+                    const byName = form.querySelector(`[name="${key}"]`);
+                    if (byName && typeof byName.value === 'string') {
+                        return normalizeAnswer(byName.value);
+                    }
+                    const byId = form.querySelector(`#${CSS.escape(key)}`);
+                    if (byId && typeof byId.value === 'string') {
+                        return normalizeAnswer(byId.value);
+                    }
+                    // Fallback: any input/textarea inside the form
+                    const anyInput = form.querySelector('textarea, input[type="text"]');
+                    if (anyInput && typeof anyInput.value === 'string') {
+                        return normalizeAnswer(anyInput.value);
+                    }
+                }
                 const byId = document.getElementById(key);
                 if (byId && typeof byId.value === 'string') {
                     return normalizeAnswer(byId.value);
-                }
-                const form = document.querySelector(formSelector);
-                if (!form) return '';
-                const byName = form.querySelector(`[name="${key}"]`);
-                if (byName && typeof byName.value === 'string') {
-                    return normalizeAnswer(byName.value);
                 }
                 return '';
             }

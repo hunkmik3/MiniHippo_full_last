@@ -53,10 +53,10 @@ export default async function handler(req, res) {
         setTitle
       });
 
-      if (autoGrade?.status === 'completed') {
-        numericTotal = Number(autoGrade.totalScore) || 0;
-        numericMax = Number(autoGrade.maxScore) || 0;
-      }
+      // Writing auto-grading only provides correction hints. Official score and
+      // band stay pending until admin review.
+      numericTotal = 0;
+      numericMax = 0;
 
       if (autoGrade?.metadataPatch && typeof autoGrade.metadataPatch === 'object') {
         mergedMetadata = {
@@ -93,7 +93,6 @@ export default async function handler(req, res) {
     });
   }
 }
-
 
 
 

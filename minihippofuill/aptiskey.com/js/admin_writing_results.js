@@ -88,15 +88,18 @@
         const metadata = result?.metadata && typeof result.metadata === 'object'
             ? result.metadata
             : {};
+        if (!metadata.admin_graded_at) return 'Pending';
         const rawBand = typeof metadata.band === 'string' ? metadata.band.trim() : '';
         if (!rawBand) return 'Pending';
+        return rawBand;
+    }
 
-        const isLegacyDefaultC = rawBand.toUpperCase() === 'C'
-            && !metadata.admin_graded_at
-            && Number(result?.total_score || 0) === 0
-            && Number(result?.max_score || 0) === 0;
-
-        return isLegacyDefaultC ? 'Pending' : rawBand;
+    function getDisplayScore(result) {
+        const metadata = result?.metadata && typeof result.metadata === 'object'
+            ? result.metadata
+            : {};
+        if (!metadata.admin_graded_at) return 'Pending';
+        return `${result?.total_score || 0}/${result?.max_score || 0}`;
     }
 
     function getAiUsageInfo(result) {
@@ -150,7 +153,7 @@
             return;
         }
         refs.tableBody.innerHTML = results.map((item) => {
-            const score = `${item.total_score || 0}/${item.max_score || 0}`;
+            const score = getDisplayScore(item);
             const aiUsage = getAiUsageInfo(item);
             const aiText = aiUsage.probability !== null
                 ? `${aiUsage.label} (${aiUsage.probability}%)`
@@ -366,7 +369,7 @@
                 <div><strong>Học viên:</strong> ${escapeHtml(getUserLabel(result.user_id))}</div>
                 <div><strong>Ngày nộp:</strong> ${escapeHtml(formatDateTime(result.submitted_at))}</div>
                 <div><strong>Bài:</strong> ${escapeHtml(result.set_title || result.set_id || '—')}</div>
-                <div><strong>Điểm:</strong> ${escapeHtml(`${result.total_score || 0}/${result.max_score || 0}`)}</div>
+                <div><strong>Điểm:</strong> ${escapeHtml(getDisplayScore(result))}</div>
                 <div><strong>Band:</strong> ${escapeHtml(getBand(result))}</div>
                 <div><strong>Thời gian làm:</strong> ${escapeHtml(formatDurationSeconds(result.duration_seconds))}</div>
                 <div><strong>AI Usage:</strong> ${escapeHtml(aiUsage.probability !== null ? `${aiUsage.label} (${aiUsage.probability}%)` : aiUsage.label)}</div>
@@ -399,11 +402,11 @@
             }
         }
         const bandInput = document.getElementById('wr-admin-band');
-        if (bandInput) bandInput.value = getBand(result);
+        if (bandInput) bandInput.value = metadata.admin_graded_at ? getBand(result) : '';
         const scoreInput = document.getElementById('wr-admin-score');
-        if (scoreInput) scoreInput.value = result.total_score ?? 0;
+        if (scoreInput) scoreInput.value = metadata.admin_graded_at ? (result.total_score ?? 0) : 0;
         const maxInput = document.getElementById('wr-admin-max-score');
-        if (maxInput) maxInput.value = result.max_score ?? 0;
+        if (maxInput) maxInput.value = metadata.admin_graded_at ? (result.max_score ?? 0) : 0;
         const noteInput = document.getElementById('wr-admin-note');
         if (noteInput) noteInput.value = metadata.admin_note || '';
         if (refs.selectedLabel) {

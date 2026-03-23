@@ -1,28 +1,12 @@
 import { extractJsonObject, generateAIText, getConfiguredAIProvider } from './ai.js';
 
-const WRITING_MAX_SCORE = 100;
 const AUTO_GRADE_MAX_ATTEMPTS = 3;
-const VALID_BANDS = new Set(['CHUA DAT A2', 'A2', 'B1', 'B2', 'C']);
 const WRITING_RESPONSE_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    overall_score: {
-      type: 'integer',
-      minimum: 0,
-      maximum: 100
-    },
-    band: {
-      type: 'string'
-    },
     overall_feedback: {
       type: 'string'
-    },
-    strengths: {
-      type: 'array',
-      items: {
-        type: 'string'
-      }
     },
     common_errors: {
       type: 'array',
@@ -42,11 +26,6 @@ const WRITING_RESPONSE_JSON_SCHEMA = {
           key: {
             type: 'string'
           },
-          grammar_score: {
-            type: 'integer',
-            minimum: 0,
-            maximum: 100
-          },
           corrected_answer: {
             type: 'string'
           },
@@ -54,11 +33,11 @@ const WRITING_RESPONSE_JSON_SCHEMA = {
             type: 'string'
           }
         },
-        required: ['part', 'key', 'grammar_score', 'corrected_answer', 'feedback']
+        required: ['part', 'key', 'corrected_answer', 'feedback']
       }
     }
   },
-  required: ['overall_score', 'band', 'overall_feedback', 'strengths', 'common_errors', 'items']
+  required: ['overall_feedback', 'common_errors', 'items']
 };
 
 export async function autoGradeWritingSubmission({
@@ -87,17 +66,18 @@ export async function autoGradeWritingSubmission({
       status: 'unavailable',
       metadataPatch: {
         auto_grading_status: 'unavailable',
-        auto_grading_message: 'Chưa cấu hình AI API key nên chưa thể chấm Writing tự động.',
-        ai_feedback_preview: 'Chưa cấu hình AI API key nên chưa thể chấm Writing tự động.',
-        ai_feedback: 'Chưa cấu hình AI API key nên chưa thể chấm Writing tự động.'
+        auto_grading_message: 'Chưa cấu hình AI API key nên chưa thể sửa lỗi Writing tự động.',
+        ai_feedback_preview: 'Chưa cấu hình AI API key nên chưa thể sửa lỗi Writing tự động.',
+        ai_feedback: 'Chưa cấu hình AI API key nên chưa thể sửa lỗi Writing tự động.'
       }
     };
   }
 
   const systemPrompt = [
-    'You are a careful English writing assessor for Vietnamese learners.',
-    'Correct only grammar, spelling, punctuation, capitalization, word form, and natural phrasing.',
-    'Do not add new ideas. Preserve the student meaning and difficulty level.',
+    'You are a careful English writing corrector for Vietnamese learners.',
+    'Your ONLY job is to correct grammar, spelling, punctuation, capitalization, word form, and natural phrasing errors.',
+    'Do NOT add new ideas. Do NOT change the meaning. Preserve the student\'s original ideas and difficulty level.',
+    'Do NOT score or grade the writing. Do NOT assign any band or points.',
     'Return JSON only. No markdown. No code fences.'
   ].join(' ');
 
@@ -128,10 +108,8 @@ export async function autoGradeWritingSubmission({
 
         return {
           status: 'completed',
-          totalScore: normalized.overallScore,
-          maxScore: WRITING_MAX_SCORE,
           metadataPatch: {
-            band: normalized.band,
+            band: 'Pending',
             ai_feedback: normalized.overallFeedback,
             ai_feedback_preview: normalized.overallFeedback,
             auto_grading_status: 'completed',
@@ -140,11 +118,7 @@ export async function autoGradeWritingSubmission({
             auto_grading_attempts: attempt,
             auto_graded_at: new Date().toISOString(),
             auto_writing_feedback: {
-              overall_score: normalized.overallScore,
-              max_score: WRITING_MAX_SCORE,
-              band: normalized.band,
               overall_feedback: normalized.overallFeedback,
-              strengths: normalized.strengths,
               common_errors: normalized.commonErrors,
               items: normalized.items
             }
@@ -164,10 +138,10 @@ export async function autoGradeWritingSubmission({
       metadataPatch: {
         auto_grading_status: 'failed',
         auto_grading_attempts: AUTO_GRADE_MAX_ATTEMPTS,
-        auto_grading_message: 'Hệ thống chưa thể chấm Writing tự động ở lần nộp này.',
+        auto_grading_message: 'Hệ thống chưa thể sửa lỗi Writing tự động ở lần nộp này.',
         auto_grading_error: sanitizeText(error?.message || '', 280),
-        ai_feedback_preview: 'Lần nộp này chưa chấm Writing tự động thành công.',
-        ai_feedback: 'Lần nộp này chưa chấm Writing tự động thành công.'
+        ai_feedback_preview: 'Lần nộp này chưa sửa lỗi Writing tự động thành công.',
+        ai_feedback: 'Lần nộp này chưa sửa lỗi Writing tự động thành công.'
       }
     };
   }
@@ -212,26 +186,21 @@ function buildWritingPrompt({ setTitle, totalWords, writingItems }) {
   };
 
   return [
-    'Evaluate this English writing submission.',
-    'Focus mainly on grammar accuracy, spelling, punctuation, and clarity.',
-    'For each item, minimally correct the answer so it becomes natural and correct English.',
-    'Keep the same meaning. Do not add ideas that the student did not write.',
+    'Correct the grammar and vocabulary errors in this English writing submission.',
+    'Do NOT score or grade the writing. Do NOT assign any band or points.',
+    'Only fix grammar, spelling, punctuation, capitalization, word form, and unnatural phrasing.',
+    'Keep the same meaning and ideas. Do not add ideas that the student did not write.',
     'Keep every feedback very short and practical.',
-    'Strengths and common_errors should have at most 3 items each.',
-    'Each item feedback must be 1 short sentence in Vietnamese.',
-    'Use the score scale 0-100 and the band scale: Chua dat A2, A2, B1, B2, C.',
+    'common_errors should have at most 3 items.',
+    'Each item feedback must be 1 short sentence in Vietnamese explaining what was corrected.',
     'Return JSON exactly with this structure:',
     JSON.stringify({
-      overall_score: 78,
-      band: 'B1',
-      overall_feedback: 'Nhan xet ngan bang tieng Viet.',
-      strengths: ['Diem manh 1', 'Diem manh 2'],
+      overall_feedback: 'Nhan xet tong the ngan bang tieng Viet ve loi ngu phap va tu vung.',
       common_errors: ['Loi 1', 'Loi 2'],
       items: [
         {
           part: 'part1',
           key: 'question1_1',
-          grammar_score: 80,
           corrected_answer: 'Corrected English answer.',
           feedback: 'Nhan xet ngan cho cau nay bang tieng Viet.'
         }
@@ -259,58 +228,23 @@ function normalizeAIWritingResponse(parsed, writingItems) {
     const feedback = hasAnswer
       ? sanitizeText(rawItem.feedback || '')
       : 'Không có câu trả lời.';
-    const grammarScore = hasAnswer ? clampScore(rawItem.grammar_score) : 0;
 
     return {
       part: item.part,
       key: item.key,
-      grammar_score: grammarScore,
       corrected_answer: hasAnswer ? (correctedAnswer || item.answer || '') : '',
       feedback
     };
   });
 
-  const averagedScore = normalizedItems.length
-    ? Math.round(normalizedItems.reduce((sum, item) => sum + item.grammar_score, 0) / normalizedItems.length)
-    : 0;
-  const overallScore = clampScore(parsed?.overall_score ?? averagedScore);
-  const band = normalizeBand(parsed?.band, overallScore);
-  const overallFeedback = sanitizeText(parsed?.overall_feedback || '') || buildFallbackFeedback(overallScore, band);
-  const strengths = normalizeStringArray(parsed?.strengths);
+  const overallFeedback = sanitizeText(parsed?.overall_feedback || '') || 'AI đã sửa lỗi ngữ pháp và từ vựng cho bài viết.';
   const commonErrors = normalizeStringArray(parsed?.common_errors);
 
   return {
-    overallScore,
-    band,
     overallFeedback,
-    strengths,
     commonErrors,
     items: normalizedItems
   };
-}
-
-function buildFallbackFeedback(score, band) {
-  return `Hệ thống tạm ước lượng bài viết ở mức ${band} với điểm ngữ pháp khoảng ${score}/${WRITING_MAX_SCORE}.`;
-}
-
-function normalizeBand(rawBand, score) {
-  const normalized = sanitizeText(rawBand || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, ' ')
-    .trim();
-
-  if (VALID_BANDS.has(normalized)) {
-    if (normalized === 'CHUA DAT A2') return 'Chưa đạt A2';
-    return normalized;
-  }
-
-  if (score >= 85) return 'C';
-  if (score >= 70) return 'B2';
-  if (score >= 55) return 'B1';
-  if (score >= 40) return 'A2';
-  return 'Chưa đạt A2';
 }
 
 function normalizeStringArray(value) {
@@ -338,10 +272,4 @@ function sanitizeText(value, maxLength = 5000) {
     .replace(/\u0000/g, '')
     .trim();
   return text.length > maxLength ? text.slice(0, maxLength) : text;
-}
-
-function clampScore(value) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return 0;
-  return Math.max(0, Math.min(WRITING_MAX_SCORE, Math.round(numeric)));
 }

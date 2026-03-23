@@ -217,7 +217,7 @@ const description_question4 = "Write a short email (about 50 words) to your frie
 // Hàm để render câu hỏi cho câu hỏi 4
 function renderQuestions4() {
     // Cập nhật nội dung cho thẻ h1
-    document.getElementById('topic-title_q4').textContent = "Question 4 of 4 - Email Writing";
+    document.getElementById('topic-title_q4').textContent = `Question 4 of 4 - ${club_name}`;
 
     // Cập nhật nội dung cho thẻ h6
     document.getElementById('description_q4').textContent = description_question4;

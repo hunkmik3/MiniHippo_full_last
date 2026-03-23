@@ -1,6 +1,20 @@
 document.addEventListener('DOMContentLoaded', function() {
 
 document.getElementById('question_step').innerHTML = 'Bộ đề #012';
+const confirmationModalEl = document.getElementById('confirmationModal');
+const confirmSubmitBtn = document.getElementById('confirmSubmitBtn');
+let isSubmitConfirmed = false;
+
+if (confirmSubmitBtn) {
+    confirmSubmitBtn.removeAttribute('data-bs-dismiss');
+}
+
+function getConfirmationModal() {
+    if (!confirmationModalEl || !window.bootstrap) {
+        return null;
+    }
+    return bootstrap.Modal.getInstance(confirmationModalEl) || new bootstrap.Modal(confirmationModalEl);
+}
 const q2_topic = "Enter the conference hall";
 const q3_topic = "Animal Hospital Process";
 const q4_topic = "The Art";
@@ -180,17 +194,10 @@ document.getElementById('nextButton').addEventListener('click', function() {
     } else if (currentQuestion === 5) {
         // Khi nút Next có văn bản là "Submit Test", hiển thị modal xác nhận
         if (document.getElementById('nextButton').textContent === "Submit Test") {
-            const confirmationModal = new bootstrap.Modal(document.getElementById('confirmationModal'));
-
-            // Mở modal
-            confirmationModal.show();
-
-            // Loại bỏ aria-hidden khi modal được mở
-            const modalElement = document.getElementById('confirmationModal');
-            modalElement.removeAttribute('aria-hidden');  // Loại bỏ aria-hidden khi modal mở
-
-            // Đảm bảo tiêu điểm chuyển đến modal
-            modalElement.querySelector('.btn-close').focus();  // Đưa tiêu điểm về nút đóng modal
+            const confirmationModal = getConfirmationModal();
+            if (confirmationModal) {
+                confirmationModal.show();
+            }
         }
 
 
@@ -229,21 +236,24 @@ document.getElementById('backButton').addEventListener('click', function() {
 
 
 // Handle the confirm submission button click
-document.getElementById('confirmSubmitBtn').addEventListener('click', function() {
-    // Close the modal
-    const confirmationModal = new bootstrap.Modal(document.getElementById('confirmationModal'));
-    confirmationModal.hide();
+document.getElementById('confirmSubmitBtn').addEventListener('click', function(event) {
+    event.preventDefault();
+    if (isSubmitConfirmed) {
+        return;
+    }
+    isSubmitConfirmed = true;
+
+    const confirmationModal = getConfirmationModal();
+    if (confirmationModal) {
+        confirmationModal.hide();
+    }
 
     // Cập nhật nội dung khi xác nhận submit
     document.getElementById('nextButton').textContent = "Back to home";
     document.getElementById('backButton').style.display = 'none';
 
-    // Loại bỏ aria-hidden khi modal ẩn đi
-    const modalElement = document.getElementById('confirmationModal');
-    modalElement.setAttribute('aria-hidden', 'true'); // Thêm lại aria-hidden khi modal ẩn
-
     // Đảm bảo tiêu điểm trở lại một phần tử hợp lý, chẳng hạn nút Next
-    document.getElementById('nextButton').focus(); // Đưa tiêu điểm về nút Next
+    document.getElementById('nextButton').focus();
 });
 
 

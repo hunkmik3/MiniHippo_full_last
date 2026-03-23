@@ -103,24 +103,24 @@
         const status = String(metadata.auto_grading_status || '').trim() || 'unknown';
         const map = {
             completed: {
-                label: 'Đã chấm tự động',
+                label: 'Đã sửa lỗi tự động',
                 badgeClass: 'bg-success',
                 message: ''
             },
             unavailable: {
                 label: 'Chưa có AI key',
                 badgeClass: 'bg-secondary',
-                message: metadata.auto_grading_message || 'Chưa cấu hình AI nên chưa thể chấm tự động.'
+                message: metadata.auto_grading_message || 'Chưa cấu hình AI nên chưa thể sửa lỗi tự động.'
             },
             failed: {
-                label: 'Chấm tự động lỗi',
+                label: 'Sửa lỗi tự động lỗi',
                 badgeClass: 'bg-danger',
-                message: metadata.auto_grading_message || 'Lần nộp này chưa chấm tự động thành công.'
+                message: metadata.auto_grading_message || 'Lần nộp này chưa sửa lỗi tự động thành công.'
             },
             skipped_empty: {
                 label: 'Không có nội dung',
                 badgeClass: 'bg-warning text-dark',
-                message: metadata.auto_grading_message || 'Không có nội dung bài viết để chấm tự động.'
+                message: metadata.auto_grading_message || 'Không có nội dung bài viết để sửa lỗi tự động.'
             },
             unknown: {
                 label: 'Chưa có dữ liệu',
@@ -165,8 +165,7 @@
             const key = buildQuestionId(item?.part, item?.key, idx);
             return [key, {
                 correctedAnswer: normalizeText(item?.corrected_answer || ''),
-                feedback: normalizeText(item?.feedback || ''),
-                grammarScore: Number(item?.grammar_score || 0)
+                feedback: normalizeText(item?.feedback || '')
             }];
         }));
     }
@@ -264,9 +263,6 @@
         const statusInfo = getStatusInfo(metadata);
         const autoData = metadata?.auto_writing_feedback;
         const feedback = normalizeText(autoData?.overall_feedback || metadata.ai_feedback_preview || '');
-        const band = normalizeText(autoData?.band || metadata.band || '');
-        const score = Number(autoData?.overall_score);
-        const maxScore = Number(autoData?.max_score);
         const provider = normalizeText(metadata.auto_grading_provider || '');
         const gradedAt = normalizeText(metadata.auto_graded_at || '');
 
@@ -275,15 +271,11 @@
         }
 
         const metaBits = [];
-        if (band) metaBits.push(`Band: ${escapeHtml(band)}`);
-        if (Number.isFinite(score) && Number.isFinite(maxScore) && maxScore > 0) {
-            metaBits.push(`Điểm: ${escapeHtml(`${score}/${maxScore}`)}`);
-        }
         if (provider) metaBits.push(`AI: ${escapeHtml(provider)}`);
         if (gradedAt) {
             const date = new Date(gradedAt);
             if (!Number.isNaN(date.getTime())) {
-                metaBits.push(`Lúc chấm: ${escapeHtml(date.toLocaleString('vi-VN'))}`);
+                metaBits.push(`Lúc sửa: ${escapeHtml(date.toLocaleString('vi-VN'))}`);
             }
         }
 
@@ -295,7 +287,6 @@
                 </div>
                 ${feedback ? `<div class="small">${escapeHtml(feedback)}</div>` : ''}
                 ${statusInfo.message ? `<div class="small text-muted mt-2">${escapeHtml(statusInfo.message)}</div>` : ''}
-                ${renderList('Điểm mạnh', autoData?.strengths)}
                 ${renderList('Lỗi thường gặp', autoData?.common_errors)}
             </div>
         `;
@@ -336,9 +327,6 @@
                         <strong>Nhận xét:</strong>
                         <div>${escapeHtml(feedback.feedback || statusInfo.message || 'Chưa có nhận xét tự động cho câu này.')}</div>
                     </div>
-                    ${Number.isFinite(feedback.grammarScore) && feedback.grammarScore > 0 ? `
-                        <div class="mt-2 small text-muted">Điểm ngữ pháp ước lượng: ${escapeHtml(String(feedback.grammarScore))}/100</div>
-                    ` : ''}
                 </div>
             `;
 

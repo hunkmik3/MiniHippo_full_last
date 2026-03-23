@@ -21,6 +21,7 @@
         nextButton: document.getElementById('nextButton'),
         checkButton: document.getElementById('checkResultButton'),
         submitModal: document.getElementById('submitModal'),
+        submitConfirmButton: document.getElementById('confirmSubmitBtn'),
         part5Toggle: document.getElementById('togglePart5ContentBtn'),
         part5TipsBtn: document.getElementById('showPart5TipsBtn'),
         part5Content: document.getElementById('part5-paragraph-container'),
@@ -46,6 +47,7 @@
         timerInterval: null,
         setTitle: '',
         completed: false,
+        isSubmitting: false,
         part2OrderData: {
             question2: [],
             question3: []
@@ -77,6 +79,13 @@
             refs.loading.innerHTML = '<div class="alert alert-danger">Thiếu tham số bộ đề. Vui lòng quay lại trang trước.</div>';
         }
         return;
+    }
+
+    function getSubmitModal() {
+        if (!refs.submitModal || !window.bootstrap) {
+            return null;
+        }
+        return bootstrap.Modal.getInstance(refs.submitModal) || new bootstrap.Modal(refs.submitModal);
     }
 
     function formatTime(seconds) {
@@ -145,8 +154,10 @@
 
             if (state.currentStep === state.totalSteps) {
                 if (!state.isSubmitting && !state.completed) {
-                    const modal = new bootstrap.Modal(refs.submitModal);
-                    modal.show();
+                    const modal = getSubmitModal();
+                    if (modal) {
+                        modal.show();
+                    }
                 }
             } else {
                 showStep(state.currentStep + 1);
@@ -162,16 +173,28 @@
             });
         }
 
-        document.getElementById('confirmSubmitBtn').addEventListener('click', () => {
+        const confirmSubmitButton = refs.submitConfirmButton || document.getElementById('confirmSubmitBtn');
+        confirmSubmitButton.addEventListener('click', () => {
             if (state.isSubmitting || state.completed) {
                 return;
             }
             state.isSubmitting = true;
-            const instance = bootstrap.Modal.getInstance(refs.submitModal);
+            confirmSubmitButton.disabled = true;
+            confirmSubmitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang xử lý...';
+
+            const instance = getSubmitModal();
             if (instance) {
                 instance.hide();
             }
-            completePractice();
+
+            try {
+                completePractice();
+            } catch (error) {
+                state.isSubmitting = false;
+                confirmSubmitButton.disabled = false;
+                confirmSubmitButton.textContent = 'Kết thúc';
+                throw error;
+            }
         });
 
         if (refs.navButtons && refs.navButtons.length) {
@@ -983,5 +1006,4 @@
         loadPracticeSet({ skipRenderIfLoaded: Boolean(cachedSet) });
     });
 })();
-
 

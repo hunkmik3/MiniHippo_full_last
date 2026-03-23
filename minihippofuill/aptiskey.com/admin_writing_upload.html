@@ -280,7 +280,7 @@ const description_question4 = "Write a short email (about 50-75 words) to your f
 
 // Hàm để render câu hỏi cho câu hỏi 4
 function renderQuestions4() {
-    document.getElementById('topic-title_q4').textContent = "Question 4 of 4 - Email Writing";
+    document.getElementById('topic-title_q4').textContent = `Question 4 of 4 - ${club_name}`;
     document.getElementById('description_q4').textContent = description_question4;
     const container = document.getElementById("questions-container4");
     let formContent = '';
@@ -337,7 +337,7 @@ document.addEventListener("DOMContentLoaded", () => {
 async function handleSubmitAllQuestions() {
     const ans = {question1: {}, question2: {}, question3: {}, question4: {}};
     for (let i = 1; i <= 5; i++) ans.question1[\`question1_\${i}\`] = document.getElementById(\`question1_\${i}\`)?.value || "";
-    ans.question2.question2 = document.getElementById('question2')?.value || "";
+    ans.question2.question2 = document.querySelector('#question2Form [name="question2"]')?.value || document.querySelector('#question2Form textarea')?.value || "";
     for (let i = 1; i <= 3; i++) ans.question3[\`question3_\${i}\`] = document.getElementById(\`question3_\${i}\`)?.value || "";
     ans.question4.question4_1 = document.getElementById('question4_1')?.value || "";
     ans.question4.question4_2 = document.getElementById('question4_2')?.value || "";

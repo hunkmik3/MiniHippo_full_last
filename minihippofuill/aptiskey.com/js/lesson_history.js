@@ -63,19 +63,30 @@
 
     function resolveDisplayBand(result, metadata = {}) {
         const practiceType = String(result?.practice_type || '').toLowerCase();
-        if (practiceType === 'writing' || practiceType === 'speaking') {
+        if (practiceType === 'writing') {
+            if (!metadata.admin_graded_at) return 'Pending';
+            const rawBand = typeof metadata.band === 'string' ? metadata.band.trim() : '';
+            return rawBand || 'Pending';
+        }
+        if (practiceType === 'speaking') {
             const rawBand = typeof metadata.band === 'string' ? metadata.band.trim() : '';
             if (!rawBand) return 'Pending';
 
-            const isLegacyDefaultC = practiceType === 'writing'
-                && rawBand.toUpperCase() === 'C'
-                && !metadata.admin_graded_at
+            const isLegacyDefaultC = rawBand.toUpperCase() === 'C'
                 && Number(result?.total_score || 0) === 0
                 && Number(result?.max_score || 0) === 0;
 
             return isLegacyDefaultC ? 'Pending' : rawBand;
         }
         return calculateBand(result?.practice_type, result?.total_score);
+    }
+
+    function resolveDisplayScore(result, metadata = {}) {
+        const practiceType = String(result?.practice_type || '').toLowerCase();
+        if (practiceType === 'writing' && !metadata.admin_graded_at) {
+            return 'Pending';
+        }
+        return `${result?.total_score || 0}/${result?.max_score || 0}`;
     }
 
     function getAiUsageInfo(metadata = {}) {
@@ -223,7 +234,6 @@
                                 <div id="history-detail-admin-note" class="border rounded p-2 small"></div>
                             </div>
                             <div class="mt-3" id="history-detail-writing-auto-wrap" style="display: none;">
-                                <h6 class="mb-2">Sửa lỗi tự động</h6>
                                 <div id="history-detail-writing-auto-summary"></div>
                                 <div id="history-detail-writing-auto"></div>
                             </div>
@@ -256,9 +266,9 @@
                 ? item.practice_type.charAt(0).toUpperCase() + item.practice_type.slice(1)
                 : '—';
             const submittedAt = formatDateTime(item.submitted_at);
-            const score = `${item.total_score || 0}/${item.max_score || 0}`;
             const duration = formatDurationSeconds(item.duration_seconds);
             const metadata = item.metadata && typeof item.metadata === 'object' ? item.metadata : {};
+            const score = resolveDisplayScore(item, metadata);
             const band = resolveDisplayBand(item, metadata);
             const aiUsage = item.practice_type === 'writing' ? getAiUsageInfo(metadata) : null;
             const aiUsageText = aiUsage
@@ -315,7 +325,7 @@
         state.selectedResult = result;
         const modalEl = ensureDetailModal();
         const metadata = result.metadata && typeof result.metadata === 'object' ? result.metadata : {};
-        const score = `${result.total_score || 0}/${result.max_score || 0}`;
+        const score = resolveDisplayScore(result, metadata);
         const type = result.practice_type
             ? result.practice_type.charAt(0).toUpperCase() + result.practice_type.slice(1)
             : '—';

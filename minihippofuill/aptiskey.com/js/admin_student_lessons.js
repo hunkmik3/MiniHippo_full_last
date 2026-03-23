@@ -186,19 +186,29 @@
 
     function resolveDisplayBand(result, metadata = {}) {
         const practiceType = String(result?.practice_type || '').toLowerCase();
-        if (practiceType === 'writing' || practiceType === 'speaking') {
+        if (practiceType === 'writing') {
+            if (!metadata.admin_graded_at) return 'Pending';
+            const rawBand = typeof metadata.band === 'string' ? metadata.band.trim() : '';
+            return rawBand || 'Pending';
+        }
+        if (practiceType === 'speaking') {
             const rawBand = typeof metadata.band === 'string' ? metadata.band.trim() : '';
             if (!rawBand) return 'Pending';
-
-            const isLegacyDefaultC = practiceType === 'writing'
-                && rawBand.toUpperCase() === 'C'
-                && !metadata.admin_graded_at
+            const isLegacyDefaultC = rawBand.toUpperCase() === 'C'
                 && Number(result?.total_score || 0) === 0
                 && Number(result?.max_score || 0) === 0;
 
             return isLegacyDefaultC ? 'Pending' : rawBand;
         }
         return calculateBand(result?.practice_type, result?.total_score);
+    }
+
+    function resolveDisplayScore(result, metadata = {}) {
+        const practiceType = String(result?.practice_type || '').toLowerCase();
+        if (practiceType === 'writing' && !metadata.admin_graded_at) {
+            return 'Pending';
+        }
+        return `${result?.total_score || 0}/${result?.max_score || 0}`;
     }
 
     function ensureResultDetailModal() {
@@ -372,11 +382,11 @@
             ? result.metadata
             : {};
         const aiFeedback = metadata.ai_feedback || metadata.ai_feedback_preview || '';
-        const score = `${result.total_score || 0}/${result.max_score || 0}`;
         const type = result.practice_type
             ? result.practice_type.charAt(0).toUpperCase() + result.practice_type.slice(1)
             : '—';
         const band = resolveDisplayBand(result, metadata);
+        const score = resolveDisplayScore(result, metadata);
 
         const titleEl = document.getElementById('student-result-detail-title');
         if (titleEl) {
@@ -427,15 +437,15 @@
 
         const bandInput = document.getElementById('student-result-admin-band');
         if (bandInput) {
-            bandInput.value = band || '';
+            bandInput.value = metadata.admin_graded_at ? (band || '') : '';
         }
         const scoreInput = document.getElementById('student-result-admin-score');
         if (scoreInput) {
-            scoreInput.value = result.total_score ?? 0;
+            scoreInput.value = metadata.admin_graded_at ? (result.total_score ?? 0) : 0;
         }
         const maxScoreInput = document.getElementById('student-result-admin-max-score');
         if (maxScoreInput) {
-            maxScoreInput.value = result.max_score ?? 0;
+            maxScoreInput.value = metadata.admin_graded_at ? (result.max_score ?? 0) : 0;
         }
         const noteInput = document.getElementById('student-result-admin-note');
         if (noteInput) {
@@ -525,13 +535,13 @@
         refs.resultsBody.innerHTML = results
             .map(item => {
                 const submittedAt = formatDateTime(item.submitted_at);
-                const score = `${item.total_score || 0}/${item.max_score || 0}`;
                 const practiceType = item.practice_type
                     ? item.practice_type.charAt(0).toUpperCase() + item.practice_type.slice(1)
                     : '—';
                 const duration = formatDurationSeconds(item.duration_seconds);
                 const metadata = item.metadata && typeof item.metadata === 'object' ? item.metadata : {};
                 const band = resolveDisplayBand(item, metadata);
+                const score = resolveDisplayScore(item, metadata);
 
                 const isChecked = state.selectedResultIds.has(item.id);
                 const detailBtn = item.id
