@@ -578,10 +578,15 @@
                         newConfirmBtn.disabled = true;
                         newConfirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang nộp...';
 
-                        // Hide confirm modal first
+                        // Keep modal open, hide close/review buttons, show progress
                         const confirmModalEl = document.getElementById('confirmationModal');
-                        const confirmModal = bootstrap.Modal.getInstance(confirmModalEl);
-                        if (confirmModal) confirmModal.hide();
+                        const modalBody = confirmModalEl.querySelector('.modal-body');
+                        const modalCloseBtn = confirmModalEl.querySelector('.btn-close');
+                        const modalReviewBtn = confirmModalEl.querySelector('[data-bs-dismiss="modal"].btn-secondary');
+                        const originalBody = modalBody.innerHTML;
+                        modalBody.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary mb-3" role="status"></div><div class="fw-semibold">Đang nộp bài và sửa lỗi tự động...</div><div class="text-muted small mt-1">Vui lòng chờ trong giây lát</div></div>';
+                        if (modalCloseBtn) modalCloseBtn.style.display = 'none';
+                        if (modalReviewBtn) modalReviewBtn.style.display = 'none';
 
                         try {
                             // Save result once after grading
@@ -630,11 +635,21 @@
                             }
                         } catch (error) {
                             console.error('Writing submit/save failed:', error);
-                            alert('Nộp bài thất bại. Vui lòng thử lại.');
+                            modalBody.innerHTML = '<div class="text-center py-3"><div class="text-danger fw-semibold">Nộp bài thất bại</div><div class="text-muted small mt-1">Vui lòng thử lại.</div></div>';
+                            setTimeout(() => {
+                                modalBody.innerHTML = originalBody;
+                                if (modalCloseBtn) modalCloseBtn.style.display = '';
+                                if (modalReviewBtn) modalReviewBtn.style.display = '';
+                            }, 2000);
                         } finally {
                             savingInProgress = false;
                             newConfirmBtn.disabled = false;
                             newConfirmBtn.innerHTML = defaultConfirmButtonHtml;
+                            // Close confirm modal on success
+                            if (writingResultSubmitted) {
+                                const confirmModal = bootstrap.Modal.getInstance(confirmModalEl);
+                                if (confirmModal) confirmModal.hide();
+                            }
                         }
                     });
                 }
