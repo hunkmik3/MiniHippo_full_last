@@ -3,7 +3,7 @@ const club_name = "Television club";
 //----------------------------------------------------------------------
 const questions1 = {
     "question1_1": "Who do you usually go to the movies with?",
-    "question1_2": "Do you like to take photos? 999",
+    "question1_2": "Do you like to take photos? ",
     "question1_3": "Where do you like to go on holiday?",
     "question1_4": "What’s your favorite color?",
     "question1_5": "What did you do last night?",
