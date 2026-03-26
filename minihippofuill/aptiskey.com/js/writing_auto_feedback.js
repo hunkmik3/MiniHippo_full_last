@@ -161,28 +161,32 @@
         }));
     }
 
-    function tokenizeWords(text) {
-        const tokens = [];
-        normalizeText(text).split('\n').forEach((line, i, arr) => {
-            const words = line.split(/\s+/).filter(Boolean);
-            tokens.push(...words);
-            if (i < arr.length - 1) tokens.push('\n');
-        });
-        return tokens;
-    }
-
     function buildWordDiff(original, corrected) {
-        const source = tokenizeWords(original);
-        const target = tokenizeWords(corrected);
+        const origNorm = normalizeText(original);
+        const corrNorm = normalizeText(corrected);
 
-        if (!source.length && !target.length) {
-            return '';
+        // Build source words and record line break positions from original
+        const source = [];
+        const breaksBeforeIdx = {};
+        let wordIdx = 0;
+        const origLines = origNorm.split('\n');
+        for (let li = 0; li < origLines.length; li++) {
+            const words = origLines[li].split(/\s+/).filter(Boolean);
+            if (li > 0) {
+                breaksBeforeIdx[wordIdx] = (breaksBeforeIdx[wordIdx] || 0) + 1;
+            }
+            source.push(...words);
+            wordIdx += words.length;
         }
 
+        const target = corrNorm.split(/\s+/).filter(Boolean);
+
+        if (!source.length && !target.length) return '';
+
+        // LCS table
         const rows = source.length;
         const cols = target.length;
         const dp = Array.from({ length: rows + 1 }, () => Array(cols + 1).fill(0));
-
         for (let i = rows - 1; i >= 0; i -= 1) {
             for (let j = cols - 1; j >= 0; j -= 1) {
                 if (source[i] === target[j]) {
@@ -193,52 +197,44 @@
             }
         }
 
+        // Build diff parts
         const parts = [];
-        let i = 0;
-        let j = 0;
+        let i = 0, j = 0;
         while (i < rows && j < cols) {
             if (source[i] === target[j]) {
-                parts.push({
-                    type: 'same',
-                    value: source[i]
-                });
-                i += 1;
-                j += 1;
+                parts.push({ type: 'same', value: source[i] });
+                i += 1; j += 1;
             } else if (dp[i + 1][j] >= dp[i][j + 1]) {
-                parts.push({
-                    type: 'del',
-                    value: source[i]
-                });
+                parts.push({ type: 'del', value: source[i] });
                 i += 1;
             } else {
-                parts.push({
-                    type: 'ins',
-                    value: target[j]
-                });
+                parts.push({ type: 'ins', value: target[j] });
                 j += 1;
             }
         }
+        while (i < rows) { parts.push({ type: 'del', value: source[i] }); i += 1; }
+        while (j < cols) { parts.push({ type: 'ins', value: target[j] }); j += 1; }
 
-        while (i < rows) {
-            parts.push({ type: 'del', value: source[i] });
-            i += 1;
-        }
-        while (j < cols) {
-            parts.push({ type: 'ins', value: target[j] });
-            j += 1;
-        }
-
-        return parts.map((part) => {
-            if (part.value === '\n') return '<br>';
-            const safeValue = escapeHtml(part.value);
+        // Render with line breaks from original
+        const result = [];
+        let srcPos = 0;
+        for (const part of parts) {
+            if (part.type !== 'ins' && breaksBeforeIdx[srcPos]) {
+                for (let b = 0; b < breaksBeforeIdx[srcPos]; b++) result.push('<br>');
+                delete breaksBeforeIdx[srcPos];
+            }
+            const safe = escapeHtml(part.value);
             if (part.type === 'del') {
-                return `<span class="writing-auto-del">${safeValue}</span>`;
+                result.push(`<span class="writing-auto-del">${safe}</span>`);
+                srcPos++;
+            } else if (part.type === 'ins') {
+                result.push(`<span class="writing-auto-ins">${safe}</span>`);
+            } else {
+                result.push(`<span class="writing-auto-unchanged">${safe}</span>`);
+                srcPos++;
             }
-            if (part.type === 'ins') {
-                return `<span class="writing-auto-ins">${safeValue}</span>`;
-            }
-            return `<span class="writing-auto-unchanged">${safeValue}</span>`;
-        }).join(' ');
+        }
+        return result.join(' ');
     }
 
     function renderList(title, items = []) {
