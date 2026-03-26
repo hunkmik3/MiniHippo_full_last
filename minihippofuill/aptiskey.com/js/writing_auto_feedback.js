@@ -28,20 +28,11 @@
                 line-height: 1.7;
                 font-size: 0.95rem;
             }
-            .writing-auto-original {
-                background: #f8fafc;
-                border: 1px solid #e2e8f0;
-                color: #1e293b;
-            }
-            .writing-auto-corrected {
-                background: #f0fdf4;
-                border: 1px solid #bbf7d0;
-                color: #166534;
-            }
-            .writing-auto-diff {
+            .writing-auto-inline {
                 background: #fff;
-                border: 1px dashed #cbd5e1;
+                border: 1px solid #e2e8f0;
                 color: #0f172a;
+                line-height: 1.85;
             }
             .writing-auto-del {
                 color: #dc2626;
@@ -310,23 +301,11 @@
             const questionId = entry.id || buildQuestionId(entry.part, entry.key, idx);
             const feedback = feedbackMap.get(questionId) || {};
             const correctedAnswer = normalizeText(feedback.correctedAnswer || entry.answer);
+            const diffHtml = buildWordDiff(entry.answer, correctedAnswer);
             const perItemHtml = `
                 <div class="writing-auto-card">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <strong class="small">${escapeHtml(entry.key)}</strong>
-                        <span class="badge bg-light text-dark">${escapeHtml(`${entry.wordCount || 0} từ`)}</span>
-                    </div>
-                    ${entry.prompt ? `<div class="small text-muted mb-2">${escapeHtml(entry.prompt)}</div>` : ''}
-                    <div class="small text-muted mb-1">Bài gốc</div>
-                    <div class="writing-auto-block writing-auto-original">${escapeHtml(entry.answer || '—')}</div>
-                    <div class="small text-muted mt-3 mb-1">Bản đã sửa</div>
-                    <div class="writing-auto-block writing-auto-corrected">${escapeHtml(correctedAnswer || '—')}</div>
-                    <div class="small text-muted mt-3 mb-1">So sánh lỗi</div>
-                    <div class="writing-auto-block writing-auto-diff">${buildWordDiff(entry.answer, correctedAnswer) || '<span class="text-muted">Không có thay đổi.</span>'}</div>
-                    <div class="mt-2 small">
-                        <strong>Nhận xét:</strong>
-                        <div>${escapeHtml(feedback.feedback || statusInfo.message || 'Chưa có nhận xét tự động cho câu này.')}</div>
-                    </div>
+                    ${entry.prompt ? `<div class="small text-muted mb-2"><em>${escapeHtml(entry.prompt)}</em></div>` : ''}
+                    <div class="writing-auto-block writing-auto-inline">${diffHtml || '<span class="text-muted">Không có thay đổi.</span>'}</div>
                 </div>
             `;
 
