@@ -162,9 +162,13 @@
     }
 
     function tokenizeWords(text) {
-        return normalizeText(text)
-            .split(/\s+/)
-            .filter(Boolean);
+        const tokens = [];
+        normalizeText(text).split('\n').forEach((line, i, arr) => {
+            const words = line.split(/\s+/).filter(Boolean);
+            tokens.push(...words);
+            if (i < arr.length - 1) tokens.push('\n');
+        });
+        return tokens;
     }
 
     function buildWordDiff(original, corrected) {
@@ -225,6 +229,7 @@
         }
 
         return parts.map((part) => {
+            if (part.value === '\n') return '<br>';
             const safeValue = escapeHtml(part.value);
             if (part.type === 'del') {
                 return `<span class="writing-auto-del">${safeValue}</span>`;
