@@ -2,7 +2,7 @@ const key_id = "Bộ đề #001";
 const club_name = "TRAVEL CLUB";
 //----------------------------------------------------------------------
 const questions1 = {
-    "question1_1": "1.What country would you like to visit? cdsfjosdlfjsdlfjhsldjf",
+    "question1_1": "1.What country would you like to visit? ",
     "question1_2": "2.Who do you usually travel with?",
     "question1_3": "3.What do you always take on holiday?",
     "question1_4": "4.How often do you travel?",
