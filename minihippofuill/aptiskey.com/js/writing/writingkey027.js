@@ -34,9 +34,9 @@ const questions3_answer = {
     "question3_3_answer": "",
 };
 //----------------------------------------------------------------------
-const questions4_main = "Dear member,\nThe club wants to make a plan for the young people because they just love to stay home and play games.\n";
+const questions4_main = "Dear member,\nThe club wants to make a plan for the young people because they just love to stay home and play games.";
 const question4_1_text = "Write a short email to your friend (about 50 words).";
-const question4_2_text = "Write an email to the president of the club (about 120-150 words).";
+const question4_2_text = "Write an email to the manager of the club. Write about 120 - 150 words.";
 const question4_1_text_answer = ``;
 const question4_2_text_answer = ``;
 
