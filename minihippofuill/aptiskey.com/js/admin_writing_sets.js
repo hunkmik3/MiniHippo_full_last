@@ -92,6 +92,7 @@ window.showWritingForm = function (isEdit) {
     // Reset form to create mode if not editing
     if (!isEdit) {
         window._writingEditMode = false;
+        window._writingEditId = null;
         document.getElementById('writing-form-title').textContent = 'Tạo bộ đề Writing mới';
         const keyInput = document.getElementById('w-lessonKey');
         if (keyInput) { keyInput.readOnly = false; keyInput.value = ''; }
@@ -119,6 +120,7 @@ window.hideWritingForm = function () {
 
     // Reset edit state
     window._writingEditMode = false;
+    window._writingEditId = null;
     document.getElementById('writing-form-title').textContent = 'Tạo bộ đề Writing mới';
     const keyInput = document.getElementById('w-lessonKey');
     if (keyInput) { keyInput.readOnly = false; keyInput.value = ''; }
@@ -167,6 +169,7 @@ window.editWritingSet = async function (id, filePath) {
         // Show form in edit mode
         showWritingForm(true);
         window._writingEditMode = true;
+        window._writingEditId = id;
 
         // Update UI for edit mode
         document.getElementById('writing-form-title').textContent = `Chỉnh sửa bộ đề #${parsed.key}`;
@@ -440,16 +443,17 @@ if(typeof renderQuestions1==='function'){renderQuestions1();renderQuestions2();r
             body: JSON.stringify({
                 filePath: `js/writing/${fileName}`,
                 content: jsContent,
-                message: `Upload writing lesson ${fileName}`,
+                message: window._writingEditMode ? `Update writing lesson ${fileName}` : `Upload writing lesson ${fileName}`,
                 part: 'writing',
                 title: `Writing Set #${key}`,
-                topic: club, // Save club name as topic
-                club: club
+                topic: club,
+                club: club,
+                lessonId: window._writingEditMode ? window._writingEditId : undefined
             })
         });
 
         if (response.ok) {
-            alert('Upload thành công! File: ' + fileName);
+            alert(window._writingEditMode ? 'Cập nhật thành công! File: ' + fileName : 'Upload thành công! File: ' + fileName);
             // Hide form and reload list
             if (typeof hideWritingForm === 'function') hideWritingForm();
         } else {
