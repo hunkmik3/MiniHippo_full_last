@@ -57,6 +57,9 @@ window.loadWritingSets = async function () {
                         <a href="writing_question.html?lesson=writingkey${key}" target="_blank" class="btn btn-sm btn-outline-info">
                             <i class="bi bi-eye me-1"></i>Xem
                         </a>
+                        <button onclick="editWritingSet('${set.id}', '${set.file_path}')" class="btn btn-sm btn-outline-warning">
+                            <i class="bi bi-pencil me-1"></i>Sửa
+                        </button>
                         <button onclick="deleteWritingSet('${set.id}')" class="btn btn-sm btn-outline-danger">
                             <i class="bi bi-trash me-1"></i>Xoá
                         </button>
@@ -71,7 +74,7 @@ window.loadWritingSets = async function () {
     }
 };
 
-window.showWritingForm = function () {
+window.showWritingForm = function (isEdit) {
     const listEl = document.getElementById('writing-set-list');
     const emptyEl = document.getElementById('writing-set-empty');
     const formCard = document.getElementById('writing-set-form-card');
@@ -85,6 +88,20 @@ window.showWritingForm = function () {
     // Hide header buttons to avoid confusion
     if (createBtn) createBtn.style.display = 'none';
     if (refreshBtn) refreshBtn.style.display = 'none';
+
+    // Reset form to create mode if not editing
+    if (!isEdit) {
+        window._writingEditMode = false;
+        document.getElementById('writing-form-title').textContent = 'Tạo bộ đề Writing mới';
+        const keyInput = document.getElementById('w-lessonKey');
+        if (keyInput) { keyInput.readOnly = false; keyInput.value = ''; }
+        const submitBtn = document.querySelector('#writing-upload-form button[onclick*="generateAndUploadWriting"]');
+        if (submitBtn) {
+            submitBtn.innerHTML = '<i class="bi bi-cloud-upload me-2"></i>Tạo & Upload Bài Học';
+            submitBtn.className = 'btn btn-success btn-lg';
+        }
+        document.getElementById('writing-upload-form')?.reset();
+    }
 };
 
 window.hideWritingForm = function () {
@@ -99,6 +116,18 @@ window.hideWritingForm = function () {
     // Show header buttons
     if (createBtn) createBtn.style.display = 'inline-flex';
     if (refreshBtn) refreshBtn.style.display = 'inline-flex';
+
+    // Reset edit state
+    window._writingEditMode = false;
+    document.getElementById('writing-form-title').textContent = 'Tạo bộ đề Writing mới';
+    const keyInput = document.getElementById('w-lessonKey');
+    if (keyInput) { keyInput.readOnly = false; keyInput.value = ''; }
+    const submitBtn = document.querySelector('#writing-upload-form button[onclick*="generateAndUploadWriting"]');
+    if (submitBtn) {
+        submitBtn.innerHTML = '<i class="bi bi-cloud-upload me-2"></i>Tạo & Upload Bài Học';
+        submitBtn.className = 'btn btn-success btn-lg';
+    }
+    document.getElementById('writing-upload-form')?.reset();
 
     // Reload list to ensure it's up to date
     loadWritingSets();
@@ -123,6 +152,93 @@ window.deleteWritingSet = async function (id) {
         alert("Lỗi khi xóa: " + err.message);
     }
 };
+
+window.editWritingSet = async function (id, filePath) {
+    const listEl = document.getElementById('writing-set-list');
+    if (listEl) listEl.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-2 text-muted">Đang tải dữ liệu bộ đề...</p></div>';
+
+    try {
+        const res = await fetch(`/api/lessons/get-script?filePath=${encodeURIComponent(filePath)}`);
+        if (!res.ok) throw new Error('Không thể tải nội dung bộ đề');
+        const jsContent = await res.text();
+        const parsed = parseWritingSetContent(jsContent);
+
+        // Show form in edit mode
+        showWritingForm(true);
+        window._writingEditMode = true;
+
+        // Update UI for edit mode
+        document.getElementById('writing-form-title').textContent = `Chỉnh sửa bộ đề #${parsed.key}`;
+        const keyInput = document.getElementById('w-lessonKey');
+        if (keyInput) { keyInput.value = parsed.key; keyInput.readOnly = true; }
+        document.getElementById('w-clubName').value = parsed.clubName;
+
+        // Part 1
+        for (let i = 1; i <= 5; i++) {
+            const el = document.getElementById(`w-q1_${i}`);
+            if (el) el.value = parsed.questions1[`question1_${i}`] || '';
+        }
+        // Part 2
+        document.getElementById('w-q2-question').value = parsed.question2 || '';
+        // Part 3
+        for (let i = 1; i <= 3; i++) {
+            const el = document.getElementById(`w-q3_${i}`);
+            if (el) el.value = parsed.questions3[`question3_${i}`] || '';
+        }
+        // Part 4
+        document.getElementById('w-q4-main').value = parsed.questions4Main || '';
+        document.getElementById('w-q4-1-text').value = parsed.question4_1Text || '';
+        document.getElementById('w-q4-2-text').value = parsed.question4_2Text || '';
+
+        // Change submit button
+        const submitBtn = document.querySelector('#writing-upload-form button[onclick*="generateAndUploadWriting"]');
+        if (submitBtn) {
+            submitBtn.innerHTML = '<i class="bi bi-save me-2"></i>Cập nhật bộ đề';
+            submitBtn.className = 'btn btn-warning btn-lg';
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Lỗi khi tải dữ liệu: ' + err.message);
+        loadWritingSets();
+    }
+};
+
+function parseWritingSetContent(jsContent) {
+    const unesc = (s) => (s || '').replace(/\\n/g, '\n').replace(/\\"/g, '"').trim();
+    const getMatch = (pattern) => { const m = jsContent.match(pattern); return m ? m[1] : ''; };
+
+    const key = getMatch(/key_id\s*=\s*"Bộ đề #(\d+)"/);
+    const clubName = getMatch(/club_name\s*=\s*"([^"]+)"/);
+
+    // Part 1 — extract from const questions1 block only
+    const questions1 = {};
+    const q1Block = jsContent.match(/const questions1\s*=\s*\{([\s\S]*?)\};/);
+    if (q1Block) {
+        for (const m of q1Block[1].matchAll(/"question1_(\d+)":\s*"([^"]*(?:\\.[^"]*)*)"/g)) {
+            questions1[`question1_${m[1]}`] = unesc(m[2]);
+        }
+    }
+
+    // Part 2
+    const q2Block = jsContent.match(/const questions2\s*=\s*\{[\s\S]*?"question2":\s*"([^"]*(?:\\.[^"]*)*)"/);
+    const question2 = q2Block ? unesc(q2Block[1]) : '';
+
+    // Part 3
+    const questions3 = {};
+    const q3Block = jsContent.match(/const questions3\s*=\s*\{([\s\S]*?)\};/);
+    if (q3Block) {
+        for (const m of q3Block[1].matchAll(/"question3_(\d+)":\s*"([^"]*(?:\\.[^"]*)*)"/g)) {
+            questions3[`question3_${m[1]}`] = unesc(m[2]);
+        }
+    }
+
+    // Part 4
+    const questions4Main = unesc(getMatch(/questions4_main\s*=\s*"([^"]*(?:\\.[^"]*)*)"/));
+    const question4_1Text = unesc(getMatch(/question4_1_text\s*=\s*"([^"]*(?:\\.[^"]*)*)"/));
+    const question4_2Text = unesc(getMatch(/question4_2_text\s*=\s*"([^"]*(?:\\.[^"]*)*)"/));
+
+    return { key, clubName, questions1, question2, questions3, questions4Main, question4_1Text, question4_2Text };
+}
 
 function extractKeyFromPath(path) {
     // js/writing/writingkey001.js -> 001
