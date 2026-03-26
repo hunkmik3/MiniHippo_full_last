@@ -2,7 +2,7 @@ const key_id = "Bộ đề #003";
 const club_name = "Walking Club";
 //----------------------------------------------------------------------
 const questions1 = {
-    "question1_1": "1. What's the weather like today? 99999999",
+    "question1_1": "1. What's the weather like today? ",
     "question1_2": "2. What is your favorite season of the year?",
     "question1_3": "3. What do you usually do when you have free time?",
     "question1_4": "4. What is your favorite sport?",
