@@ -158,7 +158,8 @@ window.editWritingSet = async function (id, filePath) {
     if (listEl) listEl.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-2 text-muted">Đang tải dữ liệu bộ đề...</p></div>';
 
     try {
-        const res = await fetch(`/api/lessons/get-script?filePath=${encodeURIComponent(filePath)}`);
+        // Fetch the JS file directly as static content
+        const res = await fetch(`/${filePath}?t=${Date.now()}`);
         if (!res.ok) throw new Error('Không thể tải nội dung bộ đề');
         const jsContent = await res.text();
         const parsed = parseWritingSetContent(jsContent);
