@@ -75,9 +75,15 @@ export async function autoGradeWritingSubmission({
 
   const systemPrompt = [
     'You are a careful English writing corrector for Vietnamese learners.',
-    'Your ONLY job is to correct grammar, spelling, punctuation, capitalization, word form, and natural phrasing errors.',
-    'Do NOT add new ideas. Do NOT change the meaning. Preserve the student\'s original ideas and difficulty level.',
-    'Do NOT score or grade the writing. Do NOT assign any band or points.',
+    'Your ONLY job is to fix grammar, spelling, punctuation, and capitalization errors.',
+    'CRITICAL RULES:',
+    '- Only change the MINIMUM number of words needed to fix each error.',
+    '- Do NOT restructure or rewrite sentences.',
+    '- Do NOT add new words or phrases that the student did not write.',
+    '- Do NOT replace words with synonyms unless the original word is grammatically wrong.',
+    '- Keep the exact same sentence structure and word order.',
+    '- If a sentence has no errors, keep it exactly as-is.',
+    '- Do NOT score or grade the writing.',
     'Return JSON only. No markdown. No code fences.'
   ].join(' ');
 
@@ -186,10 +192,10 @@ function buildWritingPrompt({ setTitle, totalWords, writingItems }) {
   };
 
   return [
-    'Correct the grammar and vocabulary errors in this English writing submission.',
-    'Do NOT score or grade the writing. Do NOT assign any band or points.',
-    'Only fix grammar, spelling, punctuation, capitalization, word form, and unnatural phrasing.',
-    'Keep the same meaning and ideas. Do not add ideas that the student did not write.',
+    'Fix ONLY grammar, spelling, punctuation, and capitalization errors in this English writing submission.',
+    'Change the MINIMUM number of words possible. Do NOT rewrite or restructure any sentence.',
+    'Do NOT add words the student did not write. Do NOT replace words with synonyms.',
+    'If a sentence is grammatically correct, keep it EXACTLY as the student wrote it.',
     'Keep every feedback very short and practical.',
     'common_errors should have at most 3 items.',
     'Each item feedback must be 1 short sentence in Vietnamese explaining what was corrected.',
