@@ -91,6 +91,33 @@
         return !!value && !/[A-Za-z0-9]/.test(String(value));
     }
 
+    function isClosingPunctuationToken(value) {
+        return /^[,.;:!?%)\]}]+$/.test(String(value || ''));
+    }
+
+    function isOpeningPunctuationToken(value) {
+        return /^[(\[{'"“‘]+$/.test(String(value || ''));
+    }
+
+    function shouldInsertGapBetweenSegments(previousRaw, nextRaw) {
+        const prev = String(previousRaw || '');
+        const next = String(nextRaw || '');
+
+        if (!prev || !next || prev === '\n' || next === '\n') {
+            return false;
+        }
+
+        if (isClosingPunctuationToken(next)) {
+            return false;
+        }
+
+        if (isOpeningPunctuationToken(prev)) {
+            return false;
+        }
+
+        return true;
+    }
+
     function buildQuestionId(partKey, itemKey, idx) {
         const safePart = String(partKey || 'part').trim() || 'part';
         const safeKey = String(itemKey || `item_${idx + 1}`).trim() || `item_${idx + 1}`;
@@ -259,34 +286,49 @@
         let srcPos = 0;
         for (const part of parts) {
             if (part.type !== 'ins' && breaksBeforeIdx[srcPos]) {
-                for (let b = 0; b < breaksBeforeIdx[srcPos]; b++) result.push('<br>');
+                for (let b = 0; b < breaksBeforeIdx[srcPos]; b++) {
+                    result.push({ html: '<br>', raw: '\n' });
+                }
                 delete breaksBeforeIdx[srcPos];
             }
             const safe = escapeHtml(part.value);
             const punctuationOnly = isPunctuationToken(part.value);
             if (part.type === 'del') {
                 if (!punctuationOnly) {
-                    result.push(`<span class="writing-auto-del">${safe}</span>`);
+                    result.push({ html: `<span class="writing-auto-del">${safe}</span>`, raw: part.value });
                 }
                 srcPos++;
             } else if (part.type === 'ins') {
-                result.push(
-                    punctuationOnly
+                result.push({
+                    html: punctuationOnly
                         ? `<span class="writing-auto-unchanged">${safe}</span>`
-                        : `<span class="writing-auto-ins">${safe}</span>`
-                );
+                        : `<span class="writing-auto-ins">${safe}</span>`,
+                    raw: part.value
+                });
             } else {
-                result.push(`<span class="writing-auto-unchanged">${safe}</span>`);
+                result.push({ html: `<span class="writing-auto-unchanged">${safe}</span>`, raw: part.value });
                 srcPos++;
             }
         }
-        return result
-            .join(' ')
-            .replace(/\s+([.,!?;:])/g, '$1')
-            .replace(/([(\[{])\s+/g, '$1')
-            .replace(/\s+([)\]}])/g, '$1')
-            .replace(/<br>\s+/g, '<br>')
-            .replace(/\s+<br>/g, '<br>');
+
+        let html = '';
+        let previousRaw = '';
+        result.forEach((segment) => {
+            if (segment.raw === '\n') {
+                html += segment.html;
+                previousRaw = '\n';
+                return;
+            }
+
+            if (shouldInsertGapBetweenSegments(previousRaw, segment.raw)) {
+                html += ' ';
+            }
+
+            html += segment.html;
+            previousRaw = segment.raw;
+        });
+
+        return html;
     }
 
     function renderList(title, items = []) {

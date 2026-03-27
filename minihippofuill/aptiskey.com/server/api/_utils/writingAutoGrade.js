@@ -11,7 +11,7 @@ const STYLE_PHRASES_TO_KEEP = [
   'i suppose',
   'i am sure'
 ];
-const PUNCTUATION_SAFE_SIGNOFF_LINES = new Set([
+const TERMINAL_PERIOD_SAFE_SIGNOFF_LINES = new Set([
   'best regards',
   'kind regards',
   'regards',
@@ -153,27 +153,35 @@ const OPENAI_TEXT_ONLY_SYSTEM_PROMPT = [
   'COLLOCATION RULES:',
   '- Only fix collocations when the original phrase is clearly unnatural or incorrect, even if grammatically possible.',
   '- Replace only 1–2 words maximum.',
-  '- Prefer changing only ONE word (for example a verb or noun), or adding a small word such as an article.',
+  '- Prefer changing only ONE word (e.g., verb or noun), or adding a small word (e.g., an article).',
   '- Do NOT restructure the sentence.',
   '- Do NOT change if multiple correct options exist.',
   '- Prefer the simplest, most common, and closest equivalent collocation.',
   'STRICT PROHIBITIONS:',
-  '- Do NOT fix spelling or capitalization unless required for grammar or the word is clearly incorrect.',
-  '- You may make only these punctuation fixes: add a missing period at the end of a sentence, remove an unnecessary period that breaks one sentence into two, and ensure one space after a comma or period when needed.',
+  '- Do NOT fix spelling, punctuation, or capitalization unless required for grammar or the word is clearly incorrect.',
+  '- Exception: you may add a missing period at the end of a sentence when it is clearly needed.',
   '- Do NOT improve vocabulary or style.',
   '- Do NOT rewrite awkward but grammatically acceptable sentences.',
   '- Do NOT replace phrases just to sound more natural.',
   '- Do NOT explain anything.',
   '- Do NOT add comments, labels, or notes.',
-  '- Never change proper nouns such as personal names, club names, place names, greeting names, or signature names.',
   'DECISION RULE:',
-  '- If unsure whether something is wrong, DO NOT change it.',
+  '- If unsure whether something is wrong → DO NOT change it.',
   '- If a sentence is acceptable, keep it exactly the same.',
-  '- Each correction should affect as few words as possible, usually 1–3 tokens.',
+  '- Each correction should affect as few words as possible (prefer 1–3 tokens).',
   'OUTPUT FORMAT:',
   '- Return ONLY the corrected text.',
   '- Keep original line breaks and paragraph breaks.',
   '- Do not include explanations or any extra text.'
+].join(' ');
+const OPENAI_EDIT_VALIDATOR_SYSTEM_PROMPT = [
+  'You are a strict validator for English correction edits.',
+  'Decide whether a candidate edit is NECESSARY under these rules only:',
+  '- allow only clear grammar fixes, clear spelling fixes, or a very small number of obvious wrong-word or incorrect collocation fixes.',
+  '- keep the original wording, tone, and sentence structure whenever possible.',
+  '- reject synonym swaps, standardization, style improvements, optional paraphrases, or changes with multiple reasonable alternatives.',
+  '- if the original wording is already acceptable, keep it.',
+  'Return ONLY YES or NO.'
 ].join(' ');
 
 export async function autoGradeWritingSubmission({
@@ -279,7 +287,7 @@ export async function autoGradeWritingSubmission({
     '- Prefer the simplest, most common, and closest equivalent collocation.',
     'STRICT PROHIBITIONS:',
     '- Do NOT fix spelling or capitalization unless required for grammar or the word is clearly incorrect.',
-    '- You may make only these punctuation fixes: add a missing period at the end of a sentence, remove an unnecessary period that breaks one sentence into two, and ensure one space after a comma or period when needed.',
+    '- The only punctuation change you may make is adding a missing period at the end of a sentence when it is clearly needed.',
     '- Do NOT improve vocabulary or style.',
     '- Do NOT rewrite awkward but grammatically acceptable sentences.',
     '- Do NOT replace phrases just to sound more natural.',
@@ -531,9 +539,11 @@ async function autoGradeWithLanguageTool({ writingItems, gradableItems, metadata
       const safeMatchSelection = await buildIterativeSafeCorrection(item.answer);
       const matches = safeMatchSelection.matches;
       allMatches.push(...matches);
-      const corrected = restoreOriginalLineBreaks(item.answer, safeMatchSelection.correctedText);
-      const formattedCorrected = normalizeBasicPunctuationFormatting(corrected, item.answer);
-      const correctionDecision = enforceMinimalGrammarCorrection(item.answer, formattedCorrected);
+      const corrected = normalizeTerminalPeriods(
+        restoreOriginalLineBreaks(item.answer, safeMatchSelection.correctedText),
+        item.answer
+      );
+      const correctionDecision = enforceMinimalGrammarCorrection(item.answer, corrected);
       const diffCategories = getCorrectionDiffCategories(item.answer, correctionDecision.correctedAnswer);
       const feedbackParts = [];
       const seenFeedbackParts = new Set();
@@ -581,8 +591,8 @@ async function autoGradeWithLanguageTool({ writingItems, gradableItems, metadata
       ...buildCommonErrorsFromCategoryCounts(categoryCounts)
     ])).slice(0, 3);
     const overallFeedback = hasCorrections
-      ? 'Bài viết có một số lỗi về ngữ pháp, chính tả, collocation hoặc dấu câu cơ bản cần chỉnh nhẹ.'
-      : 'Không phát hiện lỗi ngữ pháp, chính tả, collocation hoặc dấu câu cơ bản cần sửa.';
+      ? 'Bài viết có một số lỗi về ngữ pháp, chính tả hoặc collocation cần chỉnh nhẹ.'
+      : 'Không phát hiện lỗi ngữ pháp, từ sai hoặc collocation sai rõ ràng.';
 
     return {
       status: 'completed',
@@ -642,9 +652,11 @@ async function autoGradeWithOpenAITextMode({ writingItems, gradableItems, metada
     });
 
     const normalizedOutput = normalizeCorrectedPlainText(response.text, item.answer);
-    const restoredOutput = restoreOriginalLineBreaks(item.answer, normalizedOutput);
-    const formattedOutput = normalizeBasicPunctuationFormatting(restoredOutput, item.answer);
-    const correctionDecision = enforceMinimalOpenAICorrection(item.answer, formattedOutput);
+    const restoredOutput = normalizeTerminalPeriods(
+      restoreOriginalLineBreaks(item.answer, normalizedOutput),
+      item.answer
+    );
+    const correctionDecision = await enforceMinimalOpenAICorrection(item.answer, restoredOutput);
     const diffCategories = getCorrectionDiffCategories(item.answer, correctionDecision.correctedAnswer);
     diffCategories.forEach((category) => {
       categoryCounts.set(category, (categoryCounts.get(category) || 0) + 1);
@@ -663,8 +675,8 @@ async function autoGradeWithOpenAITextMode({ writingItems, gradableItems, metada
     sanitizeText(item.corrected_answer || '') !== sanitizeText(writingItems[index]?.answer || '')
   ));
   const overallFeedback = hasCorrections
-    ? 'Bài viết có một số lỗi về ngữ pháp, chính tả, collocation hoặc dấu câu cơ bản cần chỉnh nhẹ.'
-    : 'Không phát hiện lỗi ngữ pháp, chính tả, collocation hoặc dấu câu cơ bản cần sửa.';
+    ? 'Bài viết có một số lỗi về ngữ pháp, chính tả hoặc collocation cần chỉnh nhẹ.'
+    : 'Không phát hiện lỗi ngữ pháp, từ sai hoặc collocation sai rõ ràng.';
 
   return {
     status: 'completed',
@@ -1515,7 +1527,7 @@ function buildWritingPrompt({ setTitle, totalWords, writingItems }) {
     'Do NOT fix awkward but acceptable wording.',
     'Do NOT remove phrases like "I think" or "In my opinion" if they are grammatically acceptable.',
     'Do NOT change proper nouns such as personal names, club names, place names, greeting names, or signature names.',
-    'You may make only these punctuation fixes: add a missing period at the end of a sentence, remove an unnecessary period that breaks one sentence into two, and ensure one space after a comma or period when needed.',
+    'The only punctuation change you may make is adding a missing period at the end of a sentence when it is clearly needed.',
     'Keep original line breaks and paragraph breaks whenever possible.',
     'Keep every feedback very short and practical.',
     'common_errors should have at most 3 items.',
@@ -1545,9 +1557,6 @@ function buildWritingPrompt({ setTitle, totalWords, writingItems }) {
     'Original: "There are 6 people in my family"',
     'Corrected: "There are 6 people in my family."',
     'Why: add only the missing period at the end of the sentence.',
-    'Original: "I read books,and chat online."',
-    'Corrected: "I read books, and chat online."',
-    'Why: keep the same words and add one space after the comma only.',
     'Return JSON exactly with this structure:',
     JSON.stringify({
       overall_feedback: 'Nhan xet tong the ngan bang tieng Viet ve loi ngu phap, tu sai ro rang, hoac collocation sai ro rang.',
@@ -1578,7 +1587,7 @@ function normalizeAIWritingResponse(parsed, writingItems) {
 
     const hasAnswer = !!item.answer;
     const rawCorrectedAnswer = hasAnswer
-      ? normalizeBasicPunctuationFormatting(
+      ? normalizeTerminalPeriods(
         restoreOriginalLineBreaks(item.answer, sanitizeText(rawItem.corrected_answer || item.answer)),
         item.answer
       )
@@ -1603,7 +1612,7 @@ function normalizeAIWritingResponse(parsed, writingItems) {
     };
   });
 
-  const overallFeedback = sanitizeText(parsed?.overall_feedback || '') || 'AI đã rà soát và chỉ sửa lỗi ngữ pháp, từ sai rõ ràng, collocation sai rõ ràng, hoặc dấu câu cơ bản thật sự cần thiết.';
+  const overallFeedback = sanitizeText(parsed?.overall_feedback || '') || 'AI đã rà soát và chỉ sửa lỗi ngữ pháp, từ sai rõ ràng, hoặc collocation sai rõ ràng thật sự cần thiết.';
   const commonErrors = normalizeStringArray(parsed?.common_errors);
 
   return {
@@ -1657,7 +1666,7 @@ function restoreOriginalLineBreaks(original, corrected) {
     .replace(/\n{3,}/g, '\n\n');
 }
 
-function normalizeBasicPunctuationFormatting(text, originalText = '') {
+function normalizeTerminalPeriods(text, originalText = '') {
   const normalizedText = String(text || '').replace(/\r\n/g, '\n');
   if (!normalizedText.trim()) {
     return sanitizeText(text || '');
@@ -1666,7 +1675,7 @@ function normalizeBasicPunctuationFormatting(text, originalText = '') {
   const originalLines = String(originalText || '').replace(/\r\n/g, '\n').split('\n');
   const formatted = normalizedText
     .split('\n')
-    .map((line, index) => normalizeBasicPunctuationLine(line, originalLines[index] || ''))
+    .map((line, index) => normalizeTerminalPeriodLine(line, originalLines[index] || ''))
     .join('\n')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n[ \t]+/g, '\n')
@@ -1675,35 +1684,29 @@ function normalizeBasicPunctuationFormatting(text, originalText = '') {
   return sanitizeText(formatted);
 }
 
-function normalizeBasicPunctuationLine(line, originalLine = '') {
-  const rawLine = String(line || '');
-  const trimmed = rawLine.trim();
+function normalizeTerminalPeriodLine(line, originalLine = '') {
+  const trimmed = String(line || '').trim();
   if (!trimmed) return '';
 
-  let formatted = trimmed
-    .replace(/\s+([,.!?;:])/g, '$1')
-    .replace(/,\s*([A-Za-z0-9("'“])/g, ', $1')
-    .replace(/([A-Za-z)"'’])\.\s*([A-Za-z("'“])/g, '$1. $2');
-
-  if (shouldAppendTerminalPeriod(formatted, originalLine)) {
-    formatted = `${formatted}.`;
+  if (shouldAppendTerminalPeriod(trimmed, originalLine)) {
+    return `${trimmed}.`;
   }
 
-  return formatted;
+  return trimmed;
 }
 
 function shouldAppendTerminalPeriod(line, originalLine = '') {
   const trimmed = String(line || '').trim();
   if (!trimmed) return false;
   if (/[.!?]$/.test(trimmed)) return false;
-  if (/,$/.test(trimmed)) return false;
-  if (!/[A-Za-z0-9)"'’]$/.test(trimmed)) return false;
+  if (/[,;:]$/.test(trimmed)) return false;
+  if (!/[A-Za-z0-9)"'’\]]$/.test(trimmed)) return false;
   if (isGreetingOrSignoffLine(trimmed) || isLikelyStandaloneSignatureLine(trimmed)) {
     return false;
   }
 
   const originalTrimmed = String(originalLine || '').trim();
-  if (originalTrimmed && /,$/.test(originalTrimmed)) {
+  if (originalTrimmed && /[,;:]$/.test(originalTrimmed)) {
     return false;
   }
 
@@ -1714,7 +1717,7 @@ function isGreetingOrSignoffLine(line = '') {
   const lowered = String(line || '').trim().toLowerCase().replace(/[,:]+$/, '');
   if (!lowered) return false;
   if (lowered.startsWith('dear ')) return true;
-  return PUNCTUATION_SAFE_SIGNOFF_LINES.has(lowered);
+  return TERMINAL_PERIOD_SAFE_SIGNOFF_LINES.has(lowered);
 }
 
 function isLikelyStandaloneSignatureLine(line = '') {
@@ -1723,7 +1726,7 @@ function isLikelyStandaloneSignatureLine(line = '') {
   return /^[A-Z][A-Za-z'’.-]*(?:\s+[A-Z][A-Za-z'’.-]*){0,3}\.?$/.test(trimmed);
 }
 
-function isAllowedFormattingOnlyChange(originalText, candidateText) {
+function isAllowedTerminalPeriodOnlyChange(originalText, candidateText) {
   const originalValue = sanitizeText(originalText || '');
   const candidateValue = sanitizeText(candidateText || '');
 
@@ -1731,8 +1734,7 @@ function isAllowedFormattingOnlyChange(originalText, candidateText) {
     return false;
   }
 
-  return normalizeBasicPunctuationFormatting(originalValue, originalValue)
-    === normalizeBasicPunctuationFormatting(candidateValue, originalValue);
+  return normalizeTerminalPeriods(originalValue, originalValue) === candidateValue;
 }
 
 function buildLineAnchors(line) {
@@ -1821,7 +1823,7 @@ function enforceMinimalGrammarCorrection(original, candidate) {
   return salvageLineLevelCorrection(original, candidate, strictDecision);
 }
 
-function enforceMinimalOpenAICorrection(original, candidate) {
+async function enforceMinimalOpenAICorrection(original, candidate) {
   const originalText = sanitizeText(original || '');
   let candidateText = sanitizeText(candidate || '');
 
@@ -1896,10 +1898,192 @@ function enforceMinimalOpenAICorrection(original, candidate) {
     };
   }
 
+  const diffChunks = computeWordDiffChunks(originalLower, candidateLower);
+  candidateText = await restoreUnsupportedOpenAIChunks(originalText, candidateText, diffChunks);
+
+  const postRestoreDecision = restoreProtectedContent(originalText, candidateText);
+  candidateText = postRestoreDecision.correctedAnswer;
+  if (postRestoreDecision.rejected || removesProtectedStylePhrase(originalText, candidateText)) {
+    return {
+      correctedAnswer: originalText,
+      rejected: true
+    };
+  }
+
   return {
     correctedAnswer: candidateText,
     rejected: false
   };
+}
+
+async function restoreUnsupportedOpenAIChunks(originalText, candidateText, diffChunks = []) {
+  let nextText = String(candidateText || '');
+  const chunks = Array.isArray(diffChunks) ? [...diffChunks] : [];
+
+  for (let index = chunks.length - 1; index >= 0; index -= 1) {
+    const chunk = chunks[index];
+    const isSupported = await isOpenAIChunkSupported(originalText, nextText, chunk);
+    if (isSupported) continue;
+    nextText = restoreOriginalTextForUnsupportedChunks(originalText, nextText, chunk);
+  }
+
+  return cleanupOpenAIChunkSpacing(nextText);
+}
+
+async function isOpenAIChunkSupported(originalText, candidateText, chunk) {
+  if (isOpenAIChunkSupportedByOriginalIssue(chunk)) {
+    return true;
+  }
+
+  return askOpenAIIfChunkIsNecessary(originalText, candidateText, chunk);
+}
+
+function isOpenAIChunkSupportedByOriginalIssue(chunk) {
+  const removed = chunk?.removed || [];
+  const added = chunk?.added || [];
+
+  if (!removed.length && !added.length) {
+    return true;
+  }
+
+  if (removed.length === 1 && added.length === 1) {
+    const [fromWord] = removed;
+    const [toWord] = added;
+    return isAllowedWordSwap(fromWord, toWord)
+      || (isSimpleSpellingVariant(fromWord, toWord) && !isInflectionVariant(fromWord, toWord));
+  }
+
+  if (!removed.length || !added.length) {
+    return [...removed, ...added].every(isFunctionWord);
+  }
+
+  return removed.every(isFunctionWord) && added.every(isFunctionWord);
+}
+
+async function askOpenAIIfChunkIsNecessary(originalText, candidateText, chunk) {
+  const originalRange = getTokenRange(originalText, chunk?.startOriginal, chunk?.endOriginal);
+  const candidateRange = getTokenRange(candidateText, chunk?.startTarget, chunk?.endTarget);
+  const originalChunk = originalRange ? originalText.slice(originalRange.start, originalRange.end) : '';
+  const candidateChunk = candidateRange ? candidateText.slice(candidateRange.start, candidateRange.end) : '';
+  const originalContextRange = getChunkContextRange(originalText, originalRange);
+  const candidateContextRange = getChunkContextRange(candidateText, candidateRange);
+
+  const response = await generateAIText({
+    systemPrompt: OPENAI_EDIT_VALIDATOR_SYSTEM_PROMPT,
+    userPrompt: [
+      'Original text:',
+      originalText,
+      '',
+      'Candidate text:',
+      candidateText,
+      '',
+      `Original changed chunk: ${JSON.stringify(originalChunk)}`,
+      `Candidate changed chunk: ${JSON.stringify(candidateChunk)}`,
+      `Original chunk context: ${JSON.stringify(originalContextRange)}`,
+      `Candidate chunk context: ${JSON.stringify(candidateContextRange)}`,
+      '',
+      'Is the candidate change strictly necessary to fix a clear grammar error, spelling error, or obvious wrong-word/collocation error?',
+      'If the change is only a synonym swap, wording preference, standardization, or optional rewrite, answer NO.',
+      'Return ONLY YES or NO.'
+    ].join('\n'),
+    maxTokens: 5,
+    temperature: 0
+  });
+
+  return /^yes\b/i.test(String(response?.text || '').trim());
+}
+
+function getChunkContextRange(text, range) {
+  if (!range) return '';
+  const value = String(text || '');
+  const contextPadding = 30;
+  const start = Math.max(0, range.start - contextPadding);
+  const end = Math.min(value.length, range.end + contextPadding);
+  return value.slice(start, end);
+}
+
+function restoreOriginalTextForUnsupportedChunks(originalText, candidateText, chunk) {
+  const originalRange = getTokenRange(originalText, chunk?.startOriginal, chunk?.endOriginal);
+  const candidateRange = getTokenRange(candidateText, chunk?.startTarget, chunk?.endTarget);
+  const originalChunk = originalRange ? originalText.slice(originalRange.start, originalRange.end) : '';
+  const candidateChunk = candidateRange ? candidateText.slice(candidateRange.start, candidateRange.end) : '';
+
+  if (!originalChunk && !candidateChunk) {
+    return candidateText;
+  }
+
+  if (candidateRange) {
+    return cleanupOpenAIChunkSpacing(
+      `${candidateText.slice(0, candidateRange.start)}${originalChunk}${candidateText.slice(candidateRange.end)}`
+    );
+  }
+
+  if (originalChunk) {
+    const insertionOffset = getTokenInsertionOffset(candidateText, chunk?.startTarget || 0);
+    return cleanupOpenAIChunkSpacing(
+      `${candidateText.slice(0, insertionOffset)}${originalChunk}${candidateText.slice(insertionOffset)}`
+    );
+  }
+
+  return candidateText;
+}
+
+function getTokenRange(text, startIndex, endIndex) {
+  const ranges = getTokenRanges(text);
+  const start = Number(startIndex);
+  const end = Number(endIndex);
+
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < 0 || end <= start) {
+    return null;
+  }
+
+  const first = ranges[start];
+  const last = ranges[end - 1];
+  if (!first || !last) return null;
+
+  return {
+    start: first.start,
+    end: last.end
+  };
+}
+
+function getTokenInsertionOffset(text, tokenIndex) {
+  const ranges = getTokenRanges(text);
+  const index = Number(tokenIndex);
+  if (!ranges.length) return String(text || '').length;
+  if (!Number.isFinite(index) || index <= 0) return ranges[0].start;
+  if (index >= ranges.length) return ranges[ranges.length - 1].end;
+  return ranges[index].start;
+}
+
+function getTokenRanges(text) {
+  const value = String(text || '');
+  const regex = /[A-Za-z0-9']+/g;
+  const ranges = [];
+  let match;
+
+  while ((match = regex.exec(value)) !== null) {
+    ranges.push({
+      start: match.index,
+      end: match.index + match[0].length
+    });
+  }
+
+  return ranges;
+}
+
+function rangesOverlap(left, right) {
+  if (!left || !right) return false;
+  return left.start < right.end && right.start < left.end;
+}
+
+function cleanupOpenAIChunkSpacing(text = '') {
+  return String(text || '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 function salvageLineLevelCorrection(original, candidate, fallbackDecision) {
@@ -1989,7 +2173,7 @@ function enforceMinimalGrammarCorrectionStrict(original, candidate) {
   const candidateLower = candidateWords.map((word) => word.toLowerCase());
 
   if (areArraysEqual(originalLower, candidateLower)) {
-    if (isAllowedFormattingOnlyChange(originalText, candidateText)) {
+    if (isAllowedTerminalPeriodOnlyChange(originalText, candidateText)) {
       return {
         correctedAnswer: candidateText,
         rejected: false
@@ -2389,6 +2573,7 @@ function computeWordDiffChunks(source, target) {
   const flush = () => {
     if (!current) return;
     current.endOriginal = row;
+    current.endTarget = col;
     chunks.push(current);
     current = null;
   };
@@ -2405,6 +2590,8 @@ function computeWordDiffChunks(source, target) {
       current = {
         startOriginal: row,
         endOriginal: row,
+        startTarget: col,
+        endTarget: col,
         removed: [],
         added: []
       };
@@ -2543,8 +2730,8 @@ function getCorrectionDiffCategories(originalText = '', correctedText = '') {
   const correctedLower = correctedWords.map((word) => word.toLowerCase());
 
   if (areArraysEqual(originalLower, correctedLower)) {
-    return isAllowedFormattingOnlyChange(originalText, correctedText)
-      ? ['basic_punctuation']
+    return isAllowedTerminalPeriodOnlyChange(originalText, correctedText)
+      ? ['terminal_period']
       : [];
   }
 
@@ -2612,10 +2799,9 @@ function buildItemFeedbackFromCategories(categories = []) {
   if (list.includes('word_choice_or_collocation')) {
     messages.push('Kiểm tra lại từ dùng hoặc collocation ở cụm này.');
   }
-  if (list.includes('basic_punctuation')) {
-    messages.push('Kiểm tra lại dấu câu cơ bản và khoảng trắng sau dấu câu.');
+  if (list.includes('terminal_period')) {
+    messages.push('Kiểm tra lại dấu chấm cuối câu.');
   }
-
   return messages.slice(0, 3).join(' ') || 'Kiểm tra lại ngữ pháp ở cụm này.';
 }
 
@@ -2625,7 +2811,7 @@ function buildCommonErrorsFromCategoryCounts(categoryCounts) {
     article_or_preposition: 'Lỗi dùng mạo từ hoặc giới từ',
     spelling: 'Lỗi dùng từ sai hoặc chính tả',
     word_choice_or_collocation: 'Lỗi dùng từ sai hoặc collocation không tự nhiên',
-    basic_punctuation: 'Lỗi dấu câu cơ bản hoặc thiếu khoảng trắng sau dấu câu'
+    terminal_period: 'Thiếu dấu chấm cuối câu'
   };
 
   return Array.from(categoryCounts.entries())
