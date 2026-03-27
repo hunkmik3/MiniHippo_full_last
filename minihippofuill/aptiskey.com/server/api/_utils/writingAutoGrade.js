@@ -138,51 +138,107 @@ const WRITING_RESPONSE_JSON_SCHEMA = {
 };
 const OPENAI_TEXT_ONLY_SYSTEM_PROMPT = [
   'You are a strict English grammar corrector for Vietnamese learners.',
-  'Your ONLY task is to make the smallest possible edits to fix clear grammar errors and a very small number of obvious wrong-word or incorrect collocation errors.',
-  'You must follow ALL rules below.',
-  'CRITICAL CONSTRAINTS:',
-  '- Make MINIMAL edits only. Change as few words as possible.',
+  'Your ONLY task is to make the smallest possible edits to fix clear grammar errors and a very small number of obvious typo, wrong-word, or incorrect collocation errors.',
+  'CORE GOAL:',
+  '- Make MINIMAL edits only.',
+  '- Change as few words as possible.',
   '- Keep the original wording, vocabulary, tone, and sentence structure.',
-  '- Do NOT rewrite, paraphrase, or improve style.',
-  '- Do NOT make sentences more natural if they are already grammatically acceptable.',
-  '- Do NOT add or reorder information.',
+  '- Preserve the student\'s original answer style whenever possible.',
+  '- If the original answer is acceptable, keep it unchanged.',
   'ALLOWED CHANGES:',
-  '- Grammar only: verb forms, subject-verb agreement, articles, prepositions, pronouns, singular/plural, basic clause errors.',
+  '- Grammar only: verb forms, subject-verb agreement, missing subject, missing auxiliary, articles, prepositions, pronouns, singular/plural, tense, infinitive/gerund, clearly wrong word order.',
+  '- Obvious typo: only when the intended word is clear and the typo creates a wrong word or clearly blocks correct English.',
   '- Obvious wrong word: only if clearly incorrect and fixable with ONE simple replacement.',
-  '- Collocations: only if clearly incorrect, unnatural, or not used by native speakers, and the correct form is very common and obvious.',
+  '- Obvious collocation: only if clearly incorrect and the fix is very common and obvious.',
+  '- Capitalize the pronoun "I" when needed.',
+  'IMPORTANT BEHAVIOR:',
+  '- If a sentence is clearly missing one essential word for grammar, add ONLY that missing word.',
+  '- Do NOT avoid correction just because one word must be added.',
+  '- For short-answer tasks, preserve short-answer style.',
+  '- If the task says "Use 1-5 words", keep the correction within that limit whenever possible.',
+  '- If there are multiple possible fixes, choose the one closest to the original wording.',
+  '- Do NOT leave a clearly wrong sentence unchanged.',
+  'PUNCTUATION RULE:',
+  '- After minimal grammar correction, add end punctuation if a sentence clearly lacks final punctuation.',
+  '- If a sentence does NOT end with ".", "?", or "!", add ".".',
+  '- Do NOT add "." if the sentence already ends with ".", "?", or "!".',
+  '- Do NOT rewrite the sentence just to change punctuation.',
+  '- Do NOT create duplicate punctuation such as ".."',
   'COLLOCATION RULES:',
-  '- Only fix collocations when the original phrase is clearly unnatural or incorrect, even if grammatically possible.',
-  '- Replace only 1–2 words maximum.',
-  '- Prefer changing only ONE word (e.g., verb or noun), or adding a small word (e.g., an article).',
+  '- Only fix collocations when the original phrase is clearly unnatural or incorrect.',
+  '- Replace only 1-2 words maximum.',
+  '- Prefer changing only ONE word.',
   '- Do NOT restructure the sentence.',
   '- Do NOT change if multiple correct options exist.',
-  '- Prefer the simplest, most common, and closest equivalent collocation.',
   'STRICT PROHIBITIONS:',
-  '- Do NOT fix spelling, punctuation, or capitalization unless required for grammar or the word is clearly incorrect.',
-  '- Exception: you may add a missing period at the end of a sentence when it is clearly needed.',
-  '- Do NOT improve vocabulary or style.',
-  '- Do NOT rewrite awkward but grammatically acceptable sentences.',
-  '- Do NOT replace phrases just to sound more natural.',
+  '- Do NOT rewrite, paraphrase, or improve style.',
+  '- Do NOT make the sentence more natural if it is already grammatically acceptable.',
+  '- Do NOT add or reorder information.',
   '- Do NOT explain anything.',
   '- Do NOT add comments, labels, or notes.',
+  '- Do NOT correct advanced style issues.',
+  '- Do NOT change punctuation except final end punctuation when missing.',
+  '- Do NOT change capitalization except when grammar requires it.',
   'DECISION RULE:',
-  '- If unsure whether something is wrong → DO NOT change it.',
-  '- If a sentence is acceptable, keep it exactly the same.',
-  '- Each correction should affect as few words as possible (prefer 1–3 tokens).',
+  '- If unsure whether something is wrong, DO NOT change it.',
+  '- If it is clearly wrong, fix it minimally.',
+  '- Prefer 1-3 token changes.',
+  '- When one missing subject, article, pronoun, auxiliary, or infinitive marker is the only problem, add only that word.',
+  'FEW-SHOT EXAMPLES:',
+  'Example 1',
+  'Question: What do you like to do every morning?',
+  'Student answer: I like read book every morning',
+  'Corrected answer: I like reading books every morning.',
+  'Example 2',
+  'Question: What did you do last night?',
+  'Student answer: Did my homework last night',
+  'Corrected answer: I did my homework last night.',
+  'Example 3',
+  'Question: How is the weather today?',
+  'Student answer: Sunny and warn',
+  'Corrected answer: Sunny and warm.',
+  'Example 4',
+  'Question: What do you like to do in your free time?',
+  'Student answer: I like listen to music in your free time',
+  'Corrected answer: I like listening to music in my free time.',
+  'Example 5',
+  'Question: When was the last time you read a book and how was the book?',
+  'Student answer: The last time I read book was last week. I read it at hone in the evening. The book was very interesting and easy to understand. I enjoyed the story and learned some new things from it. I really like it',
+  'Corrected answer: The last time I read a book was last week. I read it at home in the evening. The book was very interesting and easy to understand. I enjoyed the story and learned some new things from it. I really liked it.',
+  'Example 6',
+  'Question: Do you like to read? Why?',
+  'Student answer: Yes, i like to read. I often read books and magazines in my free time. Reading helps me relax and learn new things. Sometime i read stories and sometime i read about sport beacause it is interesting',
+  'Corrected answer: Yes, I like to read. I often read books and magazines in my free time. Reading helps me relax and learn new things. Sometimes I read stories and sometimes I read about sport because it is interesting.',
   'OUTPUT FORMAT:',
   '- Return ONLY the corrected text.',
   '- Keep original line breaks and paragraph breaks.',
-  '- Do not include explanations or any extra text.'
+  '- Do not include explanations or extra text.'
 ].join(' ');
 const OPENAI_EDIT_VALIDATOR_SYSTEM_PROMPT = [
   'You are a strict validator for English correction edits.',
   'Decide whether a candidate edit is NECESSARY under these rules only:',
   '- allow only clear grammar fixes, clear spelling fixes, or a very small number of obvious wrong-word or incorrect collocation fixes.',
+  '- allow adding one essential missing word when that is the only needed grammar fix, such as a subject, article, pronoun, auxiliary, or "to".',
+  '- allow capitalizing the pronoun "I" when needed.',
+  '- allow adding a final ".", but only when the sentence clearly lacks end punctuation.',
   '- keep the original wording, tone, and sentence structure whenever possible.',
   '- reject synonym swaps, standardization, style improvements, optional paraphrases, or changes with multiple reasonable alternatives.',
   '- if the original wording is already acceptable, keep it.',
   'Return ONLY YES or NO.'
 ].join(' ');
+
+function buildOpenAITextCorrectionUserPrompt(item = {}) {
+  const question = sanitizeText(item?.prompt || '');
+  const answer = sanitizeText(item?.answer || '');
+
+  return [
+    question ? `Question: ${question}` : '',
+    'Student answer:',
+    answer,
+    '',
+    'Corrected answer:'
+  ].filter(Boolean).join('\n');
+}
 
 export async function autoGradeWritingSubmission({
   metadata = {},
@@ -646,17 +702,13 @@ async function autoGradeWithOpenAITextMode({ writingItems, gradableItems, metada
 
     const response = await generateAIText({
       systemPrompt: OPENAI_TEXT_ONLY_SYSTEM_PROMPT,
-      userPrompt: item.answer,
+      userPrompt: buildOpenAITextCorrectionUserPrompt(item),
       maxTokens: Math.min(2000, Math.max(400, item.answer.length * 4)),
       temperature: 0
     });
 
-    const normalizedOutput = normalizeCorrectedPlainText(response.text, item.answer);
-    const restoredOutput = normalizeTerminalPeriods(
-      restoreOriginalLineBreaks(item.answer, normalizedOutput),
-      item.answer
-    );
-    const correctionDecision = await enforceMinimalOpenAICorrection(item.answer, restoredOutput);
+    const finalized = await finalizeOpenAITextCorrection(item.answer, response.text);
+    const correctionDecision = finalized.correctionDecision;
     const diffCategories = getCorrectionDiffCategories(item.answer, correctionDecision.correctedAnswer);
     diffCategories.forEach((category) => {
       categoryCounts.set(category, (categoryCounts.get(category) || 0) + 1);
@@ -666,7 +718,11 @@ async function autoGradeWithOpenAITextMode({ writingItems, gradableItems, metada
       part: item.part,
       key: item.key,
       corrected_answer: correctionDecision.correctedAnswer,
-      feedback: buildItemFeedbackFromCategories(diffCategories)
+      feedback: buildItemFeedbackFromCategories(diffCategories),
+      raw_model_output: finalized.rawModelOutput,
+      normalized_output: finalized.normalizedOutput,
+      final_corrected_answer: correctionDecision.correctedAnswer,
+      rejection_flags: correctionDecision.rejectionFlags || []
     });
   }
 
@@ -696,6 +752,22 @@ async function autoGradeWithOpenAITextMode({ writingItems, gradableItems, metada
         items: correctedItems
       }
     }
+  };
+}
+
+async function finalizeOpenAITextCorrection(originalAnswer = '', rawModelOutput = '') {
+  const normalizedOutput = normalizeCorrectedPlainText(rawModelOutput, originalAnswer);
+  const restoredOutput = normalizeTerminalPeriods(
+    restoreOriginalLineBreaks(originalAnswer, normalizedOutput),
+    originalAnswer
+  );
+  const correctionDecision = await enforceMinimalOpenAICorrection(originalAnswer, restoredOutput);
+
+  return {
+    rawModelOutput: sanitizeText(rawModelOutput || ''),
+    normalizedOutput,
+    restoredOutput,
+    correctionDecision
   };
 }
 
@@ -1737,6 +1809,42 @@ function isAllowedTerminalPeriodOnlyChange(originalText, candidateText) {
   return normalizeTerminalPeriods(originalValue, originalValue) === candidateValue;
 }
 
+function normalizePronounICapitalization(text = '') {
+  const value = String(text || '');
+  if (!value) return '';
+
+  return value
+    .replace(/\bi(['’](?:m|d|ll|ve))\b/g, (_, suffix) => `I${suffix}`)
+    .replace(/(^|[\s([{"'“‘])i(?=($|[\s.,!?;:)\]"'”’]))/g, (_, prefix) => `${prefix}I`);
+}
+
+function isAllowedPronounICapitalizationOnlyChange(originalText, candidateText) {
+  const originalValue = sanitizeText(originalText || '');
+  const candidateValue = sanitizeText(candidateText || '');
+
+  if (!originalValue || !candidateValue || originalValue === candidateValue) {
+    return false;
+  }
+
+  return sanitizeText(normalizePronounICapitalization(originalValue)) === candidateValue;
+}
+
+function isAllowedMinimalSurfaceChange(originalText, candidateText) {
+  const originalValue = sanitizeText(originalText || '');
+  const candidateValue = sanitizeText(candidateText || '');
+
+  if (!originalValue || !candidateValue || originalValue === candidateValue) {
+    return false;
+  }
+
+  const originalWithI = sanitizeText(normalizePronounICapitalization(originalValue));
+  const originalWithIAndPeriod = sanitizeText(normalizeTerminalPeriods(originalWithI, originalValue));
+
+  return candidateValue === originalWithI
+    || candidateValue === originalWithIAndPeriod
+    || isAllowedTerminalPeriodOnlyChange(originalValue, candidateValue);
+}
+
 function buildLineAnchors(line) {
   const trimmed = String(line || '').trim();
   if (!trimmed) return null;
@@ -1826,18 +1934,27 @@ function enforceMinimalGrammarCorrection(original, candidate) {
 async function enforceMinimalOpenAICorrection(original, candidate) {
   const originalText = sanitizeText(original || '');
   let candidateText = sanitizeText(candidate || '');
+  const rejectionFlags = [];
+
+  const reject = (flag) => ({
+    correctedAnswer: originalText,
+    rejected: true,
+    rejectionFlags: rejectionFlags.concat(flag).filter(Boolean)
+  });
 
   if (!originalText) {
     return {
       correctedAnswer: '',
-      rejected: false
+      rejected: false,
+      rejectionFlags
     };
   }
 
   if (!candidateText || candidateText === originalText) {
     return {
       correctedAnswer: originalText,
-      rejected: false
+      rejected: false,
+      rejectionFlags
     };
   }
 
@@ -1845,38 +1962,34 @@ async function enforceMinimalOpenAICorrection(original, candidate) {
   candidateText = protectedContentDecision.correctedAnswer;
 
   if (protectedContentDecision.rejected) {
-    return {
-      correctedAnswer: originalText,
-      rejected: true
-    };
+    return reject('protected_content');
   }
 
   if (removesProtectedStylePhrase(originalText, candidateText)) {
-    return {
-      correctedAnswer: originalText,
-      rejected: true
-    };
+    return reject('protected_style_phrase');
   }
 
   const originalWords = tokenizeComparisonWords(originalText);
   const candidateWords = tokenizeComparisonWords(candidateText);
 
   if (!originalWords.length || !candidateWords.length) {
-    return {
-      correctedAnswer: originalText,
-      rejected: true
-    };
+    return reject('empty_word_tokens');
   }
 
   const originalLower = originalWords.map((word) => word.toLowerCase());
   const candidateLower = candidateWords.map((word) => word.toLowerCase());
 
+  if (areArraysEqual(originalLower, candidateLower) && isAllowedMinimalSurfaceChange(originalText, candidateText)) {
+    return {
+      correctedAnswer: candidateText,
+      rejected: false,
+      rejectionFlags
+    };
+  }
+
   const wordDelta = Math.abs(candidateWords.length - originalWords.length);
   if (wordDelta > getAllowedOpenAIWordDelta(originalWords.length)) {
-    return {
-      correctedAnswer: originalText,
-      rejected: true
-    };
+    return reject('word_delta');
   }
 
   const lcsLength = computeWordLcsLength(originalLower, candidateLower);
@@ -1885,17 +1998,11 @@ async function enforceMinimalOpenAICorrection(original, candidate) {
   const changedWordCount = maxLength - lcsLength;
 
   if (preservedRatio < getMinimumOpenAIPreservedRatio(originalWords.length)) {
-    return {
-      correctedAnswer: originalText,
-      rejected: true
-    };
+    return reject('preserved_ratio');
   }
 
   if (changedWordCount > getAllowedOpenAIChangedWordCount(originalWords.length)) {
-    return {
-      correctedAnswer: originalText,
-      rejected: true
-    };
+    return reject('changed_word_count');
   }
 
   const diffChunks = computeWordDiffChunks(originalLower, candidateLower);
@@ -1904,15 +2011,13 @@ async function enforceMinimalOpenAICorrection(original, candidate) {
   const postRestoreDecision = restoreProtectedContent(originalText, candidateText);
   candidateText = postRestoreDecision.correctedAnswer;
   if (postRestoreDecision.rejected || removesProtectedStylePhrase(originalText, candidateText)) {
-    return {
-      correctedAnswer: originalText,
-      rejected: true
-    };
+    return reject('post_restore_rejected');
   }
 
   return {
     correctedAnswer: candidateText,
-    rejected: false
+    rejected: false,
+    rejectionFlags
   };
 }
 
@@ -1951,6 +2056,10 @@ function isOpenAIChunkSupportedByOriginalIssue(chunk) {
     const [toWord] = added;
     return isAllowedWordSwap(fromWord, toWord)
       || (isSimpleSpellingVariant(fromWord, toWord) && !isInflectionVariant(fromWord, toWord));
+  }
+
+  if (removed.length === added.length && removed.length > 1 && removed.length <= 3) {
+    return removed.every((fromWord, index) => isAllowedWordSwap(fromWord, added[index]));
   }
 
   if (!removed.length || !added.length) {
@@ -2173,7 +2282,7 @@ function enforceMinimalGrammarCorrectionStrict(original, candidate) {
   const candidateLower = candidateWords.map((word) => word.toLowerCase());
 
   if (areArraysEqual(originalLower, candidateLower)) {
-    if (isAllowedTerminalPeriodOnlyChange(originalText, candidateText)) {
+    if (isAllowedMinimalSurfaceChange(originalText, candidateText)) {
       return {
         correctedAnswer: candidateText,
         rejected: false
@@ -2720,7 +2829,8 @@ function normalizeCorrectedPlainText(rawText = '', originalText = '') {
     ? unfenced.slice(1, -1)
     : unfenced;
 
-  return sanitizeText(unquoted || originalText || '');
+  const unlabeled = unquoted.replace(/^(corrected answer|answer)\s*:\s*/i, '').trim();
+  return sanitizeText(normalizePronounICapitalization(unlabeled || originalText || ''));
 }
 
 function getCorrectionDiffCategories(originalText = '', correctedText = '') {
@@ -2730,9 +2840,18 @@ function getCorrectionDiffCategories(originalText = '', correctedText = '') {
   const correctedLower = correctedWords.map((word) => word.toLowerCase());
 
   if (areArraysEqual(originalLower, correctedLower)) {
-    return isAllowedTerminalPeriodOnlyChange(originalText, correctedText)
-      ? ['terminal_period']
-      : [];
+    const categories = [];
+    if (isAllowedPronounICapitalizationOnlyChange(originalText, correctedText)) {
+      categories.push('capitalization');
+    }
+    if (isAllowedTerminalPeriodOnlyChange(originalText, correctedText) || isAllowedMinimalSurfaceChange(originalText, correctedText)) {
+      const originalValue = sanitizeText(originalText || '');
+      const correctedValue = sanitizeText(correctedText || '');
+      if (correctedValue.endsWith('.') && !/[.!?]$/.test(originalValue)) {
+        categories.push('terminal_period');
+      }
+    }
+    return categories;
   }
 
   const chunks = computeWordDiffChunks(originalLower, correctedLower);
@@ -2799,6 +2918,9 @@ function buildItemFeedbackFromCategories(categories = []) {
   if (list.includes('word_choice_or_collocation')) {
     messages.push('Kiểm tra lại từ dùng hoặc collocation ở cụm này.');
   }
+  if (list.includes('capitalization')) {
+    messages.push('Kiểm tra lại viết hoa đại từ "I".');
+  }
   if (list.includes('terminal_period')) {
     messages.push('Kiểm tra lại dấu chấm cuối câu.');
   }
@@ -2811,6 +2933,7 @@ function buildCommonErrorsFromCategoryCounts(categoryCounts) {
     article_or_preposition: 'Lỗi dùng mạo từ hoặc giới từ',
     spelling: 'Lỗi dùng từ sai hoặc chính tả',
     word_choice_or_collocation: 'Lỗi dùng từ sai hoặc collocation không tự nhiên',
+    capitalization: 'Lỗi viết hoa đại từ "I"',
     terminal_period: 'Thiếu dấu chấm cuối câu'
   };
 
@@ -2873,3 +2996,12 @@ function sanitizeText(value, maxLength = 5000) {
     .trim();
   return text.length > maxLength ? text.slice(0, maxLength) : text;
 }
+
+export const __testables = {
+  buildOpenAITextCorrectionUserPrompt,
+  finalizeOpenAITextCorrection,
+  normalizeCorrectedPlainText,
+  normalizeTerminalPeriods,
+  normalizePronounICapitalization,
+  enforceMinimalOpenAICorrection
+};
