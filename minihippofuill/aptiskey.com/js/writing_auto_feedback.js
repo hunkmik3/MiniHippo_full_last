@@ -83,6 +83,14 @@
             .trim();
     }
 
+    function tokenizeDiffLine(value) {
+        return String(value || '').match(/[A-Za-z0-9]+(?:['’][A-Za-z0-9]+)*|[^\sA-Za-z0-9]+/g) || [];
+    }
+
+    function isPunctuationToken(value) {
+        return !!value && !/[A-Za-z0-9]/.test(String(value));
+    }
+
     function buildQuestionId(partKey, itemKey, idx) {
         const safePart = String(partKey || 'part').trim() || 'part';
         const safeKey = String(itemKey || `item_${idx + 1}`).trim() || `item_${idx + 1}`;
@@ -192,21 +200,25 @@
         const origNorm = normalizeText(original);
         const corrNorm = normalizeText(corrected);
 
-        // Build source words and record line break positions from original
+        // Build source tokens and record line break positions from original
         const source = [];
         const breaksBeforeIdx = {};
-        let wordIdx = 0;
+        let tokenIdx = 0;
         const origLines = origNorm.split('\n');
         for (let li = 0; li < origLines.length; li++) {
-            const words = origLines[li].split(/\s+/).filter(Boolean);
+            const tokens = tokenizeDiffLine(origLines[li]);
             if (li > 0) {
-                breaksBeforeIdx[wordIdx] = (breaksBeforeIdx[wordIdx] || 0) + 1;
+                breaksBeforeIdx[tokenIdx] = (breaksBeforeIdx[tokenIdx] || 0) + 1;
             }
-            source.push(...words);
-            wordIdx += words.length;
+            source.push(...tokens);
+            tokenIdx += tokens.length;
         }
 
-        const target = corrNorm.split(/\s+/).filter(Boolean);
+        const target = [];
+        const corrLines = corrNorm.split('\n');
+        corrLines.forEach((line) => {
+            target.push(...tokenizeDiffLine(line));
+        });
 
         if (!source.length && !target.length) return '';
 
@@ -251,17 +263,30 @@
                 delete breaksBeforeIdx[srcPos];
             }
             const safe = escapeHtml(part.value);
+            const punctuationOnly = isPunctuationToken(part.value);
             if (part.type === 'del') {
-                result.push(`<span class="writing-auto-del">${safe}</span>`);
+                if (!punctuationOnly) {
+                    result.push(`<span class="writing-auto-del">${safe}</span>`);
+                }
                 srcPos++;
             } else if (part.type === 'ins') {
-                result.push(`<span class="writing-auto-ins">${safe}</span>`);
+                result.push(
+                    punctuationOnly
+                        ? `<span class="writing-auto-unchanged">${safe}</span>`
+                        : `<span class="writing-auto-ins">${safe}</span>`
+                );
             } else {
                 result.push(`<span class="writing-auto-unchanged">${safe}</span>`);
                 srcPos++;
             }
         }
-        return result.join(' ');
+        return result
+            .join(' ')
+            .replace(/\s+([.,!?;:])/g, '$1')
+            .replace(/([(\[{])\s+/g, '$1')
+            .replace(/\s+([)\]}])/g, '$1')
+            .replace(/<br>\s+/g, '<br>')
+            .replace(/\s+<br>/g, '<br>');
     }
 
     function renderList(title, items = []) {

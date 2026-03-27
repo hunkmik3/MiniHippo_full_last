@@ -11,6 +11,18 @@ const STYLE_PHRASES_TO_KEEP = [
   'i suppose',
   'i am sure'
 ];
+const PUNCTUATION_SAFE_SIGNOFF_LINES = new Set([
+  'best regards',
+  'kind regards',
+  'regards',
+  'love',
+  'dear',
+  'yours sincerely',
+  'yours faithfully',
+  'sincerely',
+  'thanks',
+  'thank you'
+]);
 const FUNCTION_WORDS = new Set([
   'a', 'an', 'the',
   'and', 'or', 'but', 'so', 'yet', 'nor',
@@ -33,13 +45,20 @@ const FUNCTION_WORDS = new Set([
   'very', 'more', 'most', 'less', 'least'
 ]);
 const COMMON_BASE_VERBS = new Set([
-  'ask', 'attend', 'be', 'build', 'buy', 'call', 'chat', 'choose', 'collect', 'contribute', 'cook',
-  'create', 'discuss', 'do', 'drink', 'eat', 'enjoy', 'feel', 'find', 'forget', 'gather', 'get',
-  'give', 'go', 'have', 'help', 'hold', 'imagine', 'improve', 'invite', 'join', 'keep', 'know',
-  'learn', 'like', 'listen', 'make', 'mean', 'meet', 'need', 'offer', 'organize', 'plan', 'play',
-  'prefer', 'prepare', 'provide', 'read', 'reduce', 'relax', 'reply', 'say', 'see', 'send', 'share',
-  'show', 'sound', 'speak', 'spend', 'stay', 'study', 'support', 'survey', 'take', 'talk', 'teach',
-  'tell', 'think', 'trust', 'use', 'visit', 'walk', 'watch', 'work', 'write', 'save', 'become'
+  'agree', 'arrange', 'ask', 'attend', 'be', 'become', 'believe', 'bring', 'build', 'buy', 'call',
+  'carry', 'change', 'chat', 'check', 'choose', 'clean', 'climb', 'collect', 'connect', 'continue',
+  'contribute', 'cook', 'create', 'cut', 'dance', 'decide', 'design', 'develop', 'discuss', 'do',
+  'draw', 'drink', 'drive', 'drop', 'earn', 'eat', 'enjoy', 'enter', 'exercise', 'explore', 'feel',
+  'find', 'finish', 'fix', 'follow', 'forget', 'gather', 'get', 'give', 'go', 'grow', 'guess',
+  'happen', 'have', 'hear', 'help', 'hold', 'hope', 'imagine', 'improve', 'include', 'increase',
+  'invite', 'jog', 'join', 'keep', 'know', 'learn', 'like', 'listen', 'live', 'look', 'love',
+  'make', 'mean', 'meet', 'move', 'need', 'offer', 'open', 'organize', 'pay', 'pick', 'plan',
+  'play', 'prefer', 'prepare', 'print', 'protect', 'provide', 'raise', 'read', 'reduce', 'relax',
+  'remember', 'reply', 'replace', 'run', 'say', 'search', 'see', 'sell', 'send', 'serve', 'share',
+  'shop', 'show', 'sing', 'sit', 'sketch', 'sleep', 'smile', 'sound', 'speak', 'spend', 'start',
+  'stay', 'stop', 'study', 'support', 'survey', 'take', 'talk', 'teach', 'tell', 'think', 'travel',
+  'trust', 'try', 'turn', 'use', 'visit', 'walk', 'want', 'wash', 'watch', 'wear', 'win', 'work',
+  'worry', 'write'
 ]);
 const COMMON_ADVERBS = new Set([
   'always', 'also', 'almost', 'just', 'never', 'often', 'really', 'sometimes', 'still', 'usually'
@@ -49,10 +68,19 @@ const NON_SUBJECT_STARTERS = new Set([
   'from', 'here', 'honestly', 'however', 'if', 'in', 'last', 'meanwhile', 'moreover', 'next', 'on',
   'second', 'suddenly', 'then', 'there', 'therefore', 'this', 'today', 'tomorrow', 'when', 'while', 'yesterday'
 ]);
+const CLAUSE_START_WORDS = new Set([
+  'that', 'if', 'because', 'when', 'while', 'although', 'though', 'since', 'after', 'before',
+  'as', 'unless', 'whether', 'and', 'but', 'so', 'or', 'then', 'than', 'who', 'which', 'what',
+  'where', 'why', 'how', 'think', 'believe', 'guess', 'suppose', 'hope', 'say', 'said', 'know',
+  'knew', 'known', 'feel', 'felt', 'hear', 'heard', 'read', 'announce', 'announced'
+]);
 const SINGULAR_DETERMINERS = new Set([
   'a', 'an', 'another', 'each', 'every', 'one',
   'my', 'your', 'his', 'her', 'its', 'our', 'their',
   'this', 'that', 'the'
+]);
+const PLURAL_DETERMINERS = new Set([
+  'these', 'those', 'many', 'some', 'several', 'few', 'both'
 ]);
 const SINGULAR_DETERMINER_PATTERN = '(?:another|every|their|your|this|that|each|our|one|the|his|her|its|my|an|a)';
 const SINGULAR_NOUN_EXCEPTIONS = new Set([
@@ -108,6 +136,45 @@ const WRITING_RESPONSE_JSON_SCHEMA = {
   },
   required: ['overall_feedback', 'common_errors', 'items']
 };
+const OPENAI_TEXT_ONLY_SYSTEM_PROMPT = [
+  'You are a strict English grammar corrector for Vietnamese learners.',
+  'Your ONLY task is to make the smallest possible edits to fix clear grammar errors and a very small number of obvious wrong-word or incorrect collocation errors.',
+  'You must follow ALL rules below.',
+  'CRITICAL CONSTRAINTS:',
+  '- Make MINIMAL edits only. Change as few words as possible.',
+  '- Keep the original wording, vocabulary, tone, and sentence structure.',
+  '- Do NOT rewrite, paraphrase, or improve style.',
+  '- Do NOT make sentences more natural if they are already grammatically acceptable.',
+  '- Do NOT add or reorder information.',
+  'ALLOWED CHANGES:',
+  '- Grammar only: verb forms, subject-verb agreement, articles, prepositions, pronouns, singular/plural, basic clause errors.',
+  '- Obvious wrong word: only if clearly incorrect and fixable with ONE simple replacement.',
+  '- Collocations: only if clearly incorrect, unnatural, or not used by native speakers, and the correct form is very common and obvious.',
+  'COLLOCATION RULES:',
+  '- Only fix collocations when the original phrase is clearly unnatural or incorrect, even if grammatically possible.',
+  '- Replace only 1–2 words maximum.',
+  '- Prefer changing only ONE word (for example a verb or noun), or adding a small word such as an article.',
+  '- Do NOT restructure the sentence.',
+  '- Do NOT change if multiple correct options exist.',
+  '- Prefer the simplest, most common, and closest equivalent collocation.',
+  'STRICT PROHIBITIONS:',
+  '- Do NOT fix spelling or capitalization unless required for grammar or the word is clearly incorrect.',
+  '- You may make only these punctuation fixes: add a missing period at the end of a sentence, remove an unnecessary period that breaks one sentence into two, and ensure one space after a comma or period when needed.',
+  '- Do NOT improve vocabulary or style.',
+  '- Do NOT rewrite awkward but grammatically acceptable sentences.',
+  '- Do NOT replace phrases just to sound more natural.',
+  '- Do NOT explain anything.',
+  '- Do NOT add comments, labels, or notes.',
+  '- Never change proper nouns such as personal names, club names, place names, greeting names, or signature names.',
+  'DECISION RULE:',
+  '- If unsure whether something is wrong, DO NOT change it.',
+  '- If a sentence is acceptable, keep it exactly the same.',
+  '- Each correction should affect as few words as possible, usually 1–3 tokens.',
+  'OUTPUT FORMAT:',
+  '- Return ONLY the corrected text.',
+  '- Keep original line breaks and paragraph breaks.',
+  '- Do not include explanations or any extra text.'
+].join(' ');
 
 export async function autoGradeWritingSubmission({
   metadata = {},
@@ -142,6 +209,52 @@ export async function autoGradeWritingSubmission({
     return autoGradeWithLanguageTool({ writingItems, gradableItems });
   }
 
+  if (provider.provider === 'openai') {
+    try {
+      return await autoGradeWithOpenAITextMode({
+        writingItems,
+        gradableItems,
+        metadataPatch: {
+          auto_grading_provider: provider.provider,
+          auto_grading_model: provider.model,
+          auto_grading_attempts: 1
+        }
+      });
+    } catch (error) {
+      console.error('auto grade writing openai text mode error:', error);
+      const failureInfo = getAutoGradingFailureInfo(error, provider.provider);
+      if (!allowLanguageToolFallback) {
+        return {
+          status: 'failed',
+          metadataPatch: {
+            auto_grading_status: 'failed',
+            auto_grading_attempts: 1,
+            auto_grading_message: failureInfo.message,
+            auto_grading_error: sanitizeText(error?.message || '', 280),
+            auto_grading_provider: provider.provider,
+            auto_grading_model: provider.model,
+            auto_grading_error_type: failureInfo.type,
+            ai_feedback_preview: failureInfo.preview,
+            ai_feedback: failureInfo.preview
+          }
+        };
+      }
+
+      return autoGradeWithLanguageTool({
+        writingItems,
+        gradableItems,
+        metadataPatch: {
+          auto_grading_provider: 'languagetool-fallback',
+          auto_grading_model: 'LanguageTool API',
+          auto_grading_attempts: 1,
+          auto_grading_fallback_from: provider.provider,
+          auto_grading_fallback_error: sanitizeText(error?.message || '', 280),
+          auto_grading_message: failureInfo.fallbackMessage
+        }
+      });
+    }
+  }
+
   const systemPrompt = [
     'You are a strict English grammar corrector for Vietnamese learners.',
     'Your ONLY task is to make the smallest possible edits to fix clear grammar errors and a very small number of obvious wrong-word or incorrect collocation errors.',
@@ -165,7 +278,8 @@ export async function autoGradeWritingSubmission({
     '- Do NOT change if multiple correct options exist.',
     '- Prefer the simplest, most common, and closest equivalent collocation.',
     'STRICT PROHIBITIONS:',
-    '- Do NOT fix spelling, punctuation, or capitalization unless required for grammar or the word is clearly incorrect.',
+    '- Do NOT fix spelling or capitalization unless required for grammar or the word is clearly incorrect.',
+    '- You may make only these punctuation fixes: add a missing period at the end of a sentence, remove an unnecessary period that breaks one sentence into two, and ensure one space after a comma or period when needed.',
     '- Do NOT improve vocabulary or style.',
     '- Do NOT rewrite awkward but grammatically acceptable sentences.',
     '- Do NOT replace phrases just to sound more natural.',
@@ -400,6 +514,8 @@ async function autoGradeWithLanguageTool({ writingItems, gradableItems, metadata
   try {
     const allMatches = [];
     const correctedItems = [];
+    const categoryCounts = new Map();
+    let hasCorrections = false;
 
     for (const item of writingItems) {
       if (!item.answer) {
@@ -412,19 +528,35 @@ async function autoGradeWithLanguageTool({ writingItems, gradableItems, metadata
         continue;
       }
 
-      const rawMatches = [
-        ...filterGrammarOnlyMatches(await checkGrammar(item.answer)),
-        ...getMinimalCustomRuleMatches(item.answer)
-      ];
-      const safeMatchSelection = selectSafeLanguageToolMatches(item.answer, rawMatches);
+      const safeMatchSelection = await buildIterativeSafeCorrection(item.answer);
       const matches = safeMatchSelection.matches;
       allMatches.push(...matches);
       const corrected = restoreOriginalLineBreaks(item.answer, safeMatchSelection.correctedText);
-      const correctionDecision = enforceMinimalGrammarCorrection(item.answer, corrected);
+      const formattedCorrected = normalizeBasicPunctuationFormatting(corrected, item.answer);
+      const correctionDecision = enforceMinimalGrammarCorrection(item.answer, formattedCorrected);
+      const diffCategories = getCorrectionDiffCategories(item.answer, correctionDecision.correctedAnswer);
       const feedbackParts = [];
+      const seenFeedbackParts = new Set();
 
       if (matches.length > 0) {
-        feedbackParts.push(...matches.slice(0, 3).map(m => matchToVietnamese(m)).filter(Boolean));
+        matches
+          .map((match) => matchToVietnamese(match))
+          .filter(Boolean)
+          .forEach((message) => {
+            if (seenFeedbackParts.has(message)) return;
+            seenFeedbackParts.add(message);
+            feedbackParts.push(message);
+          });
+      }
+
+      diffCategories.forEach((category) => {
+        categoryCounts.set(category, (categoryCounts.get(category) || 0) + 1);
+      });
+
+      const originalAnswer = sanitizeText(item.answer || '');
+      const hasItemCorrection = sanitizeText(correctionDecision.correctedAnswer || '') !== originalAnswer;
+      if (hasItemCorrection) {
+        hasCorrections = true;
       }
 
       const itemFeedback = correctionDecision.rejected
@@ -432,7 +564,7 @@ async function autoGradeWithLanguageTool({ writingItems, gradableItems, metadata
         : (
           feedbackParts.length > 0
             ? feedbackParts.slice(0, 3).join(' ')
-            : 'Không có lỗi ngữ pháp, từ sai hoặc collocation sai rõ ràng.'
+            : buildItemFeedbackFromCategories(diffCategories)
         );
 
       correctedItems.push({
@@ -444,9 +576,13 @@ async function autoGradeWithLanguageTool({ writingItems, gradableItems, metadata
     }
 
     const { commonErrors } = buildFeedbackFromMatches(allMatches);
-    const overallFeedback = allMatches.length > 0
-      ? 'Bài viết có một số lỗi về ngữ pháp, chính tả hoặc collocation cần chỉnh nhẹ.'
-      : 'Không phát hiện lỗi ngữ pháp, từ sai hoặc collocation sai rõ ràng.';
+    const mergedCommonErrors = Array.from(new Set([
+      ...commonErrors,
+      ...buildCommonErrorsFromCategoryCounts(categoryCounts)
+    ])).slice(0, 3);
+    const overallFeedback = hasCorrections
+      ? 'Bài viết có một số lỗi về ngữ pháp, chính tả, collocation hoặc dấu câu cơ bản cần chỉnh nhẹ.'
+      : 'Không phát hiện lỗi ngữ pháp, chính tả, collocation hoặc dấu câu cơ bản cần sửa.';
 
     return {
       status: 'completed',
@@ -462,7 +598,7 @@ async function autoGradeWithLanguageTool({ writingItems, gradableItems, metadata
         ...metadataPatch,
         auto_writing_feedback: {
           overall_feedback: overallFeedback,
-          common_errors: commonErrors,
+          common_errors: mergedCommonErrors,
           items: correctedItems
         }
       }
@@ -481,6 +617,103 @@ async function autoGradeWithLanguageTool({ writingItems, gradableItems, metadata
       }
     };
   }
+}
+
+async function autoGradeWithOpenAITextMode({ writingItems, gradableItems, metadataPatch = {} }) {
+  const correctedItems = [];
+  const categoryCounts = new Map();
+
+  for (const item of writingItems) {
+    if (!item.answer) {
+      correctedItems.push({
+        part: item.part,
+        key: item.key,
+        corrected_answer: '',
+        feedback: 'Không có câu trả lời.'
+      });
+      continue;
+    }
+
+    const response = await generateAIText({
+      systemPrompt: OPENAI_TEXT_ONLY_SYSTEM_PROMPT,
+      userPrompt: item.answer,
+      maxTokens: Math.min(2000, Math.max(400, item.answer.length * 4)),
+      temperature: 0
+    });
+
+    const normalizedOutput = normalizeCorrectedPlainText(response.text, item.answer);
+    const restoredOutput = restoreOriginalLineBreaks(item.answer, normalizedOutput);
+    const formattedOutput = normalizeBasicPunctuationFormatting(restoredOutput, item.answer);
+    const correctionDecision = enforceMinimalOpenAICorrection(item.answer, formattedOutput);
+    const diffCategories = getCorrectionDiffCategories(item.answer, correctionDecision.correctedAnswer);
+    diffCategories.forEach((category) => {
+      categoryCounts.set(category, (categoryCounts.get(category) || 0) + 1);
+    });
+
+    correctedItems.push({
+      part: item.part,
+      key: item.key,
+      corrected_answer: correctionDecision.correctedAnswer,
+      feedback: buildItemFeedbackFromCategories(diffCategories)
+    });
+  }
+
+  const commonErrors = buildCommonErrorsFromCategoryCounts(categoryCounts);
+  const hasCorrections = correctedItems.some((item, index) => (
+    sanitizeText(item.corrected_answer || '') !== sanitizeText(writingItems[index]?.answer || '')
+  ));
+  const overallFeedback = hasCorrections
+    ? 'Bài viết có một số lỗi về ngữ pháp, chính tả, collocation hoặc dấu câu cơ bản cần chỉnh nhẹ.'
+    : 'Không phát hiện lỗi ngữ pháp, chính tả, collocation hoặc dấu câu cơ bản cần sửa.';
+
+  return {
+    status: 'completed',
+    metadataPatch: {
+      band: 'Pending',
+      ai_feedback: overallFeedback,
+      ai_feedback_preview: overallFeedback,
+      auto_grading_status: 'completed',
+      auto_grading_provider: metadataPatch.auto_grading_provider || 'openai',
+      auto_grading_model: metadataPatch.auto_grading_model || 'OpenAI',
+      auto_grading_attempts: Number(metadataPatch.auto_grading_attempts) || 1,
+      auto_graded_at: new Date().toISOString(),
+      ...metadataPatch,
+      auto_writing_feedback: {
+        overall_feedback: overallFeedback,
+        common_errors: commonErrors,
+        items: correctedItems
+      }
+    }
+  };
+}
+
+async function buildIterativeSafeCorrection(sourceText = '', maxPasses = 3) {
+  let currentText = String(sourceText || '');
+  const aggregatedMatches = [];
+
+  for (let pass = 0; pass < maxPasses; pass += 1) {
+    const rawMatches = [
+      ...filterGrammarOnlyMatches(await checkGrammar(currentText)),
+      ...getMinimalCustomRuleMatches(currentText)
+    ];
+
+    if (!rawMatches.length) {
+      break;
+    }
+
+    const safeSelection = selectSafeLanguageToolMatches(currentText, rawMatches);
+    if (!safeSelection.matches.length || safeSelection.correctedText === currentText) {
+      break;
+    }
+
+    aggregatedMatches.push(...safeSelection.matches);
+    currentText = safeSelection.correctedText;
+  }
+
+  return {
+    matches: aggregatedMatches,
+    correctedText: currentText
+  };
 }
 
 function selectSafeLanguageToolMatches(originalText, matches = []) {
@@ -635,9 +868,260 @@ function isSafeSingularSubjectPhrase(phrase = '', { allowDeterminer = false } = 
   return true;
 }
 
+function tokenizeWordSpans(text = '') {
+  const tokens = [];
+  const pattern = /[A-Za-z']+/g;
+  let match;
+  while ((match = pattern.exec(String(text || ''))) !== null) {
+    tokens.push({
+      value: match[0],
+      lower: match[0].toLowerCase(),
+      offset: match.index,
+      length: match[0].length
+    });
+  }
+  return tokens;
+}
+
+function getPreviousNonSpaceChar(text = '', offset = 0) {
+  const source = String(text || '');
+  for (let index = offset - 1; index >= 0; index -= 1) {
+    if (!/\s/.test(source[index])) {
+      return source[index];
+    }
+  }
+  return '';
+}
+
+function isLikelyClauseStart(sourceText, tokens, index) {
+  const token = tokens[index];
+  if (!token) return false;
+
+  const previousChar = getPreviousNonSpaceChar(sourceText, token.offset);
+  if (!previousChar || /[\n\r.!?,;:()]/.test(previousChar)) {
+    return true;
+  }
+
+  const previousToken = tokens[index - 1]?.lower || '';
+  return CLAUSE_START_WORDS.has(previousToken);
+}
+
+function isPotentialObservedVerb(lowerWord = '') {
+  const lower = String(lowerWord || '').toLowerCase();
+  if (!lower) return false;
+  if (['am', 'is', 'are', 'was', 'were', 'do', 'does', 'have', 'has'].includes(lower)) {
+    return true;
+  }
+  const base = toBaseVerbForm(lower);
+  return isLikelyCommonVerbBase(base) || isLikelyCommonVerbBase(lower);
+}
+
+function isPotentialSubjectToken(lowerWord = '') {
+  const lower = String(lowerWord || '').toLowerCase();
+  if (!lower) return false;
+  if (
+    FUNCTION_WORDS.has(lower)
+    || COMMON_ADVERBS.has(lower)
+    || NON_SUBJECT_STARTERS.has(lower)
+    || PRONOUN_AUX_EXPECTATIONS[lower]
+    || lower.endsWith('ly')
+  ) {
+    return false;
+  }
+  return /^[a-z-]+$/i.test(lower);
+}
+
+function isLikelyPluralNounHead(lowerWord = '') {
+  const lower = String(lowerWord || '').toLowerCase();
+  if (!lower) return false;
+  if (SINGULAR_NOUN_EXCEPTIONS.has(lower)) return true;
+  if (PLURAL_SUBJECT_EXCEPTIONS.has(lower)) return false;
+  return lower.endsWith('s') && !lower.endsWith('ss');
+}
+
+function isSafeGerundSubjectPhrase(phrase = '') {
+  const tokens = String(phrase || '').trim().split(/\s+/).filter(Boolean);
+  if (!tokens.length || !tokens[0].toLowerCase().endsWith('ing')) {
+    return false;
+  }
+
+  for (let index = 1; index < tokens.length; index += 1) {
+    const lower = tokens[index].toLowerCase();
+    if (
+      COMMON_ADVERBS.has(lower)
+      || NON_SUBJECT_STARTERS.has(lower)
+      || PRONOUN_AUX_EXPECTATIONS[lower]
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function buildPhraseText(tokens, startIndex, endIndex) {
+  return tokens.slice(startIndex, endIndex + 1).map((token) => token.value).join(' ');
+}
+
+function findNextVerbTokenIndex(tokens, startIndex, maxGap = 2) {
+  let skippedAdverbs = 0;
+  for (let index = startIndex; index < tokens.length && index <= startIndex + maxGap + 2; index += 1) {
+    const lower = tokens[index].lower;
+    if (COMMON_ADVERBS.has(lower) && skippedAdverbs < 2) {
+      skippedAdverbs += 1;
+      continue;
+    }
+    return isPotentialObservedVerb(lower) ? index : -1;
+  }
+  return -1;
+}
+
 function pushGenericAgreementMatches(sourceText, pushReplacementMatch) {
   let match;
   const singularAuxMap = { are: 'is', were: 'was', have: 'has', do: 'does' };
+  const pluralAuxMap = { is: 'are', was: 'were', has: 'have', does: 'do' };
+  const tokens = tokenizeWordSpans(sourceText);
+
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    if (!isLikelyClauseStart(sourceText, tokens, index)) {
+      continue;
+    }
+
+    if (SINGULAR_DETERMINERS.has(token.lower)) {
+      for (let phraseEnd = index + 1; phraseEnd < tokens.length && phraseEnd <= index + 3; phraseEnd += 1) {
+        if (!isPotentialSubjectToken(tokens[phraseEnd].lower)) {
+          break;
+        }
+
+        const phraseText = buildPhraseText(tokens, index, phraseEnd);
+        if (!isSafeSingularSubjectPhrase(phraseText, { allowDeterminer: true })) {
+          continue;
+        }
+
+        const verbIndex = findNextVerbTokenIndex(tokens, phraseEnd + 1);
+        if (verbIndex < 0) {
+          continue;
+        }
+
+        const observed = tokens[verbIndex].lower;
+        if (singularAuxMap[observed]) {
+          pushReplacementMatch({
+            offset: tokens[verbIndex].offset,
+            length: tokens[verbIndex].length,
+            value: singularAuxMap[observed],
+            message: 'Use a singular verb after a singular noun phrase.',
+            ruleId: 'CUSTOM_TOKEN_SINGULAR_NOUN_PHRASE_AUX',
+            description: 'Singular noun phrase with an incorrect auxiliary verb.'
+          });
+          break;
+        }
+
+        if (isLikelyCommonVerbBase(observed) && toThirdPersonSingularVerb(observed) !== observed) {
+          pushReplacementMatch({
+            offset: tokens[verbIndex].offset,
+            length: tokens[verbIndex].length,
+            value: toThirdPersonSingularVerb(observed),
+            message: 'Use a singular lexical verb after a singular noun phrase.',
+            ruleId: 'CUSTOM_TOKEN_SINGULAR_NOUN_PHRASE_LEXICAL_VERB',
+            description: 'Singular noun phrase with a bare lexical verb.'
+          });
+          break;
+        }
+      }
+    }
+
+    if (token.lower.endsWith('ing')) {
+      for (let phraseEnd = index; phraseEnd < tokens.length && phraseEnd <= index + 3; phraseEnd += 1) {
+        if (phraseEnd > index && !isPotentialSubjectToken(tokens[phraseEnd].lower)) {
+          break;
+        }
+
+        const phraseText = buildPhraseText(tokens, index, phraseEnd);
+        if (!isSafeGerundSubjectPhrase(phraseText)) {
+          continue;
+        }
+
+        const verbIndex = findNextVerbTokenIndex(tokens, phraseEnd + 1);
+        if (verbIndex < 0) {
+          continue;
+        }
+
+        const observed = tokens[verbIndex].lower;
+        if (singularAuxMap[observed]) {
+          pushReplacementMatch({
+            offset: tokens[verbIndex].offset,
+            length: tokens[verbIndex].length,
+            value: singularAuxMap[observed],
+            message: 'Use a singular verb after a gerund phrase subject.',
+            ruleId: 'CUSTOM_TOKEN_GERUND_PHRASE_AUX',
+            description: 'Gerund phrase subject with an incorrect auxiliary verb.'
+          });
+          break;
+        }
+
+        if (isLikelyCommonVerbBase(observed) && toThirdPersonSingularVerb(observed) !== observed) {
+          pushReplacementMatch({
+            offset: tokens[verbIndex].offset,
+            length: tokens[verbIndex].length,
+            value: toThirdPersonSingularVerb(observed),
+            message: 'Use a singular lexical verb after a gerund phrase subject.',
+            ruleId: 'CUSTOM_TOKEN_GERUND_PHRASE_LEXICAL_VERB',
+            description: 'Gerund phrase subject with a bare lexical verb.'
+          });
+          break;
+        }
+      }
+    }
+
+    if (PLURAL_DETERMINERS.has(token.lower)) {
+      for (let phraseEnd = index + 1; phraseEnd < tokens.length && phraseEnd <= index + 3; phraseEnd += 1) {
+        if (!isPotentialSubjectToken(tokens[phraseEnd].lower)) {
+          break;
+        }
+
+        const head = tokens[phraseEnd].lower;
+        if (!isLikelyPluralNounHead(head)) {
+          continue;
+        }
+
+        const verbIndex = findNextVerbTokenIndex(tokens, phraseEnd + 1);
+        if (verbIndex < 0) {
+          continue;
+        }
+
+        const observed = tokens[verbIndex].lower;
+        if (pluralAuxMap[observed]) {
+          pushReplacementMatch({
+            offset: tokens[verbIndex].offset,
+            length: tokens[verbIndex].length,
+            value: pluralAuxMap[observed],
+            message: 'Use the plural verb after a plural noun phrase.',
+            ruleId: 'CUSTOM_TOKEN_PLURAL_NOUN_PHRASE_AUX',
+            description: 'Plural noun phrase with a singular auxiliary verb.'
+          });
+          break;
+        }
+
+        if (['am', 'is', 'are', 'was', 'were', 'do', 'does', 'have', 'has'].includes(observed)) {
+          continue;
+        }
+
+        const base = toBaseVerbForm(observed);
+        if (base && base !== observed && isLikelyCommonVerbBase(base)) {
+          pushReplacementMatch({
+            offset: tokens[verbIndex].offset,
+            length: tokens[verbIndex].length,
+            value: base,
+            message: 'Use the base verb after a plural noun phrase.',
+            ruleId: 'CUSTOM_TOKEN_PLURAL_NOUN_PHRASE_LEXICAL_VERB',
+            description: 'Plural noun phrase with an unnecessary third-person singular verb.'
+          });
+          break;
+        }
+      }
+    }
+  }
 
   const pronounAuxRule = /\b(i|you|we|they|he|she|it)\s+((?:always|also|almost|just|never|often|really|sometimes|still|usually)\s+)?(am|is|are|was|were|has|have|does|do)\b/gi;
   while ((match = pronounAuxRule.exec(sourceText)) !== null) {
@@ -690,51 +1174,7 @@ function pushGenericAgreementMatches(sourceText, pushReplacementMatch) {
     });
   }
 
-  const singularDeterminerAuxRule = new RegExp(
-    `\\b(${SINGULAR_DETERMINER_PATTERN}\\s+(?!(?:${SINGULAR_DETERMINER_PATTERN})\\b)[A-Za-z]+(?:\\s+[A-Za-z]+){0,2}?)\\s+((?:always|also|almost|just|never|often|really|sometimes|still|usually)\\s+)?(are|were|have|do)\\b`,
-    'gi'
-  );
-  while ((match = singularDeterminerAuxRule.exec(sourceText)) !== null) {
-    const phrase = String(match[1] || '').trim();
-    const observed = String(match[3] || '').toLowerCase();
-    const replacement = singularAuxMap[observed];
-    if (!replacement) continue;
-    if (!isSafeSingularSubjectPhrase(phrase, { allowDeterminer: true })) continue;
-    const offset = match.index + match[0].lastIndexOf(match[3]);
-    pushReplacementMatch({
-      offset,
-      length: match[3].length,
-      value: replacement,
-      message: 'Use a singular verb after a singular noun phrase.',
-      ruleId: 'CUSTOM_SINGULAR_NOUN_PHRASE_AUX',
-      description: 'Subject-verb agreement for a singular noun phrase with an incorrect auxiliary verb.'
-    });
-  }
-
-  const singularDeterminerLexicalRule = new RegExp(
-    `\\b(${SINGULAR_DETERMINER_PATTERN}\\s+(?!(?:${SINGULAR_DETERMINER_PATTERN})\\b)[A-Za-z]+(?:\\s+[A-Za-z]+){0,2}?)\\s+((?:always|also|almost|just|never|often|really|sometimes|still|usually)\\s+)?([A-Za-z]+)\\b`,
-    'gi'
-  );
-  while ((match = singularDeterminerLexicalRule.exec(sourceText)) !== null) {
-    const phrase = String(match[1] || '').trim();
-    const observed = String(match[3] || '').toLowerCase();
-    if (!isSafeSingularSubjectPhrase(phrase, { allowDeterminer: true }) || !observed || FUNCTION_WORDS.has(observed)) continue;
-
-    const singularVerb = toThirdPersonSingularVerb(observed);
-    if (!singularVerb || singularVerb === observed || !isLikelyCommonVerbBase(observed)) continue;
-    const offset = match.index + match[0].lastIndexOf(match[3]);
-    pushReplacementMatch({
-      offset,
-      length: match[3].length,
-      value: singularVerb,
-      message: 'Use a singular lexical verb after a singular noun phrase.',
-      ruleId: 'CUSTOM_SINGULAR_NOUN_PHRASE_LEXICAL_VERB',
-      description: 'Singular noun phrase with a bare lexical verb.'
-    });
-  }
-
   const pluralSubjectAuxRule = /\b([A-Za-z]+s)\s+(is|was|has|does)\b/gi;
-  const pluralAuxMap = { is: 'are', was: 'were', has: 'have', does: 'do' };
   while ((match = pluralSubjectAuxRule.exec(sourceText)) !== null) {
     const subject = String(match[1] || '').toLowerCase();
     const observed = String(match[2] || '').toLowerCase();
@@ -753,6 +1193,7 @@ function pushGenericAgreementMatches(sourceText, pushReplacementMatch) {
   const irregularPluralSubjectRule = /\b(children|people|men|women|teeth|feet|mice|police)\s+(is|was|has|does|[A-Za-z]+)\b/gi;
   while ((match = irregularPluralSubjectRule.exec(sourceText)) !== null) {
     const observed = String(match[2] || '').toLowerCase();
+    if (['are', 'were', 'have', 'do'].includes(observed)) continue;
     let replacement = { is: 'are', was: 'were', has: 'have', does: 'do' }[observed] || '';
     if (!replacement) {
       const base = toBaseVerbForm(observed);
@@ -978,6 +1419,46 @@ function getMinimalCustomRuleMatches(text = '') {
     });
   }
 
+  const duplicateBeRule = /\b(am|is|are|was|were)\s+be\s+([A-Za-z]+)\b/gi;
+  while ((match = duplicateBeRule.exec(sourceText)) !== null) {
+    const predicate = String(match[2] || '').toLowerCase();
+    if (
+      !predicate
+      || (
+        !predicate.endsWith('ed')
+        && !predicate.endsWith('en')
+        && !['aware', 'afraid', 'alive', 'alone', 'available', 'common', 'different', 'full', 'happy', 'helpful', 'important', 'interested', 'ready', 'safe', 'similar', 'useful', 'worried'].includes(predicate)
+      )
+    ) {
+      continue;
+    }
+
+    const beIndex = String(match[0] || '').toLowerCase().indexOf(' be ');
+    if (beIndex < 0) continue;
+    pushReplacementMatch({
+      offset: match.index + beIndex + 1,
+      length: 3,
+      value: '',
+      message: 'Remove the extra "be" in this verb phrase.',
+      ruleId: 'CUSTOM_DUPLICATE_BE_IN_VERB_PHRASE',
+      description: 'Duplicate "be" inside a verb phrase.'
+    });
+  }
+
+  const moreThanJustNounRule = /\bmore than just\s+([A-Za-z]+)\b/gi;
+  while ((match = moreThanJustNounRule.exec(sourceText)) !== null) {
+    const noun = String(match[1] || '').toLowerCase();
+    if (!noun || !isSingularNounHead(noun) || noun.endsWith('s')) continue;
+    pushReplacementMatch({
+      offset: match.index + match[0].length - match[1].length,
+      length: 0,
+      value: 'a ',
+      message: 'Add the article before this singular count noun.',
+      ruleId: 'CUSTOM_MISSING_ARTICLE_AFTER_MORE_THAN_JUST',
+      description: 'Missing article before a singular count noun after "more than just".'
+    });
+  }
+
   return matches;
 }
 
@@ -1034,6 +1515,7 @@ function buildWritingPrompt({ setTitle, totalWords, writingItems }) {
     'Do NOT fix awkward but acceptable wording.',
     'Do NOT remove phrases like "I think" or "In my opinion" if they are grammatically acceptable.',
     'Do NOT change proper nouns such as personal names, club names, place names, greeting names, or signature names.',
+    'You may make only these punctuation fixes: add a missing period at the end of a sentence, remove an unnecessary period that breaks one sentence into two, and ensure one space after a comma or period when needed.',
     'Keep original line breaks and paragraph breaks whenever possible.',
     'Keep every feedback very short and practical.',
     'common_errors should have at most 3 items.',
@@ -1060,6 +1542,12 @@ function buildWritingPrompt({ setTitle, totalWords, writingItems }) {
     'Original: "I was eager to contribute to preparation process."',
     'Corrected: "I was eager to contribute to the preparation process."',
     'Why: add one small missing article only.',
+    'Original: "There are 6 people in my family"',
+    'Corrected: "There are 6 people in my family."',
+    'Why: add only the missing period at the end of the sentence.',
+    'Original: "I read books,and chat online."',
+    'Corrected: "I read books, and chat online."',
+    'Why: keep the same words and add one space after the comma only.',
     'Return JSON exactly with this structure:',
     JSON.stringify({
       overall_feedback: 'Nhan xet tong the ngan bang tieng Viet ve loi ngu phap, tu sai ro rang, hoac collocation sai ro rang.',
@@ -1090,15 +1578,21 @@ function normalizeAIWritingResponse(parsed, writingItems) {
 
     const hasAnswer = !!item.answer;
     const rawCorrectedAnswer = hasAnswer
-      ? restoreOriginalLineBreaks(item.answer, sanitizeText(rawItem.corrected_answer || item.answer))
+      ? normalizeBasicPunctuationFormatting(
+        restoreOriginalLineBreaks(item.answer, sanitizeText(rawItem.corrected_answer || item.answer)),
+        item.answer
+      )
       : '';
     const correctionDecision = hasAnswer
       ? enforceMinimalGrammarCorrection(item.answer, rawCorrectedAnswer)
       : { correctedAnswer: '', rejected: false };
+    const diffCategories = hasAnswer
+      ? getCorrectionDiffCategories(item.answer, correctionDecision.correctedAnswer)
+      : [];
     const feedback = hasAnswer
       ? (correctionDecision.rejected
         ? 'Giữ nguyên câu gốc để tránh sửa quá nhiều câu chữ.'
-        : sanitizeText(rawItem.feedback || ''))
+        : (sanitizeText(rawItem.feedback || '') || buildItemFeedbackFromCategories(diffCategories)))
       : 'Không có câu trả lời.';
 
     return {
@@ -1109,7 +1603,7 @@ function normalizeAIWritingResponse(parsed, writingItems) {
     };
   });
 
-  const overallFeedback = sanitizeText(parsed?.overall_feedback || '') || 'AI đã rà soát và chỉ sửa lỗi ngữ pháp, từ sai rõ ràng, hoặc collocation sai rõ ràng thật sự cần thiết.';
+  const overallFeedback = sanitizeText(parsed?.overall_feedback || '') || 'AI đã rà soát và chỉ sửa lỗi ngữ pháp, từ sai rõ ràng, collocation sai rõ ràng, hoặc dấu câu cơ bản thật sự cần thiết.';
   const commonErrors = normalizeStringArray(parsed?.common_errors);
 
   return {
@@ -1163,6 +1657,84 @@ function restoreOriginalLineBreaks(original, corrected) {
     .replace(/\n{3,}/g, '\n\n');
 }
 
+function normalizeBasicPunctuationFormatting(text, originalText = '') {
+  const normalizedText = String(text || '').replace(/\r\n/g, '\n');
+  if (!normalizedText.trim()) {
+    return sanitizeText(text || '');
+  }
+
+  const originalLines = String(originalText || '').replace(/\r\n/g, '\n').split('\n');
+  const formatted = normalizedText
+    .split('\n')
+    .map((line, index) => normalizeBasicPunctuationLine(line, originalLines[index] || ''))
+    .join('\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/\n{3,}/g, '\n\n');
+
+  return sanitizeText(formatted);
+}
+
+function normalizeBasicPunctuationLine(line, originalLine = '') {
+  const rawLine = String(line || '');
+  const trimmed = rawLine.trim();
+  if (!trimmed) return '';
+
+  let formatted = trimmed
+    .replace(/\s+([,.!?;:])/g, '$1')
+    .replace(/,\s*([A-Za-z0-9("'“])/g, ', $1')
+    .replace(/([A-Za-z)"'’])\.\s*([A-Za-z("'“])/g, '$1. $2');
+
+  if (shouldAppendTerminalPeriod(formatted, originalLine)) {
+    formatted = `${formatted}.`;
+  }
+
+  return formatted;
+}
+
+function shouldAppendTerminalPeriod(line, originalLine = '') {
+  const trimmed = String(line || '').trim();
+  if (!trimmed) return false;
+  if (/[.!?]$/.test(trimmed)) return false;
+  if (/,$/.test(trimmed)) return false;
+  if (!/[A-Za-z0-9)"'’]$/.test(trimmed)) return false;
+  if (isGreetingOrSignoffLine(trimmed) || isLikelyStandaloneSignatureLine(trimmed)) {
+    return false;
+  }
+
+  const originalTrimmed = String(originalLine || '').trim();
+  if (originalTrimmed && /,$/.test(originalTrimmed)) {
+    return false;
+  }
+
+  return true;
+}
+
+function isGreetingOrSignoffLine(line = '') {
+  const lowered = String(line || '').trim().toLowerCase().replace(/[,:]+$/, '');
+  if (!lowered) return false;
+  if (lowered.startsWith('dear ')) return true;
+  return PUNCTUATION_SAFE_SIGNOFF_LINES.has(lowered);
+}
+
+function isLikelyStandaloneSignatureLine(line = '') {
+  const trimmed = String(line || '').trim();
+  if (!trimmed) return false;
+  return /^[A-Z][A-Za-z'’.-]*(?:\s+[A-Z][A-Za-z'’.-]*){0,3}\.?$/.test(trimmed);
+}
+
+function isAllowedFormattingOnlyChange(originalText, candidateText) {
+  const originalValue = sanitizeText(originalText || '');
+  const candidateValue = sanitizeText(candidateText || '');
+
+  if (!originalValue || !candidateValue || originalValue === candidateValue) {
+    return false;
+  }
+
+  return normalizeBasicPunctuationFormatting(originalValue, originalValue)
+    === normalizeBasicPunctuationFormatting(candidateValue, originalValue);
+}
+
 function buildLineAnchors(line) {
   const trimmed = String(line || '').trim();
   if (!trimmed) return null;
@@ -1196,12 +1768,42 @@ function filterGrammarOnlyMatches(matches = []) {
   return matches.filter((match) => {
     const categoryName = String(match?.rule?.category?.name || '').toLowerCase();
     const issueType = String(match?.rule?.issueType || '').toLowerCase();
+    const ruleId = String(match?.rule?.id || '').toLowerCase();
+    const description = String(match?.rule?.description || '').toLowerCase();
+    const message = String(match?.message || '').toLowerCase();
+    const haystack = [categoryName, issueType, ruleId, description, message].join(' ');
+
+    if (
+      haystack.includes('capitalization')
+      || haystack.includes('punctuation')
+      || haystack.includes('whitespace')
+      || haystack.includes('style')
+      || ruleId === 'been_part_agreement'
+    ) {
+      return false;
+    }
+
     return (
       categoryName.includes('grammar')
       || issueType === 'grammar'
       || issueType === 'misspelling'
       || issueType === 'typographical'
       || categoryName.includes('spelling')
+      || haystack.includes('agreement')
+      || haystack.includes('verb form')
+      || haystack.includes('subject-verb')
+      || haystack.includes('subject verb')
+      || haystack.includes('article')
+      || haystack.includes('determiner')
+      || haystack.includes('preposition')
+      || haystack.includes('collocation')
+      || haystack.includes('phrase')
+      || haystack.includes('expression')
+      || haystack.includes('wrong word')
+      || haystack.includes('word choice')
+      || haystack.includes('confused words')
+      || haystack.includes('misspell')
+      || haystack.includes('typo')
       || (
         categoryName.includes('possible typo')
         && typeof match?.replacements?.[0]?.value === 'string'
@@ -1217,6 +1819,87 @@ function enforceMinimalGrammarCorrection(original, candidate) {
   }
 
   return salvageLineLevelCorrection(original, candidate, strictDecision);
+}
+
+function enforceMinimalOpenAICorrection(original, candidate) {
+  const originalText = sanitizeText(original || '');
+  let candidateText = sanitizeText(candidate || '');
+
+  if (!originalText) {
+    return {
+      correctedAnswer: '',
+      rejected: false
+    };
+  }
+
+  if (!candidateText || candidateText === originalText) {
+    return {
+      correctedAnswer: originalText,
+      rejected: false
+    };
+  }
+
+  const protectedContentDecision = restoreProtectedContent(originalText, candidateText);
+  candidateText = protectedContentDecision.correctedAnswer;
+
+  if (protectedContentDecision.rejected) {
+    return {
+      correctedAnswer: originalText,
+      rejected: true
+    };
+  }
+
+  if (removesProtectedStylePhrase(originalText, candidateText)) {
+    return {
+      correctedAnswer: originalText,
+      rejected: true
+    };
+  }
+
+  const originalWords = tokenizeComparisonWords(originalText);
+  const candidateWords = tokenizeComparisonWords(candidateText);
+
+  if (!originalWords.length || !candidateWords.length) {
+    return {
+      correctedAnswer: originalText,
+      rejected: true
+    };
+  }
+
+  const originalLower = originalWords.map((word) => word.toLowerCase());
+  const candidateLower = candidateWords.map((word) => word.toLowerCase());
+
+  const wordDelta = Math.abs(candidateWords.length - originalWords.length);
+  if (wordDelta > getAllowedOpenAIWordDelta(originalWords.length)) {
+    return {
+      correctedAnswer: originalText,
+      rejected: true
+    };
+  }
+
+  const lcsLength = computeWordLcsLength(originalLower, candidateLower);
+  const maxLength = Math.max(originalLower.length, candidateLower.length, 1);
+  const preservedRatio = lcsLength / maxLength;
+  const changedWordCount = maxLength - lcsLength;
+
+  if (preservedRatio < getMinimumOpenAIPreservedRatio(originalWords.length)) {
+    return {
+      correctedAnswer: originalText,
+      rejected: true
+    };
+  }
+
+  if (changedWordCount > getAllowedOpenAIChangedWordCount(originalWords.length)) {
+    return {
+      correctedAnswer: originalText,
+      rejected: true
+    };
+  }
+
+  return {
+    correctedAnswer: candidateText,
+    rejected: false
+  };
 }
 
 function salvageLineLevelCorrection(original, candidate, fallbackDecision) {
@@ -1305,9 +1988,14 @@ function enforceMinimalGrammarCorrectionStrict(original, candidate) {
   const originalLower = originalWords.map((word) => word.toLowerCase());
   const candidateLower = candidateWords.map((word) => word.toLowerCase());
 
-  // If only punctuation/capitalization changed, keep the original because
-  // this mode should focus on grammar only.
   if (areArraysEqual(originalLower, candidateLower)) {
+    if (isAllowedFormattingOnlyChange(originalText, candidateText)) {
+      return {
+        correctedAnswer: candidateText,
+        rejected: false
+      };
+    }
+
     return {
       correctedAnswer: originalText,
       rejected: true
@@ -1639,6 +2327,27 @@ function getAllowedChangedWordCount(wordCount) {
   return Math.max(8, Math.ceil(wordCount * 0.2));
 }
 
+function getAllowedOpenAIWordDelta(wordCount) {
+  if (wordCount <= 8) return 3;
+  if (wordCount <= 20) return 5;
+  if (wordCount <= 60) return 8;
+  return 12;
+}
+
+function getMinimumOpenAIPreservedRatio(wordCount) {
+  if (wordCount <= 8) return 0.45;
+  if (wordCount <= 20) return 0.6;
+  if (wordCount <= 60) return 0.68;
+  return 0.72;
+}
+
+function getAllowedOpenAIChangedWordCount(wordCount) {
+  if (wordCount <= 8) return 5;
+  if (wordCount <= 20) return 8;
+  if (wordCount <= 60) return Math.max(10, Math.ceil(wordCount * 0.35));
+  return Math.max(14, Math.ceil(wordCount * 0.3));
+}
+
 function computeWordLcsLength(source, target) {
   const rows = source.length;
   const cols = target.length;
@@ -1803,6 +2512,127 @@ function isSimpleSpellingVariant(left, right) {
   if (Math.abs(fromWord.length - toWord.length) > 2) return false;
   if (fromWord[0] !== toWord[0]) return false;
   return levenshteinDistance(fromWord, toWord) <= 2;
+}
+
+function normalizeCorrectedPlainText(rawText = '', originalText = '') {
+  const raw = String(rawText || '').replace(/\r\n/g, '\n').trim();
+  if (!raw) {
+    return sanitizeText(originalText || '');
+  }
+
+  const fencedMatch = raw.match(/```(?:text)?\s*([\s\S]*?)```/i);
+  const unfenced = (fencedMatch?.[1] || raw).trim();
+  if (!unfenced) {
+    return sanitizeText(originalText || '');
+  }
+
+  const unquoted = (
+    (unfenced.startsWith('"') && unfenced.endsWith('"'))
+    || (unfenced.startsWith("'") && unfenced.endsWith("'"))
+  )
+    ? unfenced.slice(1, -1)
+    : unfenced;
+
+  return sanitizeText(unquoted || originalText || '');
+}
+
+function getCorrectionDiffCategories(originalText = '', correctedText = '') {
+  const originalWords = tokenizeComparisonWords(originalText);
+  const correctedWords = tokenizeComparisonWords(correctedText);
+  const originalLower = originalWords.map((word) => word.toLowerCase());
+  const correctedLower = correctedWords.map((word) => word.toLowerCase());
+
+  if (areArraysEqual(originalLower, correctedLower)) {
+    return isAllowedFormattingOnlyChange(originalText, correctedText)
+      ? ['basic_punctuation']
+      : [];
+  }
+
+  const chunks = computeWordDiffChunks(originalLower, correctedLower);
+  const categories = new Set();
+
+  chunks.forEach((chunk) => {
+    const removed = chunk.removed || [];
+    const added = chunk.added || [];
+
+    if (!removed.length && !added.length) {
+      return;
+    }
+
+    if (removed.length === 1 && added.length === 1) {
+      const [fromWord] = removed;
+      const [toWord] = added;
+      if (isSimpleSpellingVariant(fromWord, toWord) && !isInflectionVariant(fromWord, toWord)) {
+        categories.add('spelling');
+        return;
+      }
+      if (isInflectionVariant(fromWord, toWord)) {
+        categories.add('verb_agreement');
+        return;
+      }
+      if (isFunctionWord(fromWord) || isFunctionWord(toWord)) {
+        categories.add('article_or_preposition');
+        return;
+      }
+      categories.add('word_choice_or_collocation');
+      return;
+    }
+
+    if (!removed.length || !added.length) {
+      if ([...removed, ...added].every(isFunctionWord)) {
+        categories.add('article_or_preposition');
+        return;
+      }
+      categories.add('word_choice_or_collocation');
+      return;
+    }
+
+    categories.add('word_choice_or_collocation');
+  });
+
+  return Array.from(categories);
+}
+
+function buildItemFeedbackFromCategories(categories = []) {
+  const list = Array.isArray(categories) ? categories : [];
+  if (!list.length) {
+    return 'Không có lỗi ngữ pháp, từ sai hoặc collocation sai rõ ràng.';
+  }
+
+  const messages = [];
+  if (list.includes('verb_agreement')) {
+    messages.push('Kiểm tra lại hòa hợp chủ ngữ-động từ hoặc dạng động từ.');
+  }
+  if (list.includes('article_or_preposition')) {
+    messages.push('Kiểm tra lại mạo từ, giới từ hoặc từ chức năng ở cụm này.');
+  }
+  if (list.includes('spelling')) {
+    messages.push('Kiểm tra lại chính tả hoặc từ dùng ở cụm này.');
+  }
+  if (list.includes('word_choice_or_collocation')) {
+    messages.push('Kiểm tra lại từ dùng hoặc collocation ở cụm này.');
+  }
+  if (list.includes('basic_punctuation')) {
+    messages.push('Kiểm tra lại dấu câu cơ bản và khoảng trắng sau dấu câu.');
+  }
+
+  return messages.slice(0, 3).join(' ') || 'Kiểm tra lại ngữ pháp ở cụm này.';
+}
+
+function buildCommonErrorsFromCategoryCounts(categoryCounts) {
+  const labelMap = {
+    verb_agreement: 'Lỗi hòa hợp chủ ngữ-động từ và dạng động từ',
+    article_or_preposition: 'Lỗi dùng mạo từ hoặc giới từ',
+    spelling: 'Lỗi dùng từ sai hoặc chính tả',
+    word_choice_or_collocation: 'Lỗi dùng từ sai hoặc collocation không tự nhiên',
+    basic_punctuation: 'Lỗi dấu câu cơ bản hoặc thiếu khoảng trắng sau dấu câu'
+  };
+
+  return Array.from(categoryCounts.entries())
+    .sort((left, right) => right[1] - left[1])
+    .map(([category]) => labelMap[category])
+    .filter(Boolean)
+    .slice(0, 3);
 }
 
 function levenshteinDistance(source, target) {
