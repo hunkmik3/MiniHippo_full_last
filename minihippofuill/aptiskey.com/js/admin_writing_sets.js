@@ -54,7 +54,7 @@ window.loadWritingSets = async function () {
                         </p>
                     </div>
                     <div class="d-flex gap-2">
-                        <a href="writing_question.html?lesson=writingkey${key}" target="_blank" class="btn btn-sm btn-outline-info">
+                        <a href="writing_question?lesson=writingkey${key}" target="_blank" class="btn btn-sm btn-outline-info" onclick="try{localStorage.setItem('pending_writing_lesson', JSON.stringify({ lesson: 'writingkey${key}', at: Date.now() }));}catch(e){}">
                             <i class="bi bi-eye me-1"></i>Xem
                         </a>
                         <button onclick="editWritingSet('${set.id}', '${set.file_path}')" class="btn btn-sm btn-outline-warning">

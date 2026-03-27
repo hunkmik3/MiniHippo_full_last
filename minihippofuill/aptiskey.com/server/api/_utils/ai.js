@@ -227,10 +227,10 @@ async function callGemini({
   };
 
   if (responseMimeType) {
-    generationConfig.response_mime_type = responseMimeType;
+    generationConfig.responseMimeType = responseMimeType;
   }
   if (responseJsonSchema) {
-    generationConfig.response_schema = toGeminiSchema(responseJsonSchema);
+    generationConfig.responseSchema = toGeminiSchema(responseJsonSchema);
   }
 
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {

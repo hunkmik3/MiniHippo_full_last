@@ -4,6 +4,8 @@
         return;
     }
 
+    const DISPLAY_STYLE_ID = 'writing-result-display-style';
+
     const refs = {
         searchInput: document.getElementById('writing-results-search-input'),
         clearSearchBtn: document.getElementById('clear-writing-results-search-btn'),
@@ -27,6 +29,60 @@
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+    }
+
+    function ensureDisplayStyles() {
+        if (document.getElementById(DISPLAY_STYLE_ID)) return;
+        const styleEl = document.createElement('style');
+        styleEl.id = DISPLAY_STYLE_ID;
+        styleEl.textContent = `
+            .writing-result-answer-card {
+                border: 1px solid #dbe3f0;
+                border-radius: 1rem;
+                padding: 1rem;
+                background: #fff;
+                margin-bottom: 0.9rem;
+                box-shadow: 0 12px 30px rgba(15, 23, 42, 0.04);
+            }
+            .writing-result-answer-prompt {
+                color: #5f6b7a;
+                font-size: 0.98rem;
+                line-height: 1.6;
+                margin-bottom: 0.9rem;
+            }
+            .writing-result-answer-display {
+                white-space: pre-wrap;
+                overflow-wrap: break-word;
+                border: 1px solid #dbe3f0;
+                border-radius: 1rem;
+                padding: 1rem 1.1rem;
+                background: #fff;
+                color: #334155;
+                line-height: 1.8;
+                font-size: 1rem;
+                min-height: 7.5rem;
+            }
+        `;
+        document.head.appendChild(styleEl);
+    }
+
+    function normalizeDisplayText(value) {
+        return String(value || '')
+            .replace(/\r\n/g, '\n')
+            .replace(/[ \t]+\n/g, '\n')
+            .replace(/\n[ \t]+/g, '\n')
+            .trim();
+    }
+
+    function formatDisplayText(value) {
+        const normalized = normalizeDisplayText(value);
+        return normalized ? escapeHtml(normalized) : '—';
+    }
+
+    function getPartLabel(partKey) {
+        if (!partKey) return '';
+        const normalized = String(partKey).replace(/^part/i, '').trim();
+        return normalized ? `Part ${normalized}` : String(partKey);
     }
 
     function getAuthHeaders(extra = {}) {
@@ -229,6 +285,7 @@
     }
 
     function renderAnswerItems(items = [], partKey = '', questionFeedbackMap = {}) {
+        ensureDisplayStyles();
         if (!Array.isArray(items) || !items.length) {
             return '<div class="text-muted small">Không có dữ liệu câu trả lời.</div>';
         }
@@ -236,17 +293,17 @@
             const key = item.key || `item_${idx + 1}`;
             const questionId = buildQuestionFeedbackId(partKey, key, idx);
             const savedFeedback = questionFeedbackMap[questionId] || questionFeedbackMap[key] || '';
-            const prompt = item.prompt ? `<div class="small text-muted mb-1">${escapeHtml(item.prompt)}</div>` : '';
-            const answerText = escapeHtml(item.answer || '—').replace(/\n/g, '<br>');
+            const prompt = item.prompt ? `<div class="writing-result-answer-prompt"><em>${escapeHtml(item.prompt)}</em></div>` : '';
+            const answerText = formatDisplayText(item.answer);
             const words = Number(item.word_count || 0);
             return `
-                <div class="border rounded p-2 mb-2">
+                <div class="writing-result-answer-card">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <strong class="small">${escapeHtml(key)}</strong>
                         <span class="badge bg-light text-dark">${words} từ</span>
                     </div>
                     ${prompt}
-                    <div>${answerText}</div>
+                    <div class="writing-result-answer-display">${answerText}</div>
                     <div class="mt-2">
                         <label class="form-label small mb-1">Nhận xét câu này</label>
                         <textarea
@@ -273,7 +330,7 @@
         }
         return sections.map((partKey) => `
             <div class="mb-3">
-                <h6 class="small text-primary mb-2">${escapeHtml(partKey.toUpperCase())}</h6>
+                <h6 class="small text-primary mb-2">${escapeHtml(getPartLabel(partKey))}</h6>
                 ${renderAnswerItems(userAnswers[partKey], partKey, questionFeedbackMap)}
             </div>
         `).join('');

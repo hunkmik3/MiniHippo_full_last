@@ -53,30 +53,106 @@
         // Dynamic JS loading based on lesson ID parameter
         (function () {
             const urlParams = new URLSearchParams(window.location.search);
-            const lessonId = urlParams.get('lesson');
+            const PENDING_WRITING_LESSON_KEY = 'pending_writing_lesson';
+            const lessonId = resolveRequestedLesson();
+            const DEFAULT_LESSON_SCRIPT = 'js/writing/writingkey001.js';
+
+            function readPendingLesson() {
+                try {
+                    const raw = localStorage.getItem(PENDING_WRITING_LESSON_KEY);
+                    if (!raw) return '';
+                    const parsed = JSON.parse(raw);
+                    const lesson = String(parsed?.lesson || '').trim().replace(/\.js$/i, '');
+                    const at = Number(parsed?.at || 0);
+                    const isFresh = at > 0 && (Date.now() - at) < (10 * 60 * 1000);
+                    return lesson && isFresh ? lesson : '';
+                } catch (error) {
+                    console.warn('Failed to read pending writing lesson:', error);
+                    return '';
+                }
+            }
+
+            function savePendingLesson(lesson) {
+                const value = String(lesson || '').trim().replace(/\.js$/i, '');
+                if (!value) return;
+                try {
+                    localStorage.setItem(PENDING_WRITING_LESSON_KEY, JSON.stringify({
+                        lesson: value,
+                        at: Date.now()
+                    }));
+                } catch (error) {
+                    console.warn('Failed to persist pending writing lesson:', error);
+                }
+            }
+
+            function resolveRequestedLesson() {
+                const fromQuery = String(urlParams.get('lesson') || '').trim().replace(/\.js$/i, '');
+                if (fromQuery) {
+                    savePendingLesson(fromQuery);
+                    return fromQuery;
+                }
+
+                const pending = readPendingLesson();
+                if (pending) {
+                    console.warn('Lesson query missing; using pending writing lesson from localStorage:', pending);
+                    return pending;
+                }
+
+                return '';
+            }
 
             async function loadLessonScript() {
                 // If no lesson ID, load default script
                 if (!lessonId) {
                     console.log('No lesson parameter - loading default lesson');
-                    loadScript('js/writing/writingkey001.js');
+                    loadScript(DEFAULT_LESSON_SCRIPT, { requestedLesson: 'writingkey001', allowFallback: false });
                     return;
                 }
 
                 try {
                     // Try to load the requested lesson
-                    const scriptUrl = `js/writing/${lessonId}.js`;
-                    loadScript(scriptUrl);
+                    const scriptUrl = `js/writing/${encodeURIComponent(lessonId)}.js?v=${encodeURIComponent(lessonId)}`;
+                    loadScript(scriptUrl, { requestedLesson: lessonId, allowFallback: false });
                 } catch (error) {
                     console.error('Error loading lesson:', error);
-                    loadScript('js/writing/writingkey001.js');
+                    showLessonLoadError(lessonId, 'Không thể khởi tạo bộ đề Writing được yêu cầu.');
                 }
             }
 
-            function loadScript(url) {
+            function showLessonLoadError(requestedLesson, message) {
+                const loadingStyle = document.getElementById('lesson-loading-style');
+                if (loadingStyle) loadingStyle.remove();
+                if (window._lessonLoadingStyle) window._lessonLoadingStyle.remove();
+
+                document.body.classList.remove('lesson-loading');
+                const loadingIndicator = document.getElementById('lesson-loading-indicator');
+                if (loadingIndicator) {
+                    loadingIndicator.style.display = 'none';
+                }
+
+                const keysIdEl = document.getElementById('keys_id');
+                if (keysIdEl && requestedLesson) {
+                    keysIdEl.textContent = requestedLesson;
+                }
+
+                const target = document.getElementById('question1Form') || document.getElementById('content-wrapper') || document.body;
+                if (target) {
+                    target.innerHTML = `
+                        <div class="alert alert-danger mt-3" role="alert">
+                            <strong>Không tải được bộ đề Writing.</strong><br>
+                            Bộ đề yêu cầu: <code>${requestedLesson || 'unknown'}</code><br>
+                            ${message || 'Vui lòng tải lại trang hoặc quay lại danh sách bộ đề.'}
+                        </div>
+                    `;
+                }
+            }
+
+            function loadScript(url, options = {}) {
+                const requestedLesson = options.requestedLesson || '';
                 console.log('Loading script from:', url);
                 const script = document.createElement('script');
                 script.src = url;
+                script.dataset.lesson = requestedLesson;
 
                 script.onload = function () {
                     console.log('Script loaded successfully');
@@ -143,10 +219,7 @@
 
                 script.onerror = function () {
                     console.error('Failed to load script:', url);
-                    // Only fallback if we weren't already trying the default
-                    if (url !== 'js/writing/writingkey001.js') {
-                        loadScript('js/writing/writingkey001.js');
-                    }
+                    showLessonLoadError(requestedLesson || lessonId, 'Tệp bộ đề không tải được hoặc đang bị cache sai. Hãy refresh mạnh rồi thử lại.');
                 };
 
                 document.head.appendChild(script);

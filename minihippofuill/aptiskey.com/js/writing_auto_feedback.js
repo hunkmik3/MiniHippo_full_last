@@ -14,25 +14,26 @@
                 margin-bottom: 0.9rem;
             }
             .writing-auto-card {
-                border: 1px solid #e2e8f0;
-                border-radius: 0.9rem;
-                padding: 0.9rem;
+                border: 1px solid #dbe3f0;
+                border-radius: 1rem;
+                padding: 1rem;
                 background: #fff;
-                box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
-                margin-bottom: 0.85rem;
+                box-shadow: 0 12px 30px rgba(15, 23, 42, 0.04);
+                margin-bottom: 1rem;
             }
             .writing-auto-block {
-                border-radius: 0.75rem;
-                padding: 0.75rem 0.85rem;
+                border-radius: 1rem;
+                padding: 1rem 1.1rem;
                 white-space: pre-wrap;
-                line-height: 1.7;
-                font-size: 0.95rem;
+                line-height: 1.85;
+                font-size: 1rem;
+                overflow-wrap: break-word;
             }
             .writing-auto-inline {
                 background: #fff;
-                border: 1px solid #e2e8f0;
+                border: 1px solid #dbe3f0;
                 color: #0f172a;
-                line-height: 1.85;
+                min-height: 7.5rem;
             }
             .writing-auto-del {
                 color: #dc2626;
@@ -75,7 +76,11 @@
     }
 
     function normalizeText(value) {
-        return String(value || '').replace(/\r\n/g, '\n').trim();
+        return String(value || '')
+            .replace(/\r\n/g, '\n')
+            .replace(/[ \t]+\n/g, '\n')
+            .replace(/\n[ \t]+/g, '\n')
+            .trim();
     }
 
     function buildQuestionId(partKey, itemKey, idx) {
@@ -90,8 +95,30 @@
         return normalized ? `Part ${normalized}` : String(partKey);
     }
 
+    function getFailureOverride(metadata = {}) {
+        const errorText = String(metadata.auto_grading_error || '').toLowerCase();
+        if (
+            errorText.includes('api error (429)')
+            || errorText.includes('resource_exhausted')
+            || errorText.includes('quota exceeded')
+            || errorText.includes('generate_content_free_tier_requests')
+        ) {
+            return {
+                label: 'Gemini hết quota',
+                badgeClass: 'bg-warning text-dark',
+                message: 'Gemini đang vượt quota nên lần nộp này chưa thể sửa lỗi tự động. Chờ quota hồi lại rồi nộp lại, hoặc đổi AI key/provider.',
+                feedback: 'Lần nộp này Gemini đang vượt quota nên chưa thể sửa lỗi tự động.'
+            };
+        }
+        return null;
+    }
+
     function getStatusInfo(metadata = {}) {
         const status = String(metadata.auto_grading_status || '').trim() || 'unknown';
+        const failureOverride = status === 'failed' ? getFailureOverride(metadata) : null;
+        if (failureOverride) {
+            return failureOverride;
+        }
         const map = {
             completed: {
                 label: 'Đã sửa lỗi tự động',
@@ -254,7 +281,7 @@
         ensureStyles();
         const statusInfo = getStatusInfo(metadata);
         const autoData = metadata?.auto_writing_feedback;
-        const feedback = normalizeText(autoData?.overall_feedback || metadata.ai_feedback_preview || '');
+        const feedback = normalizeText(statusInfo.feedback || autoData?.overall_feedback || metadata.ai_feedback_preview || '');
         const provider = normalizeText(metadata.auto_grading_provider || '');
         const gradedAt = normalizeText(metadata.auto_graded_at || '');
 
@@ -323,9 +350,38 @@
         `).join('');
     }
 
+    function renderInlineQuestionCorrection({
+        metadata = {},
+        part = '',
+        key = '',
+        idx = 0,
+        answer = ''
+    } = {}) {
+        ensureStyles();
+        const feedbackMap = getAutoFeedbackMap(metadata);
+        const questionId = buildQuestionId(part, key, idx);
+        const feedback = feedbackMap.get(questionId);
+        if (!feedback) {
+            return '';
+        }
+
+        const correctedAnswer = normalizeText(feedback.correctedAnswer || answer);
+        const diffHtml = buildWordDiff(answer, correctedAnswer);
+        const itemFeedback = normalizeText(feedback.feedback || '');
+
+        return `
+            <div class="mt-3">
+                <div class="small fw-semibold mb-1">AI sửa lỗi</div>
+                <div class="writing-auto-block writing-auto-inline">${diffHtml || '<span class="text-muted">Không có thay đổi.</span>'}</div>
+                ${itemFeedback ? `<div class="small text-muted mt-2">${escapeHtml(itemFeedback)}</div>` : ''}
+            </div>
+        `;
+    }
+
     window.WritingAutoFeedback = {
         ensureStyles,
         renderOverallSummary,
-        renderSections
+        renderSections,
+        renderInlineQuestionCorrection
     };
 })();

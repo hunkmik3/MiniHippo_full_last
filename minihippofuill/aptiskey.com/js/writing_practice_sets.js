@@ -1,8 +1,21 @@
 (function () {
     const listContainer = document.getElementById('writing-upload-sets');
     const placeholder = document.getElementById('writing-upload-placeholder');
+    const PENDING_WRITING_LESSON_KEY = 'pending_writing_lesson';
 
     if (!listContainer) return;
+
+    function rememberSelectedLesson(filename) {
+        if (!filename) return;
+        try {
+            localStorage.setItem(PENDING_WRITING_LESSON_KEY, JSON.stringify({
+                lesson: filename,
+                at: Date.now()
+            }));
+        } catch (error) {
+            console.warn('Failed to store selected writing lesson:', error);
+        }
+    }
 
     function setPlaceholder(message) {
         if (placeholder) {
@@ -66,11 +79,15 @@
         }
 
         const button = document.createElement('a');
-        button.href = filename ? `writing_question.html?lesson=${filename}` : '#';
+        button.href = filename ? `writing_question?lesson=${filename}` : '#';
         button.className = 'btn btn-light fw-bold mt-3 w-100 border-0';
         button.style.color = '#6d28d9'; // Purple text
         button.textContent = 'Vào bộ đề';
         if (!filename) button.classList.add('disabled');
+        if (filename) {
+            button.addEventListener('click', () => rememberSelectedLesson(filename));
+            button.addEventListener('auxclick', () => rememberSelectedLesson(filename));
+        }
 
         card.appendChild(title);
         card.appendChild(meta);

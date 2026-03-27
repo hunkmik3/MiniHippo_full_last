@@ -131,7 +131,7 @@
         return `${safePart}:${safeKey}`;
     }
 
-    function renderWritingAnswerItemsWithFeedback(items = [], partKey = '', questionFeedbackMap = {}) {
+    function renderWritingAnswerItemsWithFeedback(items = [], partKey = '', questionFeedbackMap = {}, metadata = {}) {
         if (!Array.isArray(items) || !items.length) {
             return '<div class="text-muted small">Không có dữ liệu câu trả lời.</div>';
         }
@@ -146,6 +146,15 @@
             const feedbackHtml = feedbackText
                 ? escapeHtml(feedbackText).replace(/\n/g, '<br>')
                 : '<span class="text-muted">Chưa có nhận xét cho câu này.</span>';
+            const autoCorrectionHtml = window.WritingAutoFeedback
+                ? window.WritingAutoFeedback.renderInlineQuestionCorrection({
+                    metadata,
+                    part: partKey,
+                    key,
+                    idx,
+                    answer: item.answer || ''
+                })
+                : '';
 
             return `
                 <div class="border rounded p-2 mb-2">
@@ -155,6 +164,7 @@
                     </div>
                     ${prompt}
                     <div class="mb-2">${answerText}</div>
+                    ${autoCorrectionHtml}
                     <div class="small">
                         <strong>Nhận xét admin:</strong>
                         <div>${feedbackHtml}</div>
@@ -180,7 +190,7 @@
         return sections.map((partKey) => `
             <div class="mb-3">
                 <h6 class="small text-primary mb-2">${escapeHtml(getPartLabel(partKey))}</h6>
-                ${renderWritingAnswerItemsWithFeedback(userAnswers[partKey], partKey, questionFeedbackMap)}
+                ${renderWritingAnswerItemsWithFeedback(userAnswers[partKey], partKey, questionFeedbackMap, metadata)}
             </div>
         `).join('');
     }
@@ -234,6 +244,7 @@
                                 <div id="history-detail-admin-note" class="border rounded p-2 small"></div>
                             </div>
                             <div class="mt-3" id="history-detail-writing-auto-wrap" style="display: none;">
+                                <h6 class="mb-2">Sửa lỗi tự động</h6>
                                 <div id="history-detail-writing-auto-summary"></div>
                                 <div id="history-detail-writing-auto"></div>
                             </div>
