@@ -3,7 +3,12 @@ import assert from 'node:assert/strict';
 
 import { __testables } from './writingAutoGrade.js';
 
-const { finalizeOpenAITextCorrection, buildOpenAITextCorrectionUserPrompt } = __testables;
+const {
+  finalizeOpenAITextCorrection,
+  buildOpenAITextCorrectionUserPrompt,
+  buildPart1SemanticCheckUserPrompt,
+  parsePart1SemanticCheckVerdict
+} = __testables;
 
 async function finalize(originalAnswer, rawModelOutput) {
   const result = await finalizeOpenAITextCorrection(originalAnswer, rawModelOutput);
@@ -19,6 +24,27 @@ test('active OpenAI prompt builder includes question context and answer', () => 
   assert.match(prompt, /Question: What do you like to do every morning\?/);
   assert.match(prompt, /Student answer:\nI like read book every morning/);
   assert.match(prompt, /Corrected answer:/);
+});
+
+test('part 1 semantic prompt builder includes question and corrected answer', () => {
+  const prompt = buildPart1SemanticCheckUserPrompt(
+    {
+      prompt: 'Have you had dinner?',
+      answer: 'I go by motorbike'
+    },
+    'I go by motorbike.'
+  );
+
+  assert.match(prompt, /Question: Have you had dinner\?/);
+  assert.match(prompt, /Answer:\nI go by motorbike\./);
+  assert.match(prompt, /Verdict:/);
+});
+
+test('parses part 1 semantic verdict safely', () => {
+  assert.equal(parsePart1SemanticCheckVerdict('MISMATCH'), 'MISMATCH');
+  assert.equal(parsePart1SemanticCheckVerdict('MISMATCH.'), 'MISMATCH');
+  assert.equal(parsePart1SemanticCheckVerdict('MATCH'), 'MATCH');
+  assert.equal(parsePart1SemanticCheckVerdict('something unclear'), 'MATCH');
 });
 
 test('fixes "I like read book every morning"', async () => {

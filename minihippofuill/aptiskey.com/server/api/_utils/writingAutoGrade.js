@@ -226,6 +226,29 @@ const OPENAI_EDIT_VALIDATOR_SYSTEM_PROMPT = [
   '- if the original wording is already acceptable, keep it.',
   'Return ONLY YES or NO.'
 ].join(' ');
+const PART1_SEMANTIC_CHECK_SYSTEM_PROMPT = [
+  'You are a strict evaluator for Aptis-style Writing Part 1 short answers.',
+  'Decide whether the student answer matches the concept requested by the question.',
+  'Focus on semantic fit only, not grammar correction.',
+  'RULES:',
+  '- Return ONLY MATCH or MISMATCH.',
+  '- Ignore minor grammar, spelling, capitalization, or punctuation issues.',
+  '- Accept short answers and fragments if they answer the question.',
+  '- Accept broad but relevant answers if they match the requested concept.',
+  '- Mark MISMATCH only when the answer clearly gives the wrong kind of information, answers a different question, or is off-topic.',
+  '- If the question asks about time, place, number, weather, activity, transport, hobby, person, reason, or preference, the answer must match that concept.',
+  '- If unsure, return MATCH.',
+  'EXAMPLES:',
+  'Question: Have you had dinner?',
+  'Answer: I go by motorbike.',
+  'Verdict: MISMATCH',
+  'Question: How do you go to school?',
+  'Answer: By motorbike.',
+  'Verdict: MATCH',
+  'Question: How many people are in your family?',
+  'Answer: Six people.',
+  'Verdict: MATCH'
+].join(' ');
 
 function buildOpenAITextCorrectionUserPrompt(item = {}) {
   const question = sanitizeText(item?.prompt || '');
@@ -238,6 +261,61 @@ function buildOpenAITextCorrectionUserPrompt(item = {}) {
     '',
     'Corrected answer:'
   ].filter(Boolean).join('\n');
+}
+
+function buildPart1SemanticCheckUserPrompt(item = {}, correctedAnswer = '') {
+  const question = sanitizeText(item?.prompt || '');
+  const answer = sanitizeText(correctedAnswer || item?.answer || '');
+
+  return [
+    question ? `Question: ${question}` : '',
+    'Answer:',
+    answer,
+    '',
+    'Verdict:'
+  ].filter(Boolean).join('\n');
+}
+
+function parsePart1SemanticCheckVerdict(text = '') {
+  const normalized = sanitizeText(text || '')
+    .toUpperCase()
+    .replace(/[^A-Z]/g, '');
+
+  if (normalized.startsWith('MISMATCH')) {
+    return 'MISMATCH';
+  }
+  if (normalized.startsWith('MATCH')) {
+    return 'MATCH';
+  }
+  return 'MATCH';
+}
+
+function isPart1WritingItem(item = {}) {
+  return String(item?.part || '').trim().toLowerCase() === 'part1';
+}
+
+async function evaluatePart1SemanticMismatch(item = {}, correctedAnswer = '') {
+  if (!isPart1WritingItem(item) || !sanitizeText(item?.answer || '')) {
+    return {
+      semanticMismatch: false,
+      verdict: 'MATCH',
+      rawModelOutput: ''
+    };
+  }
+
+  const response = await generateAIText({
+    systemPrompt: PART1_SEMANTIC_CHECK_SYSTEM_PROMPT,
+    userPrompt: buildPart1SemanticCheckUserPrompt(item, correctedAnswer),
+    maxTokens: 8,
+    temperature: 0
+  });
+
+  const verdict = parsePart1SemanticCheckVerdict(response.text);
+  return {
+    semanticMismatch: verdict === 'MISMATCH',
+    verdict,
+    rawModelOutput: sanitizeText(response.text || '')
+  };
 }
 
 export async function autoGradeWritingSubmission({
@@ -713,16 +791,25 @@ async function autoGradeWithOpenAITextMode({ writingItems, gradableItems, metada
     diffCategories.forEach((category) => {
       categoryCounts.set(category, (categoryCounts.get(category) || 0) + 1);
     });
+    const semanticCheck = await evaluatePart1SemanticMismatch(item, correctionDecision.correctedAnswer);
+    if (semanticCheck.semanticMismatch) {
+      categoryCounts.set('semantic_mismatch', (categoryCounts.get('semantic_mismatch') || 0) + 1);
+    }
 
     correctedItems.push({
       part: item.part,
       key: item.key,
       corrected_answer: correctionDecision.correctedAnswer,
-      feedback: buildItemFeedbackFromCategories(diffCategories),
+      feedback: semanticCheck.semanticMismatch
+        ? 'Câu trả lời chưa đúng ý hoặc chưa đúng concept của câu hỏi ở Part 1.'
+        : buildItemFeedbackFromCategories(diffCategories),
       raw_model_output: finalized.rawModelOutput,
       normalized_output: finalized.normalizedOutput,
       final_corrected_answer: correctionDecision.correctedAnswer,
-      rejection_flags: correctionDecision.rejectionFlags || []
+      rejection_flags: correctionDecision.rejectionFlags || [],
+      semantic_mismatch: semanticCheck.semanticMismatch,
+      semantic_verdict: semanticCheck.verdict,
+      semantic_raw_output: semanticCheck.rawModelOutput
     });
   }
 
@@ -2924,6 +3011,9 @@ function buildItemFeedbackFromCategories(categories = []) {
   if (list.includes('terminal_period')) {
     messages.push('Kiểm tra lại dấu chấm cuối câu.');
   }
+  if (list.includes('semantic_mismatch')) {
+    messages.push('Câu trả lời chưa đúng ý hoặc chưa đúng concept của câu hỏi.');
+  }
   return messages.slice(0, 3).join(' ') || 'Kiểm tra lại ngữ pháp ở cụm này.';
 }
 
@@ -2934,7 +3024,8 @@ function buildCommonErrorsFromCategoryCounts(categoryCounts) {
     spelling: 'Lỗi dùng từ sai hoặc chính tả',
     word_choice_or_collocation: 'Lỗi dùng từ sai hoặc collocation không tự nhiên',
     capitalization: 'Lỗi viết hoa đại từ "I"',
-    terminal_period: 'Thiếu dấu chấm cuối câu'
+    terminal_period: 'Thiếu dấu chấm cuối câu',
+    semantic_mismatch: 'Câu trả lời chưa đúng ý câu hỏi ở Part 1'
   };
 
   return Array.from(categoryCounts.entries())
@@ -2999,6 +3090,8 @@ function sanitizeText(value, maxLength = 5000) {
 
 export const __testables = {
   buildOpenAITextCorrectionUserPrompt,
+  buildPart1SemanticCheckUserPrompt,
+  parsePart1SemanticCheckVerdict,
   finalizeOpenAITextCorrection,
   normalizeCorrectedPlainText,
   normalizeTerminalPeriods,

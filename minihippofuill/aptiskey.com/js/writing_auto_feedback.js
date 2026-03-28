@@ -218,9 +218,22 @@
             const key = buildQuestionId(item?.part, item?.key, idx);
             return [key, {
                 correctedAnswer: normalizeText(item?.corrected_answer || ''),
-                feedback: normalizeText(item?.feedback || '')
+                feedback: normalizeText(item?.feedback || ''),
+                semanticMismatch: !!item?.semantic_mismatch
             }];
         }));
+    }
+
+    function renderWholeAnswerDeleted(answer) {
+        const normalized = normalizeText(answer);
+        if (!normalized) {
+            return '<span class="text-muted">Không có thay đổi.</span>';
+        }
+
+        return normalized
+            .split('\n')
+            .map((line) => `<span class="writing-auto-del">${escapeHtml(line)}</span>`)
+            .join('<br>');
     }
 
     function buildWordDiff(original, corrected) {
@@ -396,7 +409,9 @@
             const questionId = entry.id || buildQuestionId(entry.part, entry.key, idx);
             const feedback = feedbackMap.get(questionId) || {};
             const correctedAnswer = normalizeText(feedback.correctedAnswer || entry.answer);
-            const diffHtml = buildWordDiff(entry.answer, correctedAnswer);
+            const diffHtml = feedback.semanticMismatch
+                ? renderWholeAnswerDeleted(entry.answer)
+                : buildWordDiff(entry.answer, correctedAnswer);
             const perItemHtml = `
                 <div class="writing-auto-card">
                     ${entry.prompt ? `<div class="small text-muted mb-2"><em>${escapeHtml(entry.prompt)}</em></div>` : ''}
@@ -433,7 +448,9 @@
         }
 
         const correctedAnswer = normalizeText(feedback.correctedAnswer || answer);
-        const diffHtml = buildWordDiff(answer, correctedAnswer);
+        const diffHtml = feedback.semanticMismatch
+            ? renderWholeAnswerDeleted(answer)
+            : buildWordDiff(answer, correctedAnswer);
         const itemFeedback = normalizeText(feedback.feedback || '');
 
         return `
