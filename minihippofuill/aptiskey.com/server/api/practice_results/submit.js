@@ -1,7 +1,13 @@
 import parseBody from '../_utils/parseBody.js';
-import { insertInto } from '../_utils/supabase.js';
+import { insertInto, selectFrom } from '../_utils/supabase.js';
 import { verifyUserRequest } from '../_utils/auth.js';
 import { autoGradeWritingSubmission } from '../_utils/writingAutoGrade.js';
+
+function parseSessionNumber(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return null;
+  return Math.trunc(number);
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -38,6 +44,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Thiếu loại bài luyện tập' });
   }
 
+  const normalizedPracticeType = String(practiceType || '').trim().toLowerCase();
   let numericTotal = Number(totalScore) || 0;
   let numericMax = Number(maxScore) || 0;
   const numericDuration =
@@ -46,8 +53,56 @@ export default async function handler(req, res) {
       : null;
   let mergedMetadata = metadata && typeof metadata === 'object' ? { ...metadata } : metadata || null;
 
+  // Map non-standard practice types to ones allowed by DB constraint.
+  // DB only accepts: reading, listening, writing, speaking.
+  // "homework" is a logical type used by Lớp Học module — persist the best
+  // matching concrete type, plus tag metadata for admin filtering.
+  const VALID_DB_TYPES = new Set(['reading', 'listening', 'writing', 'speaking']);
+  let dbPracticeType = normalizedPracticeType;
+  if (!VALID_DB_TYPES.has(dbPracticeType)) {
+    // Prefer session_type in metadata if provided, else fall back to 'writing'.
+    const hintedType = String(mergedMetadata?.session_type || '').trim().toLowerCase();
+    dbPracticeType = VALID_DB_TYPES.has(hintedType) ? hintedType : 'writing';
+    mergedMetadata = {
+      ...(mergedMetadata && typeof mergedMetadata === 'object' ? mergedMetadata : {}),
+      submission_kind: normalizedPracticeType,
+      submitted_as: dbPracticeType
+    };
+  }
+
   try {
-    if (String(practiceType || '').toLowerCase() === 'writing') {
+    if (normalizedPracticeType === 'homework') {
+      const sessionNumber = parseSessionNumber(mergedMetadata?.session_number);
+      if (!setId || !sessionNumber) {
+        return res.status(400).json({
+          error: 'Thiếu class id hoặc số buổi khi nộp BTVN'
+        });
+      }
+
+      const classSet = await selectFrom('practice_sets', {
+        filters: [{ column: 'id', value: setId }],
+        single: true
+      });
+
+      if (!classSet) {
+        return res.status(404).json({ error: 'Không tìm thấy lớp học tương ứng' });
+      }
+
+      const sessions = Array.isArray(classSet?.data?.sessions) ? classSet.data.sessions : [];
+      const session = sessions.find((item) => parseSessionNumber(item?.number) === sessionNumber);
+      if (!session) {
+        return res.status(400).json({ error: `Không tìm thấy dữ liệu deadline cho buổi ${sessionNumber}` });
+      }
+
+      const deadline = new Date(session.deadline);
+      if (!Number.isNaN(deadline.getTime()) && Date.now() > deadline.getTime()) {
+        return res.status(403).json({
+          error: `Buổi ${sessionNumber} đã quá deadline, không thể nộp bài`
+        });
+      }
+    }
+
+    if (normalizedPracticeType === 'writing') {
       const autoGrade = await autoGradeWritingSubmission({
         metadata: mergedMetadata || {},
         setTitle
@@ -69,7 +124,7 @@ export default async function handler(req, res) {
     const [record] = await insertInto('practice_results', [
       {
         user_id: authResult.user.id,
-        practice_type: practiceType,
+        practice_type: dbPracticeType,
         practice_mode: mode,
         set_id: setId || null,
         set_title: setTitle || null,
@@ -93,7 +148,6 @@ export default async function handler(req, res) {
     });
   }
 }
-
 
 
 

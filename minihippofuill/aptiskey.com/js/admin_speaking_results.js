@@ -186,6 +186,17 @@
 
         return answers.map((item, index) => {
             const answerText = escapeHtml(item.answer || '—').replace(/\n/g, '<br>');
+            const recordingUrl = typeof item.recording_url === 'string' ? item.recording_url.trim() : '';
+            const recordingPlayer = recordingUrl
+                ? `
+                    <div class="mt-2">
+                        <div class="small text-muted mb-1">File ghi âm</div>
+                        <audio controls preload="none" style="width:100%;">
+                            <source src="${escapeHtml(recordingUrl)}">
+                        </audio>
+                    </div>
+                `
+                : '<div class="small text-muted mt-2">Chưa có file ghi âm.</div>';
             return `
                 <div class="border rounded p-2 mb-2">
                     <div class="d-flex justify-content-between align-items-center mb-1">
@@ -194,6 +205,7 @@
                     </div>
                     ${item.prompt ? `<div class="small text-muted mb-1">${escapeHtml(item.prompt)}</div>` : ''}
                     <div>${answerText}</div>
+                    ${recordingPlayer}
                 </div>
             `;
         }).join('');

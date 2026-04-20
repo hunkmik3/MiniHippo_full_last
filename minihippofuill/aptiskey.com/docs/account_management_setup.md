@@ -9,8 +9,12 @@ alter table public.users
     add column if not exists full_name text,
     add column if not exists phone_number text,
     add column if not exists device_limit int default 2,
+    add column if not exists started_on date,
     add column if not exists expires_at date,
-    add column if not exists notes text;
+    add column if not exists notes text,
+    add column if not exists course text,
+    add column if not exists band text,
+    add column if not exists learning_program text;
 
 alter table public.users
     add column if not exists last_login timestamptz;
@@ -53,5 +57,5 @@ create index if not exists practice_results_type_idx on public.practice_results(
 
 > **Ghi chú**
 > - `device_limit` có thể chỉnh trên từng tài khoản (mặc định = 2).
+> - Với học viên `Lớp học`, cần lưu `band` (`B1` hoặc `B2`) để phân quyền bộ bài tập đúng band.
 > - Sau khi tạo bảng mới, phân quyền `select/insert/update` cho role `service_role`/`anon` theo nhu cầu.
-

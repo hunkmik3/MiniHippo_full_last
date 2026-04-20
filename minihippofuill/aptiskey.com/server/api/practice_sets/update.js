@@ -44,7 +44,8 @@ function extractSupabaseError(error) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'PUT') {
+  const method = String(req.method || '').toUpperCase();
+  if (method !== 'PUT' && method !== 'PATCH') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
@@ -55,13 +56,13 @@ export default async function handler(req, res) {
       .json({ error: adminCheck.error || 'Unauthorized' });
   }
 
-  const id = req.query.id;
-  if (!id) {
-    return res.status(400).json({ error: 'Thiếu tham số id' });
-  }
-
   try {
     const body = await parseJsonBody(req);
+    const id = req.query.id || body?.id;
+    if (!id) {
+      return res.status(400).json({ error: 'Thiếu tham số id' });
+    }
+
     const payload = { ...body, updated_at: new Date().toISOString() };
     delete payload.id;
 
@@ -72,34 +73,39 @@ export default async function handler(req, res) {
     try {
       result = await updateTable('practice_sets', [{ column: 'id', value: id }], payload);
     } catch (error) {
-      if (requestedType === 'speaking' && isTypeConstraintError(error)) {
-        let fallbackResult = null;
-        let lastError = error;
-        for (const fallbackType of TYPE_FALLBACKS) {
-          try {
-            fallbackResult = await updateTable('practice_sets', [{ column: 'id', value: id }], {
-              ...payload,
-              type: fallbackType,
-              data: isPlainObject(payload.data)
-                ? {
-                    ...payload.data,
-                    __practice_type: 'speaking',
-                    __storage_type: fallbackType
-                  }
-                : payload.data
-            });
-            break;
-          } catch (fallbackError) {
-            lastError = fallbackError;
-          }
-        }
-        if (!fallbackResult) {
-          throw lastError;
-        }
-        result = fallbackResult;
-      } else {
+      const shouldTryTypeFallback =
+        requestedType &&
+        isTypeConstraintError(error) &&
+        !TYPE_FALLBACKS.includes(requestedType);
+
+      if (!shouldTryTypeFallback) {
         throw error;
       }
+
+      let fallbackResult = null;
+      let lastError = error;
+      for (const fallbackType of TYPE_FALLBACKS) {
+        try {
+          fallbackResult = await updateTable('practice_sets', [{ column: 'id', value: id }], {
+            ...payload,
+            type: fallbackType,
+            data: isPlainObject(payload.data)
+              ? {
+                  ...payload.data,
+                  __practice_type: requestedType,
+                  __storage_type: fallbackType
+                }
+              : payload.data
+          });
+          break;
+        } catch (fallbackError) {
+          lastError = fallbackError;
+        }
+      }
+      if (!fallbackResult) {
+        throw lastError;
+      }
+      result = fallbackResult;
     }
 
     const record = Array.isArray(result) ? result[0] : result;

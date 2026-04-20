@@ -18,14 +18,14 @@ window.loadWritingSets = async function () {
     const emptyEl = document.getElementById('writing-set-empty');
     if (!listEl) return;
 
-    listEl.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 text-muted">Đang tải danh sách...</p></div>';
+    listEl.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 text-muted">Đang tải dữ liệu Writing sets...</p></div>';
     listEl.style.display = 'block';
 
     try {
         const res = await fetch('/api/lessons/list?part=writing');
         const data = await res.json();
 
-        if (!res.ok) throw new Error(data.error || 'Failed to load sets');
+        if (!res.ok) throw new Error(data.error || 'Không thể tải dữ liệu Writing sets.');
 
         const sets = data.lessons || [];
 
@@ -61,7 +61,7 @@ window.loadWritingSets = async function () {
                             <i class="bi bi-pencil me-1"></i>Sửa
                         </button>
                         <button onclick="deleteWritingSet('${set.id}')" class="btn btn-sm btn-outline-danger">
-                            <i class="bi bi-trash me-1"></i>Xoá
+                            <i class="bi bi-trash me-1"></i>Xóa
                         </button>
                     </div>
                 </div>
@@ -145,7 +145,7 @@ window.deleteWritingSet = async function (id) {
         });
         const data = await res.json();
 
-        if (!res.ok) throw new Error(data.error || 'Failed to delete');
+        if (!res.ok) throw new Error(data.error || 'Không thể xóa Writing set.');
 
         alert("Đã xóa bộ đề thành công!");
         loadWritingSets();
@@ -432,7 +432,7 @@ if(typeof renderQuestions1==='function'){renderQuestions1();renderQuestions2();r
     const btn = document.querySelector('#writing-upload-form button[onclick*="generateAndUploadWriting"]');
     const originalText = btn ? btn.innerHTML : 'Lưu lại';
     if (btn) {
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Uploading...';
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Đang upload...';
         btn.disabled = true;
     }
 
@@ -458,7 +458,7 @@ if(typeof renderQuestions1==='function'){renderQuestions1();renderQuestions2();r
             if (typeof hideWritingForm === 'function') hideWritingForm();
         } else {
             const err = await response.text();
-            alert('Upload thất bại: ' + err);
+            alert('Không thể upload lesson: ' + err);
         }
 
     } catch (e) {

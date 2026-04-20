@@ -1,8 +1,11 @@
 (function () {
     const query = new URLSearchParams(window.location.search);
     const setId = query.get('set');
+    const fromSource = (query.get('from') || '').toLowerCase();
+    const returnPage = fromSource === 'lop_hoc' ? 'lop_hoc.html' : 'listening_bode.html';
 
     const sections = [
+        { id: 'intro-section', label: 'Intro', key: 'intro' },
         { id: 'part1-section', label: 'Question 1', key: 'part1' },
         { id: 'part2-section', label: 'Question 2', key: 'part2' },
         { id: 'part3-section', label: 'Question 3', key: 'part3' },
@@ -130,6 +133,15 @@
         }
     }
 
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     // Stop all audio players
     function stopAllAudio() {
         // Stop all audio elements on the page
@@ -174,8 +186,17 @@
 
     function updateQuestionStep() {
         if (!refs.questionStep) return;
+        const currentMapping = state.questionMapping[state.currentStep - 1] || null;
+        const partLabelMap = {
+            intro: 'Intro',
+            part1: 'Part 1',
+            part2: 'Part 2',
+            part3: 'Part 3',
+            part4: 'Part 4'
+        };
+        const partLabel = currentMapping ? (partLabelMap[currentMapping.part] || currentMapping.part) : 'Listening';
         const suffix = state.setTitle ? ` · ${state.setTitle}` : '';
-        refs.questionStep.textContent = `Question ${state.currentStep} of ${state.totalSteps}${suffix}`;
+        refs.questionStep.textContent = `${partLabel} (${state.currentStep}/${state.totalSteps})${suffix}`;
     }
 
     function showStep(step) {
@@ -197,7 +218,12 @@
         });
 
         // Show the appropriate section and render question based on mapping
-        if (currentMapping.part === 'part1') {
+        if (currentMapping.part === 'intro') {
+            const introSection = document.getElementById('intro-section');
+            if (introSection) {
+                introSection.classList.add('active');
+            }
+        } else if (currentMapping.part === 'part1') {
             const part1Section = document.getElementById('part1-section');
             if (part1Section) {
                 part1Section.classList.add('active');
@@ -237,6 +263,11 @@
         if (refs.nextButton) {
             refs.nextButton.textContent = state.currentStep === state.totalSteps ? 'Nộp bài' : 'Next';
         }
+        if (refs.checkButton) {
+            const canCheck = Boolean(currentMapping?.part && checkHandlers[currentMapping.part]);
+            refs.checkButton.disabled = !canCheck;
+            refs.checkButton.style.opacity = canCheck ? '1' : '0.55';
+        }
     }
 
     function attachNavigation() {
@@ -270,8 +301,10 @@
                 if (state.completed) {
                     return;
                 }
-                if (checkHandlers[`part${state.currentStep}`]) {
-                    checkHandlers[`part${state.currentStep}`]();
+                const currentMapping = state.questionMapping[state.currentStep - 1];
+                const handlerKey = currentMapping?.part || '';
+                if (handlerKey && checkHandlers[handlerKey]) {
+                    checkHandlers[handlerKey]();
                 }
             });
         }
@@ -391,6 +424,21 @@
             });
             audioRange.value = 1;
         }
+    }
+
+    function renderIntro(intro = {}) {
+        const section = document.getElementById('intro-section');
+        const titleEl = document.getElementById('intro-title');
+        const contentEl = document.getElementById('intro-content');
+        if (!section || !titleEl || !contentEl) return;
+
+        const title = String(intro.title || 'Trang mở đầu').trim();
+        const content = String(intro.content || '').trim();
+
+        titleEl.textContent = title || 'Trang mở đầu';
+        contentEl.innerHTML = content
+            ? escapeHtml(content).replace(/\n/g, '<br>')
+            : '<span class="text-muted">Chưa có nội dung.</span>';
     }
 
     // Part 1: Questions 1-13
@@ -1223,8 +1271,7 @@
         if (refs.nextButton) {
             refs.nextButton.textContent = 'The end';
             refs.nextButton.onclick = () => {
-                // Khi đã hoàn thành bài và bấm "The end" -> quay về trang chọn bộ đề Listening
-                window.location.href = 'listening_bode.html';
+                window.location.href = returnPage;
             };
         }
         state.completed = true;
@@ -1293,6 +1340,13 @@
 
     function buildQuestionMapping(set) {
         const mapping = [];
+
+        const intro = set.data?.intro || {};
+        const introContent = String(intro.content || '').trim();
+        const introTitle = String(intro.title || '').trim();
+        if (introContent || introTitle) {
+            mapping.push({ part: 'intro', questionIndex: 0 });
+        }
         
         // Part 1: Questions 1-13 (mỗi câu là 1 step)
         const part1Questions = set.data?.part1?.questions || [];
@@ -1335,6 +1389,7 @@
         state.questionMapping = buildQuestionMapping(set);
         state.totalSteps = state.questionMapping.length;
 
+        renderIntro(set.data?.intro);
         renderPart1(set.data?.part1);
         renderPart2(set.data?.part2);
         renderPart3(set.data?.part3);
@@ -1368,6 +1423,10 @@
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
+        const homeLink = document.getElementById('listening-set-home-link');
+        if (homeLink) {
+            homeLink.setAttribute('href', returnPage);
+        }
         if (typeof requireAuth === 'function') {
             const ok = await requireAuth();
             if (!ok) {
@@ -1382,4 +1441,3 @@
         loadPracticeSet({ skipRenderIfLoaded: Boolean(cachedSet) });
     });
 })();
-

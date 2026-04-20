@@ -19,6 +19,8 @@ const directApiRoutes = {
   '/api/ask.js': 'api/ask.js',
   '/api/upload-audio': 'api/upload-audio.js',
   '/api/upload-audio.js': 'api/upload-audio.js',
+  '/api/upload-speaking-recording': 'api/upload-speaking-recording.js',
+  '/api/upload-speaking-recording.js': 'api/upload-speaking-recording.js',
   '/api/upload-lesson': 'api/upload-lesson.js',
   '/api/upload-lesson.js': 'api/upload-lesson.js',
   '/api/visitor-count': 'api/visitor-count.js',

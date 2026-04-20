@@ -50,6 +50,7 @@
         loadingUsers: false,
         selectedUserIds: new Set()
     };
+    const USER_GROUP = 'aptis';
 
     function showCreateAlert(message, type = 'info') {
         if (!refs.createAlert) return;
@@ -192,7 +193,7 @@
         state.selectedUserIds.clear();
         renderUsers([]);
         try {
-            const data = await fetchJson('/api/users/list');
+            const data = await fetchJson(`/api/users/list?group=${USER_GROUP}`);
             state.users = data.users || [];
             applySearchFilter();
         } catch (error) {
@@ -403,7 +404,9 @@
                 phone: refs.createPhone.value.trim() || undefined,
                 deviceLimit: Number(refs.createDeviceLimit.value) || 2,
                 expiresAt: refs.createExpiresAt.value || undefined,
-                notes: refs.createNotes.value.trim() || undefined
+                notes: refs.createNotes.value.trim() || undefined,
+                learningProgram: USER_GROUP,
+                course: 'Aptis'
             };
             const data = await fetchJson('/api/users/create', {
                 method: 'POST',
@@ -442,7 +445,9 @@
                     fullName: refs.detailFullName.value.trim(),
                     phone: refs.detailPhone.value.trim(),
                     expiresAt: refs.detailExpiresAt.value || null,
-                    notes: refs.detailNotes.value.trim()
+                    notes: refs.detailNotes.value.trim(),
+                    learningProgram: USER_GROUP,
+                    course: 'Aptis'
                 })
             });
             loadUsers();
@@ -550,7 +555,9 @@
                             deviceLimit: r.device_limit ? Number(r.device_limit) : undefined,
                             expiresAt: r.expires_at?.trim() || undefined,
                             notes: r.notes?.trim() || undefined,
-                            password: r.password?.trim() || undefined
+                            password: r.password?.trim() || undefined,
+                            learningProgram: USER_GROUP,
+                            course: 'Aptis'
                         };
                         if (!payload.accountCode && !payload.email) {
                             failed.push({ index: i + 2, reason: 'Thiếu account_code và email' });
@@ -723,6 +730,5 @@
 
     window.initUserManagementModule = initUserManagementModule;
 })();
-
 
 
