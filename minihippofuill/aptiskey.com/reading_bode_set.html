@@ -48,12 +48,17 @@
         #part5-paragraph-container.collapsed {
             display: none;
         }
+        .intro-content {
+            white-space: pre-wrap;
+            line-height: 1.75;
+            font-size: 1.02rem;
+        }
     </style>
 </head>
 <body>
     <div class="header d-flex justify-content-between align-items-center p-3 bg-primary text-white shadow">
         <div class="d-flex align-items-center">
-            <a href="reading_bode.html" class="me-3 text-decoration-none text-white fs-4 d-flex align-items-center">
+            <a href="reading_bode.html" id="reading-set-home-link" class="me-3 text-decoration-none text-white fs-4 d-flex align-items-center">
                 <i class="bi bi-house-door-fill me-2 fs-5"></i>
                 <span class="fw-bold">Mini Hippo</span>
             </a>
@@ -76,8 +81,18 @@
         </div>
 
         <div id="practiceContent" style="display: none;">
+            <!-- Intro: Key page -->
+            <section id="intro-section" class="practice-section">
+                <div class="container py-5">
+                    <div class="question-container">
+                        <h3 class="mb-4"><strong id="intro-title">Trang mở đầu</strong></h3>
+                        <div id="intro-content" class="intro-content"></div>
+                    </div>
+                </div>
+            </section>
+
             <!-- Part 1 -->
-            <section id="part1-section" class="practice-section active">
+            <section id="part1-section" class="practice-section">
                 <div id="question1" class="container py-5">
                     <h1 class="mb-4"><strong>Question 1 of 4</strong></h1>
                     <p class="mb-4 text-muted" id="part1-intro"></p>
@@ -276,7 +291,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script src="js/auth.js"></script>
     <script src="js/reading_bode_set.js"></script>
+    <script src="js/copy_paste_guard.js"></script>
 </body>
 </html>
-
 

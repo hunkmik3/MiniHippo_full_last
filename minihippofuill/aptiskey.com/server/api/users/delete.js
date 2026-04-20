@@ -1,5 +1,6 @@
 import { verifyAdminRequest } from '../_utils/auth.js';
 import { callSupabaseAuth, deleteFrom } from '../_utils/supabase.js';
+import parseBody from '../_utils/parseBody.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'DELETE') {
@@ -13,7 +14,14 @@ export default async function handler(req, res) {
       .json({ error: adminCheck.error || 'Unauthorized' });
   }
 
-  const id = req.query.id;
+  let body = {};
+  try {
+    body = await parseBody(req);
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'Invalid JSON payload' });
+  }
+
+  const id = req.query.id || body?.id;
   if (!id) {
     return res.status(400).json({ error: 'Thiếu tham số id' });
   }
@@ -42,4 +50,3 @@ export default async function handler(req, res) {
 
   return res.status(200).json({ success: true });
 }
-

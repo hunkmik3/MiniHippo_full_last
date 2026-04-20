@@ -9,9 +9,13 @@
         emptyState: document.getElementById('listening-set-empty'),
         formCard: document.getElementById('listening-set-form-card'),
         formTitle: document.getElementById('listening-set-form-title'),
+        pageTitle: document.getElementById('listening-page-title'),
+        pageDescription: document.getElementById('listening-page-description'),
         titleInput: document.getElementById('listening-set-title'),
         durationInput: document.getElementById('listening-set-duration'),
         descriptionInput: document.getElementById('listening-set-description'),
+        introTitleInput: document.getElementById('listening-intro-title'),
+        introContentInput: document.getElementById('listening-intro-content'),
         part1Count: document.getElementById('listening-part1-count'),
         part1Container: document.getElementById('listening-part1-questions'),
         part2Topic: document.getElementById('listening-part2-topic'),
@@ -36,6 +40,28 @@
         sets: [],
         editingId: null
     };
+
+    const query = new URLSearchParams(window.location.search);
+    const requestedSetType = String(
+        query.get('setType') || window.__LISTENING_SET_TYPE || 'listening'
+    ).trim().toLowerCase();
+    const setType = requestedSetType === 'key_listening' ? 'key_listening' : 'listening';
+    const isKeyListeningMode = setType === 'key_listening';
+    const setLabel = isKeyListeningMode ? 'Key Listening' : 'Listening';
+
+    function applyModeUI() {
+        if (!isKeyListeningMode) return;
+        if (refs.pageTitle) refs.pageTitle.textContent = 'Key Listening sets';
+        if (refs.pageDescription) {
+            refs.pageDescription.textContent =
+                'Tạo bộ Key Listening: trang mở đầu tự nhập + Part 1/2/3/4 theo cấu trúc Aptis.';
+        }
+        if (refs.createBtn) refs.createBtn.innerHTML = '<i class="bi bi-plus-circle me-2"></i>Tạo Key Listening mới';
+        if (refs.emptyState) {
+            refs.emptyState.innerHTML =
+                '<i class="bi bi-info-circle me-2"></i>Chưa có Key Listening nào. Hãy tạo bộ đầu tiên để bắt đầu.';
+        }
+    }
 
     // Helper function to build authorized headers
     function buildAuthHeaders(additionalHeaders = {}) {
@@ -191,13 +217,13 @@
                     
                     // Check if response is ok before parsing
                     if (!response.ok) {
-                        let errorMessage = 'Upload failed';
+                        let errorMessage = 'Không thể upload audio.';
                         try {
                             const errorData = JSON.parse(responseText);
                             errorMessage = errorData.error || errorData.details || errorMessage;
                         } catch (parseError) {
                             // If response is not JSON, use text as error message
-                            errorMessage = responseText || `Server error: ${response.status} ${response.statusText}`;
+                            errorMessage = responseText || `Lỗi server: ${response.status} ${response.statusText}`;
                         }
                         throw new Error(errorMessage);
                     }
@@ -207,11 +233,11 @@
                     try {
                         result = JSON.parse(responseText);
                     } catch (parseError) {
-                        throw new Error(`Invalid response from server: ${responseText.substring(0, 200)}`);
+                        throw new Error(`Phản hồi server không hợp lệ: ${responseText.substring(0, 200)}`);
                     }
                     
                     if (!result.rawUrl) {
-                        throw new Error('Server did not return audio URL');
+                        throw new Error('Server không trả về audio URL hợp lệ.');
                     }
                     
                     resolve(result.rawUrl);
@@ -219,7 +245,7 @@
                     reject(error);
                 }
             };
-            reader.onerror = () => reject(new Error('Failed to read file'));
+            reader.onerror = () => reject(new Error('Không thể đọc file đã chọn.'));
             reader.readAsDataURL(file);
         });
     }
@@ -526,10 +552,12 @@
 
     function resetForm() {
         state.editingId = null;
-        refs.formTitle.textContent = 'Tạo bộ đề Listening';
+        refs.formTitle.textContent = `Tạo bộ đề ${setLabel}`;
         refs.titleInput.value = '';
         refs.durationInput.value = 35;
         refs.descriptionInput.value = '';
+        if (refs.introTitleInput) refs.introTitleInput.value = '';
+        if (refs.introContentInput) refs.introContentInput.value = '';
         refs.part1Count.value = 13;
         refs.part1Container.innerHTML = '';
         refs.part2Topic.value = '';
@@ -567,11 +595,11 @@
 
     async function loadListeningSets() {
         try {
-            refs.list.innerHTML = '<div class="text-muted small"><i class="spinner-border spinner-border-sm me-2"></i>Đang tải bộ đề...</div>';
-            const response = await fetch('/api/practice_sets/list?type=listening');
+            refs.list.innerHTML = `<div class="text-muted small"><i class="spinner-border spinner-border-sm me-2"></i>Đang tải dữ liệu ${setLabel} sets...</div>`;
+            const response = await fetch(`/api/practice_sets/list?type=${encodeURIComponent(setType)}`);
             const result = await response.json();
             if (!response.ok) {
-                throw new Error(result.error || 'Không thể tải danh sách');
+                throw new Error(result.error || `Không thể tải dữ liệu ${setLabel} sets.`);
             }
             state.sets = (result.sets || []).slice().sort((a, b) =>
                 (a.title || '').localeCompare(b.title || '', 'vi', { sensitivity: 'base', numeric: true })
@@ -610,7 +638,7 @@
                                 <i class="bi bi-box-arrow-up-right me-1"></i>Mở trang học
                             </button>
                             <button class="btn btn-outline-danger btn-sm" data-action="delete" data-id="${set.id}">
-                                <i class="bi bi-trash me-1"></i>Xoá
+                                <i class="bi bi-trash me-1"></i>Xóa
                             </button>
                         </div>
                     </div>
@@ -639,6 +667,7 @@
 
     async function editListeningSet(setId) {
         try {
+            resetForm();
             const response = await fetch(`/api/practice_sets/get?id=${setId}`, {
                 headers: buildAuthHeaders()
             });
@@ -649,21 +678,26 @@
             
             const set = result.set;
             state.editingId = setId;
-            refs.formTitle.textContent = 'Chỉnh sửa bộ đề Listening';
+            refs.formTitle.textContent = `Chỉnh sửa bộ đề ${setLabel}`;
             refs.titleInput.value = set.title || '';
             refs.durationInput.value = set.duration_minutes || 35;
             refs.descriptionInput.value = set.description || '';
             
             const data = set.data || {};
+            if (refs.introTitleInput) refs.introTitleInput.value = data?.intro?.title || '';
+            if (refs.introContentInput) refs.introContentInput.value = data?.intro?.content || '';
             
             // Load Part 1
-            if (data.part1 && data.part1.questions) {
+            if (data.part1 && data.part1.questions && data.part1.questions.length) {
                 refs.part1Container.innerHTML = '';
                 refs.part1Count.value = data.part1.questions.length;
                 data.part1.questions.forEach(q => {
                     refs.part1Container.appendChild(createPart1QuestionRow(q));
                 });
                 refreshPart1Indexes();
+            } else {
+                refs.part1Container.innerHTML = '';
+                refs.part1Count.value = 0;
             }
             
             // Load Part 2
@@ -734,6 +768,8 @@
         if (!title) {
             throw new Error('Vui lòng nhập tiêu đề bộ đề');
         }
+        const introTitle = refs.introTitleInput?.value.trim() || '';
+        const introContent = refs.introContentInput?.value.trim() || '';
 
         // Part 1: Questions 1-13
         const part1Questions = Array.from(refs.part1Container.querySelectorAll('.question-item')).map(item => {
@@ -766,10 +802,9 @@
 
         // Part 2: Question 14
         const part2Topic = refs.part2Topic.value.trim();
-        const part2AudioFile = document.getElementById('listening-part2-audio-file');
         const part2AudioUrlInput = document.getElementById('listening-part2-audio');
         const part2AudioUrlText = document.getElementById('listening-part2-audio-url');
-        let part2Audio = part2AudioUrlInput?.value.trim() || part2AudioUrlText?.value.trim() || '';
+        const part2Audio = part2AudioUrlInput?.value.trim() || part2AudioUrlText?.value.trim() || '';
         const part2Options = (refs.part2Options.value || '')
             .split(/\r?\n/)
             .map(opt => opt.trim())
@@ -787,10 +822,9 @@
 
         // Part 3: Question 15
         const part3Topic = refs.part3Topic.value.trim();
-        const part3AudioFile = document.getElementById('listening-part3-audio-file');
         const part3AudioUrlInput = document.getElementById('listening-part3-audio');
         const part3AudioUrlText = document.getElementById('listening-part3-audio-url');
-        let part3Audio = part3AudioUrlInput?.value.trim() || part3AudioUrlText?.value.trim() || '';
+        const part3Audio = part3AudioUrlInput?.value.trim() || part3AudioUrlText?.value.trim() || '';
         const part3Questions = (refs.part3Questions.value || '')
             .split(/\r?\n/)
             .map(q => q.trim())
@@ -856,6 +890,12 @@
             description: refs.descriptionInput.value.trim(),
             duration_minutes: parseInt(refs.durationInput.value, 10) || 35,
             data: {
+                ...((introTitle || introContent) && {
+                    intro: {
+                        title: introTitle || 'Trang mở đầu',
+                        content: introContent
+                    }
+                }),
                 part1: {
                     questions: part1Questions
                 },
@@ -899,7 +939,7 @@
                 headers: buildAuthHeaders(),
                 body: JSON.stringify({
                     ...formData,
-                    type: 'listening'
+                    type: setType
                 })
             });
             
@@ -908,7 +948,7 @@
                 throw new Error(result.error || 'Không thể lưu bộ đề');
             }
             
-            alert(state.editingId ? 'Cập nhật bộ đề thành công!' : 'Tạo bộ đề thành công!');
+            alert(state.editingId ? `Cập nhật bộ đề ${setLabel} thành công!` : `Tạo bộ đề ${setLabel} thành công!`);
             resetForm();
             refs.formCard.style.display = 'none';
             await loadListeningSets();
@@ -981,8 +1021,8 @@
     }
 
     // Initialize
+    applyModeUI();
     if (refs.list) {
         loadListeningSets();
     }
 })();
-

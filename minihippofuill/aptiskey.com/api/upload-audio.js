@@ -1,18 +1,26 @@
 import parseBody from './_utils/parseBody.js';
 import { putGithubContent } from './_utils/supabase.js';
-import { verifyAdminRequest } from './_utils/auth.js';
+import { verifyAdminRequest, verifyUserRequest } from './_utils/auth.js';
+
+const MAX_AUDIO_BYTES = 12 * 1024 * 1024; // 12MB
+
+function normalizePath(value) {
+  return String(value || '')
+    .trim()
+    .replace(/^\/+/, '')
+    .replace(/\\/g, '/');
+}
+
+function isSpeakingSubmissionPath(path) {
+  return (
+    path.startsWith('audio/speaking_submissions/') ||
+    path.startsWith('minihippofuill/aptiskey.com/audio/speaking_submissions/')
+  );
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  // Verify admin authentication
-  const adminCheck = await verifyAdminRequest(req);
-  if (!adminCheck.success) {
-    return res
-      .status(adminCheck.status)
-      .json({ error: adminCheck.error || 'Unauthorized' });
   }
 
   let body;
@@ -40,8 +48,34 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'content phải là chuỗi base64 không rỗng' });
   }
 
+  const normalizedInputPath = normalizePath(filePath);
+  const speakingSubmissionUpload = isSpeakingSubmissionPath(normalizedInputPath);
+
+  if (speakingSubmissionUpload) {
+    const userCheck = await verifyUserRequest(req, { requireDevice: true });
+    if (!userCheck.success) {
+      return res
+        .status(userCheck.status)
+        .json({ error: userCheck.error || 'Unauthorized' });
+    }
+  } else {
+    const adminCheck = await verifyAdminRequest(req);
+    if (!adminCheck.success) {
+      return res
+        .status(adminCheck.status)
+        .json({ error: adminCheck.error || 'Unauthorized' });
+    }
+  }
+
+  const approxBytes = Math.floor((content.length * 3) / 4);
+  if (approxBytes <= 0 || approxBytes > MAX_AUDIO_BYTES) {
+    return res
+      .status(400)
+      .json({ error: `File audio vượt giới hạn cho phép (${MAX_AUDIO_BYTES / (1024 * 1024)}MB).` });
+  }
+
   // Normalize file path - remove leading slashes and ensure proper format
-  let normalizedPath = filePath.trim().replace(/^\/+/, '').replace(/\\/g, '/');
+  let normalizedPath = normalizedInputPath;
   
   // Ensure path starts with minihippofuill/aptiskey.com/ if not already
   if (!normalizedPath.startsWith('minihippofuill/aptiskey.com/')) {
@@ -83,5 +117,4 @@ export default async function handler(req, res) {
     });
   }
 }
-
 

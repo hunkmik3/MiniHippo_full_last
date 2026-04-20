@@ -1,8 +1,11 @@
 (function () {
     const query = new URLSearchParams(window.location.search);
     const setId = query.get('set');
+    const fromSource = (query.get('from') || '').toLowerCase();
+    const returnPage = fromSource === 'lop_hoc' ? 'lop_hoc.html' : 'reading_bode.html';
 
     const sections = [
+        { id: 'intro-section', label: 'Intro', key: 'intro' },
         { id: 'part1-section', label: 'Reading Question 1', key: 'part1' },
         { id: 'part2-section', label: 'Reading Question 2 & 3', key: 'part2' },
         { id: 'part4-section', label: 'Reading Question 4', key: 'part4' },
@@ -42,7 +45,8 @@
     const state = {
         data: null,
         currentStep: 1,
-        totalSteps: sections.length,
+        totalSteps: 1,
+        activeSections: [],
         timeLeft: 35 * 60,
         timerInterval: null,
         setTitle: '',
@@ -113,26 +117,31 @@
 
     function updateQuestionStep() {
         if (!refs.questionStep) return;
+        const currentSection = state.activeSections[state.currentStep - 1];
+        const label = currentSection?.label || 'Reading Practice Set';
         const suffix = state.setTitle ? ` · ${state.setTitle}` : '';
-        refs.questionStep.textContent = `Question ${state.currentStep} of ${state.totalSteps}${suffix}`;
+        refs.questionStep.textContent = `${label} (${state.currentStep}/${state.totalSteps})${suffix}`;
     }
 
     function showStep(step) {
         state.currentStep = Math.min(Math.max(step, 1), state.totalSteps);
-        sections.forEach((sectionConfig, index) => {
+        const currentSection = state.activeSections[state.currentStep - 1];
+        if (!currentSection) return;
+
+        sections.forEach((sectionConfig) => {
             const section = document.getElementById(sectionConfig.id);
             if (!section) {
                 return;
             }
-            section.classList.toggle('active', index + 1 === state.currentStep);
+            section.classList.toggle('active', sectionConfig.id === currentSection.id);
         });
 
         updateQuestionStep();
         refs.backButton.disabled = state.currentStep === 1;
         refs.nextButton.textContent = state.currentStep === state.totalSteps ? 'Nộp bài' : 'Next';
         
-        // Re-render Part 2 with new shuffle each time it's shown (step 2 is Reading Question 2 & 3)
-        if (state.currentStep === 2 && state.data?.data?.part2) {
+        // Re-render Part 2 with new shuffle each time it's shown
+        if (currentSection.key === 'part2' && state.data?.data?.part2) {
             renderPart2(state.data.data.part2);
         }
     }
@@ -147,8 +156,8 @@
 
         refs.nextButton.addEventListener('click', () => {
             if (state.completed) {
-                // Khi đã hoàn thành bài và bấm "The end" -> quay về trang chọn bộ đề Reading
-                window.location.href = 'reading_bode.html';
+                // Khi đã hoàn thành bài và bấm "The end" -> quay về trang nguồn
+                window.location.href = returnPage;
                 return;
             }
 
@@ -166,7 +175,7 @@
 
         if (refs.checkButton) {
             refs.checkButton.addEventListener('click', () => {
-                const current = sections[state.currentStep - 1];
+                const current = state.activeSections[state.currentStep - 1];
                 if (current && typeof checkHandlers[current.key] === 'function') {
                     checkHandlers[current.key]();
                 }
@@ -255,6 +264,21 @@
             [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
         }
         return shuffled;
+    }
+
+    function renderIntro(intro = {}) {
+        const section = document.getElementById('intro-section');
+        const titleEl = document.getElementById('intro-title');
+        const contentEl = document.getElementById('intro-content');
+        if (!section || !titleEl || !contentEl) return;
+
+        const title = String(intro.title || 'Trang mở đầu').trim();
+        const content = String(intro.content || '').trim();
+
+        titleEl.textContent = title || 'Trang mở đầu';
+        contentEl.innerHTML = content
+            ? escapeHtml(content).replace(/\n/g, '<br>')
+            : '<span class="text-muted">Chưa có nội dung.</span>';
     }
 
     function normalizePart2Question(part2 = {}, key) {
@@ -946,6 +970,44 @@
         }
     }
 
+    function resolveLogicalType(set) {
+        const marker = set?.data?.__practice_type;
+        if (typeof marker === 'string' && marker.trim()) {
+            return marker.trim().toLowerCase();
+        }
+        return typeof set?.type === 'string' ? set.type.toLowerCase() : '';
+    }
+
+    function buildActiveSections(set) {
+        const flow = [];
+        const byKey = Object.fromEntries(sections.map((item) => [item.key, item]));
+        const logicalType = resolveLogicalType(set);
+        const introTitle = String(set?.data?.intro?.title || '').trim();
+        const introContent = String(set?.data?.intro?.content || '').trim();
+        const showIntro = logicalType === 'key_reading' || Boolean(introTitle || introContent);
+
+        if (showIntro && byKey.intro) {
+            flow.push(byKey.intro);
+        }
+        if (set?.data?.part1 && byKey.part1) {
+            flow.push(byKey.part1);
+        }
+        if (set?.data?.part2 && byKey.part2) {
+            flow.push(byKey.part2);
+        }
+        if (set?.data?.part4 && byKey.part4) {
+            flow.push(byKey.part4);
+        }
+        if (set?.data?.part5 && byKey.part5) {
+            flow.push(byKey.part5);
+        }
+
+        if (!flow.length && byKey.part1) {
+            flow.push(byKey.part1);
+        }
+        return flow;
+    }
+
     function renderPractice(set) {
         hasRendered = true;
         if (refs.loading) {
@@ -958,7 +1020,10 @@
         if (refs.resultTitle) {
             refs.resultTitle.textContent = state.setTitle ? `Test and Answer Review · ${state.setTitle}` : 'Test and Answer Review';
         }
+        state.activeSections = buildActiveSections(set);
+        state.totalSteps = state.activeSections.length;
 
+        renderIntro(set.data?.intro);
         renderPart1(set.data?.part1);
         renderPart2(set.data?.part2);
         renderPart4(set.data?.part4);
@@ -992,6 +1057,10 @@
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
+        const homeLink = document.getElementById('reading-set-home-link');
+        if (homeLink) {
+            homeLink.setAttribute('href', returnPage);
+        }
         if (typeof requireAuth === 'function') {
             const ok = await requireAuth();
             if (!ok) {
@@ -1006,4 +1075,3 @@
         loadPracticeSet({ skipRenderIfLoaded: Boolean(cachedSet) });
     });
 })();
-

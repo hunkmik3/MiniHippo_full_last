@@ -84,34 +84,37 @@ export default async function handler(req, res) {
     try {
       result = await insertInto('practice_sets', basePayload);
     } catch (error) {
-      if (requestedType === 'speaking' && isTypeConstraintError(error)) {
-        let fallbackResult = null;
-        let lastError = error;
-        for (const fallbackType of TYPE_FALLBACKS) {
-          try {
-            fallbackResult = await insertInto('practice_sets', {
-              ...basePayload,
-              type: fallbackType,
-              data: isPlainObject(normalizedData)
-                ? {
-                    ...normalizedData,
-                    __practice_type: 'speaking',
-                    __storage_type: fallbackType
-                  }
-                : normalizedData
-            });
-            break;
-          } catch (fallbackError) {
-            lastError = fallbackError;
-          }
-        }
-        if (!fallbackResult) {
-          throw lastError;
-        }
-        result = fallbackResult;
-      } else {
+      const shouldTryTypeFallback =
+        isTypeConstraintError(error) && !TYPE_FALLBACKS.includes(requestedType);
+
+      if (!shouldTryTypeFallback) {
         throw error;
       }
+
+      let fallbackResult = null;
+      let lastError = error;
+      for (const fallbackType of TYPE_FALLBACKS) {
+        try {
+          fallbackResult = await insertInto('practice_sets', {
+            ...basePayload,
+            type: fallbackType,
+            data: isPlainObject(normalizedData)
+              ? {
+                  ...normalizedData,
+                  __practice_type: requestedType,
+                  __storage_type: fallbackType
+                }
+              : normalizedData
+          });
+          break;
+        } catch (fallbackError) {
+          lastError = fallbackError;
+        }
+      }
+      if (!fallbackResult) {
+        throw lastError;
+      }
+      result = fallbackResult;
     }
 
     // Supabase returns array when using Prefer: return=representation

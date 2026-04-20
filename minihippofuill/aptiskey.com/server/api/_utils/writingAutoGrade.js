@@ -3088,13 +3088,14 @@ function sanitizeText(value, maxLength = 5000) {
   return text.length > maxLength ? text.slice(0, maxLength) : text;
 }
 
-export const __testables = {
-  buildOpenAITextCorrectionUserPrompt,
-  buildPart1SemanticCheckUserPrompt,
-  parsePart1SemanticCheckVerdict,
-  finalizeOpenAITextCorrection,
-  normalizeCorrectedPlainText,
-  normalizeTerminalPeriods,
-  normalizePronounICapitalization,
-  enforceMinimalOpenAICorrection
-};
+// Test-only exports (disabled for runtime compatibility)
+// export const __testables = {
+//   buildOpenAITextCorrectionUserPrompt,
+//   buildPart1SemanticCheckUserPrompt,
+//   parsePart1SemanticCheckVerdict,
+//   finalizeOpenAITextCorrection,
+//   normalizeCorrectedPlainText,
+//   normalizeTerminalPeriods,
+//   normalizePronounICapitalization,
+//   enforceMinimalOpenAICorrection
+// };

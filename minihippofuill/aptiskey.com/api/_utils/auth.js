@@ -1,1 +1,1 @@
-export { verifyAdminRequest } from '../../server/api/_utils/auth.js';
+export { verifyAdminRequest, verifyUserRequest } from '../../server/api/_utils/auth.js';

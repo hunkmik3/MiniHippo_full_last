@@ -67,13 +67,7 @@ function switchPart(part) {
         radio.checked = true;
     }
     
-    // Always ensure action buttons section is visible
-    const actionSection = document.getElementById('action-buttons-section');
-    if (actionSection) {
-        actionSection.style.display = 'block';
-        actionSection.style.visibility = 'visible';
-        actionSection.style.opacity = '1';
-    }
+    // Contextual action area visibility is controlled centrally by updateActionButtons(module)
 }
 
 // ============================================
@@ -652,4 +646,3 @@ function clearForm() {
         document.getElementById('preview-section').style.display = 'none';
     }
 }
-

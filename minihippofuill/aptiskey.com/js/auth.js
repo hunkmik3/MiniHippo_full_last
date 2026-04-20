@@ -3,6 +3,14 @@
 const DEVICE_ID_KEY = 'mh_device_id';
 const DEVICE_NAME_KEY = 'mh_device_name';
 const DEVICE_HEADER_SAFE_NAME_KEY = 'mh_device_header_name';
+const CLASSROOM_ONLY_PATHS = new Set([
+    '/lop_hoc.html',
+    '/buoi_hoc.html',
+    '/speaking_cauhoi_part.html'
+]);
+const CLASSROOM_ALLOWED_EXTRA_PATHS = new Set([
+    '/lesson_history.html'
+]);
 
 function generateDeviceId() {
     if (window.crypto?.randomUUID) {
@@ -62,6 +70,53 @@ function buildDeviceHeaders(additionalHeaders = {}) {
     return headers;
 }
 
+function normalizeCourse(value) {
+    return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+function normalizeRole(value) {
+    return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+function isAdminUser(user) {
+    return normalizeRole(user && user.role) === 'admin';
+}
+
+function normalizePathname(pathname) {
+    const raw = typeof pathname === 'string' ? pathname.trim().toLowerCase() : '';
+    if (!raw || raw === '/') return '/';
+    return raw.endsWith('/') ? raw.slice(0, -1) : raw;
+}
+
+function enforceCourseRoute(user) {
+    if (!user || isAdminUser(user)) return true;
+
+    const course = normalizeCourse(user.course);
+    const path = normalizePathname(window.location.pathname);
+    const isClassroomOnlyPath = CLASSROOM_ONLY_PATHS.has(path);
+
+    if (course === 'lớp học') {
+        if (
+            isClassroomOnlyPath ||
+            CLASSROOM_ALLOWED_EXTRA_PATHS.has(path) ||
+            path === '/login.html' ||
+            path === '/lop_hoc.html' ||
+            path === '/'
+        ) {
+            return true;
+        }
+        window.location.replace('/lop_hoc.html');
+        return false;
+    }
+
+    if ((course === 'aptis' || course === 'lớp ôn thi' || !course) && isClassroomOnlyPath) {
+        window.location.replace('/home.html');
+        return false;
+    }
+
+    return true;
+}
+
 // Check if user is authenticated
 async function checkAuth() {
     const token = localStorage.getItem('auth_token');
@@ -89,6 +144,9 @@ async function checkAuth() {
         if (result.success && result.user) {
             // Update user info in localStorage
             localStorage.setItem('auth_user', JSON.stringify(result.user));
+            // Route guard should not be treated as auth failure.
+            // If redirect is needed, enforceCourseRoute will handle navigation.
+            enforceCourseRoute(result.user);
             return true;
         }
         
@@ -116,6 +174,43 @@ function getCurrentUser() {
 // Get auth token
 function getAuthToken() {
     return localStorage.getItem('auth_token');
+}
+
+async function refreshAuthToken() {
+    const refreshToken = localStorage.getItem('auth_refresh_token');
+    if (!refreshToken) {
+        return null;
+    }
+
+    try {
+        const response = await fetch('/api/auth/refresh', {
+            method: 'POST',
+            headers: buildDeviceHeaders({
+                'Content-Type': 'application/json'
+            }),
+            body: JSON.stringify({ refreshToken })
+        });
+
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result?.token) {
+            clearAuth();
+            return null;
+        }
+
+        localStorage.setItem('auth_token', result.token);
+        if (result.refreshToken) {
+            localStorage.setItem('auth_refresh_token', result.refreshToken);
+        }
+        if (result.user) {
+            localStorage.setItem('auth_user', JSON.stringify(result.user));
+        }
+
+        return result.token;
+    } catch (error) {
+        console.error('Refresh token error:', error);
+        clearAuth();
+        return null;
+    }
 }
 
 // Logout
@@ -185,7 +280,7 @@ async function requireAuth() {
 // Check if user is admin
 function isAdmin() {
     const user = getCurrentUser();
-    return user && user.role === 'admin';
+    return isAdminUser(user);
 }
 
 // Require admin role
@@ -235,6 +330,7 @@ async function submitPracticeResult(payload = {}) {
 window.checkAuth = checkAuth;
 window.getCurrentUser = getCurrentUser;
 window.getAuthToken = getAuthToken;
+window.refreshAuthToken = refreshAuthToken;
 window.logout = logout;
 window.clearAuth = clearAuth;
 window.requireAuth = requireAuth;

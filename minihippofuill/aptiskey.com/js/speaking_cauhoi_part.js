@@ -1,8 +1,48 @@
 (function () {
     var query = new URLSearchParams(window.location.search);
     var setId = query.get('set');
+    var buoiId = query.get('buoi'); // e.g. "B2-5"
+    var classId = query.get('classId') || '';
+    var sessionFromQuery = Number(query.get('session')) || 0;
+    var bandFromQuery = query.get('band') || '';
     var CACHE_PREFIX = 'speaking_cauhoi_cache_';
     var cacheKey = setId ? CACHE_PREFIX + setId : null;
+
+    // ── Inline data for Lớp Học buổi speaking ──
+    var BUOI_SPEAKING_DATA = {
+        'B1-6': {
+            id: 'buoi-b1-6', title: 'B1 Buổi 6 - Speaking Part 1',
+            type: 'speaking',
+            data: {
+                part: 1,
+                pages: [{
+                    questions: [
+                        { prompt: 'What do you enjoy doing in your free time?' },
+                        { prompt: 'Tell me about your favourite place to visit.' },
+                        { prompt: 'What kind of food do you like? Why?' },
+                        { prompt: 'Do you prefer studying alone or with other people? Why?' },
+                        { prompt: 'What would you like to do in the future?' }
+                    ]
+                }]
+            }
+        },
+        'B2-5': {
+            id: 'buoi-b2-5', title: 'B2 Buổi 5 - Speaking Part 1',
+            type: 'speaking',
+            data: {
+                part: 1,
+                pages: [{
+                    questions: [
+                        { prompt: 'What do you like to do on weekends?' },
+                        { prompt: 'Tell me about a teacher who influenced you.' },
+                        { prompt: 'Do you prefer living in the city or the countryside? Why?' },
+                        { prompt: 'What is the most useful thing you have learned recently?' },
+                        { prompt: 'If you could travel anywhere, where would you go and why?' }
+                    ]
+                }]
+            }
+        }
+    };
 
     var PART_LABELS = {
         1: 'Part 1 - Câu hỏi cá nhân',
@@ -23,10 +63,22 @@
         timerInterval: null,
         timerRemaining: 0,
         answers: {},
+        recordings: {},
+        recordingActive: null,
+        recorderRefs: {},
+        setId: '',
         setTitle: '',
         headerTitle: '',
         startAt: Date.now(),
         currentAudioElements: []
+    };
+
+    var accessContext = {
+        user: null,
+        classSet: null,
+        sessionMeta: null,
+        locked: false,
+        lockReason: ''
     };
 
     function safeText(value) {
@@ -55,6 +107,417 @@
         return safeText(value).split(/\s+/).filter(Boolean).length;
     }
 
+    function supportsAudioRecording() {
+        return Boolean(window.MediaRecorder && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    }
+
+    function pickRecordingMimeType() {
+        if (!window.MediaRecorder || typeof window.MediaRecorder.isTypeSupported !== 'function') {
+            return '';
+        }
+        var preferred = [
+            'audio/webm;codecs=opus',
+            'audio/webm',
+            'audio/ogg;codecs=opus',
+            'audio/mp4'
+        ];
+        for (var i = 0; i < preferred.length; i += 1) {
+            if (window.MediaRecorder.isTypeSupported(preferred[i])) {
+                return preferred[i];
+            }
+        }
+        return '';
+    }
+
+    function extensionFromMimeType(mimeType) {
+        var value = String(mimeType || '').toLowerCase();
+        if (value.indexOf('audio/mpeg') >= 0) return 'mp3';
+        if (value.indexOf('audio/ogg') >= 0) return 'ogg';
+        if (value.indexOf('audio/wav') >= 0) return 'wav';
+        if (value.indexOf('audio/mp4') >= 0 || value.indexOf('audio/x-m4a') >= 0) return 'm4a';
+        return 'webm';
+    }
+
+    function sanitizeFileSegment(value, fallback) {
+        var safe = String(value || '')
+            .trim()
+            .replace(/[^\w.-]+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-|-$/g, '');
+        return safe || String(fallback || 'item');
+    }
+
+    function buildRecordingFilePath(key, extension) {
+        var user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+        var userCode = sanitizeFileSegment(
+            (user && (user.accountCode || user.username || user.id)) || 'user',
+            'user'
+        );
+        var setCode = sanitizeFileSegment(practiceState.setId || (buoiId || 'speaking_part'), 'set');
+        var answerCode = sanitizeFileSegment(key || 'answer', 'answer');
+        var stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        var dateFolder = stamp.slice(0, 10);
+        return 'audio/speaking_submissions/' + dateFolder + '/' + userCode + '/' + setCode + '_' + answerCode + '_' + stamp + '.' + extension;
+    }
+
+    function extractApiErrorMessage(data, fallback) {
+        if (data && typeof data === 'object') {
+            if (data.error && data.details) return data.error + ' (' + data.details + ')';
+            if (data.error) return data.error;
+            if (data.details) return data.details;
+        }
+        return fallback;
+    }
+
+    function blobToBase64(blob) {
+        return new Promise(function (resolve, reject) {
+            var reader = new FileReader();
+            reader.onloadend = function () {
+                var result = String(reader.result || '');
+                var marker = 'base64,';
+                var markerIndex = result.indexOf(marker);
+                if (markerIndex < 0) {
+                    reject(new Error('Không thể chuyển bản ghi âm sang base64.'));
+                    return;
+                }
+                resolve(result.slice(markerIndex + marker.length));
+            };
+            reader.onerror = function () {
+                reject(new Error('Không thể đọc file ghi âm.'));
+            };
+            reader.readAsDataURL(blob);
+        });
+    }
+
+    function revokeRecordingObjectUrl(recording) {
+        if (recording && recording.objectUrl) {
+            try {
+                URL.revokeObjectURL(recording.objectUrl);
+            } catch (error) {
+                console.warn('Revoke recording url failed:', error);
+            }
+        }
+    }
+
+    function setRecordingStatusForKey(key, message, level) {
+        var refs = practiceState.recorderRefs[key];
+        if (!refs || !refs.status) return;
+
+        refs.status.className = 'recording-status';
+        if (level === 'success') refs.status.classList.add('text-success');
+        if (level === 'warning') refs.status.classList.add('text-warning');
+        if (level === 'danger') refs.status.classList.add('text-danger');
+        refs.status.textContent = message;
+    }
+
+    function renderRecordingForKey(key) {
+        var refs = practiceState.recorderRefs[key];
+        if (!refs) return;
+
+        var recording = practiceState.recordings[key] || null;
+        var active = practiceState.recordingActive;
+        var isCurrentRecording = Boolean(active && active.key === key);
+        var supported = supportsAudioRecording();
+
+        if (!supported) {
+            refs.start.disabled = true;
+            refs.stop.disabled = true;
+            refs.clear.disabled = true;
+            if (refs.audio) {
+                refs.audio.pause();
+                refs.audio.removeAttribute('src');
+                refs.audio.style.display = 'none';
+            }
+            setRecordingStatusForKey(key, 'Trình duyệt này không hỗ trợ ghi âm trực tiếp.', 'danger');
+            return;
+        }
+
+        refs.start.disabled = isCurrentRecording;
+        refs.stop.disabled = !isCurrentRecording;
+        refs.clear.disabled = !recording;
+
+        if (refs.audio) {
+            var source = recording && (recording.uploadedUrl || recording.objectUrl);
+            if (source) {
+                if (refs.audio.src !== source) refs.audio.src = source;
+                refs.audio.style.display = 'block';
+            } else {
+                refs.audio.pause();
+                refs.audio.removeAttribute('src');
+                refs.audio.style.display = 'none';
+            }
+        }
+
+        if (isCurrentRecording) {
+            setRecordingStatusForKey(key, 'Đang ghi âm... Nhấn "Dừng" để kết thúc.', 'danger');
+            return;
+        }
+
+        if (recording && recording.uploadedUrl) {
+            setRecordingStatusForKey(key, 'Đã lưu file ghi âm thành công.', 'success');
+            return;
+        }
+
+        if (recording && recording.blob) {
+            setRecordingStatusForKey(key, 'Đã ghi âm xong. File sẽ được lưu khi nộp bài.', 'warning');
+            return;
+        }
+
+        setRecordingStatusForKey(key, 'Chưa có bản ghi âm cho câu này.', 'muted');
+    }
+
+    async function uploadRecordingForKey(key) {
+        var recording = practiceState.recordings[key];
+        if (!recording || !recording.blob) return null;
+        if (recording.uploadedUrl) return recording;
+        if (recording.uploadPromise) return recording.uploadPromise;
+
+        recording.uploadPromise = (async function () {
+            var base64 = await blobToBase64(recording.blob);
+            var extension = extensionFromMimeType(recording.mimeType);
+            var fileName = (practiceState.setId || 'speaking_part') + '_' + key + '_' + Date.now() + '.' + extension;
+            var filePath = buildRecordingFilePath(key, extension);
+            var primaryPayload = {
+                contentBase64: base64,
+                fileName: fileName,
+                mimeType: recording.mimeType || 'audio/webm',
+                speakingSetId: practiceState.setId || (buoiId || 'speaking_part'),
+                speakingPart: 'part' + String(practiceState.partNum || ''),
+                answerKey: key
+            };
+            var primaryResult = await postJsonWithAuthRetry('/api/upload-speaking-recording', primaryPayload);
+            var response = primaryResult.response;
+            var data = primaryResult.data;
+
+            if (!response.ok && response.status === 404) {
+                var fallbackPayload = {
+                    filePath: filePath,
+                    content: base64,
+                    message: 'Upload speaking recording ' + (practiceState.setId || 'speaking_part') + ' ' + key
+                };
+                var fallbackResult = await postJsonWithAuthRetry('/api/upload-audio', fallbackPayload);
+                response = fallbackResult.response;
+                data = fallbackResult.data;
+                if (response.ok) {
+                    recording.uploadedUrl = data.rawUrl || '';
+                    recording.filePath = filePath;
+                }
+            }
+
+            if (!response.ok) {
+                throw new Error(extractApiErrorMessage(data, 'Không thể upload file ghi âm.'));
+            }
+            if (!recording.uploadedUrl) {
+                recording.uploadedUrl = data.rawUrl || '';
+            }
+            if (!recording.filePath) {
+                recording.filePath = data.filePath || filePath;
+            }
+            recording.uploadedAt = new Date().toISOString();
+            return recording;
+        })();
+
+        try {
+            return await recording.uploadPromise;
+        } finally {
+            recording.uploadPromise = null;
+            renderRecordingForKey(key);
+        }
+    }
+
+    async function postJsonWithAuthRetry(url, payload, allowRetry) {
+        var retry = allowRetry !== false;
+        var response = await fetch(url, {
+            method: 'POST',
+            headers: getAuthorizedHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify(payload || {})
+        });
+
+        if (response.status === 401 && retry && typeof refreshAuthToken === 'function') {
+            var refreshedToken = await refreshAuthToken();
+            if (refreshedToken) {
+                return postJsonWithAuthRetry(url, payload, false);
+            }
+        }
+
+        var data = await response.json().catch(function () { return {}; });
+        return { response: response, data: data };
+    }
+
+    async function ensureRecordingsUploaded(answerRows) {
+        var errors = [];
+        var rows = Array.isArray(answerRows) ? answerRows : [];
+
+        for (var i = 0; i < rows.length; i += 1) {
+            var key = rows[i] && rows[i].key ? rows[i].key : '';
+            var recording = key ? practiceState.recordings[key] : null;
+            if (!recording || !recording.blob || recording.uploadedUrl) {
+                continue;
+            }
+            try {
+                setRecordingStatusForKey(key, 'Đang lưu file ghi âm lên server...', 'warning');
+                await uploadRecordingForKey(key);
+            } catch (error) {
+                errors.push(key + ': ' + (error.message || 'Upload thất bại'));
+            }
+        }
+
+        if (errors.length) {
+            throw new Error('Không thể lưu một số file ghi âm:\n' + errors.join('\n'));
+        }
+    }
+
+    async function stopActiveRecording(reason) {
+        var active = practiceState.recordingActive;
+        if (!active) return null;
+
+        var recorder = active.mediaRecorder;
+        var stream = active.stream;
+
+        if (recorder && recorder.state !== 'inactive') {
+            try {
+                recorder.stop();
+            } catch (error) {
+                console.warn('Stop recording error:', error);
+            }
+        }
+
+        var result = await active.stopPromise.catch(function (error) {
+            console.warn('Stop recording promise error:', error);
+            return null;
+        });
+
+        if (stream && typeof stream.getTracks === 'function') {
+            stream.getTracks().forEach(function (track) {
+                try { track.stop(); } catch (error) { }
+            });
+        }
+
+        if (reason && reason !== 'manual' && reason !== 'submit') {
+            setRecordingStatusForKey(active.key, 'Ghi âm đã dừng khi chuyển trang.', 'warning');
+        }
+
+        return result;
+    }
+
+    async function startRecordingForKey(key) {
+        if (!key) return;
+
+        if (!supportsAudioRecording()) {
+            setRecordingStatusForKey(key, 'Trình duyệt không hỗ trợ ghi âm trực tiếp.', 'danger');
+            return;
+        }
+
+        if (practiceState.recordingActive && practiceState.recordingActive.key !== key) {
+            await stopActiveRecording('switch');
+        }
+        if (practiceState.recordingActive && practiceState.recordingActive.key === key) {
+            return;
+        }
+
+        try {
+            var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            var preferredType = pickRecordingMimeType();
+            var options = preferredType ? { mimeType: preferredType } : undefined;
+            var mediaRecorder = options ? new MediaRecorder(stream, options) : new MediaRecorder(stream);
+            var chunks = [];
+            var startedAt = Date.now();
+            var resolveStop;
+            var rejectStop;
+            var stopPromise = new Promise(function (resolve, reject) {
+                resolveStop = resolve;
+                rejectStop = reject;
+            });
+
+            practiceState.recordingActive = {
+                key: key,
+                stream: stream,
+                mediaRecorder: mediaRecorder,
+                chunks: chunks,
+                startedAt: startedAt,
+                mimeType: mediaRecorder.mimeType || preferredType || 'audio/webm',
+                stopPromise: stopPromise
+            };
+
+            mediaRecorder.addEventListener('dataavailable', function (event) {
+                if (event.data && event.data.size > 0) {
+                    chunks.push(event.data);
+                }
+            });
+
+            mediaRecorder.addEventListener('error', function (event) {
+                var err = event && event.error ? event.error : new Error('MediaRecorder error');
+                if (typeof rejectStop === 'function') rejectStop(err);
+                setRecordingStatusForKey(key, 'Không thể ghi âm. Vui lòng thử lại.', 'danger');
+            });
+
+            mediaRecorder.addEventListener('stop', function () {
+                var active = practiceState.recordingActive;
+                var elapsed = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
+                if (!active || active.key !== key) {
+                    if (typeof resolveStop === 'function') resolveStop(null);
+                    practiceState.recordingActive = null;
+                    return;
+                }
+
+                var blob = chunks.length ? new Blob(chunks, { type: active.mimeType || 'audio/webm' }) : null;
+                if (blob && blob.size > 0) {
+                    var previous = practiceState.recordings[key];
+                    if (previous) revokeRecordingObjectUrl(previous);
+                    practiceState.recordings[key] = {
+                        blob: blob,
+                        mimeType: blob.type || active.mimeType || 'audio/webm',
+                        objectUrl: URL.createObjectURL(blob),
+                        sizeBytes: blob.size,
+                        durationSeconds: elapsed,
+                        uploadedUrl: '',
+                        filePath: '',
+                        uploadedAt: '',
+                        updatedAt: new Date().toISOString(),
+                        uploadPromise: null
+                    };
+                    if (typeof resolveStop === 'function') resolveStop(practiceState.recordings[key]);
+                } else if (typeof resolveStop === 'function') {
+                    resolveStop(null);
+                }
+
+                practiceState.recordingActive = null;
+                renderRecordingForKey(key);
+            });
+
+            mediaRecorder.start(250);
+            renderRecordingForKey(key);
+        } catch (error) {
+            console.error('Start recording failed:', error);
+            setRecordingStatusForKey(key, 'Không thể mở microphone. Hãy cấp quyền và thử lại.', 'danger');
+        }
+    }
+
+    async function clearRecordingForKey(key) {
+        if (!key) return;
+        if (practiceState.recordingActive && practiceState.recordingActive.key === key) {
+            await stopActiveRecording('clear');
+        }
+        var recording = practiceState.recordings[key];
+        if (recording) {
+            revokeRecordingObjectUrl(recording);
+            delete practiceState.recordings[key];
+        }
+        renderRecordingForKey(key);
+    }
+
+    function cleanupRecordings() {
+        Object.keys(practiceState.recordings).forEach(function (key) {
+            revokeRecordingObjectUrl(practiceState.recordings[key]);
+        });
+        practiceState.recordings = {};
+        if (practiceState.recordingActive && practiceState.recordingActive.stream) {
+            practiceState.recordingActive.stream.getTracks().forEach(function (track) {
+                try { track.stop(); } catch (error) { }
+            });
+        }
+    }
+
     function getAuthorizedHeaders(extra) {
         var headers = Object.assign({}, extra || {});
         var token = typeof getAuthToken === 'function' ? getAuthToken() : null;
@@ -63,6 +526,245 @@
         if (typeof getDeviceId === 'function') headers['X-Device-Id'] = getDeviceId();
         if (typeof getDeviceName === 'function') headers['X-Device-Name'] = getDeviceName();
         return headers;
+    }
+
+    function normalizeTextLower(value) {
+        return typeof value === 'string' ? value.trim().toLowerCase() : '';
+    }
+
+    function normalizeBand(value) {
+        var band = normalizeTextLower(value).toUpperCase();
+        return band === 'B1' || band === 'B2' ? band : '';
+    }
+
+    function normalizeRole(value) {
+        return typeof value === 'string' ? value.trim().toLowerCase() : '';
+    }
+
+    function isAdminUser(user) {
+        return normalizeRole(user && user.role) === 'admin';
+    }
+
+    function resolveSessionNumber() {
+        if (sessionFromQuery > 0) return sessionFromQuery;
+        if (!buoiId) return 0;
+        var parts = String(buoiId).split('-');
+        if (parts.length < 2) return 0;
+        return Number(parts[1]) || 0;
+    }
+
+    function resolveBand() {
+        var fromBuoi = '';
+        if (buoiId) {
+            var parts = String(buoiId).split('-');
+            fromBuoi = parts[0] || '';
+        }
+        return normalizeBand(bandFromQuery || fromBuoi);
+    }
+
+    function toDate(value) {
+        if (!value) return null;
+        var date = new Date(value);
+        if (Number.isNaN(date.getTime())) return null;
+        return date;
+    }
+
+    function dateDistanceDays(a, b) {
+        if (!a || !b) return 9999;
+        return Math.abs(a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24);
+    }
+
+    async function apiGet(url, retryWithRefresh) {
+        var retry = retryWithRefresh !== false;
+        var response = await fetch(url, {
+            method: 'GET',
+            headers: getAuthorizedHeaders()
+        });
+
+        if (response.status === 401 && retry && typeof refreshAuthToken === 'function') {
+            var refreshed = await refreshAuthToken();
+            if (refreshed) return apiGet(url, false);
+        }
+
+        var data = await response.json().catch(function () { return {}; });
+        if (!response.ok) {
+            throw new Error(data.error || data.message || ('HTTP ' + response.status));
+        }
+        return data;
+    }
+
+    function scoreClassForBand(cls, band, user) {
+        var data = cls && cls.data ? cls.data : {};
+        var configuredBand = normalizeBand(data.band || data.band_code);
+        if (configuredBand && configuredBand !== band) return -9999;
+
+        var note = normalizeTextLower(user && user.notes);
+        var title = normalizeTextLower((cls && (cls.title || data.name)) || '');
+        var firstDate = toDate(data.first_date);
+        var startedOn = toDate(user && (user.startedOn || user.started_on));
+        var now = new Date();
+
+        var score = 0;
+        if (configuredBand === band) score += 90;
+        if (!configuredBand) score += 20;
+        if (note && title && note.indexOf(title) >= 0) score += 35;
+        if (startedOn && firstDate && startedOn.toDateString() === firstDate.toDateString()) score += 40;
+        if (startedOn && firstDate) score += Math.max(0, 20 - dateDistanceDays(startedOn, firstDate));
+        if (!startedOn && firstDate && firstDate <= now) score += 8;
+        return score;
+    }
+
+    function pickClassForBand(classes, band, user) {
+        var ranked = (classes || [])
+            .map(function (cls) {
+                return { cls: cls, score: scoreClassForBand(cls, band, user) };
+            })
+            .filter(function (entry) {
+                return entry.score > -9999;
+            })
+            .sort(function (a, b) {
+                if (b.score !== a.score) return b.score - a.score;
+                var ta = new Date((a.cls && (a.cls.updated_at || a.cls.created_at)) || 0).getTime();
+                var tb = new Date((b.cls && (b.cls.updated_at || b.cls.created_at)) || 0).getTime();
+                return tb - ta;
+            });
+
+        return ranked.length ? ranked[0].cls : null;
+    }
+
+    function resolveSessionMeta(classSet, sessionNumber) {
+        var sessions = classSet && classSet.data && Array.isArray(classSet.data.sessions)
+            ? classSet.data.sessions
+            : [];
+        return sessions.find(function (session) {
+            return Number(session && session.number) === Number(sessionNumber);
+        }) || null;
+    }
+
+    function formatDateTimeVi(date) {
+        if (!date) return '';
+        return date.toLocaleString('vi-VN', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+
+    async function resolveAccessContext() {
+        if (!buoiId) return accessContext;
+
+        var authOk = typeof checkAuth === 'function' ? await checkAuth() : true;
+        if (!authOk) {
+            accessContext.locked = true;
+            accessContext.lockReason = 'Bạn cần đăng nhập lại để tiếp tục.';
+            return accessContext;
+        }
+
+        var user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+        var isAdmin = isAdminUser(user);
+        accessContext.user = user || null;
+        var userBand = normalizeBand(user && user.band);
+        var requestedBand = resolveBand();
+
+        if (isAdmin) {
+            var adminClasses = [];
+            try {
+                var adminPayload = await apiGet('/api/practice_sets/list?type=homework_class');
+                adminClasses = Array.isArray(adminPayload && adminPayload.sets) ? adminPayload.sets : [];
+            } catch (adminError) {
+                console.warn('Load homework classes failed for admin:', adminError);
+            }
+
+            var adminBand = requestedBand || userBand || 'B1';
+            var adminSessionNumber = resolveSessionNumber();
+            var adminClass = null;
+
+            if (classId) {
+                adminClass = adminClasses.find(function (cls) {
+                    return String(cls && cls.id) === String(classId);
+                }) || null;
+            }
+            if (!adminClass) {
+                adminClass = pickClassForBand(adminClasses, adminBand, user);
+            }
+
+            accessContext.classSet = adminClass || null;
+            accessContext.sessionMeta = resolveSessionMeta(adminClass, adminSessionNumber) || null;
+            accessContext.locked = false;
+            accessContext.lockReason = '';
+            return accessContext;
+        }
+
+        var course = normalizeTextLower(user && user.course);
+        if (course === 'lớp ôn thi') {
+            window.location.replace('home.html');
+            accessContext.locked = true;
+            accessContext.lockReason = 'Tài khoản này dùng giao diện ôn thi.';
+            return accessContext;
+        }
+
+        if (course !== 'lớp học') {
+            window.location.replace('home.html');
+            accessContext.locked = true;
+            accessContext.lockReason = 'Tài khoản này không thuộc module lớp học.';
+            return accessContext;
+        }
+
+        if (!userBand) {
+            accessContext.locked = true;
+            accessContext.lockReason = 'Tài khoản lớp học chưa được gán band (B1/B2).';
+            return accessContext;
+        }
+
+        if (requestedBand && requestedBand !== userBand) {
+            window.location.replace('lop_hoc.html');
+            accessContext.locked = true;
+            accessContext.lockReason =
+                'Bạn thuộc band ' + userBand + ', không thể truy cập band ' + requestedBand + '.';
+            return accessContext;
+        }
+
+        var classes = [];
+        try {
+            var payload = await apiGet('/api/practice_sets/list?type=homework_class');
+            classes = Array.isArray(payload && payload.sets) ? payload.sets : [];
+        } catch (error) {
+            console.warn('Load homework classes failed:', error);
+        }
+
+        var band = userBand || requestedBand || '';
+        var sessionNumber = resolveSessionNumber();
+        var selectedClass = null;
+
+        if (classId) {
+            selectedClass = classes.find(function (cls) {
+                return String(cls && cls.id) === String(classId);
+            }) || null;
+        }
+        if (!selectedClass) {
+            selectedClass = pickClassForBand(classes, band, user);
+        }
+
+        var sessionMeta = resolveSessionMeta(selectedClass, sessionNumber);
+        var deadline = toDate(sessionMeta && sessionMeta.deadline);
+        var locked = !!deadline && Date.now() > deadline.getTime();
+
+        accessContext.classSet = selectedClass || null;
+        accessContext.sessionMeta = sessionMeta || null;
+        accessContext.locked = locked;
+        accessContext.lockReason = locked
+            ? ('Buổi ' + sessionNumber + ' đã quá deadline (' + formatDateTimeVi(deadline) + ').')
+            : '';
+
+        return accessContext;
+    }
+
+    function ensureAccessOrFail() {
+        if (!accessContext.locked) return true;
+        showError(accessContext.lockReason || 'Buổi học đã bị khóa.');
+        return false;
     }
 
     function showError(message) {
@@ -297,6 +999,9 @@
         if (index < 0 || index >= practiceState.totalPages) return;
 
         saveCurrentAnswers();
+        if (practiceState.recordingActive) {
+            stopActiveRecording('page-change');
+        }
         clearTimer();
         stopCurrentAudios();
         practiceState.currentPage = index;
@@ -309,6 +1014,7 @@
     }
 
     function goNext() {
+        if (!ensureAccessOrFail()) return;
         if (practiceState.currentPage < practiceState.totalPages - 1) {
             goToPage(practiceState.currentPage + 1);
         }
@@ -360,6 +1066,79 @@
         footer.appendChild(hint);
         footer.appendChild(badge);
         wrap.appendChild(footer);
+
+        var recordingPanel = document.createElement('div');
+        recordingPanel.className = 'recording-panel';
+
+        var actions = document.createElement('div');
+        actions.className = 'recording-actions';
+
+        var startBtn = document.createElement('button');
+        startBtn.type = 'button';
+        startBtn.className = 'btn btn-sm btn-outline-danger';
+        startBtn.innerHTML = '<i class="bi bi-mic-fill me-1"></i>Bắt đầu ghi âm';
+
+        var stopBtn = document.createElement('button');
+        stopBtn.type = 'button';
+        stopBtn.className = 'btn btn-sm btn-outline-secondary';
+        stopBtn.innerHTML = '<i class="bi bi-stop-fill me-1"></i>Dừng';
+        stopBtn.disabled = true;
+
+        var clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.className = 'btn btn-sm btn-outline-warning';
+        clearBtn.innerHTML = '<i class="bi bi-trash me-1"></i>Xóa bản ghi';
+        clearBtn.disabled = true;
+
+        actions.appendChild(startBtn);
+        actions.appendChild(stopBtn);
+        actions.appendChild(clearBtn);
+        recordingPanel.appendChild(actions);
+
+        var status = document.createElement('div');
+        status.className = 'recording-status';
+        status.textContent = 'Chưa có bản ghi âm cho câu này.';
+        recordingPanel.appendChild(status);
+
+        var preview = document.createElement('audio');
+        preview.className = 'recording-audio';
+        preview.controls = true;
+        preview.preload = 'none';
+        recordingPanel.appendChild(preview);
+
+        wrap.appendChild(recordingPanel);
+
+        practiceState.recorderRefs[item.key] = {
+            start: startBtn,
+            stop: stopBtn,
+            clear: clearBtn,
+            status: status,
+            audio: preview
+        };
+
+        startBtn.addEventListener('click', async function () {
+            await startRecordingForKey(item.key);
+        });
+
+        stopBtn.addEventListener('click', async function () {
+            await stopActiveRecording('manual');
+            var recording = practiceState.recordings[item.key];
+            if (recording && recording.blob && !recording.uploadedUrl) {
+                setRecordingStatusForKey(item.key, 'Đang lưu file ghi âm lên server...', 'warning');
+                try {
+                    await uploadRecordingForKey(item.key);
+                    renderRecordingForKey(item.key);
+                } catch (error) {
+                    setRecordingStatusForKey(item.key, error.message || 'Không thể lưu file ghi âm.', 'danger');
+                }
+            }
+        });
+
+        clearBtn.addEventListener('click', async function () {
+            await clearRecordingForKey(item.key);
+        });
+
+        renderRecordingForKey(item.key);
 
         return wrap;
     }
@@ -655,6 +1434,7 @@
 
         if (answerBlock) {
             answerBlock.innerHTML = '';
+            practiceState.recorderRefs = {};
 
             if (Array.isArray(page.answerItems) && page.answerItems.length) {
                 page.answerItems.forEach(function (item, index) {
@@ -691,12 +1471,18 @@
             var items = Array.isArray(page.answerItems) ? page.answerItems : [];
             items.forEach(function (item) {
                 var answerText = practiceState.answers[item.key] || '';
+                var recording = practiceState.recordings[item.key] || null;
                 answers.push({
                     key: item.key,
                     page: page.title || item.key,
                     prompt: item.prompt || '',
                     answer: answerText,
-                    word_count: getWordCount(answerText)
+                    word_count: getWordCount(answerText),
+                    recording_url: recording && recording.uploadedUrl ? recording.uploadedUrl : '',
+                    recording_duration_seconds: recording && recording.durationSeconds ? recording.durationSeconds : 0,
+                    recording_mime_type: recording && recording.mimeType ? recording.mimeType : '',
+                    recording_file_path: recording && recording.filePath ? recording.filePath : '',
+                    recording_size_bytes: recording && recording.sizeBytes ? recording.sizeBytes : 0
                 });
             });
         });
@@ -704,28 +1490,88 @@
         return answers;
     }
 
-    async function submitResult(set, partNum) {
-        var answers = collectAllAnswers();
+    async function submitHomeworkStatus() {
+        if (!buoiId) return true;
+        if (accessContext.locked) return false;
+
+        var classSet = accessContext.classSet;
+        var sessionNumber = resolveSessionNumber();
+        var band = resolveBand();
+        if (!classSet || !classSet.id || !sessionNumber) return true;
+
         var payload = {
-            practiceType: 'speaking',
-            mode: 'part',
-            setId: set.id || null,
-            setTitle: (set.title || '') + ' - ' + (PART_LABELS[partNum] || 'Part ' + partNum),
+            practiceType: 'homework',
+            mode: 'session',
+            setId: classSet.id,
+            setTitle: (classSet.title || (classSet.data && classSet.data.name) || ('Lớp ' + band)),
             totalScore: 0,
-            maxScore: 50,
+            maxScore: 0,
             durationSeconds: Math.max(1, Math.round((Date.now() - practiceState.startAt) / 1000)),
             metadata: {
-                band: 'Pending',
-                admin_note: null,
-                speaking_answers: answers,
-                speaking_part: partNum,
-                speaking_mode: 'part',
-                speaking_page_count: practiceState.totalPages,
-                speaking_submitted_at: new Date().toISOString()
+                class_id: classSet.id,
+                class_title: classSet.title || (classSet.data && classSet.data.name) || '',
+                session_key: buoiId,
+                session_number: sessionNumber,
+                band: band,
+                homework_submitted_at: new Date().toISOString()
             }
         };
 
         try {
+            var response = await fetch('/api/practice_results/submit', {
+                method: 'POST',
+                headers: getAuthorizedHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+                var data = await response.json().catch(function () { return {}; });
+                throw new Error(data.error || 'Không thể ghi nhận trạng thái nộp BTVN');
+            }
+            return true;
+        } catch (error) {
+            console.warn('Submit homework status failed:', error);
+            return false;
+        }
+    }
+
+    async function submitResult(set, partNum) {
+        if (!ensureAccessOrFail()) return;
+
+        try {
+            await stopActiveRecording('submit');
+
+            var answers = collectAllAnswers();
+            await ensureRecordingsUploaded(answers);
+            var classSet = accessContext && accessContext.classSet ? accessContext.classSet : null;
+            var sessionNumber = resolveSessionNumber();
+            var sessionKey = buoiId || (sessionNumber ? (resolveBand() + '-' + sessionNumber) : '');
+            var resolvedBand = resolveBand() || (accessContext && accessContext.user && accessContext.user.band) || 'Pending';
+
+            var payload = {
+                practiceType: 'speaking',
+                mode: 'part',
+                setId: (classSet && classSet.id) || set.id || null,
+                setTitle: (set.title || '') + ' - ' + (PART_LABELS[partNum] || 'Part ' + partNum),
+                totalScore: 0,
+                maxScore: 50,
+                durationSeconds: Math.max(1, Math.round((Date.now() - practiceState.startAt) / 1000)),
+                metadata: {
+                    submission_kind: 'homework',
+                    band: resolvedBand,
+                    session_type: 'speaking',
+                    class_id: classSet ? classSet.id : null,
+                    class_title: classSet ? (classSet.title || (classSet.data && classSet.data.name) || '') : '',
+                    session_key: sessionKey || null,
+                    session_number: sessionNumber || null,
+                    admin_note: null,
+                    speaking_answers: answers,
+                    speaking_part: partNum,
+                    speaking_mode: 'part',
+                    speaking_page_count: practiceState.totalPages,
+                    speaking_submitted_at: new Date().toISOString()
+                }
+            };
+
             var ok = false;
             if (typeof submitPracticeResult === 'function') {
                 ok = await submitPracticeResult(payload);
@@ -740,6 +1586,11 @@
 
             if (!ok) throw new Error('Không thể nộp bài.');
 
+            var homeworkOk = await submitHomeworkStatus();
+            if (!homeworkOk) {
+                alert('Bài đã nộp nhưng chưa ghi nhận trạng thái BTVN, vui lòng báo admin kiểm tra.');
+            }
+
             var doneModal = document.getElementById('doneModal');
             if (doneModal && window.bootstrap) {
                 new bootstrap.Modal(doneModal).show();
@@ -753,6 +1604,10 @@
     }
 
     async function fetchSetData() {
+        // If buoi param, return inline data
+        if (buoiId && BUOI_SPEAKING_DATA[buoiId]) {
+            return BUOI_SPEAKING_DATA[buoiId];
+        }
         if (!setId) throw new Error('Thiếu tham số.');
 
         if (cacheKey) {
@@ -780,12 +1635,15 @@
     }
 
     async function init() {
-        if (!setId) {
+        if (!setId && !buoiId) {
             showError('Thiếu tham số. Vui lòng quay lại danh sách.');
             return;
         }
 
         try {
+            await resolveAccessContext();
+            if (!ensureAccessOrFail()) return;
+
             var set = await fetchSetData();
             if (!set) throw new Error('Không tìm thấy dữ liệu.');
 
@@ -799,6 +1657,7 @@
             practiceState.partNum = partNum;
             practiceState.totalPages = runtimePages.length;
             practiceState.currentPage = 0;
+            practiceState.setId = set.id || (buoiId || '');
             practiceState.setTitle = set.title || 'Speaking Practice';
             practiceState.headerTitle = PART_LABELS[partNum] || 'Speaking Practice';
             practiceState.startAt = Date.now();
@@ -820,7 +1679,7 @@
                 backButton.addEventListener('click', function () {
                     if (practiceState.currentPage === 0) {
                         saveCurrentAnswers();
-                        window.location.href = 'speaking_cauhoi.html';
+                        window.location.href = buoiId ? 'lop_hoc.html' : 'speaking_cauhoi.html';
                         return;
                     }
                     goToPage(practiceState.currentPage - 1);
@@ -855,6 +1714,8 @@
                     submitResult(set, partNum);
                 });
             }
+
+            window.addEventListener('beforeunload', cleanupRecordings);
         } catch (error) {
             showError(error.message || 'Không thể tải bài Speaking.');
         }

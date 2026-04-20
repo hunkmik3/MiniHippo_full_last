@@ -16,6 +16,12 @@
     <link rel="stylesheet" href="css/lesson-ui.css">
     
     <style>
+        :root {
+            --border: #e2e8f0;
+            --text-secondary: #64748b;
+            --surface-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
+        }
+
         body {
             background: #f3f4f6;
             color: #0f172a;
@@ -34,13 +40,34 @@
             border: 1px solid #cbd5f5;
             box-shadow: 0 20px 35px rgba(148, 163, 184, 0.25);
         }
-        
+
+        .page-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #334155;
+            margin-bottom: 0.75rem;
+        }
+
+        .page-context {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            margin-top: 0.65rem;
+        }
+
         .form-section {
             background: white;
             padding: 2rem;
             border-radius: 1.2rem;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
+            border: 1px solid var(--border);
+            box-shadow: var(--surface-shadow);
             margin-bottom: 2rem;
         }
         
@@ -64,15 +91,20 @@
         <div class="upload-hero">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
                 <div>
-                    <h1 class="mb-2">Quản lý Bộ Đề Listening</h1>
-                    <p class="text-muted mb-0">Tạo và quản lý các bộ đề listening cho trang học theo bộ đề.</p>
+                    <div class="page-kicker"><i class="bi bi-compass"></i>Admin Workspace</div>
+                    <h1 class="mb-2" id="listening-page-title">Listening sets</h1>
+                    <p class="text-muted mb-0" id="listening-page-description">Tạo và quản lý bộ đề Listening trong `practice_sets`, kèm upload audio/media theo từng part.</p>
+                    <div class="page-context"><i class="bi bi-dot"></i><span>Admin Workspace / Bộ đề / Listening sets</span></div>
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
+                    <a href="admin_upload.html" class="btn btn-outline-secondary">
+                        <i class="bi bi-kanban me-2"></i>Về workspace
+                    </a>
                     <button type="button" class="btn btn-outline-primary" id="refreshListeningSetsBtn">
                         <i class="bi bi-arrow-repeat me-2"></i>Tải lại danh sách
                     </button>
                     <button type="button" class="btn btn-primary" id="createListeningSetBtn">
-                        <i class="bi bi-plus-circle me-2"></i>Tạo bộ đề mới
+                        <i class="bi bi-plus-circle me-2"></i>Tạo Listening set mới
                     </button>
                 </div>
             </div>
@@ -80,7 +112,7 @@
 
         <div id="listening-set-list" class="mb-4"></div>
         <div id="listening-set-empty" class="empty-state-notice" style="display: none;">
-            <i class="bi bi-info-circle me-2"></i>Chưa có bộ đề listening nào. Hãy tạo bộ đề đầu tiên của bạn.
+            <i class="bi bi-info-circle me-2"></i>Chưa có Listening set nào. Hãy tạo Listening set đầu tiên để bắt đầu.
         </div>
 
         <div id="listening-set-form-card" class="card" style="display: none;">
@@ -105,6 +137,15 @@
                     <div class="col-12">
                         <label class="form-label fw-bold">Mô tả ngắn</label>
                         <textarea class="form-control" id="listening-set-description" rows="2" placeholder="Thông tin nổi bật..."></textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold">Tiêu đề trang mở đầu</label>
+                        <input type="text" class="form-control" id="listening-intro-title" placeholder="Ví dụ: Key Listening - Part 1">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold">Nội dung trang mở đầu (admin tự nhập)</label>
+                        <textarea class="form-control" id="listening-intro-content" rows="10" placeholder="Nhập nội dung key tại đây. Mỗi dòng sẽ được giữ nguyên khi hiển thị cho học viên."></textarea>
+                        <div class="form-text">Trang mở đầu này hiển thị trước Part 1 để học viên xem key/ghi chú.</div>
                     </div>
                 </div>
 
@@ -146,7 +187,7 @@
                                         <input type="text" class="form-control" id="listening-part2-topic" placeholder="Ví dụ: Shopping">
                                     </div>
                                     <div class="col-12">
-                                        <label class="form-label fw-bold">Chọn file MP3</label>
+                                        <label class="form-label fw-bold">Chọn file MP3 (không bắt buộc)</label>
                                         <input type="file" class="form-control" id="listening-part2-audio-file" accept="audio/mp3,audio/mpeg,.mp3">
                                         <input type="hidden" id="listening-part2-audio" value="">
                                         <div class="form-text">Hoặc nhập URL: <input type="text" class="form-control mt-1" id="listening-part2-audio-url" placeholder="audio/question14/audio_q1.mp3"></div>
@@ -184,7 +225,7 @@
                                         <input type="text" class="form-control" id="listening-part3-topic" placeholder="Ví dụ: Changes in the workplace">
                                     </div>
                                     <div class="col-12">
-                                        <label class="form-label fw-bold">Chọn file MP3</label>
+                                        <label class="form-label fw-bold">Chọn file MP3 (không bắt buộc)</label>
                                         <input type="file" class="form-control" id="listening-part3-audio-file" accept="audio/mp3,audio/mpeg,.mp3">
                                         <input type="hidden" id="listening-part3-audio" value="">
                                         <div class="form-text">Hoặc nhập URL: <input type="text" class="form-control mt-1" id="listening-part3-audio-url" placeholder="audio/question15/audio_q1.mp3"></div>
@@ -239,6 +280,6 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="js/admin_upload_v2.js"></script>
     <script src="js/admin_listening_sets.js"></script>
+    <script src="js/copy_paste_guard.js"></script>
 </body>
 </html>
-

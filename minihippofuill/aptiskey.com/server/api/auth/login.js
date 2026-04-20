@@ -106,8 +106,14 @@ export default async function handler(req, res) {
       status: profile.status || 'active',
       accountCode: profile.account_code || '',
       fullName: profile.full_name || '',
+      phone: profile.phone_number || null,
       deviceLimit: resolveDeviceLimit(profile),
-      expiresAt: profile.expires_at || null
+      expiresAt: profile.expires_at || null,
+      startedOn: profile.started_on || null,
+      notes: profile.notes || null,
+      learningProgram: profile.learning_program || null,
+      course: profile.course || null,
+      band: profile.band || null
     };
 
     return res.status(200).json({
@@ -125,5 +131,3 @@ export default async function handler(req, res) {
     });
   }
 }
-
-

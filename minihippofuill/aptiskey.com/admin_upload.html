@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Upload - Mini Hippo</title>
+    <title>Admin Workspace - Mini Hippo</title>
     <link rel="icon" href="images/favicon.ico" type="image/x-icon">
 
     <!-- Bootstrap CSS -->
@@ -192,6 +192,19 @@
             box-shadow: var(--shadow-md);
         }
 
+        .workspace-breadcrumb {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.78rem;
+            color: #64748b;
+            margin-top: 0.45rem;
+        }
+
+        .workspace-breadcrumb i {
+            color: #94a3b8;
+        }
+
         .upload-hero h1 {
             font-size: 1.5rem;
             font-weight: 700;
@@ -216,6 +229,10 @@
             padding: 0.5rem 1rem;
             font-weight: 600;
             font-size: 0.875rem;
+        }
+
+        .workspace-toolbar .btn {
+            border-radius: 0.6rem;
         }
 
         /* Compact Selectors */
@@ -643,6 +660,107 @@
             font-size: 0.875rem;
         }
 
+        .workspace-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+            border-radius: 999px;
+            padding: 0.35rem 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 0.75rem;
+        }
+
+        .workspace-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .workspace-dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1rem;
+        }
+
+        .workspace-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            padding: 1.25rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .workspace-card h4 {
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .workspace-card p {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.85rem;
+        }
+
+        .workspace-card .btn,
+        .workspace-card .btn-group {
+            margin-top: 0.25rem;
+        }
+
+        .workspace-card .d-flex {
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .workspace-note {
+            border-radius: 0.75rem;
+            background: #f8fafc;
+            border: 1px dashed #cbd5e1;
+            padding: 0.75rem 0.9rem;
+            font-size: 0.85rem;
+            color: #475569;
+        }
+
+        .workspace-note+.workspace-note {
+            margin-top: 0.65rem;
+        }
+
+        .sidebar-section-note {
+            padding: 0.25rem 1.5rem 0.75rem;
+            font-size: 0.76rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .menu-item.menu-item-external {
+            color: #0f766e;
+        }
+
+        .menu-item.menu-item-external:hover {
+            border-left-color: #14b8a6;
+            color: #0f766e;
+        }
+
+        .legacy-upload-sidebar {
+            display: none;
+            margin-top: 0.25rem;
+        }
+
+        .legacy-upload-sidebar .menu-section-title {
+            color: #1e3a8a;
+        }
+
+        .legacy-upload-sidebar .menu-item {
+            font-size: 0.875rem;
+        }
+
         /* Responsive Improvements */
         @media (max-width: 768px) {
             .admin-container {
@@ -674,11 +792,8 @@
             }
         }
 
-        /* Action Buttons Section - Always Visible */
+        /* Action Buttons Section */
         #action-buttons-section {
-            display: block !important;
-            visibility: visible !important;
-            opacity: 1 !important;
             position: sticky;
             top: 1rem;
             z-index: 1000;
@@ -838,6 +953,19 @@
             opacity: 0.6;
         }
 
+        .state-block {
+            border-radius: 0.75rem;
+            border: 1px dashed #cbd5e1;
+            background: #f8fafc;
+            color: #475569;
+            padding: 0.9rem 1rem;
+            font-size: 0.84rem;
+        }
+
+        .state-block + .state-block {
+            margin-top: 0.5rem;
+        }
+
         /* Compact Reading/Listening Set Headers */
         .reading-set-form h3,
         #listening-set-module h3 {
@@ -875,14 +1003,49 @@
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <h2>
-                <i class="bi bi-pencil-square"></i>
-                Admin Upload
+                <i class="bi bi-kanban"></i>
+                Admin Workspace
             </h2>
         </div>
 
         <nav class="sidebar-menu">
             <div class="menu-section">
-                <div class="menu-section-title">Loại bài học</div>
+                <div class="menu-section-title">Tổng quan</div>
+                <a href="#" class="menu-item" data-module="overview-module"
+                    onclick="selectModule('overview-module'); return false;">
+                    <i class="bi bi-speedometer2"></i>
+                    Dashboard admin
+                </a>
+            </div>
+
+            <div class="menu-section">
+                <div class="menu-section-title">Nội dung</div>
+                <a href="#" class="menu-item" data-module="lessons-management-module"
+                    onclick="selectModule('lessons-management-module'); return false;">
+                    <i class="bi bi-journal-text"></i>
+                    Lessons library
+                </a>
+                <a href="#" class="menu-item" data-module="single-part-module"
+                    onclick="selectModule('single-part-module'); return false;">
+                    <i class="bi bi-file-earmark-plus"></i>
+                    Legacy lessons theo part
+                </a>
+                <a href="#" class="menu-item" data-module="writing-set-module"
+                    onclick="selectModule('writing-set-module'); return false;">
+                    <i class="bi bi-pencil-square"></i>
+                    Writing legacy content
+                </a>
+                <a href="admin_writing_upload.html" class="menu-item menu-item-external">
+                    <i class="bi bi-box-arrow-up-right"></i>
+                    Writing uploader (standalone)
+                </a>
+                <div class="sidebar-section-note">
+                    Audio và media hiện vẫn được upload bên trong editor Listening/Speaking, nên được điều hướng từ nhóm Nội dung nhưng thao tác ở editor Bộ đề.
+                </div>
+            </div>
+
+            <div class="menu-section legacy-upload-sidebar" id="legacy-upload-sidebar-section">
+                <div class="menu-section-title">Legacy upload context</div>
                 <a href="#" class="menu-item" data-type="reading" onclick="selectType('reading'); return false;">
                     <i class="bi bi-book-half"></i>
                     Reading
@@ -891,112 +1054,106 @@
                     <i class="bi bi-headphones"></i>
                     Listening
                 </a>
-                <a href="#" class="menu-item" data-type="writing" onclick="selectType('writing'); return false;">
-                    <i class="bi bi-pencil-square"></i>
-                    Writing
-                </a>
-            </div>
+                <div class="sidebar-section-note">
+                    Chỉ dùng khi làm lessons file-based theo từng part.
+                </div>
 
-            <div class="menu-section" id="reading-menu-section">
-                <div class="menu-section-title">Reading Parts</div>
-                <a href="#" class="menu-item" data-part="1" onclick="selectReadingPart(1); return false;">
-                    <i class="bi bi-1-circle"></i>
-                    Question 1
-                </a>
-                <a href="#" class="menu-item" data-part="2" onclick="selectReadingPart(2); return false;">
-                    <i class="bi bi-2-circle"></i>
-                    Question 2
-                </a>
-                <a href="#" class="menu-item" data-part="4" onclick="selectReadingPart(4); return false;">
-                    <i class="bi bi-3-circle"></i>
-                    Question 3
-                </a>
-                <a href="#" class="menu-item" data-part="5" onclick="selectReadingPart(5); return false;">
-                    <i class="bi bi-4-circle"></i>
-                    Question 4
-                </a>
-            </div>
+                <div class="menu-section-title" id="reading-menu-title">Reading parts</div>
+                <div id="reading-menu-section">
+                    <a href="#" class="menu-item" data-part="1" onclick="selectReadingPart(1); return false;">
+                        <i class="bi bi-1-circle"></i>
+                        Question 1
+                    </a>
+                    <a href="#" class="menu-item" data-part="2" onclick="selectReadingPart(2); return false;">
+                        <i class="bi bi-2-circle"></i>
+                        Question 2 & 3
+                    </a>
+                    <a href="#" class="menu-item" data-part="4" onclick="selectReadingPart(4); return false;">
+                        <i class="bi bi-3-circle"></i>
+                        Question 4
+                    </a>
+                    <a href="#" class="menu-item" data-part="5" onclick="selectReadingPart(5); return false;">
+                        <i class="bi bi-4-circle"></i>
+                        Question 5
+                    </a>
+                </div>
 
-            <div class="menu-section" id="listening-menu-section" style="display: none;">
-                <div class="menu-section-title">Listening Parts</div>
-                <a href="#" class="menu-item" data-part="1_13" onclick="selectListeningPart('1_13'); return false;">
-                    <i class="bi bi-1-circle"></i>
-                    Question 1-13
-                </a>
-                <a href="#" class="menu-item" data-part="14" onclick="selectListeningPart('14'); return false;">
-                    <i class="bi bi-2-circle"></i>
-                    Question 14
-                </a>
-                <a href="#" class="menu-item" data-part="15" onclick="selectListeningPart('15'); return false;">
-                    <i class="bi bi-3-circle"></i>
-                    Question 15
-                </a>
-                <a href="#" class="menu-item" data-part="16_17" onclick="selectListeningPart('16_17'); return false;">
-                    <i class="bi bi-4-circle"></i>
-                    Question 16 & 17
-                </a>
+                <div class="menu-section-title" id="listening-menu-title" style="display: none;">Listening parts</div>
+                <div id="listening-menu-section" style="display: none;">
+                    <a href="#" class="menu-item" data-part="1_13" onclick="selectListeningPart('1_13'); return false;">
+                        <i class="bi bi-1-circle"></i>
+                        Question 1-13
+                    </a>
+                    <a href="#" class="menu-item" data-part="14" onclick="selectListeningPart('14'); return false;">
+                        <i class="bi bi-2-circle"></i>
+                        Question 14
+                    </a>
+                    <a href="#" class="menu-item" data-part="15" onclick="selectListeningPart('15'); return false;">
+                        <i class="bi bi-3-circle"></i>
+                        Question 15
+                    </a>
+                    <a href="#" class="menu-item" data-part="16_17" onclick="selectListeningPart('16_17'); return false;">
+                        <i class="bi bi-4-circle"></i>
+                        Question 16 & 17
+                    </a>
+                </div>
             </div>
 
             <div class="menu-section">
-                <div class="menu-section-title">Chế độ làm việc</div>
-                <a href="#" class="menu-item" data-module="single-part-module"
-                    onclick="selectModule('single-part-module'); return false;">
-                    <i class="bi bi-file-earmark-plus"></i>
-                    Upload theo phần
-                </a>
+                <div class="menu-section-title">Bộ đề</div>
                 <a href="#" class="menu-item" data-module="reading-set-module"
                     onclick="selectModule('reading-set-module'); return false;">
                     <i class="bi bi-book"></i>
-                    Bộ đề Reading
+                    Reading sets
                 </a>
                 <a href="#" class="menu-item" data-module="listening-set-module"
                     onclick="selectModule('listening-set-module'); return false;">
                     <i class="bi bi-headphones"></i>
-                    Bộ đề Listening
-                </a>
-                <a href="#" class="menu-item" data-module="writing-set-module"
-                    onclick="selectModule('writing-set-module'); return false;">
-                    <i class="bi bi-pencil-square"></i>
-                    Bộ đề Writing
+                    Listening sets
                 </a>
                 <a href="#" class="menu-item" data-module="speaking-set-module"
                     onclick="selectModule('speaking-set-module'); return false;">
                     <i class="bi bi-mic"></i>
-                    Bộ đề Speaking
+                    Speaking sets
                 </a>
                 <a href="#" class="menu-item" data-module="speaking-cauhoi-module"
                     onclick="selectModule('speaking-cauhoi-module'); return false;">
                     <i class="bi bi-mic-fill"></i>
-                    Speaking theo câu hỏi
+                    Speaking question sets
                 </a>
             </div>
 
             <div class="menu-section">
-                <div class="menu-section-title">Quản lý</div>
-                <a href="#" class="menu-item" data-module="lessons-management-module"
-                    onclick="selectModule('lessons-management-module'); return false;">
-                    <i class="bi bi-journal-text"></i>
-                    Quản lý bài học
-                </a>
+                <div class="menu-section-title">Vận hành</div>
                 <a href="#" class="menu-item" data-module="user-management-module"
                     onclick="selectModule('user-management-module'); return false;">
                     <i class="bi bi-people-fill"></i>
-                    Quản lý học viên
+                    Users & devices
                 </a>
                 <a href="#" class="menu-item" data-module="student-lessons-module"
                     onclick="selectModule('student-lessons-module'); return false;">
                     <i class="bi bi-clipboard-data"></i>
-                    Bài học học viên
+                    Student results
                 </a>
                 <a href="#" class="menu-item" data-module="writing-results-module"
                     onclick="selectModule('writing-results-module'); return false;">
                     <i class="bi bi-pencil-square"></i>
-                    Kết quả Writing
+                    Writing grading
                 </a>
                 <a href="#" class="menu-item" data-module="speaking-results-module"
                     onclick="selectModule('speaking-results-module'); return false;">
                     <i class="bi bi-mic"></i>
-                    Kết quả Speaking
+                    Speaking grading
+                </a>
+            </div>
+
+            <!-- Lớp Học Module -->
+            <div class="menu-section">
+                <div class="menu-section-title">Lớp Học</div>
+                <a href="admin_lop_hoc.html" class="menu-item menu-item-external">
+                    <i class="bi bi-mortarboard-fill"></i>
+                    Lớp Học Module
+                    <i class="bi bi-box-arrow-up-right ms-auto" style="font-size: 0.7rem; opacity: 0.5;"></i>
                 </a>
             </div>
         </nav>
@@ -1014,12 +1171,76 @@
         <div class="admin-container">
             <!-- Compact Header -->
             <div class="upload-hero">
-                <div>
-                    <h1>
-                        <i class="bi bi-pencil-square me-2"></i>
-                        Tạo & Quản lý Bài Học
-                    </h1>
-                    <p>Thiết kế và đẩy bài học Reading/Listening lên GitHub</p>
+                <div class="workspace-kicker" id="workspace-kicker">
+                    <i class="bi bi-speedometer2"></i>
+                    Tổng quan
+                </div>
+                <div class="d-flex flex-column flex-xl-row justify-content-between align-items-start gap-3">
+                    <div>
+                        <h1 id="workspace-title">
+                            Admin workspace
+                        </h1>
+                        <p id="workspace-description">Một hub duy nhất để truy cập nội dung, bộ đề và các tác vụ vận hành mà không đổi business logic hiện có.</p>
+                        <div class="workspace-breadcrumb" id="workspace-breadcrumb">
+                            <i class="bi bi-dot"></i>
+                            <span>Admin Workspace / Tổng quan / Dashboard admin</span>
+                        </div>
+                    </div>
+                    <div class="workspace-toolbar">
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectModule('overview-module')">
+                            <i class="bi bi-speedometer2 me-1"></i>Dashboard
+                        </button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectModule('lessons-management-module')">
+                            <i class="bi bi-journal-text me-1"></i>Lessons library
+                        </button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectModule('reading-set-module')">
+                            <i class="bi bi-book me-1"></i>Reading sets
+                        </button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectModule('user-management-module')">
+                            <i class="bi bi-people-fill me-1"></i>Users
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="overview-module" class="form-section">
+                <div class="workspace-dashboard">
+                    <div class="workspace-card">
+                        <h4><i class="bi bi-journal-code me-2"></i>Nội dung</h4>
+                        <p>Nhóm này dành cho flow file-based hiện có: lessons, upload lesson theo part, writing legacy content và điểm vào để upload audio/media trong editor phù hợp.</p>
+                        <div class="d-flex">
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectModule('lessons-management-module')">Lessons library</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectModule('single-part-module')">Legacy lessons theo part</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectModule('writing-set-module')">Writing legacy</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectModule('listening-set-module')">Listening sets (audio/media)</button>
+                        </div>
+                    </div>
+                    <div class="workspace-card">
+                        <h4><i class="bi bi-collection-play me-2"></i>Bộ đề</h4>
+                        <p>Nhóm này quản lý dữ liệu trong `practice_sets`. Media upload của Listening và Speaking nằm ngay bên trong các editor này.</p>
+                        <div class="d-flex">
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectModule('reading-set-module')">Reading</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectModule('listening-set-module')">Listening</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectModule('speaking-set-module')">Speaking</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectModule('speaking-cauhoi-module')">Speaking question sets</button>
+                        </div>
+                    </div>
+                    <div class="workspace-card">
+                        <h4><i class="bi bi-gear-wide-connected me-2"></i>Vận hành</h4>
+                        <p>Quản lý học viên, thiết bị và kết quả. Writing và Speaking grading vẫn được giữ riêng để admin đỡ phải lọc thủ công.</p>
+                        <div class="d-flex">
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectModule('user-management-module')">Users & devices</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectModule('student-lessons-module')">Student results</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectModule('writing-results-module')">Writing grading</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectModule('speaking-results-module')">Speaking grading</button>
+                        </div>
+                    </div>
+                    <div class="workspace-card">
+                        <h4><i class="bi bi-info-circle me-2"></i>Ghi chú hệ thống</h4>
+                        <div class="state-block">`Lessons` và `practice_sets` là hai flow dữ liệu riêng. Phase 1/2 chỉ reorganize cách vào module, không merge dữ liệu.</div>
+                        <div class="state-block">`Writing legacy content` vẫn tạo lesson JS/file-based. Flow learner Writing correction active không bị đổi ở đây.</div>
+                        <div class="state-block">Recent activity chưa có backend feed riêng. Dashboard hiện đóng vai trò định hướng và quick actions.</div>
+                    </div>
                 </div>
             </div>
 
@@ -1028,18 +1249,18 @@
                 <div
                     class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2">
                     <div class="flex-grow-1">
-                        <h5 class="mb-1 fw-semibold" style="font-size: 0.875rem;">
+                        <h5 class="mb-1 fw-semibold" style="font-size: 0.875rem;" id="tool-section-title">
                             <i class="bi bi-tools me-2"></i>Công cụ
                         </h5>
-                        <p class="text-muted small mb-0" style="font-size: 0.75rem;">Kiểm tra dữ liệu, xem trước và đẩy
+                        <p class="text-muted small mb-0" style="font-size: 0.75rem;" id="tool-section-description">Kiểm tra dữ liệu, xem trước và đẩy
                             bài học lên GitHub.</p>
                     </div>
                     <div class="d-flex gap-2 flex-wrap">
-                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="previewQuestionSets()">
-                            <i class="bi bi-list-ul me-1"></i>Danh sách
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="previewQuestionSetsBtn" onclick="previewQuestionSets()">
+                            <i class="bi bi-list-ul me-1"></i>Danh sách bộ đề
                         </button>
-                        <a href="admin_lessons.html" class="btn btn-outline-secondary btn-sm">
-                            <i class="bi bi-collection me-1"></i>Quản lý
+                        <a href="admin_lessons.html" class="btn btn-outline-secondary btn-sm" id="manageLessonsLink">
+                            <i class="bi bi-collection me-1"></i>Lessons library
                         </a>
                         <button type="button" class="btn btn-outline-success btn-sm" id="generate-reading-lessons-btn">
                             <i class="bi bi-magic me-1"></i>Tạo bài học từ bộ đề Reading
@@ -1056,12 +1277,12 @@
                     <strong>Chế độ chỉnh sửa:</strong> Bạn đang chỉnh sửa bài học. Thay đổi sẽ được lưu khi upload.
                 </div>
                 <div class="tool-actions d-flex gap-2 flex-wrap mt-2">
-                    <button type="button" class="btn btn-primary btn-sm" onclick="previewLessonInterface()">
-                        <i class="bi bi-eye me-1"></i>Preview
+                    <button type="button" class="btn btn-primary btn-sm" id="previewLessonInterfaceBtn" onclick="previewLessonInterface()">
+                        <i class="bi bi-eye me-1"></i>Preview lesson
                     </button>
                     <button type="button" class="btn btn-success btn-sm" id="upload-github-btn"
                         onclick="handleUploadToGitHub()">
-                        <i class="bi bi-cloud-upload me-1"></i>Upload
+                        <i class="bi bi-cloud-upload me-1"></i>Upload GitHub
                     </button>
                 </div>
             </div>
@@ -1156,9 +1377,9 @@
                 <div
                     class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-2">
                     <div>
-                        <h3 class="mb-1" style="font-size: 1rem;"><i class="bi bi-collection me-2"></i>Bộ đề Reading (4
+                        <h3 class="mb-1" id="reading-page-title" style="font-size: 1rem;"><i class="bi bi-collection me-2"></i>Bộ đề Reading (4
                             phần)</h3>
-                        <p class="text-muted small mb-0" style="font-size: 0.75rem;">Tạo trọn bộ Part 1 → Part 5 trong
+                        <p class="text-muted small mb-0" id="reading-page-description" style="font-size: 0.75rem;">Tạo trọn bộ Part 1 → Part 5 trong
                             một lần, dùng cho trang học theo bộ đề.</p>
                     </div>
                     <div class="d-flex gap-2 flex-wrap">
@@ -1166,14 +1387,14 @@
                             <i class="bi bi-arrow-repeat me-1"></i>Tải lại
                         </button>
                         <button type="button" class="btn btn-primary btn-sm" id="createReadingSetBtn">
-                            <i class="bi bi-plus-circle me-1"></i>Tạo mới
+                            <i class="bi bi-plus-circle me-1"></i>Tạo Reading set mới
                         </button>
                     </div>
                 </div>
 
                 <div id="reading-set-list" class="mb-4"></div>
                 <div id="reading-set-empty" class="empty-state-notice" style="display: none;">
-                    <i class="bi bi-info-circle me-2"></i>Chưa có bộ đề upload nào. Hãy tạo bộ đề đầu tiên của bạn.
+                    <i class="bi bi-info-circle me-2"></i>Chưa có Reading set nào. Hãy tạo Reading set đầu tiên để bắt đầu.
                 </div>
 
                 <div id="reading-set-form-card" class="card" style="display: none;">
@@ -1201,6 +1422,17 @@
                                 <label class="form-label fw-bold">Mô tả ngắn</label>
                                 <textarea class="form-control" id="reading-set-description" rows="2"
                                     placeholder="Thông tin nổi bật, ví dụ: Chủ đề công việc mùa hè..."></textarea>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-bold">Tiêu đề trang mở đầu</label>
+                                <input type="text" class="form-control" id="reading-intro-title"
+                                    placeholder="Ví dụ: Key Reading - Ghi nhớ nhanh">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-bold">Nội dung trang mở đầu (admin tự nhập)</label>
+                                <textarea class="form-control" id="reading-intro-content" rows="8"
+                                    placeholder="Nhập nội dung key tại đây. Trang này sẽ hiển thị đầu tiên trước khi sang các part Reading."></textarea>
+                                <div class="form-text">Trang đầu tiên dùng để ghi key/ghi chú tự do trước khi làm full bộ đề Reading.</div>
                             </div>
                         </div>
 
@@ -1295,7 +1527,7 @@
                                 <h2 class="accordion-header" id="headingPart4">
                                     <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
                                         data-bs-target="#collapsePart4">
-                                        Question 3
+                                        Question 4
                                     </button>
                                 </h2>
                                 <div id="collapsePart4" class="accordion-collapse collapse"
@@ -1352,7 +1584,7 @@
                                 <h2 class="accordion-header" id="headingPart5">
                                     <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
                                         data-bs-target="#collapsePart5">
-                                        Question 4
+                                        Question 5
                                     </button>
                                 </h2>
                                 <div id="collapsePart5" class="accordion-collapse collapse"
@@ -1425,14 +1657,14 @@
                             <i class="bi bi-arrow-repeat me-1"></i>Tải lại
                         </button>
                         <button type="button" class="btn btn-primary btn-sm" id="createListeningSetBtn">
-                            <i class="bi bi-plus-circle me-1"></i>Tạo mới
+                            <i class="bi bi-plus-circle me-1"></i>Tạo Listening set mới
                         </button>
                     </div>
                 </div>
 
                 <div id="listening-set-list" class="mb-4"></div>
                 <div id="listening-set-empty" class="empty-state-notice" style="display: none;">
-                    <i class="bi bi-info-circle me-2"></i>Chưa có bộ đề listening nào. Hãy tạo bộ đề đầu tiên của bạn.
+                    <i class="bi bi-info-circle me-2"></i>Chưa có Listening set nào. Hãy tạo Listening set đầu tiên để bắt đầu.
                 </div>
 
                 <div id="listening-set-form-card" class="card" style="display: none;">
@@ -1639,7 +1871,7 @@
                         </button>
                         <button type="button" class="btn btn-primary btn-sm" id="createWritingSetBtn"
                             onclick="showWritingForm()">
-                            <i class="bi bi-plus-circle me-1"></i>Tạo mới
+                            <i class="bi bi-plus-circle me-1"></i>Tạo Writing set mới
                         </button>
                     </div>
                 </div>
@@ -1647,7 +1879,7 @@
                 <!-- List Container -->
                 <div id="writing-set-list" class="mb-4"></div>
                 <div id="writing-set-empty" class="empty-state-notice" style="display: none;">
-                    <i class="bi bi-info-circle me-2"></i>Chưa có bộ đề Writing nào.
+                    <i class="bi bi-info-circle me-2"></i>Chưa có Writing set nào. Hãy tạo Writing set đầu tiên để bắt đầu.
                 </div>
 
                 <!-- Form Container -->
@@ -1762,14 +1994,14 @@
                             <i class="bi bi-arrow-repeat me-1"></i>Tải lại
                         </button>
                         <button type="button" class="btn btn-primary btn-sm" id="createSpeakingSetBtn">
-                            <i class="bi bi-plus-circle me-1"></i>Tạo mới
+                            <i class="bi bi-plus-circle me-1"></i>Tạo Speaking set mới
                         </button>
                     </div>
                 </div>
 
                 <div id="speaking-set-list" class="mb-4"></div>
                 <div id="speaking-set-empty" class="empty-state-notice" style="display: none;">
-                    <i class="bi bi-info-circle me-2"></i>Chưa có bộ đề Speaking nào.
+                    <i class="bi bi-info-circle me-2"></i>Chưa có Speaking set nào. Hãy tạo Speaking set đầu tiên để bắt đầu.
                 </div>
 
                 <div id="speaking-set-form-card" class="card" style="display: none;">
@@ -2064,14 +2296,14 @@
                             <i class="bi bi-arrow-repeat me-1"></i>Tải lại
                         </button>
                         <button type="button" class="btn btn-primary btn-sm" id="createSpeakingCauhoiBtn">
-                            <i class="bi bi-plus-circle me-1"></i>Tạo mới
+                            <i class="bi bi-plus-circle me-1"></i>Tạo câu hỏi Speaking mới
                         </button>
                     </div>
                 </div>
 
                 <div id="speaking-cauhoi-list" class="mb-4"></div>
                 <div id="speaking-cauhoi-empty" class="empty-state-notice" style="display: none;">
-                    <i class="bi bi-info-circle me-2"></i>Chưa có câu hỏi Speaking nào.
+                    <i class="bi bi-info-circle me-2"></i>Chưa có câu hỏi Speaking nào. Hãy tạo câu hỏi đầu tiên để bắt đầu.
                 </div>
 
                 <div id="speaking-cauhoi-form-card" class="card" style="display: none;">
@@ -3949,6 +4181,238 @@
             }
         });
 
+        const ADMIN_MODULE_META = {
+            'overview-module': {
+                kicker: 'Tổng quan',
+                title: 'Dashboard admin',
+                description: 'Điểm vào trung tâm để định tuyến nhanh tới nội dung, bộ đề và các tác vụ vận hành mà không thay đổi logic backend hiện có.',
+                tools: 'none'
+            },
+            'single-part-module': {
+                kicker: 'Nội dung',
+                title: 'Legacy lessons theo part',
+                description: 'Workspace cho flow file-based Reading/Listening. Chọn loại bài và part ở sidebar phụ rồi dùng preview/upload như cũ.',
+                tools: 'legacy'
+            },
+            'lessons-management-module': {
+                kicker: 'Nội dung',
+                title: 'Lessons library',
+                description: 'Xem lại các record lessons đã sync, mở lesson hiện có và xóa DB record khi cần.',
+                tools: 'none'
+            },
+            'writing-set-module': {
+                kicker: 'Nội dung',
+                title: 'Writing legacy content',
+                description: 'Quản lý lesson Writing dạng file JS / lessons. Module này giữ nguyên flow cũ, chỉ đổi cách điều hướng.',
+                tools: 'none'
+            },
+            'reading-set-module': {
+                kicker: 'Bộ đề',
+                title: 'Reading sets',
+                description: 'CRUD bộ đề Reading lưu trong practice_sets. Có công cụ tạo lessons file-based từ các Reading set hiện có.',
+                tools: 'reading-generator'
+            },
+            'listening-set-module': {
+                kicker: 'Bộ đề',
+                title: 'Listening sets',
+                description: 'CRUD bộ đề Listening, đồng thời upload audio/media trực tiếp từ editor hiện tại.',
+                tools: 'listening-generator'
+            },
+            'speaking-set-module': {
+                kicker: 'Bộ đề',
+                title: 'Speaking sets',
+                description: 'Quản lý bộ đề Speaking theo flow PG1 → PG14. UI shell mới nhưng form và handler cũ được giữ nguyên.',
+                tools: 'none'
+            },
+            'speaking-cauhoi-module': {
+                kicker: 'Bộ đề',
+                title: 'Speaking question sets',
+                description: 'Quản lý câu hỏi Speaking riêng lẻ theo part, dùng practice_sets làm storage như hiện tại.',
+                tools: 'none'
+            },
+            'user-management-module': {
+                kicker: 'Vận hành',
+                title: 'Users & devices',
+                description: 'Cấp tài khoản, import CSV, chỉnh profile, xem thiết bị và revoke/reset device trong cùng một module.',
+                tools: 'none'
+            },
+            'student-lessons-module': {
+                kicker: 'Vận hành',
+                title: 'Student results',
+                description: 'Xem kết quả chung của học viên, lọc theo user và thực hiện bulk delete hoặc patch điểm khi cần.',
+                tools: 'none'
+            },
+            'writing-results-module': {
+                kicker: 'Vận hành',
+                title: 'Writing grading',
+                description: 'Module riêng để admin xem câu trả lời Writing, AI feedback và chấm tay trên practice_results.',
+                tools: 'none'
+            },
+            'speaking-results-module': {
+                kicker: 'Vận hành',
+                title: 'Speaking grading',
+                description: 'Module riêng cho review/chấm Speaking, tách khỏi generic student results để đỡ nhiễu.',
+                tools: 'none'
+            }
+        };
+
+        function updateWorkspaceChrome(module) {
+            const meta = ADMIN_MODULE_META[module] || ADMIN_MODULE_META['overview-module'];
+            const kicker = document.getElementById('workspace-kicker');
+            const title = document.getElementById('workspace-title');
+            const description = document.getElementById('workspace-description');
+            const breadcrumb = document.getElementById('workspace-breadcrumb');
+
+            if (kicker) {
+                kicker.innerHTML = `<i class="bi bi-compass"></i>${meta.kicker}`;
+            }
+            if (title) {
+                title.textContent = meta.title;
+            }
+            if (description) {
+                description.textContent = meta.description;
+            }
+            if (breadcrumb) {
+                breadcrumb.innerHTML = `<i class="bi bi-dot"></i><span>Admin Workspace / ${meta.kicker} / ${meta.title}</span>`;
+            }
+        }
+
+        function updateActionButtons(module) {
+            const actionButtonsSection = document.getElementById('action-buttons-section');
+            const titleEl = document.getElementById('tool-section-title');
+            const descEl = document.getElementById('tool-section-description');
+            const previewQuestionSetsBtn = document.getElementById('previewQuestionSetsBtn');
+            const manageLessonsLink = document.getElementById('manageLessonsLink');
+            const generateReadingLessonsBtn = document.getElementById('generate-reading-lessons-btn');
+            const generateListeningLessonsBtn = document.getElementById('generate-listening-lessons-btn');
+            const previewLessonInterfaceBtn = document.getElementById('previewLessonInterfaceBtn');
+            const uploadGithubBtn = document.getElementById('upload-github-btn');
+
+            const meta = ADMIN_MODULE_META[module] || {};
+            const toolMode = meta.tools || 'none';
+
+            if (!actionButtonsSection) return;
+
+            [
+                previewQuestionSetsBtn,
+                manageLessonsLink,
+                generateReadingLessonsBtn,
+                generateListeningLessonsBtn,
+                previewLessonInterfaceBtn,
+                uploadGithubBtn
+            ].forEach((node) => {
+                if (node) node.style.display = 'none';
+            });
+
+            if (toolMode === 'none') {
+                actionButtonsSection.style.display = 'none';
+                return;
+            }
+
+            actionButtonsSection.style.display = 'block';
+
+            if (toolMode === 'legacy') {
+                if (titleEl) titleEl.innerHTML = '<i class="bi bi-tools me-2"></i>Công cụ legacy upload';
+                if (descEl) descEl.textContent = 'Xem danh sách set, preview giao diện lesson và upload file-based content lên GitHub như flow cũ.';
+                if (previewQuestionSetsBtn) previewQuestionSetsBtn.style.display = '';
+                if (manageLessonsLink) manageLessonsLink.style.display = '';
+                if (previewLessonInterfaceBtn) previewLessonInterfaceBtn.style.display = '';
+                if (uploadGithubBtn) uploadGithubBtn.style.display = '';
+                return;
+            }
+
+            if (toolMode === 'reading-generator') {
+                if (titleEl) titleEl.innerHTML = '<i class="bi bi-magic me-2"></i>Công cụ chuyển Reading sets';
+                if (descEl) descEl.textContent = 'Dùng khi cần tạo lessons file-based từ dữ liệu practice_sets Reading hiện có.';
+                if (manageLessonsLink) manageLessonsLink.style.display = '';
+                if (generateReadingLessonsBtn) generateReadingLessonsBtn.style.display = '';
+                return;
+            }
+
+            if (toolMode === 'listening-generator') {
+                if (titleEl) titleEl.innerHTML = '<i class="bi bi-magic me-2"></i>Công cụ chuyển Listening sets';
+                if (descEl) descEl.textContent = 'Dùng khi cần tạo lessons file-based Listening từ dữ liệu practice_sets hiện có.';
+                if (manageLessonsLink) manageLessonsLink.style.display = '';
+                if (generateListeningLessonsBtn) generateListeningLessonsBtn.style.display = '';
+            }
+        }
+
+        function updateLegacySidebarVisibility(module) {
+            const legacySection = document.getElementById('legacy-upload-sidebar-section');
+            if (legacySection) {
+                legacySection.style.display = module === 'single-part-module' ? 'block' : 'none';
+            }
+        }
+
+        function resolveInitialModuleFromQuery() {
+            const params = new URLSearchParams(window.location.search || '');
+            const directModule = (params.get('module') || '').trim();
+            const allowedModules = new Set([
+                'overview-module',
+                'single-part-module',
+                'reading-set-module',
+                'listening-set-module',
+                'writing-set-module',
+                'speaking-set-module',
+                'speaking-cauhoi-module',
+                'lessons-management-module',
+                'user-management-module',
+                'student-lessons-module',
+                'writing-results-module',
+                'speaking-results-module'
+            ]);
+            if (directModule && allowedModules.has(directModule)) {
+                let lessonType = 'reading';
+                if (directModule === 'listening-set-module') lessonType = 'listening';
+                if (directModule === 'writing-set-module') lessonType = 'writing';
+                return {
+                    module: directModule,
+                    lessonType
+                };
+            }
+
+            const editId = params.get('edit');
+            const rawPart = (params.get('part') || '').trim();
+            if (!editId || !rawPart) {
+                return null;
+            }
+
+            const lowerPart = rawPart.toLowerCase();
+            if (lowerPart === 'writing') {
+                return {
+                    module: 'writing-set-module',
+                    lessonType: 'writing'
+                };
+            }
+
+            if (lowerPart.startsWith('listening_')) {
+                return {
+                    module: 'single-part-module',
+                    lessonType: 'listening',
+                    listeningPart: lowerPart.replace('listening_', '')
+                };
+            }
+
+            if (['1_13', '14', '15', '16_17'].includes(lowerPart)) {
+                return {
+                    module: 'single-part-module',
+                    lessonType: 'listening',
+                    listeningPart: lowerPart
+                };
+            }
+
+            const numericPart = Number.parseInt(rawPart, 10);
+            if ([1, 2, 4, 5].includes(numericPart)) {
+                return {
+                    module: 'single-part-module',
+                    lessonType: 'reading',
+                    readingPart: numericPart
+                };
+            }
+
+            return null;
+        }
+
         // Select type (Reading/Listening)
         function selectType(type) {
             // Update menu items
@@ -3962,7 +4426,9 @@
             // Show/hide menu sections
             if (type === 'reading') {
                 document.getElementById('reading-menu-section').style.display = 'block';
+                document.getElementById('reading-menu-title').style.display = 'block';
                 document.getElementById('listening-menu-section').style.display = 'none';
+                document.getElementById('listening-menu-title').style.display = 'none';
                 window.currentLessonType = 'reading';
                 // Hide all reading and listening forms
                 ['part1-form', 'part2-form', 'part4-form', 'part5-form'].forEach(id => {
@@ -3975,7 +4441,9 @@
                 });
             } else if (type === 'listening') {
                 document.getElementById('reading-menu-section').style.display = 'none';
+                document.getElementById('reading-menu-title').style.display = 'none';
                 document.getElementById('listening-menu-section').style.display = 'block';
+                document.getElementById('listening-menu-title').style.display = 'block';
                 window.currentLessonType = 'listening';
                 // Hide all reading and listening forms
                 ['part1-form', 'part2-form', 'part4-form', 'part5-form'].forEach(id => {
@@ -3989,7 +4457,9 @@
             } else {
                 // Writing has dedicated set module, no part menu
                 document.getElementById('reading-menu-section').style.display = 'none';
+                document.getElementById('reading-menu-title').style.display = 'none';
                 document.getElementById('listening-menu-section').style.display = 'none';
+                document.getElementById('listening-menu-title').style.display = 'none';
                 window.currentLessonType = 'writing';
                 ['part1-form', 'part2-form', 'part4-form', 'part5-form'].forEach(id => {
                     const form = document.getElementById(id);
@@ -4102,6 +4572,7 @@
         // Select Module
         function selectModule(module) {
             // Hide all modules
+            const overviewModule = document.getElementById('overview-module');
             const singlePartModule = document.getElementById('single-part-module');
             const readingSetModule = document.getElementById('reading-set-module');
             const listeningSetModule = document.getElementById('listening-set-module');
@@ -4114,6 +4585,7 @@
             const writingResultsModule = document.getElementById('writing-results-module');
             const speakingResultsModule = document.getElementById('speaking-results-module');
 
+            if (overviewModule) overviewModule.style.display = 'none';
             if (singlePartModule) singlePartModule.style.display = 'none';
             if (readingSetModule) readingSetModule.style.display = 'none';
             if (listeningSetModule) listeningSetModule.style.display = 'none';
@@ -4140,27 +4612,15 @@
                 });
             }
 
-            // Show/hide header and action buttons based on module type
-            const uploadHero = document.querySelector('.upload-hero');
-            const actionButtonsSection = document.getElementById('action-buttons-section');
-            // Only show header and tools for upload-related modules
-            const isUploadRelatedModule = module === 'single-part-module' || module === 'reading-set-module' || module === 'listening-set-module' || module === 'writing-set-module' || module === 'speaking-set-module' || module === 'speaking-cauhoi-module';
-            // Hide for management modules
-            const isManagementModule = module === 'user-management-module' || module === 'student-lessons-module' || module === 'lessons-management-module' || module === 'writing-results-module' || module === 'speaking-results-module';
-
-            if (uploadHero) {
-                uploadHero.style.display = isUploadRelatedModule ? 'block' : 'none';
-            }
-            if (actionButtonsSection) {
-                // Always hide for management modules, show only for upload-related modules
-                actionButtonsSection.style.display = (isManagementModule || !isUploadRelatedModule) ? 'none' : 'block';
-            }
-
             // Show selected module
             const moduleEl = document.getElementById(module);
             if (moduleEl) {
                 moduleEl.style.display = 'block';
             }
+
+            updateWorkspaceChrome(module);
+            updateLegacySidebarVisibility(module);
+            updateActionButtons(module);
 
             // Init Writing Form if selected
             if (module === 'writing-set-module') {
@@ -4195,10 +4655,6 @@
             }
 
             if (module === 'user-management-module') {
-                const uploadHero = document.querySelector('.upload-hero');
-                const actionButtonsSection = document.getElementById('action-buttons-section');
-                if (uploadHero) uploadHero.style.display = 'none';
-                if (actionButtonsSection) actionButtonsSection.style.display = 'none';
                 setTimeout(() => {
                     if (typeof window.initUserManagementModule === 'function') {
                         window.initUserManagementModule();
@@ -4207,10 +4663,6 @@
             }
 
             if (module === 'student-lessons-module') {
-                const uploadHero = document.querySelector('.upload-hero');
-                const actionButtonsSection = document.getElementById('action-buttons-section');
-                if (uploadHero) uploadHero.style.display = 'none';
-                if (actionButtonsSection) actionButtonsSection.style.display = 'none';
                 setTimeout(() => {
                     if (typeof window.initStudentLessonsModule === 'function') {
                         window.initStudentLessonsModule();
@@ -4219,10 +4671,6 @@
             }
 
             if (module === 'writing-results-module') {
-                const uploadHero = document.querySelector('.upload-hero');
-                const actionButtonsSection = document.getElementById('action-buttons-section');
-                if (uploadHero) uploadHero.style.display = 'none';
-                if (actionButtonsSection) actionButtonsSection.style.display = 'none';
                 setTimeout(() => {
                     if (typeof window.initWritingResultsModule === 'function') {
                         window.initWritingResultsModule();
@@ -4231,10 +4679,6 @@
             }
 
             if (module === 'speaking-results-module') {
-                const uploadHero = document.querySelector('.upload-hero');
-                const actionButtonsSection = document.getElementById('action-buttons-section');
-                if (uploadHero) uploadHero.style.display = 'none';
-                if (actionButtonsSection) actionButtonsSection.style.display = 'none';
                 setTimeout(() => {
                     if (typeof window.initSpeakingResultsModule === 'function') {
                         window.initSpeakingResultsModule();
@@ -4296,24 +4740,31 @@
         document.addEventListener('DOMContentLoaded', function () {
             // Wait a bit for all scripts to load
             setTimeout(function () {
-                // Set initial active states
+                const deepLinkTarget = resolveInitialModuleFromQuery();
+
+                if (deepLinkTarget) {
+                    if (deepLinkTarget.lessonType === 'listening') {
+                        selectType('listening');
+                    } else if (deepLinkTarget.lessonType === 'writing') {
+                        selectType('writing');
+                    } else {
+                        selectType('reading');
+                    }
+
+                    selectModule(deepLinkTarget.module);
+
+                    if (deepLinkTarget.module === 'single-part-module') {
+                        if (deepLinkTarget.lessonType === 'listening' && deepLinkTarget.listeningPart) {
+                            selectListeningPart(deepLinkTarget.listeningPart);
+                        } else if (deepLinkTarget.lessonType === 'reading' && deepLinkTarget.readingPart) {
+                            selectReadingPart(deepLinkTarget.readingPart);
+                        }
+                    }
+                    return;
+                }
+
                 selectType('reading');
-                selectModule('single-part-module');
-                // Show Part 1 form initially
-                const part1Form = document.getElementById('part1-form');
-                if (part1Form) {
-                    part1Form.style.display = 'block';
-                }
-                // Hide other reading forms
-                ['part2-form', 'part4-form', 'part5-form'].forEach(id => {
-                    const form = document.getElementById(id);
-                    if (form) form.style.display = 'none';
-                });
-                // Set active menu item
-                const menuItem = document.querySelector('#reading-menu-section .menu-item[data-part="1"]');
-                if (menuItem) {
-                    menuItem.classList.add('active');
-                }
+                selectModule('overview-module');
             }, 100);
         });
 
@@ -4337,18 +4788,19 @@
                         const wMod = document.getElementById('writing-set-module');
                         if (wMod && wMod.style.display === 'none') {
                             console.log("Forcing Writing Module Display");
-                            // Hide others just in case
-                            document.querySelectorAll('.form-section').forEach(el => {
-                                if (el.id !== 'writing-set-module') el.style.display = 'none';
-                            });
-                            wMod.style.display = 'block';
-                            if (typeof initWritingForm === 'function') initWritingForm();
+                            if (typeof selectModule === 'function') {
+                                selectModule('writing-set-module');
+                            } else {
+                                wMod.style.display = 'block';
+                                if (typeof initWritingForm === 'function') initWritingForm();
+                            }
                         }
                     }, 100);
                 });
             }
         });
     </script>
+    <script src="js/copy_paste_guard.js"></script>
 </body>
 
 </html>

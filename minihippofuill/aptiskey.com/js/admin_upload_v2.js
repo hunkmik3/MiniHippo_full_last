@@ -529,11 +529,7 @@ async function loadExistingLesson(lessonId, requestedPart) {
             const radio = document.getElementById(`part${part}`);
             if (radio) radio.checked = true;
             
-            // Always show action buttons
-            const actionSection = document.getElementById('action-buttons-section');
-            if (actionSection) {
-                actionSection.style.display = 'block';
-            }
+            // Contextual action area visibility is controlled by updateActionButtons(module)
         }
         // Always render question sets after switching
         if (typeof renderQuestionSets === 'function') {
@@ -3719,4 +3715,3 @@ function exportToJS() {
         alert('Đã copy code JS vào clipboard! Bạn có thể paste vào file tương ứng.');
     });
 }
-

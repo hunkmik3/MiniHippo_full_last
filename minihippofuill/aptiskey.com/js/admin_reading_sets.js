@@ -13,9 +13,13 @@
         emptyState: document.getElementById('reading-set-empty'),
         formCard: document.getElementById('reading-set-form-card'),
         formTitle: document.getElementById('reading-set-form-title'),
+        pageTitle: document.getElementById('reading-page-title'),
+        pageDescription: document.getElementById('reading-page-description'),
         titleInput: document.getElementById('reading-set-title'),
         durationInput: document.getElementById('reading-set-duration'),
         descriptionInput: document.getElementById('reading-set-description'),
+        introTitleInput: document.getElementById('reading-intro-title'),
+        introContentInput: document.getElementById('reading-intro-content'),
         part1Intro: document.getElementById('reading-part1-intro'),
         part1Container: document.getElementById('reading-part1-questions'),
         part2Topic: document.getElementById('reading-part2-topic'),
@@ -47,6 +51,28 @@
         sets: [],
         editingId: null
     };
+
+    const query = new URLSearchParams(window.location.search);
+    const requestedSetType = String(
+        query.get('setType') || window.__READING_SET_TYPE || 'reading'
+    ).trim().toLowerCase();
+    const setType = requestedSetType === 'key_reading' ? 'key_reading' : 'reading';
+    const isKeyReadingMode = setType === 'key_reading';
+    const setLabel = isKeyReadingMode ? 'Key Reading' : 'Reading';
+
+    function applyModeUI() {
+        if (!isKeyReadingMode) return;
+        if (refs.pageTitle) refs.pageTitle.textContent = 'Key Reading sets';
+        if (refs.pageDescription) {
+            refs.pageDescription.textContent =
+                'Tạo bộ Key Reading: trang mở đầu admin tự nhập + full bộ đề Reading theo cấu trúc Aptis.';
+        }
+        if (refs.createBtn) refs.createBtn.innerHTML = '<i class="bi bi-plus-circle me-1"></i>Tạo Key Reading set mới';
+        if (refs.emptyState) {
+            refs.emptyState.innerHTML =
+                '<i class="bi bi-info-circle me-2"></i>Chưa có Key Reading set nào. Hãy tạo bộ đầu tiên để bắt đầu.';
+        }
+    }
 
     // Helper function to build authorized headers
     function buildAuthHeaders(additionalHeaders = {}) {
@@ -215,10 +241,16 @@
 
     function resetForm() {
         state.editingId = null;
-        refs.formTitle.textContent = 'Tạo bộ đề Reading';
+        refs.formTitle.textContent = `Tạo bộ đề ${setLabel}`;
         refs.titleInput.value = '';
         refs.durationInput.value = 35;
         refs.descriptionInput.value = '';
+        if (refs.introTitleInput) {
+            refs.introTitleInput.value = '';
+        }
+        if (refs.introContentInput) {
+            refs.introContentInput.value = '';
+        }
         refs.part1Intro.value = '';
         refs.part1Container.innerHTML = '';
         refs.part2Topic.value = '';
@@ -261,7 +293,7 @@
     async function loadReadingSets() {
         try {
             refs.list.innerHTML = '<div class="text-muted small"><i class="spinner-border spinner-border-sm me-2"></i>Đang tải bộ đề...</div>';
-            const response = await fetch('/api/practice_sets/list?type=reading');
+            const response = await fetch(`/api/practice_sets/list?type=${encodeURIComponent(setType)}`);
             const result = await response.json();
             if (!response.ok) {
                 throw new Error(result.error || 'Không thể tải danh sách');
@@ -329,7 +361,7 @@
     async function openReadingSetForm(setId) {
         refs.formCard.style.display = 'block';
         refs.saveBtn.disabled = false;
-        refs.saveBtn.innerHTML = '<i class="bi bi-cloud-arrow-up me-2"></i>Lưu bộ đề';
+        refs.saveBtn.innerHTML = `<i class="bi bi-cloud-arrow-up me-2"></i>Lưu bộ đề ${setLabel}`;
 
         if (!setId) {
             resetForm();
@@ -362,6 +394,12 @@
         refs.titleInput.value = set.title || '';
         refs.durationInput.value = set.duration_minutes || 35;
         refs.descriptionInput.value = set.description || '';
+        if (refs.introTitleInput) {
+            refs.introTitleInput.value = data.intro?.title || '';
+        }
+        if (refs.introContentInput) {
+            refs.introContentInput.value = data.intro?.content || '';
+        }
 
         refs.part1Intro.value = data.part1?.intro || '';
         refs.part1Container.innerHTML = '';
@@ -517,9 +555,14 @@
 
         return {
             title,
+            type: setType,
             description: refs.descriptionInput.value.trim(),
             duration_minutes: parseInt(refs.durationInput.value, 10) || 35,
             data: {
+                intro: {
+                    title: refs.introTitleInput?.value.trim() || '',
+                    content: refs.introContentInput?.value || ''
+                },
                 part1: {
                     intro: refs.part1Intro.value.trim(),
                     questions: part1Questions
@@ -591,7 +634,7 @@
                 throw new Error(result.error || 'Không thể lưu bộ đề');
             }
 
-            alert('Lưu bộ đề thành công!');
+            alert(`Lưu bộ đề ${setLabel} thành công!`);
             refs.formCard.style.display = 'none';
             await loadReadingSets();
         } catch (error) {
@@ -612,7 +655,7 @@
             alert(errorMessage);
         } finally {
             refs.saveBtn.disabled = false;
-            refs.saveBtn.innerHTML = '<i class="bi bi-cloud-arrow-up me-2"></i>Lưu bộ đề';
+            refs.saveBtn.innerHTML = `<i class="bi bi-cloud-arrow-up me-2"></i>Lưu bộ đề ${setLabel}`;
         }
     }
 
@@ -689,6 +732,7 @@
     }
 
     function init() {
+        applyModeUI();
         toggleModules('single-part-module');
         bindModuleSwitch();
         resetForm();
@@ -698,5 +742,3 @@
 
     document.addEventListener('DOMContentLoaded', init);
 })();
-
-

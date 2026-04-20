@@ -28,6 +28,11 @@
         answerBlock: document.getElementById('answerBlock'),
         answerInput: document.getElementById('answerInput'),
         wordCount: document.getElementById('wordCountLabel'),
+        recordStartBtn: document.getElementById('recordStartBtn'),
+        recordStopBtn: document.getElementById('recordStopBtn'),
+        recordClearBtn: document.getElementById('recordClearBtn'),
+        recordStatusText: document.getElementById('recordStatusText'),
+        recordPreviewAudio: document.getElementById('recordPreviewAudio'),
         backBtn: document.getElementById('backButton'),
         nextBtn: document.getElementById('nextButton'),
         submitModal: document.getElementById('submitModal'),
@@ -48,6 +53,8 @@
         audioList: [],
         audioIndex: 0,
         answers: {},
+        recordings: {},
+        recordingActive: null,
         isSubmitting: false,
         completed: false
     };
@@ -72,6 +79,444 @@
     function setWordCount(value) {
         if (!refs.wordCount) return;
         refs.wordCount.textContent = `${getWordCount(value)} từ`;
+    }
+
+    function supportsAudioRecording() {
+        return Boolean(window.MediaRecorder && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    }
+
+    function pickRecordingMimeType() {
+        if (!window.MediaRecorder || typeof window.MediaRecorder.isTypeSupported !== 'function') {
+            return '';
+        }
+        const preferred = [
+            'audio/webm;codecs=opus',
+            'audio/webm',
+            'audio/ogg;codecs=opus',
+            'audio/mp4'
+        ];
+        for (const type of preferred) {
+            if (window.MediaRecorder.isTypeSupported(type)) {
+                return type;
+            }
+        }
+        return '';
+    }
+
+    function extensionFromMimeType(mimeType) {
+        const value = String(mimeType || '').toLowerCase();
+        if (value.includes('audio/mpeg')) return 'mp3';
+        if (value.includes('audio/ogg')) return 'ogg';
+        if (value.includes('audio/wav')) return 'wav';
+        if (value.includes('audio/mp4') || value.includes('audio/x-m4a')) return 'm4a';
+        return 'webm';
+    }
+
+    function sanitizeFileSegment(value, fallback = 'item') {
+        const safe = String(value || '')
+            .trim()
+            .replace(/[^\w.-]+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-|-$/g, '');
+        return safe || fallback;
+    }
+
+    function buildRecordingFilePath(answerKey, extension) {
+        const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+        const userCode = sanitizeFileSegment(
+            user?.accountCode || user?.username || user?.id || 'user',
+            'user'
+        );
+        const setCode = sanitizeFileSegment(state.set?.id || 'speaking_set', 'set');
+        const answerCode = sanitizeFileSegment(answerKey || 'answer', 'answer');
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const dateFolder = stamp.slice(0, 10);
+        return `audio/speaking_submissions/${dateFolder}/${userCode}/${setCode}_${answerCode}_${stamp}.${extension}`;
+    }
+
+    function extractApiErrorMessage(data, fallback) {
+        if (data && typeof data === 'object') {
+            if (data.error && data.details) return `${data.error} (${data.details})`;
+            if (data.error) return data.error;
+            if (data.details) return data.details;
+        }
+        return fallback;
+    }
+
+    function blobToBase64(blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const result = String(reader.result || '');
+                const marker = 'base64,';
+                const markerIndex = result.indexOf(marker);
+                if (markerIndex === -1) {
+                    reject(new Error('Không thể chuyển file ghi âm sang base64.'));
+                    return;
+                }
+                resolve(result.slice(markerIndex + marker.length));
+            };
+            reader.onerror = () => reject(new Error('Không thể đọc file ghi âm.'));
+            reader.readAsDataURL(blob);
+        });
+    }
+
+    function getCurrentAnswerKey() {
+        const page = state.pages[state.currentPage - 1];
+        return page && page.answerKey ? page.answerKey : '';
+    }
+
+    function revokeRecordingObjectUrl(recording) {
+        if (recording && recording.objectUrl) {
+            try {
+                URL.revokeObjectURL(recording.objectUrl);
+            } catch (error) {
+                console.warn('Revoke object URL failed:', error);
+            }
+        }
+    }
+
+    function setRecordingStatus(message, level = 'muted') {
+        if (!refs.recordStatusText) return;
+        refs.recordStatusText.className = 'recording-status';
+        if (level === 'success') refs.recordStatusText.classList.add('text-success');
+        if (level === 'danger') refs.recordStatusText.classList.add('text-danger');
+        if (level === 'warning') refs.recordStatusText.classList.add('text-warning');
+        refs.recordStatusText.textContent = message;
+    }
+
+    function renderRecordingUI(page) {
+        if (!refs.recordStartBtn || !refs.recordStopBtn || !refs.recordClearBtn) return;
+
+        const answerKey = page && page.answerKey ? page.answerKey : '';
+        const recording = answerKey ? state.recordings[answerKey] : null;
+        const active = state.recordingActive;
+        const isRecording = Boolean(active && active.key === answerKey);
+        const supported = supportsAudioRecording();
+
+        if (!supported) {
+            refs.recordStartBtn.disabled = true;
+            refs.recordStopBtn.disabled = true;
+            refs.recordClearBtn.disabled = true;
+            if (refs.recordPreviewAudio) {
+                refs.recordPreviewAudio.pause();
+                refs.recordPreviewAudio.removeAttribute('src');
+                refs.recordPreviewAudio.style.display = 'none';
+            }
+            setRecordingStatus('Trình duyệt này không hỗ trợ ghi âm trực tiếp.', 'danger');
+            return;
+        }
+
+        if (!answerKey) {
+            refs.recordStartBtn.disabled = true;
+            refs.recordStopBtn.disabled = true;
+            refs.recordClearBtn.disabled = true;
+            if (refs.recordPreviewAudio) {
+                refs.recordPreviewAudio.pause();
+                refs.recordPreviewAudio.removeAttribute('src');
+                refs.recordPreviewAudio.style.display = 'none';
+            }
+            setRecordingStatus('Trang này không có câu trả lời để ghi âm.', 'muted');
+            return;
+        }
+
+        refs.recordStartBtn.disabled = isRecording;
+        refs.recordStopBtn.disabled = !isRecording;
+        refs.recordClearBtn.disabled = !recording;
+
+        if (refs.recordPreviewAudio) {
+            const sourceUrl = recording && (recording.uploadedUrl || recording.objectUrl);
+            if (sourceUrl) {
+                if (refs.recordPreviewAudio.src !== sourceUrl) {
+                    refs.recordPreviewAudio.src = sourceUrl;
+                }
+                refs.recordPreviewAudio.style.display = 'block';
+            } else {
+                refs.recordPreviewAudio.pause();
+                refs.recordPreviewAudio.removeAttribute('src');
+                refs.recordPreviewAudio.style.display = 'none';
+            }
+        }
+
+        if (isRecording) {
+            setRecordingStatus('Đang ghi âm... Nhấn "Dừng" để kết thúc.', 'danger');
+            return;
+        }
+
+        if (recording && recording.uploadedUrl) {
+            const sizeText = recording.sizeBytes ? ` (${Math.round(recording.sizeBytes / 1024)}KB)` : '';
+            setRecordingStatus(`Đã lưu file ghi âm thành công${sizeText}.`, 'success');
+            return;
+        }
+
+        if (recording && recording.blob) {
+            setRecordingStatus('Đã ghi âm xong. File sẽ được lưu khi nộp bài.', 'warning');
+            return;
+        }
+
+        setRecordingStatus('Chưa có bản ghi âm cho câu này.', 'muted');
+    }
+
+    async function uploadRecording(answerKey) {
+        const recording = state.recordings[answerKey];
+        if (!recording || !recording.blob) {
+            return null;
+        }
+        if (recording.uploadedUrl) {
+            return recording;
+        }
+        if (recording.uploadPromise) {
+            return recording.uploadPromise;
+        }
+
+        recording.uploadPromise = (async () => {
+            const base64 = await blobToBase64(recording.blob);
+            const extension = extensionFromMimeType(recording.mimeType);
+            const fileName = `${state.set?.id || 'speaking_set'}_${answerKey}_${Date.now()}.${extension}`;
+            const filePath = buildRecordingFilePath(answerKey, extension);
+            const primaryPayload = {
+                contentBase64: base64,
+                fileName,
+                mimeType: recording.mimeType || 'audio/webm',
+                speakingSetId: state.set?.id || 'speaking_set',
+                speakingPart: `part${state.pages[state.currentPage - 1]?.part || ''}`,
+                answerKey
+            };
+            let { response, data } = await postJsonWithAuthRetry('/api/upload-speaking-recording', primaryPayload);
+
+            if (!response.ok && response.status === 404) {
+                const fallbackPayload = {
+                    filePath,
+                    content: base64,
+                    message: `Upload speaking recording ${state.set?.id || 'speaking_set'} ${answerKey}`
+                };
+                ({ response, data } = await postJsonWithAuthRetry('/api/upload-audio', fallbackPayload));
+                if (response.ok) {
+                    recording.uploadedUrl = data.rawUrl || '';
+                    recording.filePath = filePath;
+                }
+            }
+
+            if (!response.ok) {
+                throw new Error(extractApiErrorMessage(data, 'Không thể upload file ghi âm.'));
+            }
+            if (!recording.uploadedUrl) {
+                recording.uploadedUrl = data.rawUrl || '';
+            }
+            if (!recording.filePath) {
+                recording.filePath = data.filePath || filePath;
+            }
+            recording.uploadedAt = new Date().toISOString();
+            return recording;
+        })();
+
+        try {
+            return await recording.uploadPromise;
+        } finally {
+            recording.uploadPromise = null;
+            if (getCurrentAnswerKey() === answerKey) {
+                renderRecordingUI(state.pages[state.currentPage - 1]);
+            }
+        }
+    }
+
+    async function postJsonWithAuthRetry(url, payload, allowRetry = true) {
+        let response = await fetch(url, {
+            method: 'POST',
+            headers: getAuthorizedHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify(payload || {})
+        });
+
+        if (response.status === 401 && allowRetry && typeof refreshAuthToken === 'function') {
+            const refreshedToken = await refreshAuthToken();
+            if (refreshedToken) {
+                return postJsonWithAuthRetry(url, payload, false);
+            }
+        }
+
+        const data = await response.json().catch(() => ({}));
+        return { response, data };
+    }
+
+    async function ensureRecordingsUploadedForAnswers(answerRows) {
+        const failures = [];
+        for (const row of answerRows) {
+            const key = row && row.key ? row.key : '';
+            const recording = key ? state.recordings[key] : null;
+            if (!recording || !recording.blob || recording.uploadedUrl) {
+                continue;
+            }
+            try {
+                if (getCurrentAnswerKey() === key) {
+                    setRecordingStatus('Đang lưu file ghi âm lên server...', 'warning');
+                }
+                await uploadRecording(key);
+            } catch (error) {
+                failures.push(`${key}: ${error.message || 'Upload thất bại'}`);
+            }
+        }
+
+        if (failures.length) {
+            throw new Error(`Không thể lưu một số file ghi âm:\n${failures.join('\n')}`);
+        }
+    }
+
+    async function stopActiveRecording(reason = 'manual') {
+        const active = state.recordingActive;
+        if (!active) return null;
+
+        const { mediaRecorder, stream } = active;
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            try {
+                mediaRecorder.stop();
+            } catch (error) {
+                console.warn('Stop recorder error:', error);
+            }
+        }
+
+        const result = await active.stopPromise.catch((error) => {
+            console.warn('Recording stop failed:', error);
+            return null;
+        });
+
+        if (stream && typeof stream.getTracks === 'function') {
+            stream.getTracks().forEach(track => {
+                try { track.stop(); } catch (error) { }
+            });
+        }
+
+        if (reason !== 'submit' && reason !== 'manual') {
+            setRecordingStatus('Ghi âm đã tự dừng khi chuyển trang.', 'warning');
+        }
+
+        return result;
+    }
+
+    async function startRecordingForCurrentPage() {
+        const answerKey = getCurrentAnswerKey();
+        if (!answerKey) return;
+
+        if (!supportsAudioRecording()) {
+            setRecordingStatus('Trình duyệt này không hỗ trợ ghi âm trực tiếp.', 'danger');
+            return;
+        }
+
+        if (state.recordingActive && state.recordingActive.key !== answerKey) {
+            await stopActiveRecording('switch');
+        }
+        if (state.recordingActive && state.recordingActive.key === answerKey) {
+            return;
+        }
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mimeType = pickRecordingMimeType();
+            const recorderOptions = mimeType ? { mimeType } : undefined;
+            const mediaRecorder = recorderOptions
+                ? new MediaRecorder(stream, recorderOptions)
+                : new MediaRecorder(stream);
+
+            const chunks = [];
+            const startTime = Date.now();
+            let resolveStop = null;
+            let rejectStop = null;
+
+            const stopPromise = new Promise((resolve, reject) => {
+                resolveStop = resolve;
+                rejectStop = reject;
+            });
+
+            state.recordingActive = {
+                key: answerKey,
+                mediaRecorder,
+                stream,
+                chunks,
+                mimeType: mediaRecorder.mimeType || mimeType || 'audio/webm',
+                startTime,
+                stopPromise
+            };
+
+            mediaRecorder.addEventListener('dataavailable', (event) => {
+                if (event.data && event.data.size > 0) {
+                    chunks.push(event.data);
+                }
+            });
+
+            mediaRecorder.addEventListener('error', (event) => {
+                const err = event?.error || new Error('MediaRecorder error');
+                if (typeof rejectStop === 'function') rejectStop(err);
+                setRecordingStatus('Không thể ghi âm. Vui lòng thử lại.', 'danger');
+            });
+
+            mediaRecorder.addEventListener('stop', () => {
+                const active = state.recordingActive;
+                const durationSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+                if (!active || active.key !== answerKey) {
+                    if (typeof resolveStop === 'function') resolveStop(null);
+                    state.recordingActive = null;
+                    return;
+                }
+
+                const finalBlob = chunks.length
+                    ? new Blob(chunks, { type: active.mimeType || 'audio/webm' })
+                    : null;
+
+                if (finalBlob && finalBlob.size > 0) {
+                    const previous = state.recordings[answerKey];
+                    if (previous) revokeRecordingObjectUrl(previous);
+                    state.recordings[answerKey] = {
+                        blob: finalBlob,
+                        mimeType: finalBlob.type || active.mimeType || 'audio/webm',
+                        objectUrl: URL.createObjectURL(finalBlob),
+                        sizeBytes: finalBlob.size,
+                        durationSeconds,
+                        uploadedUrl: '',
+                        filePath: '',
+                        uploadedAt: '',
+                        updatedAt: new Date().toISOString(),
+                        uploadPromise: null
+                    };
+                    if (typeof resolveStop === 'function') resolveStop(state.recordings[answerKey]);
+                } else {
+                    if (typeof resolveStop === 'function') resolveStop(null);
+                }
+
+                state.recordingActive = null;
+                renderRecordingUI(state.pages[state.currentPage - 1]);
+            });
+
+            mediaRecorder.start(250);
+            renderRecordingUI(state.pages[state.currentPage - 1]);
+        } catch (error) {
+            console.error('Start recording failed:', error);
+            setRecordingStatus('Không thể mở microphone. Hãy cấp quyền và thử lại.', 'danger');
+        }
+    }
+
+    async function clearRecordingForCurrentPage() {
+        const answerKey = getCurrentAnswerKey();
+        if (!answerKey) return;
+        if (state.recordingActive && state.recordingActive.key === answerKey) {
+            await stopActiveRecording('clear');
+        }
+        const recording = state.recordings[answerKey];
+        if (recording) {
+            revokeRecordingObjectUrl(recording);
+            delete state.recordings[answerKey];
+        }
+        renderRecordingUI(state.pages[state.currentPage - 1]);
+    }
+
+    function cleanupRecordings() {
+        Object.keys(state.recordings).forEach((key) => {
+            revokeRecordingObjectUrl(state.recordings[key]);
+        });
+        state.recordings = {};
+        if (state.recordingActive && state.recordingActive.stream) {
+            state.recordingActive.stream.getTracks().forEach(track => {
+                try { track.stop(); } catch (error) { }
+            });
+        }
     }
 
     function normalizeUrl(url) {
@@ -623,6 +1068,8 @@
                 }
             }
 
+            renderRecordingUI(page);
+
             const hasAudio = playAudioSequence(page);
 
             if (hasAudio && refs.autoHint) {
@@ -656,6 +1103,9 @@
         if (state.completed) return;
 
         persistCurrentAnswer();
+        if (state.recordingActive) {
+            stopActiveRecording('page-change');
+        }
 
         const clamped = Math.min(Math.max(pageNumber, 1), state.totalPages);
         state.currentPage = clamped;
@@ -669,13 +1119,19 @@
             .filter(page => page.answerKey)
             .map(page => {
                 const answer = state.answers[page.answerKey] || '';
+                const recording = state.recordings[page.answerKey] || null;
                 return {
                     key: page.answerKey,
                     page: page.id,
                     part: page.part,
                     prompt: page.prompt || page.instruction || '',
                     answer,
-                    word_count: getWordCount(answer)
+                    word_count: getWordCount(answer),
+                    recording_url: recording?.uploadedUrl || '',
+                    recording_duration_seconds: recording?.durationSeconds || 0,
+                    recording_mime_type: recording?.mimeType || '',
+                    recording_file_path: recording?.filePath || '',
+                    recording_size_bytes: recording?.sizeBytes || 0
                 };
             });
     }
@@ -685,6 +1141,7 @@
             return;
         }
 
+        await stopActiveRecording('submit');
         persistCurrentAnswer();
         state.isSubmitting = true;
         if (refs.nextBtn) {
@@ -692,28 +1149,29 @@
             refs.nextBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang nộp...';
         }
 
-        const answers = collectAnswerPayload();
-        const durationSeconds = Math.max(1, Math.round((Date.now() - state.startAt) / 1000));
-        const metadata = {
-            band: 'Pending',
-            admin_note: null,
-            speaking_answers: answers,
-            speaking_page_total: state.totalPages,
-            speaking_submitted_at: new Date().toISOString()
-        };
-
-        const payload = {
-            practiceType: 'speaking',
-            mode: 'set',
-            setId: state.set?.id || null,
-            setTitle: state.set?.title || null,
-            totalScore: 0,
-            maxScore: Number(state.set?.data?.maxScore) || 50,
-            durationSeconds,
-            metadata
-        };
-
         try {
+            const answers = collectAnswerPayload();
+            await ensureRecordingsUploadedForAnswers(answers);
+            const durationSeconds = Math.max(1, Math.round((Date.now() - state.startAt) / 1000));
+            const metadata = {
+                band: 'Pending',
+                admin_note: null,
+                speaking_answers: answers,
+                speaking_page_total: state.totalPages,
+                speaking_submitted_at: new Date().toISOString()
+            };
+
+            const payload = {
+                practiceType: 'speaking',
+                mode: 'set',
+                setId: state.set?.id || null,
+                setTitle: state.set?.title || null,
+                totalScore: 0,
+                maxScore: Number(state.set?.data?.maxScore) || 50,
+                durationSeconds,
+                metadata
+            };
+
             let ok = false;
             if (typeof submitPracticeResult === 'function') {
                 ok = await submitPracticeResult(payload);
@@ -785,6 +1243,28 @@
                 state.answers[page.answerKey] = value;
             }
         });
+
+        refs.recordStartBtn?.addEventListener('click', async () => {
+            await startRecordingForCurrentPage();
+        });
+
+        refs.recordStopBtn?.addEventListener('click', async () => {
+            await stopActiveRecording('manual');
+            const answerKey = getCurrentAnswerKey();
+            if (answerKey && state.recordings[answerKey]?.blob && !state.recordings[answerKey]?.uploadedUrl) {
+                setRecordingStatus('Đang lưu file ghi âm lên server...', 'warning');
+                try {
+                    await uploadRecording(answerKey);
+                    renderRecordingUI(state.pages[state.currentPage - 1]);
+                } catch (error) {
+                    setRecordingStatus(error.message || 'Không thể lưu file ghi âm. Sẽ thử lại khi nộp bài.', 'danger');
+                }
+            }
+        });
+
+        refs.recordClearBtn?.addEventListener('click', async () => {
+            await clearRecordingForCurrentPage();
+        });
     }
 
     async function fetchSetData() {
@@ -855,6 +1335,7 @@
 
             startCountdown(set.duration_minutes || 15);
             renderPage(state.pages[0]);
+            window.addEventListener('beforeunload', cleanupRecordings);
         } catch (error) {
             showError(error.message || 'Không thể tải bài Speaking.');
         }

@@ -65,7 +65,7 @@ async function loadLessonsForPart(part) {
     container.innerHTML = `
         <div class="text-center text-muted">
             <i class="spinner-border spinner-border-sm me-2"></i>
-            Đang tải...
+            Đang tải dữ liệu lessons...
         </div>
     `;
     
@@ -74,7 +74,7 @@ async function loadLessonsForPart(part) {
         const result = await response.json();
         
         if (!response.ok) {
-            throw new Error(result.error || 'Failed to load lessons');
+            throw new Error(result.error || 'Không thể tải dữ liệu lessons.');
         }
         
         const lessons = result.lessons || [];
@@ -102,10 +102,10 @@ function renderLessons(part, lessons) {
         container.innerHTML = `
             <div class="empty-state">
                 <i class="bi bi-inbox"></i>
-                <p class="mb-0">Chưa có bài học nào cho ${config.label}</p>
+                <p class="mb-0">Chưa có lesson nào cho ${config.label}. Hãy tạo lesson mới để bắt đầu.</p>
                 <a href="admin_upload.html" class="btn btn-primary mt-3">
                     <i class="bi bi-plus-circle me-2"></i>
-                    Upload bài học đầu tiên
+                    Tạo lesson đầu tiên
                 </a>
             </div>
         `;
@@ -235,7 +235,7 @@ async function deleteLesson() {
         const result = await response.json();
         
         if (!response.ok) {
-            throw new Error(result.error || 'Failed to delete lesson');
+            throw new Error(result.error || 'Không thể xóa lesson.');
         }
         
         // Close modal
@@ -281,4 +281,3 @@ window.editLesson = editLesson;
 window.confirmDeleteLesson = confirmDeleteLesson;
 window.loadLessonsForPart = loadLessonsForPart;
 window.loadAllLessons = loadAllLessons;
-

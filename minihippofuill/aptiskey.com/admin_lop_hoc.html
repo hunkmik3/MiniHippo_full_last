@@ -1,0 +1,1555 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Lớp Học - Mini Hippo</title>
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+
+    <!-- Modern UI CSS -->
+    <link rel="stylesheet" href="css/modern-ui.css">
+
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg-light: #f8fafc;
+            --border: #e2e8f0;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 270px;
+            background: white;
+            border-right: 1px solid var(--border);
+            box-shadow: var(--shadow-lg);
+            z-index: 1000;
+            overflow-y: auto;
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(135deg, #7c3aed, #6d28d9);
+            color: white;
+        }
+
+        .sidebar-header h2 {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .sidebar-header small {
+            display: block;
+            font-size: 0.72rem;
+            opacity: 0.8;
+            margin-top: 0.25rem;
+            font-weight: 400;
+        }
+
+        .sidebar-menu {
+            padding: 0.75rem 0;
+            flex: 1;
+        }
+
+        .menu-section { margin-bottom: 1.25rem; }
+
+        .menu-section-title {
+            padding: 0.5rem 1.5rem;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 0.65rem 1.5rem;
+            color: var(--text-primary);
+            text-decoration: none;
+            transition: all 0.2s ease;
+            border-left: 3px solid transparent;
+            cursor: pointer;
+            font-size: 0.875rem;
+        }
+
+        .menu-item:hover {
+            background: var(--bg-light);
+            border-left-color: #7c3aed;
+            color: #7c3aed;
+        }
+
+        .menu-item.active {
+            background: #f5f3ff;
+            border-left-color: #7c3aed;
+            color: #7c3aed;
+            font-weight: 600;
+        }
+
+        .menu-item i { width: 20px; margin-right: 0.75rem; text-align: center; }
+
+        .sidebar-footer {
+            padding: 0.75rem 1rem;
+            border-top: 1px solid var(--border);
+        }
+
+        /* ── Main Content ── */
+        .main-content {
+            margin-left: 270px;
+            min-height: 100vh;
+            transition: margin-left 0.3s ease;
+        }
+
+        .admin-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem 3rem;
+        }
+
+        /* ── Mobile Toggle ── */
+        .sidebar-toggle {
+            position: fixed;
+            top: 1rem;
+            left: 1rem;
+            z-index: 1001;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            box-shadow: var(--shadow-md);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .sidebar-toggle i { font-size: 1.25rem; color: var(--text-primary); }
+
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); }
+            .sidebar.show { transform: translateX(0); }
+            .main-content { margin-left: 0; }
+            .sidebar-toggle { display: flex; }
+            .admin-container { padding: 1rem; padding-top: 4rem; }
+        }
+
+        /* ── Hero Header ── */
+        .upload-hero {
+            background: white;
+            border-radius: 1rem;
+            padding: 1.5rem 2rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-md);
+        }
+
+        .workspace-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #7c3aed;
+            margin-bottom: 0.5rem;
+        }
+
+        .upload-hero h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .upload-hero p {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            margin: 0;
+        }
+
+        .workspace-breadcrumb {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.75rem;
+            color: #94a3b8;
+            margin-top: 0.4rem;
+        }
+
+        /* ── Form Sections ── */
+        .form-section {
+            background: white;
+            padding: 1.75rem;
+            border-radius: 1rem;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 1.5rem;
+        }
+
+        .form-section h3 {
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* ── Table Styles ── */
+        .data-table {
+            width: 100%;
+            font-size: 0.82rem;
+        }
+
+        .data-table thead th {
+            background: #f8fafc;
+            font-weight: 700;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-secondary);
+            padding: 0.75rem 0.6rem;
+            border-bottom: 2px solid var(--border);
+            white-space: nowrap;
+        }
+
+        .data-table tbody td {
+            padding: 0.65rem 0.6rem;
+            border-bottom: 1px solid #f1f5f9;
+            vertical-align: middle;
+        }
+
+        .submission-detail-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .submission-detail-chip {
+            border: 1px solid var(--border);
+            border-radius: 0.6rem;
+            background: #f8fafc;
+            padding: 0.6rem 0.75rem;
+        }
+
+        .submission-detail-chip .label {
+            display: block;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-secondary);
+            font-weight: 700;
+            margin-bottom: 0.2rem;
+        }
+
+        .submission-detail-card {
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            background: #fff;
+            padding: 0.85rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .submission-detail-card .prompt {
+            font-weight: 600;
+            margin-bottom: 0.35rem;
+            font-size: 0.85rem;
+        }
+
+        .submission-detail-card .answer {
+            white-space: pre-wrap;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            padding: 0.6rem 0.7rem;
+            font-size: 0.84rem;
+            line-height: 1.5;
+        }
+
+        .submission-detail-card .corrected {
+            white-space: pre-wrap;
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 0.5rem;
+            padding: 0.55rem 0.7rem;
+            margin-top: 0.55rem;
+            font-size: 0.82rem;
+            line-height: 1.5;
+        }
+
+        .submission-detail-section-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            margin: 0.4rem 0 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+        }
+
+        .data-table tbody tr:hover {
+            background: #f8fafc;
+        }
+
+        /* ── Badges ── */
+        .badge-course {
+            padding: 0.25rem 0.6rem;
+            border-radius: 0.4rem;
+            font-size: 0.72rem;
+            font-weight: 600;
+        }
+
+        .badge-lop-hoc {
+            background: #ede9fe;
+            color: #6d28d9;
+        }
+
+        .badge-on-thi {
+            background: #dbeafe;
+            color: #2563eb;
+        }
+
+        .badge-band {
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.35rem;
+            font-size: 0.72rem;
+            font-weight: 700;
+        }
+
+        .badge-b1 { background: #fef3c7; color: #92400e; }
+        .badge-b2 { background: #d1fae5; color: #065f46; }
+
+        .badge-status {
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.35rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        .badge-active { background: #d1fae5; color: #065f46; }
+        .badge-expired { background: #fee2e2; color: #991b1b; }
+        .badge-upcoming { background: #e0f2fe; color: #075985; }
+
+        /* ── Filter bar ── */
+        .filter-bar {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .filter-bar .form-select,
+        .filter-bar .form-control {
+            max-width: 200px;
+            font-size: 0.82rem;
+            border-radius: 0.5rem;
+        }
+
+        /* ── Detail Panel ── */
+        .detail-panel {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+        }
+
+        .detail-panel .form-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        /* ── Stats Cards ── */
+        .stat-card {
+            background: white;
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+
+        .stat-card .stat-number {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-card .stat-label {
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-top: 0.25rem;
+        }
+
+        /* ── Empty State ── */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-state i {
+            font-size: 2.5rem;
+            opacity: 0.4;
+            margin-bottom: 0.75rem;
+        }
+
+        /* ── Session Card ── */
+        .session-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1rem 1.25rem;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: box-shadow 0.2s;
+        }
+
+        .session-card:hover {
+            box-shadow: var(--shadow-md);
+        }
+
+        .session-number {
+            width: 38px;
+            height: 38px;
+            border-radius: 0.5rem;
+            background: #ede9fe;
+            color: #6d28d9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.85rem;
+            flex-shrink: 0;
+        }
+
+        .session-info { flex: 1; }
+
+        .session-info .session-title {
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .session-info .session-meta {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 0.15rem;
+        }
+
+        .session-deadline {
+            text-align: right;
+            font-size: 0.8rem;
+        }
+
+        .session-deadline .deadline-label {
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            letter-spacing: 0.03em;
+        }
+
+        /* ── Class Card ── */
+        .class-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .class-card:hover { box-shadow: var(--shadow-md); }
+
+        .class-card.selected {
+            border-color: #7c3aed;
+            box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.15);
+        }
+
+        /* ── CSV area ── */
+        .csv-paste-area {
+            min-height: 180px;
+            font-family: 'Cascadia Code', 'Fira Code', monospace;
+            font-size: 0.78rem;
+            line-height: 1.6;
+        }
+
+        /* ── Utility ── */
+        .btn-purple {
+            background: #7c3aed;
+            border-color: #7c3aed;
+            color: white;
+        }
+
+        .btn-purple:hover {
+            background: #6d28d9;
+            border-color: #6d28d9;
+            color: white;
+        }
+
+        .btn-outline-purple {
+            border-color: #7c3aed;
+            color: #7c3aed;
+        }
+
+        .btn-outline-purple:hover {
+            background: #7c3aed;
+            color: white;
+        }
+
+        .text-purple { color: #7c3aed !important; }
+
+        .divider {
+            height: 1px;
+            background: var(--border);
+            margin: 1.25rem 0;
+        }
+
+        .json-editor {
+            min-height: 420px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 0.8rem;
+            line-height: 1.55;
+        }
+
+        .guide-table td,
+        .guide-table th {
+            font-size: 0.78rem;
+            vertical-align: top;
+        }
+
+        .builder-page-item {
+            border: 1px solid var(--border);
+            border-radius: 0.55rem;
+            padding: 0.6rem 0.7rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            background: #fff;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .builder-page-item.active {
+            border-color: #7c3aed;
+            box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.12);
+            background: #faf5ff;
+        }
+
+        .builder-page-meta {
+            min-width: 0;
+            flex: 1 1 auto;
+        }
+
+        .builder-page-title {
+            font-weight: 700;
+            font-size: 0.82rem;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .builder-page-subtitle {
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            margin-top: 0.1rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .builder-page-actions {
+            display: flex;
+            gap: 0.25rem;
+            flex: 0 0 auto;
+            margin-left: auto;
+        }
+
+        .builder-page-actions .btn {
+            padding: 0.25rem 0.45rem;
+            min-width: 2rem;
+            line-height: 1.1;
+            box-shadow: none;
+        }
+
+        .builder-form-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            margin-bottom: 0.25rem;
+        }
+
+        .builder-form textarea,
+        .builder-form input,
+        .builder-form select {
+            font-size: 0.82rem;
+        }
+
+        .builder-help {
+            font-size: 0.72rem;
+            color: #64748b;
+        }
+
+        .session-toolbar-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .session-toolbar-actions .btn {
+            padding: 0.45rem 0.85rem;
+            box-shadow: none;
+        }
+
+        .session-preview-shell {
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            overflow: hidden;
+            background: #fff;
+        }
+
+        .session-preview-frame {
+            width: 100%;
+            height: 720px;
+            border: 0;
+            background: #f8fafc;
+        }
+
+        .session-builder-grid {
+            min-height: 760px;
+        }
+
+        .session-builder-pane {
+            min-height: 100%;
+        }
+
+        @media (max-width: 991.98px) {
+            .session-builder-grid {
+                min-height: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Sidebar Toggle (Mobile) -->
+    <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()">
+        <i class="bi bi-list"></i>
+    </button>
+
+    <!-- ══════════════════════════════════════════ -->
+    <!-- SIDEBAR                                    -->
+    <!-- ══════════════════════════════════════════ -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2>
+                <i class="bi bi-mortarboard-fill"></i>
+                Lớp Học Module
+            </h2>
+            <small>Quản lý học viên, BTVN & lịch học</small>
+        </div>
+
+        <nav class="sidebar-menu">
+            <!-- Học viên -->
+            <div class="menu-section">
+                <div class="menu-section-title">Học viên</div>
+                <a href="#" class="menu-item active" data-tab="tab-students"
+                    onclick="switchTab('tab-students'); return false;">
+                    <i class="bi bi-people"></i>
+                    Danh sách học viên
+                </a>
+                <a href="#" class="menu-item" data-tab="tab-import"
+                    onclick="switchTab('tab-import'); return false;">
+                    <i class="bi bi-cloud-upload"></i>
+                    Import CSV
+                </a>
+            </div>
+
+            <!-- BTVN -->
+            <div class="menu-section">
+                <div class="menu-section-title">Bài tập về nhà</div>
+                <a href="#" class="menu-item" data-tab="tab-classes"
+                    onclick="switchTab('tab-classes'); return false;">
+                    <i class="bi bi-calendar-week"></i>
+                    Quản lý lớp
+                </a>
+                <a href="#" class="menu-item" data-tab="tab-homework"
+                    onclick="switchTab('tab-homework'); return false;">
+                    <i class="bi bi-journal-check"></i>
+                    DS buổi & Deadline
+                </a>
+                <a href="#" class="menu-item" data-tab="tab-submissions"
+                    onclick="switchTab('tab-submissions'); return false;">
+                    <i class="bi bi-clipboard-data"></i>
+                    DS Trả BTVN
+                </a>
+                <a href="#" class="menu-item" data-tab="tab-session-content"
+                    onclick="switchTab('tab-session-content'); return false;">
+                    <i class="bi bi-pencil-square"></i>
+                    Nội dung buổi học
+                </a>
+            </div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <a href="admin_upload.html" class="menu-item">
+                <i class="bi bi-arrow-left"></i>
+                Về Admin Workspace
+            </a>
+        </div>
+    </aside>
+
+    <!-- ══════════════════════════════════════════ -->
+    <!-- MAIN CONTENT                               -->
+    <!-- ══════════════════════════════════════════ -->
+    <main class="main-content" id="admin-main" style="visibility: hidden;">
+        <div class="admin-container">
+
+            <!-- Hero Header -->
+            <div class="upload-hero">
+                <div class="workspace-kicker" id="workspace-kicker">
+                    <i class="bi bi-mortarboard-fill"></i>
+                    Lớp Học Module
+                </div>
+                <div class="d-flex flex-column flex-xl-row justify-content-between align-items-start gap-3">
+                    <div>
+                        <h1 id="workspace-title">Danh sách học viên</h1>
+                        <p id="workspace-description">Quản lý học viên theo lớp, khóa học và band điểm.</p>
+                        <div class="workspace-breadcrumb" id="workspace-breadcrumb">
+                            <i class="bi bi-dot"></i>
+                            <span>Lớp Học / Học viên / Danh sách</span>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap" id="hero-actions">
+                        <button class="btn btn-outline-secondary btn-sm" onclick="switchTab('tab-students')">
+                            <i class="bi bi-people me-1"></i>Học viên
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="switchTab('tab-classes')">
+                            <i class="bi bi-calendar-week me-1"></i>Lớp
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="switchTab('tab-submissions')">
+                            <i class="bi bi-clipboard-data me-1"></i>BTVN
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="switchTab('tab-session-content')">
+                            <i class="bi bi-pencil-square me-1"></i>Nội dung buổi
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════ -->
+            <!-- TAB 1: DANH SACH HOC VIEN           -->
+            <!-- ════════════════════════════════════ -->
+            <div id="tab-students" class="tab-content">
+                <!-- Stats Row -->
+                <div class="row g-3 mb-4" id="student-stats">
+                    <div class="col-6 col-md-3">
+                        <div class="stat-card">
+                            <div class="stat-number" id="stat-total">0</div>
+                            <div class="stat-label">Tổng học viên</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="stat-card">
+                            <div class="stat-number text-purple" id="stat-lop-hoc">0</div>
+                            <div class="stat-label">Lớp học</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="stat-card">
+                            <div class="stat-number" id="stat-b1" style="color: #92400e;">0</div>
+                            <div class="stat-label">Band B1</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="stat-card">
+                            <div class="stat-number" id="stat-b2" style="color: #065f46;">0</div>
+                            <div class="stat-label">Band B2</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filter + Actions -->
+                <div class="form-section">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                        <h3 class="mb-0"><i class="bi bi-people"></i> Học viên</h3>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="loadStudents()">
+                                <i class="bi bi-arrow-repeat me-1"></i>Tải lại
+                            </button>
+                            <button class="btn btn-sm btn-purple" onclick="showCreateStudentForm()">
+                                <i class="bi bi-plus-circle me-1"></i>Thêm học viên
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="filter-bar">
+                        <input type="text" class="form-control" id="filter-search"
+                            placeholder="Tìm mã HV, tên, email..." oninput="filterStudents()">
+                        <select class="form-select" id="filter-course" onchange="filterStudents()">
+                            <option value="">Tất cả khóa</option>
+                            <option value="Lớp học">Lớp học</option>
+                            <option value="Lớp ôn thi">Lớp ôn thi</option>
+                        </select>
+                        <select class="form-select" id="filter-band" onchange="filterStudents()">
+                            <option value="">Tất cả band</option>
+                            <option value="B1">B1</option>
+                            <option value="B2">B2</option>
+                        </select>
+                    </div>
+
+                    <!-- Student Table -->
+                    <div class="table-responsive">
+                        <table class="data-table" id="student-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px;">STT</th>
+                                    <th>Mã HV</th>
+                                    <th>Họ tên</th>
+                                    <th>Email</th>
+                                    <th>SĐT</th>
+                                    <th>Khóa</th>
+                                    <th>Band</th>
+                                    <th>Ngày KG</th>
+                                    <th>Hết hạn</th>
+                                    <th>Ghi chú</th>
+                                    <th style="width: 80px;">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="student-table-body">
+                                <!-- Rendered by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div id="student-empty" class="empty-state" style="display: none;">
+                        <i class="bi bi-people d-block"></i>
+                        <p class="mb-0">Chưa có học viên nào. Nhấn <strong>"Thêm học viên"</strong> hoặc <strong>"Import CSV"</strong> để bắt đầu.</p>
+                    </div>
+                </div>
+
+                <!-- Create / Edit Student Form (hidden by default) -->
+                <div class="form-section" id="student-form-panel" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h3 class="mb-0" id="student-form-title">
+                            <i class="bi bi-person-plus"></i> Thêm học viên mới
+                        </h3>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="hideStudentForm()">
+                            <i class="bi bi-x-lg me-1"></i>Đóng
+                        </button>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Mã học viên <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="sf-account-code" placeholder="VD: HV001">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Email</label>
+                            <input type="email" class="form-control" id="sf-email" placeholder="Tự tạo nếu bỏ trống">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Mật khẩu</label>
+                            <input type="text" class="form-control" id="sf-password" placeholder="Tự tạo nếu bỏ trống">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Họ tên</label>
+                            <input type="text" class="form-control" id="sf-fullname" placeholder="Nguyễn Văn A">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">SĐT</label>
+                            <input type="text" class="form-control" id="sf-phone" placeholder="0901234567">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Device limit</label>
+                            <input type="number" class="form-control" id="sf-device-limit" value="2" min="1" max="10">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Khóa học <span class="text-danger">*</span></label>
+                            <select class="form-select" id="sf-course" onchange="onCourseChange()">
+                                <option value="Lớp học">Lớp học</option>
+                                <option value="Lớp ôn thi">Lớp ôn thi</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3" id="sf-band-group">
+                            <label class="form-label fw-bold">Band</label>
+                            <select class="form-select" id="sf-band">
+                                <option value="">-- Chọn band --</option>
+                                <option value="B1">B1</option>
+                                <option value="B2">B2</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Ngày khai giảng</label>
+                            <input type="date" class="form-control" id="sf-started-on">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Ngày hết hạn</label>
+                            <input type="date" class="form-control" id="sf-expires-at">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Ghi chú</label>
+                            <input type="text" class="form-control" id="sf-notes" placeholder="VD: Lớp 18h 246, ca tối...">
+                        </div>
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <div class="d-flex gap-2 justify-content-end">
+                        <button class="btn btn-secondary btn-sm" onclick="hideStudentForm()">Hủy</button>
+                        <button class="btn btn-purple btn-sm" id="sf-submit-btn" onclick="submitStudentForm()">
+                            <i class="bi bi-check-lg me-1"></i>Tạo học viên
+                        </button>
+                    </div>
+
+                    <!-- Result message -->
+                    <div id="sf-result" class="mt-3" style="display: none;"></div>
+                </div>
+
+                <!-- Student Detail Panel (hidden by default) -->
+                <div class="form-section" id="student-detail-panel" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h3 class="mb-0">
+                            <i class="bi bi-person-lines-fill"></i>
+                            Chi tiết: <span id="sd-name" class="text-purple"></span>
+                        </h3>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="hideStudentDetail()">
+                            <i class="bi bi-x-lg me-1"></i>Đóng
+                        </button>
+                    </div>
+
+                    <div class="detail-panel">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Mã học viên</label>
+                                <input type="text" class="form-control" id="sd-account-code" readonly>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Email</label>
+                                <input type="text" class="form-control" id="sd-email" readonly>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Họ tên</label>
+                                <input type="text" class="form-control" id="sd-fullname">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">SĐT</label>
+                                <input type="text" class="form-control" id="sd-phone">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Khóa</label>
+                                <select class="form-select" id="sd-course" onchange="onDetailCourseChange()">
+                                    <option value="Lớp học">Lớp học</option>
+                                    <option value="Lớp ôn thi">Lớp ôn thi</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2" id="sd-band-group">
+                                <label class="form-label">Band</label>
+                                <select class="form-select" id="sd-band">
+                                    <option value="">--</option>
+                                    <option value="B1">B1</option>
+                                    <option value="B2">B2</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Device limit</label>
+                                <input type="number" class="form-control" id="sd-device-limit" min="1" max="10">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Ngày KG</label>
+                                <input type="date" class="form-control" id="sd-started-on">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Hết hạn</label>
+                                <input type="date" class="form-control" id="sd-expires-at">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Trạng thái</label>
+                                <select class="form-select" id="sd-status">
+                                    <option value="active">Active</option>
+                                    <option value="locked">Locked</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Ghi chú</label>
+                                <input type="text" class="form-control" id="sd-notes">
+                            </div>
+                        </div>
+
+                        <div class="divider"></div>
+
+                        <div class="d-flex justify-content-between">
+                            <button class="btn btn-sm btn-outline-danger" id="sd-delete-btn" onclick="deleteStudent()">
+                                <i class="bi bi-trash me-1"></i>Xóa tài khoản
+                            </button>
+                            <button class="btn btn-sm btn-purple" onclick="saveStudentDetail()">
+                                <i class="bi bi-save me-1"></i>Lưu thay đổi
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="sd-result" class="mt-3" style="display: none;"></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════ -->
+            <!-- TAB 2: IMPORT CSV                    -->
+            <!-- ════════════════════════════════════ -->
+            <div id="tab-import" class="tab-content" style="display: none;">
+                <div class="form-section">
+                    <h3><i class="bi bi-cloud-upload"></i> Import học viên từ CSV</h3>
+                    <p class="text-muted mb-3" style="font-size: 0.85rem;">
+                        Dán nội dung CSV bên dưới hoặc tải file CSV lên. Hệ thống sẽ tự tạo email và mật khẩu nếu bỏ trống.
+                    </p>
+
+                    <div class="mb-3">
+                        <button class="btn btn-sm btn-outline-purple" onclick="downloadCSVTemplate()">
+                            <i class="bi bi-download me-1"></i>Tải template CSV
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary ms-2" onclick="loadCSVFile()">
+                            <i class="bi bi-file-earmark-arrow-up me-1"></i>Chọn file CSV
+                        </button>
+                        <input type="file" id="csv-file-input" accept=".csv" style="display: none;" onchange="handleCSVFile(event)">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Nội dung CSV</label>
+                        <textarea class="form-control csv-paste-area" id="csv-content" rows="10"
+                            placeholder="account_code,email,full_name,phone,device_limit,started_on,expires_at,notes,course,band,password
+HV001,,Nguyễn Văn A,0901234567,2,2025-04-01,2025-12-31,Lớp 18h 246,Lớp học,B1,
+HV002,,Trần Thị B,0912345678,2,2025-04-01,2025-12-31,Lớp 18h 246,Lớp học,B2,"></textarea>
+                    </div>
+
+                    <div class="d-flex gap-2 align-items-center">
+                        <button class="btn btn-purple" id="csv-import-btn" onclick="importCSV()">
+                            <i class="bi bi-cloud-upload me-1"></i>Import
+                        </button>
+                        <span class="text-muted" style="font-size: 0.8rem;" id="csv-status"></span>
+                    </div>
+
+                    <div id="csv-result" class="mt-3" style="display: none;"></div>
+                </div>
+
+                <!-- CSV Column Reference -->
+                <div class="form-section">
+                    <h3><i class="bi bi-info-circle"></i> Cấu trúc CSV</h3>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Cột</th>
+                                    <th>Bắt buộc</th>
+                                    <th>Mô tả</th>
+                                    <th>Ví dụ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><code>account_code</code></td><td><span class="badge bg-danger">Có</span></td><td>Mã học viên (unique)</td><td>HV001</td></tr>
+                                <tr><td><code>email</code></td><td>Không</td><td>Tự tạo từ account_code nếu trống</td><td>a@b.com</td></tr>
+                                <tr><td><code>full_name</code></td><td>Không</td><td>Họ tên đầy đủ</td><td>Nguyễn Văn A</td></tr>
+                                <tr><td><code>phone</code></td><td>Không</td><td>Số điện thoại</td><td>0901234567</td></tr>
+                                <tr><td><code>device_limit</code></td><td>Không</td><td>Mặc định: 2</td><td>2</td></tr>
+                                <tr><td><code>started_on</code></td><td>Không</td><td>Ngày khai giảng (YYYY-MM-DD)</td><td>2025-04-01</td></tr>
+                                <tr><td><code>expires_at</code></td><td>Không</td><td>Ngày hết hạn (YYYY-MM-DD)</td><td>2025-12-31</td></tr>
+                                <tr><td><code>notes</code></td><td>Không</td><td>Ghi chú</td><td>Lớp 18h 246</td></tr>
+                                <tr><td><code>course</code></td><td><span class="badge bg-danger">Có</span></td><td>"Lớp học" hoặc "Lớp ôn thi"</td><td>Lớp học</td></tr>
+                                <tr><td><code>band</code></td><td>Không</td><td>B1 / B2 (chỉ cho Lớp học)</td><td>B1</td></tr>
+                                <tr><td><code>password</code></td><td>Không</td><td>Tự tạo nếu trống</td><td>abc123</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════ -->
+            <!-- TAB 3: QUAN LY LOP                   -->
+            <!-- ════════════════════════════════════ -->
+            <div id="tab-classes" class="tab-content" style="display: none;">
+                <div class="form-section">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h3 class="mb-0"><i class="bi bi-calendar-week"></i> Quản lý lớp</h3>
+                        <button class="btn btn-sm btn-purple" onclick="showCreateClassForm()">
+                            <i class="bi bi-plus-circle me-1"></i>Tạo lớp mới
+                        </button>
+                    </div>
+
+                    <div id="class-list">
+                        <!-- Rendered by JS -->
+                    </div>
+
+                    <div id="class-empty" class="empty-state" style="display: none;">
+                        <i class="bi bi-calendar-week d-block"></i>
+                        <p class="mb-0">Chưa có lớp nào. Nhấn <strong>"Tạo lớp mới"</strong> để bắt đầu.</p>
+                    </div>
+                </div>
+
+                <!-- Create/Edit Class Form -->
+                <div class="form-section" id="class-form-panel" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h3 class="mb-0" id="class-form-title">
+                            <i class="bi bi-plus-circle"></i> Tạo lớp mới
+                        </h3>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="hideClassForm()">
+                            <i class="bi bi-x-lg me-1"></i>Đóng
+                        </button>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Tên lớp <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="cf-name" placeholder="VD: Lớp B1 18h 246">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Lịch học <span class="text-danger">*</span></label>
+                            <select class="form-select" id="cf-schedule">
+                                <option value="246">Thứ 2-4-6</option>
+                                <option value="357">Thứ 3-5-7</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Band</label>
+                            <select class="form-select" id="cf-band">
+                                <option value="">-- Không --</option>
+                                <option value="B1">B1</option>
+                                <option value="B2">B2</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Giờ học <span class="text-danger">*</span></label>
+                            <input type="time" class="form-control" id="cf-start-time" value="18:00">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Ngày buổi đầu tiên <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="cf-first-date">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Số buổi học</label>
+                            <input type="number" class="form-control" id="cf-num-sessions" value="24" min="1" max="100">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Ghi chú</label>
+                            <input type="text" class="form-control" id="cf-notes" placeholder="Ghi chú thêm...">
+                        </div>
+                    </div>
+
+                    <!-- Preview Sessions -->
+                    <div class="mt-3" id="cf-preview-section" style="display: none;">
+                        <div class="divider"></div>
+                        <h5 class="fw-bold mb-2" style="font-size: 0.85rem;">
+                            <i class="bi bi-eye me-1"></i>Xem trước lịch buổi & deadline
+                        </h5>
+                        <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                            <table class="data-table" id="cf-preview-table">
+                                <thead>
+                                    <tr>
+                                        <th>Buổi</th>
+                                        <th>Ngày học</th>
+                                        <th>Thứ</th>
+                                        <th>Deadline BTVN</th>
+                                        <th>Thứ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cf-preview-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="divider"></div>
+                    <div class="d-flex gap-2 justify-content-end">
+                        <button class="btn btn-sm btn-outline-secondary" onclick="previewClassSessions()">
+                            <i class="bi bi-eye me-1"></i>Xem trước
+                        </button>
+                        <button class="btn btn-sm btn-purple" onclick="submitClassForm()">
+                            <i class="bi bi-check-lg me-1"></i>Tạo lớp
+                        </button>
+                    </div>
+
+                    <div id="cf-result" class="mt-3" style="display: none;"></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════ -->
+            <!-- TAB 4: DS BUOI & DEADLINE            -->
+            <!-- ════════════════════════════════════ -->
+            <div id="tab-homework" class="tab-content" style="display: none;">
+                <div class="form-section">
+                    <h3><i class="bi bi-journal-check"></i> Danh sách buổi & Deadline</h3>
+                    <p class="text-muted mb-3" style="font-size: 0.82rem;">
+                        Chọn lớp để xem danh sách buổi học và deadline BTVN. Có thể chỉnh deadline thủ công.
+                    </p>
+
+                    <div class="filter-bar mb-3">
+                        <select class="form-select" id="hw-class-select" onchange="loadHomeworkSessions()" style="max-width: 300px;">
+                            <option value="">-- Chọn lớp --</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="loadHomeworkSessions()">
+                            <i class="bi bi-arrow-repeat me-1"></i>Tải lại
+                        </button>
+                    </div>
+
+                    <div id="hw-session-list">
+                        <!-- Rendered by JS -->
+                    </div>
+
+                    <div id="hw-empty" class="empty-state">
+                        <i class="bi bi-journal-check d-block"></i>
+                        <p class="mb-0">Chọn lớp ở trên để xem danh sách buổi.</p>
+                    </div>
+                </div>
+
+                <!-- Edit Deadline Modal -->
+                <div class="modal fade" id="editDeadlineModal" tabindex="-1">
+                    <div class="modal-dialog modal-sm">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Chỉnh deadline</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <input type="hidden" id="edit-session-id">
+                                <label class="form-label fw-bold">Buổi: <span id="edit-session-label"></span></label>
+                                <div class="mb-2">
+                                    <label class="form-label">Ngày deadline</label>
+                                    <input type="date" class="form-control" id="edit-deadline-date">
+                                </div>
+                                <div>
+                                    <label class="form-label">Giờ deadline</label>
+                                    <input type="time" class="form-control" id="edit-deadline-time">
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Hủy</button>
+                                <button class="btn btn-purple btn-sm" onclick="saveDeadline()">
+                                    <i class="bi bi-save me-1"></i>Lưu
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════ -->
+            <!-- TAB 5: DS TRA BTVN                   -->
+            <!-- ════════════════════════════════════ -->
+            <div id="tab-submissions" class="tab-content" style="display: none;">
+                <div class="form-section">
+                    <h3><i class="bi bi-clipboard-data"></i> DS Trả BTVN</h3>
+                    <p class="text-muted mb-3" style="font-size: 0.82rem;">
+                        Xem và export danh sách học viên đã nộp BTVN theo từng buổi.
+                    </p>
+
+                    <div class="filter-bar mb-3">
+                        <select class="form-select" id="sub-class-select" onchange="loadSessionsForSubmission()" style="max-width: 280px;">
+                            <option value="">-- Chọn lớp --</option>
+                        </select>
+                        <select class="form-select" id="sub-session-select" onchange="loadSubmissions()" style="max-width: 280px;">
+                            <option value="">-- Chọn buổi --</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline-purple" onclick="exportSubmissionsCSV()" id="export-btn" disabled>
+                            <i class="bi bi-file-earmark-spreadsheet me-1"></i>Export CSV
+                        </button>
+                    </div>
+
+                    <!-- Submissions Table -->
+                    <div class="table-responsive">
+                        <table class="data-table" id="submission-table">
+                            <thead>
+                                <tr>
+                                    <th>STT</th>
+                                    <th>Ngày nộp</th>
+                                    <th>Mã HV</th>
+                                    <th>Email</th>
+                                    <th>Họ tên</th>
+                                    <th>SĐT</th>
+                                    <th>Ngày KG</th>
+                                    <th>Ngày KT</th>
+                                    <th>Band</th>
+                                    <th>Loại bài</th>
+                                    <th>BTVN buổi</th>
+                                    <th>Chi tiết</th>
+                                </tr>
+                            </thead>
+                            <tbody id="submission-table-body">
+                                <!-- Rendered by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div id="sub-empty" class="empty-state">
+                        <i class="bi bi-clipboard-data d-block"></i>
+                        <p class="mb-0">Chọn lớp và buổi ở trên để xem danh sách nộp bài.</p>
+                    </div>
+
+                    <div id="sub-summary" class="mt-3" style="display: none;">
+                        <div class="d-flex gap-3 flex-wrap">
+                            <span class="badge bg-light text-dark border" style="font-size: 0.82rem;">
+                                <i class="bi bi-people me-1"></i>Tổng: <strong id="sub-total">0</strong>
+                            </span>
+                            <span class="badge bg-light text-dark border" style="font-size: 0.82rem;">
+                                <i class="bi bi-check-circle text-success me-1"></i>Đã nộp: <strong id="sub-submitted">0</strong>
+                            </span>
+                            <span class="badge bg-light text-dark border" style="font-size: 0.82rem;">
+                                <i class="bi bi-x-circle text-danger me-1"></i>Chưa nộp: <strong id="sub-missing">0</strong>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submission Detail Modal -->
+            <div class="modal fade" id="submissionDetailModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="submission-detail-title">
+                                Chi tiết bài nộp
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div id="submission-detail-meta" class="submission-detail-meta"></div>
+                            <div id="submission-detail-content"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Đóng</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════ -->
+            <!-- TAB 6: NOI DUNG BUOI HOC            -->
+            <!-- ════════════════════════════════════ -->
+            <div id="tab-session-content" class="tab-content" style="display: none;">
+                <div class="form-section">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                        <h3 class="mb-0"><i class="bi bi-sliders"></i> Chọn buổi học</h3>
+                        <div class="session-toolbar-actions">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="loadSessionContentEditor({ forceRefresh: true })">
+                                <i class="bi bi-arrow-repeat me-1"></i>Tải custom để sửa
+                            </button>
+                            <button class="btn btn-sm btn-outline-purple" onclick="loadSessionTemplate()">
+                                <i class="bi bi-file-earmark-code me-1"></i>Tạo template
+                            </button>
+                            <a class="btn btn-sm btn-outline-primary" href="admin_listening_sets.html?setType=key_listening" target="_blank" rel="noopener">
+                                <i class="bi bi-headphones me-1"></i>Key Listening
+                            </a>
+                            <a class="btn btn-sm btn-outline-success" href="admin_upload.html?module=reading-set-module&setType=key_reading" target="_blank" rel="noopener">
+                                <i class="bi bi-book me-1"></i>Key Reading
+                            </a>
+                            <button class="btn btn-sm btn-purple" onclick="saveSessionContent()">
+                                <i class="bi bi-save me-1"></i>Lưu & Publish
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteSessionContent()">
+                                <i class="bi bi-trash me-1"></i>Xóa custom
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-muted mb-3" style="font-size: 0.82rem;">
+                        Chọn band + buổi để tải nội dung hiện tại, chỉnh sửa và publish.
+                    </p>
+
+                    <div class="row g-3 align-items-end">
+                        <div class="col-xl-2 col-lg-3 col-md-4">
+                            <label class="form-label fw-bold">Band</label>
+                            <select class="form-select" id="sc-band" onchange="onSessionBandChange()">
+                                <option value="B1">B1</option>
+                                <option value="B2">B2</option>
+                            </select>
+                        </div>
+                        <div class="col-xl-2 col-lg-3 col-md-4">
+                            <label class="form-label fw-bold">Buổi</label>
+                            <select class="form-select" id="sc-session" onchange="loadSessionContentEditor({ quiet: true })"></select>
+                        </div>
+                        <div class="col-xl-4 col-lg-6 col-md-8">
+                            <label class="form-label fw-bold">Ghi chú nội bộ</label>
+                            <input type="text" class="form-control" id="sc-notes" placeholder="VD: Cập nhật bộ đề tuần 2">
+                        </div>
+                        <div class="col-xl-4 col-lg-12">
+                            <div id="sc-status" class="alert alert-light border mb-0" style="font-size:0.8rem;">
+                                Chưa chọn buổi học.
+                            </div>
+                        </div>
+                    </div>
+                    <div id="sc-result" class="mt-3" style="display:none;"></div>
+                </div>
+
+                <div class="form-section">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                        <h3 class="mb-0"><i class="bi bi-ui-checks-grid"></i> Form Builder theo page type</h3>
+                    </div>
+
+                    <p class="text-muted mb-3" style="font-size:0.82rem;">
+                        Nhập đề bằng form theo từng <code>page.type</code>. Tập trung chỉnh bằng form để thao tác nhanh.
+                    </p>
+
+                    <div class="row g-3 builder-form session-builder-grid">
+                        <div class="col-xxl-4 col-xl-5 col-lg-5">
+                            <div class="border rounded-3 p-3 h-100 session-builder-pane">
+                                <div class="row g-2 mb-2">
+                                    <div class="col-6">
+                                        <label class="builder-form-label">Timer (phút)</label>
+                                        <input type="number" min="0" class="form-control" id="sc-timer-input"
+                                            onchange="updateDraftGlobalSettings()">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="builder-form-label">Hide global timer</label>
+                                        <div class="form-check mt-2">
+                                            <input class="form-check-input" type="checkbox" id="sc-hide-global-timer"
+                                                onchange="updateDraftGlobalSettings()">
+                                            <label class="form-check-label small" for="sc-hide-global-timer">Bật</label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="divider"></div>
+
+                                <label class="builder-form-label">Thêm page mới</label>
+                                <div class="d-flex gap-2">
+                                    <select class="form-select" id="sc-new-page-type"></select>
+                                    <button class="btn btn-sm btn-purple" onclick="addDraftPage()">
+                                        <i class="bi bi-plus-lg"></i>
+                                    </button>
+                                </div>
+
+                                <div class="divider"></div>
+                                <label class="builder-form-label">Danh sách pages</label>
+                                <div id="sc-page-list"></div>
+                            </div>
+                        </div>
+
+                        <div class="col-xxl-8 col-xl-7 col-lg-7">
+                            <div class="border rounded-3 p-3 h-100 session-builder-pane" id="sc-page-editor">
+                                <div class="text-muted" style="font-size:0.82rem;">
+                                    Chọn một page ở cột trái để chỉnh nội dung.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-12">
+                        <div class="form-section">
+                            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                <h3 class="mb-0"><i class="bi bi-play-circle"></i> Preview buổi học</h3>
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="previewSessionInAdmin()">
+                                        <i class="bi bi-eye me-1"></i>Preview trong admin
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="openSessionPreviewNewTab()">
+                                        <i class="bi bi-box-arrow-up-right me-1"></i>Tab mới
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="session-preview-shell">
+                                <iframe id="sc-preview-frame" class="session-preview-frame" title="Session Preview"></iframe>
+                            </div>
+                        </div>
+
+                        <div class="form-section">
+                            <h3><i class="bi bi-database"></i> Danh sách buổi đã có custom</h3>
+                            <p class="text-muted mb-2" style="font-size:0.82rem;">
+                                Nếu có record custom, <code>buoi_hoc.html</code> sẽ ưu tiên dùng nội dung này thay cho hard-code mặc định.
+                            </p>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Session</th>
+                                            <th>Tiêu đề</th>
+                                            <th>Cập nhật</th>
+                                            <th>Ghi chú</th>
+                                            <th>Thao tác</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sc-custom-list-body">
+                                        <!-- Rendered by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div id="sc-custom-empty" class="empty-state" style="display:none;">
+                                <i class="bi bi-folder2-open d-block"></i>
+                                <p class="mb-0">Chưa có session custom nào.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Authentication -->
+    <script src="js/auth.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async function () {
+            const main = document.getElementById('admin-main');
+            if (main) main.style.visibility = 'hidden';
+            const ok = await requireAdmin();
+            if (ok && main) {
+                main.style.visibility = 'visible';
+                initLopHocModule();
+            }
+        });
+    </script>
+
+    <!-- Module JS -->
+    <script src="js/admin_lop_hoc.js"></script>
+    <script src="js/copy_paste_guard.js"></script>
+</body>
+
+</html>

@@ -139,6 +139,57 @@
     <script src="js/auth.js"></script>
     
     <script>
+        function normalizeCourse(value) {
+            return typeof value === 'string' ? value.trim().toLowerCase() : '';
+        }
+
+        function normalizePath(pathname) {
+            const raw = typeof pathname === 'string' ? pathname.trim().toLowerCase() : '';
+            if (!raw || raw === '/') return '/';
+            return raw.endsWith('/') ? raw.slice(0, -1) : raw;
+        }
+
+        function isClassroomPath(pathname) {
+            const path = normalizePath(pathname);
+            return path === '/lop_hoc.html' || path === '/buoi_hoc.html' || path === '/speaking_cauhoi_part.html';
+        }
+
+        function sanitizeRedirectTargetByUser(user, redirectTarget) {
+            if (!redirectTarget) return '';
+            try {
+                const parsed = new URL(
+                    redirectTarget.startsWith('http') ? redirectTarget : `${window.location.origin}${redirectTarget}`
+                );
+                const path = normalizePath(parsed.pathname || '/');
+                const course = normalizeCourse(user && user.course);
+                const role = String(user && user.role || '').toLowerCase();
+
+                if (role === 'admin') {
+                    return parsed.href;
+                }
+                if (course === 'lớp học') {
+                    // Ignore stale redirects to Aptis/admin pages for classroom users.
+                    if (!isClassroomPath(path) && path !== '/lesson_history.html') {
+                        return '';
+                    }
+                    return parsed.href;
+                }
+                // Aptis / ôn thi users should not follow classroom deep links.
+                if (isClassroomPath(path)) {
+                    return '';
+                }
+                return parsed.href;
+            } catch (_) {
+                return '';
+            }
+        }
+
+        function resolveDefaultRedirect(user) {
+            if (user && user.role === 'admin') return '/home.html';
+            if (normalizeCourse(user && user.course) === 'lớp học') return '/lop_hoc.html';
+            return '/home.html';
+        }
+
         // Handle login form submission
         document.getElementById('login-form').addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -202,14 +253,12 @@
                 let redirectTarget = typeof consumePostLoginRedirect === 'function' 
                     ? consumePostLoginRedirect() 
                     : localStorage.getItem('post_login_redirect');
-                if (redirectTarget && !redirectTarget.includes('login')) {
-                    if (!redirectTarget.startsWith('http')) {
-                        redirectTarget = `${window.location.origin}${redirectTarget}`;
-                    }
+                redirectTarget = sanitizeRedirectTargetByUser(result.user || null, redirectTarget);
+                if (redirectTarget && !redirectTarget.includes('/login')) {
                     localStorage.removeItem('post_login_redirect');
                     window.location.href = redirectTarget;
                 } else {
-                window.location.href = '/home.html';
+                    window.location.href = resolveDefaultRedirect(result.user || null);
                 }
                 
             } catch (error) {
@@ -228,21 +277,21 @@
             // Verify token
             checkAuth().then(isValid => {
                 if (isValid) {
-                    let redirectTarget = typeof consumePostLoginRedirect === 'function'
-                        ? consumePostLoginRedirect()
+                    const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+                    let redirectTarget = typeof consumePostLoginRedirect === 'function' 
+                        ? consumePostLoginRedirect() 
                         : localStorage.getItem('post_login_redirect');
-                    if (redirectTarget && !redirectTarget.includes('login')) {
-                        if (!redirectTarget.startsWith('http')) {
-                            redirectTarget = `${window.location.origin}${redirectTarget}`;
-                        }
+                    redirectTarget = sanitizeRedirectTargetByUser(user, redirectTarget);
+                    if (redirectTarget && !redirectTarget.includes('/login')) {
                         localStorage.removeItem('post_login_redirect');
                         window.location.href = redirectTarget;
                     } else {
-                    window.location.href = '/home.html';
+                        window.location.href = resolveDefaultRedirect(user);
                     }
                 }
             });
         }
     </script>
+    <script src="js/copy_paste_guard.js"></script>
 </body>
 </html>

@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Buổi học - Mini Hippo</title>
+  <link rel="icon" href="images/favicon.ico" type="image/x-icon">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/source-sans-3@5.0.12/index.css"
+    integrity="sha256-tXJfXfp6Ewt1ilPzLDtQnJV4hclT9XuaZUKyUvmyr+Q=" crossorigin="anonymous" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/readingkey.css" />
+  <link rel="stylesheet" href="css/lesson-ui.css" />
+
+  <style>
+    body {
+      background: #f4f6f9;
+      font-family: 'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    /* ── Page container ── */
+    .page-container {
+      padding-bottom: 80px;
+      min-height: calc(100vh - 70px);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Progress bar ── */
+    .progress-track {
+      height: 4px;
+      background: #e2e8f0;
+      position: relative;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #1e40af, #2563eb);
+      transition: width 0.3s ease;
+    }
+
+    /* ── Question page - full width like reference ── */
+    .question-page { flex: 1; padding: 1.25rem 0 0.65rem; }
+
+    .question-card {
+      background: #fff;
+      padding: 1.5rem 1.5rem;
+      max-width: min(1060px, calc(100vw - 2rem));
+      width: 100%;
+      margin: 0 auto 1rem;
+      border: 1px solid #d9e0e8;
+      border-radius: 0.75rem;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.07);
+    }
+
+    .question-card .q-badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 2rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 1rem;
+    }
+    .q-badge-grammar { background: #dbeafe; color: #1d4ed8; }
+    .q-badge-vocab   { background: #e0f2fe; color: #0369a1; }
+
+    .question-card .q-number-label {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #2c3e50;
+      margin-bottom: 0.55rem;
+    }
+
+    .question-card .q-text {
+      font-size: 1.1rem;
+      font-weight: 500;
+      color: #334155;
+      line-height: 1.6;
+      margin-bottom: 1.5rem;
+    }
+
+    /* ── Radio options (grammar) ── */
+    .option-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .option-item {
+      background: #f8fafc;
+      border: 2px solid #e2e8f0;
+      border-radius: 0.6rem;
+      padding: 1rem 1.25rem;
+      margin-bottom: 0.6rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+
+    .option-item:hover {
+      border-color: #93c5fd;
+      background: #eff6ff;
+    }
+
+    .option-item.selected {
+      border-color: #2563eb;
+      background: #dbeafe;
+    }
+
+    .option-item .option-letter {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 2px solid #cbd5e1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.82rem;
+      color: #64748b;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+
+    .option-item.selected .option-letter {
+      background: #2563eb;
+      border-color: #2563eb;
+      color: #fff;
+    }
+
+    .option-item .option-text {
+      font-size: 1rem;
+      font-weight: 500;
+      color: #334155;
+    }
+
+    /* ── Fix dropdown icon glitch on classroom pages ──
+       Use native select UI to avoid duplicated/misaligned chevron rendering
+       from custom Bootstrap background icon on some browsers/devices. */
+    .question-card select.form-select {
+      -webkit-appearance: menulist;
+      -moz-appearance: menulist;
+      appearance: menulist;
+      background-image: none;
+      padding-right: 0.75rem;
+      text-align-last: left;
+      -webkit-text-align-last: left;
+    }
+
+    /* ── Vocab table (for vocab pages) ── */
+    .vocab-table {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.6rem;
+      overflow: hidden;
+      margin-bottom: 1rem;
+    }
+    .vocab-header {
+      background: linear-gradient(135deg, #eff6ff, #dbeafe);
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .vocab-header h5 { margin: 0; font-size: 0.9rem; font-weight: 700; color: #1e40af; }
+    .vocab-header p  { margin: 0.25rem 0 0; font-size: 0.78rem; color: #64748b; }
+
+    .vocab-body { display: flex; flex-wrap: wrap; }
+    .vocab-left { flex: 1; min-width: 220px; padding: 1rem 1.25rem; border-right: 1px solid #e2e8f0; }
+    .vocab-right { flex: 1; min-width: 180px; padding: 1rem 1.25rem; background: #f8fafc; }
+
+    .vocab-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; }
+    .vocab-row .v-num  { font-weight: 700; color: #64748b; min-width: 24px; }
+    .vocab-row .v-word { font-weight: 600; color: #1e293b; }
+    .vocab-row select  { max-width: 180px; }
+
+    .vocab-option { padding: 0.3rem 0; font-size: 0.88rem; color: #334155; }
+    .vocab-option .v-letter { font-weight: 700; color: #2563eb; margin-right: 0.35rem; }
+
+    .sentence-fill { background: #fff; border: 1px solid #e2e8f0; border-radius: 0.6rem; padding: 1rem 1.25rem; margin-bottom: 0.65rem; }
+    .sentence-fill .sf-num { font-weight: 700; color: #64748b; margin-right: 0.5rem; }
+    .sentence-fill select { display: inline-block; width: auto; min-width: 150px; margin: 0 0.25rem; }
+
+    .result-correct   { color: #16a34a; font-weight: 600; }
+    .result-incorrect  { color: #dc2626; font-weight: 600; }
+
+    /* ── Audio player bar (listening) ── */
+    .audio-bar {
+      background: linear-gradient(135deg, #991b1b, #b91c1c);
+      border-radius: 0.6rem;
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      color: #fff;
+    }
+    .audio-bar .play-btn {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.5);
+      background: transparent;
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      font-size: 1rem;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+    .audio-bar .play-btn:hover { background: rgba(255,255,255,0.15); border-color: #fff; }
+    .audio-bar .play-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .audio-bar .vol-icon { font-size: 1.1rem; flex-shrink: 0; }
+    .audio-bar input[type="range"] { flex: 1; accent-color: #60a5fa; min-width: 80px; }
+    .audio-bar .plays-remaining {
+      margin-left: auto;
+      font-size: 0.78rem;
+      white-space: nowrap;
+      opacity: 0.85;
+    }
+
+    /* ── Listening question container ── */
+    .listening-q-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.6rem;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .listening-q-box .lq-text {
+      font-weight: 700;
+      font-size: 1rem;
+      color: #1e293b;
+      margin-bottom: 0.75rem;
+    }
+
+    /* ── Person row (Part 2) ── */
+    .person-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .person-row:last-child { border-bottom: none; }
+    .person-row .person-label {
+      font-weight: 700;
+      min-width: 75px;
+      color: #1e293b;
+    }
+    .person-row select { flex: 1; }
+    .listening-opinion-row .listening-opinion-text {
+      flex: 1;
+      color: #1e293b;
+      font-weight: 500;
+      font-size: 0.95rem;
+    }
+    .listening-opinion-row select {
+      max-width: 240px;
+      flex: 0 0 220px;
+    }
+    .listening-transcript {
+      margin-top: 0.75rem;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.5rem;
+      padding: 1rem 1rem;
+      color: #475569;
+      font-size: 0.9rem;
+      line-height: 1.65;
+      white-space: pre-wrap;
+    }
+    .listening-mcq-item {
+      border: 1px solid #e2e8f0;
+      border-radius: 0.6rem;
+      padding: 1rem 1rem 0.45rem;
+      background: #fff;
+      margin-bottom: 0.8rem;
+    }
+    .listening-mcq-item:last-child { margin-bottom: 0; }
+
+    /* ── Topic banner ── */
+    .topic-banner {
+      font-size: 1.1rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: #dc2626;
+      margin-bottom: 0.5rem;
+    }
+
+    /* ── Reading Part 1: gap fill ── */
+    .gap-row {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.6rem;
+      padding: 1rem 1.25rem;
+      margin-bottom: 0.6rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      font-size: 1rem;
+      line-height: 1.8;
+    }
+    .gap-row select { display: inline-block; width: auto; min-width: 120px; }
+
+    /* ── Reading Part 1 (match old Reading Đề 1 style) ── */
+    .reading-part1-layout {
+      max-width: min(1060px, calc(100vw - 2.25rem));
+      padding: 1.5rem 1.5rem;
+      background: #fff;
+    }
+    .reading-part1-title {
+      margin: 0 0 0.85rem;
+      font-size: 2.1rem;
+      font-weight: 700;
+      color: #2c3e50;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+    }
+    .reading-part1-instruction {
+      margin: 0 0 1.15rem;
+      color: #525f7a;
+      font-size: 1.02rem;
+    }
+    .reading-part1-shell {
+      background: #f5f7fa;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.9rem;
+      padding: 1.15rem;
+    }
+    .reading-part2-layout,
+    .reading-part3-layout {
+      max-width: min(1060px, calc(100vw - 2.25rem));
+      background: #fff;
+    }
+    .reading-part1-row {
+      border: 1px solid #d8dee7;
+      border-radius: 0.65rem;
+      padding: 0.95rem 0.95rem;
+      margin-bottom: 0.8rem;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+      font-size: 1.15rem;
+      line-height: 1.7;
+      color: #1e293b;
+    }
+    .reading-part1-row:last-child { margin-bottom: 0; }
+    .reading-part1-select {
+      min-width: 132px;
+      max-width: 190px;
+      border: 1px solid #cfd6e2;
+      font-size: 1rem;
+      font-weight: 500;
+      vertical-align: middle;
+    }
+    .reading-part1-closing {
+      margin: 0;
+      white-space: pre-line;
+      color: #475569;
+      font-size: 1rem;
+    }
+
+    /* ── Reading Part 2: sentence ordering ── */
+    .draggable-card {
+      background: #fff;
+      border-radius: 0.75rem;
+      padding: 1rem;
+      border: 1px solid #e2e8f0;
+      margin-bottom: 0.75rem;
+      cursor: grab;
+      box-shadow: 0 10px 20px rgba(15,23,42,0.05);
+    }
+    .draggable-card:active { cursor: grabbing; }
+    .sortable-ghost { opacity: 0.4; }
+    .locked-sentence {
+      background: #e3f2fd;
+      border: 2px solid #1976d2;
+      border-radius: 0.75rem;
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+      cursor: default;
+    }
+
+    /* ── Reading Part 3: paragraphs + dropdown ── */
+    .paragraph-box {
+      margin-bottom: 1rem;
+    }
+    .paragraph-box p {
+      font-size: 0.9rem;
+      line-height: 1.7;
+      color: #334155;
+    }
+    .paragraph-box strong {
+      color: #1e40af;
+    }
+    .match-row {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.5rem;
+      padding: 0.75rem 1rem;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .match-row .match-label {
+      flex: 1;
+      font-size: 0.9rem;
+      color: #334155;
+    }
+    .match-row select { min-width: 80px; width: auto; }
+
+    /* ── Speaking: exact match with speaking_cauhoi_part.html ── */
+    .speaking-card { border-radius: 0.85rem; }
+    .page-image { width: 100%; max-height: 340px; object-fit: contain; border-radius: 0.75rem; border: 1px solid #cbd5e1; background: #f8fafc; }
+    .answer-box { min-height: 130px; resize: vertical; }
+    .audio-panel { border: 1px solid #dbe2ea; border-radius: 0.75rem; padding: 1rem; }
+    .page-hint { font-size: 0.875rem; color: #475569; }
+    .page-fade { animation: fadeInUp 0.4s ease-out; }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+    .page-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.3rem; align-items: center; max-width: min(760px, 60vw); }
+    .page-dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,0.35); transition: all 0.3s; }
+    .page-dot.active { background: #fbbf24; transform: scale(1.4); }
+    .page-dot.done { background: #4ade80; }
+
+    .speaking-timer-ring {
+      width: 120px; height: 120px; border-radius: 50%; border: 6px solid #e2e8f0;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 1rem; font-size: 2rem; font-weight: 800; color: #1e293b; transition: border-color 0.3s;
+    }
+    .speaking-timer-ring.running { border-color: #2563eb; }
+    .speaking-timer-ring.warning { border-color: #f59e0b; }
+    .speaking-timer-ring.expired { border-color: #ef4444; color: #ef4444; }
+    .speaking-status { text-align: center; font-size: 0.88rem; color: #64748b; margin-bottom: 0.5rem; }
+    .speaking-wait-overlay { text-align: center; padding: 2rem; }
+    .speaking-wait-overlay h4 { font-weight: 700; color: #2563eb; }
+
+    /* ── Writing: short-answer & email ── */
+    .writing-topic-bar {
+      background: #e9ecef;
+      color: #495057;
+      border-radius: 0.32rem;
+      padding: 0.85rem 1rem;
+      border-left: 5px solid #3498db;
+      margin-bottom: 1.25rem;
+      font-size: 1rem;
+      line-height: 1.55;
+    }
+    .writing-q-item {
+      margin-bottom: 1.25rem;
+    }
+    .writing-q-item label {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: #1e293b;
+      margin-bottom: 0.4rem;
+      display: block;
+    }
+    .writing-q-item input,
+    .writing-q-item textarea {
+      border: 1px solid #cbd5e1;
+      border-radius: 0.5rem;
+      transition: border-color 0.2s;
+    }
+    .writing-q-item input:focus,
+    .writing-q-item textarea:focus {
+      border-color: #3498db;
+      box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.18);
+    }
+    .writing-sentence-prompt {
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.5rem;
+      padding: 0.75rem 1rem;
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: #1e293b;
+      margin-bottom: 0.5rem;
+    }
+
+    .word-counter {
+      text-align: right;
+      font-size: 0.78rem;
+      color: #94a3b8;
+      margin-top: 0.3rem;
+    }
+    .word-counter.over-limit { color: #dc2626; font-weight: 600; }
+    .word-counter.in-range { color: #16a34a; }
+
+    /* ── AI feedback cards ── */
+    .ai-feedback-section {
+      margin-top: 1.5rem;
+    }
+    .ai-feedback-card {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 0.6rem;
+      padding: 1rem 1.25rem;
+      margin-bottom: 0.75rem;
+    }
+    .ai-feedback-card.error-card {
+      background: #fef2f2;
+      border-color: #fecaca;
+    }
+    .ai-feedback-card h6 {
+      font-size: 0.82rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    .ai-diff-del {
+      background: #fecaca;
+      color: #991b1b;
+      text-decoration: line-through;
+      padding: 0 2px;
+      border-radius: 2px;
+    }
+    .ai-diff-ins {
+      background: #bbf7d0;
+      color: #166534;
+      text-decoration: underline;
+      padding: 0 2px;
+      border-radius: 2px;
+    }
+
+    @media (max-width: 576px) {
+      .question-card {
+        max-width: calc(100vw - 1rem);
+        padding: 1rem 0.9rem;
+      }
+      .question-card .q-text { font-size: 1.05rem; }
+      .vocab-body { flex-direction: column; }
+      .vocab-left { border-right: none; border-bottom: 1px solid #e2e8f0; }
+      .audio-bar { flex-wrap: wrap; }
+      .person-row { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+      .person-row select { width: 100%; }
+      .reading-part1-layout { padding: 1rem 0.75rem; }
+      .reading-part1-title { font-size: 1.45rem; }
+      .reading-part1-shell { padding: 0.8rem; }
+      .reading-part1-row { font-size: 1rem; padding: 0.8rem; }
+      .reading-part1-select { min-width: 118px; }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ═══ STICKY HEADER (switchable: default / speaking) ═══ -->
+  <div id="app-header" class="header p-3 bg-primary text-white shadow">
+    <!-- Default header -->
+    <div id="header-default" class="d-flex justify-content-between align-items-center">
+      <div class="d-flex align-items-center">
+        <a href="lop_hoc.html" class="me-3 text-decoration-none text-white fs-4 d-flex align-items-center">
+          <i class="bi bi-house-door-fill me-2 fs-5"></i>
+          <span class="fw-bold">Mini Hippo</span>
+        </a>
+      </div>
+      <div class="d-flex align-items-center">
+        <span class="time-remaining-label me-2 fs-6">Time remaining:</span>
+        <span class="countdown fs-4 fw-bold" id="countdownTimer">25:00</span>
+      </div>
+      <div id="question_step" class="fs-5 fw-bold text-light">
+        <span id="step-label">Câu 1 / 28</span>
+      </div>
+    </div>
+    <!-- Speaking header (3-column grid with page dots) -->
+    <div id="header-speaking" style="display:none;">
+      <div style="display:grid; grid-template-columns: minmax(150px,1fr) auto minmax(180px,1fr); align-items:center; gap:1rem;">
+        <div>
+          <a href="lop_hoc.html" class="text-decoration-none text-white fs-4 d-inline-flex align-items-center gap-2">
+            <i class="bi bi-house-door-fill fs-5"></i>
+            <span class="fw-bold">Mini Hippo</span>
+          </a>
+        </div>
+        <div class="d-flex flex-column align-items-center gap-2">
+          <div class="d-flex align-items-center gap-2">
+            <span class="time-remaining-label fs-6">Time remaining:</span>
+            <span class="countdown fs-4 fw-bold" id="countdownTimerSpeaking">--:--</span>
+          </div>
+          <div class="page-dots" id="headerPageDots"></div>
+        </div>
+        <div class="fs-5 fw-bold text-light" style="text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" id="step-label-speaking">Speaking Practice</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PROGRESS BAR ═══ -->
+  <div class="progress-track">
+    <div class="progress-fill" id="progressBar" style="width: 0%;"></div>
+  </div>
+
+  <!-- ═══ DYNAMIC PAGE CONTENT ═══ -->
+  <div class="page-container">
+    <div class="question-page">
+      <div id="pageContent">
+        <!-- Rendered by JS per page -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ FOOTER NAVIGATION ═══ -->
+  <div class="footer" id="navigator">
+    <button class="btn btn-back" id="backButton" onclick="goBack()">Back</button>
+    <button class="btn btn-next" id="nextButton" onclick="goNext()">Next</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/buoi_hoc.js"></script>
+    <script src="js/copy_paste_guard.js"></script>
+</body>
+
+</html>
