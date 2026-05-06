@@ -34,7 +34,7 @@ const questions3_answer = {
     "question3_3_answer": "",
 };
 //----------------------------------------------------------------------
-const questions4_main = "Dear member, \nThe club will have a lecture soon. the club needs a guest speaker and a theme of learning language. Write an email expressing your desire to be a speaker and give the topic of the talk.";
+const questions4_main = "Dear member, \nThe club will have a lecture soon. The club needs a guest speaker and a theme of learning language. Write an email expressing your desire to be a speaker and give the topic of the talk.";
 const question4_1_text = "Write a short email to your friend. Tell your friend your feelings about this and what you plan to do.";
 const question4_2_text = "Write an email to the president of the club. Tell them your thoughts about this and what you would like to do.";
 const question4_1_text_answer = ``;
