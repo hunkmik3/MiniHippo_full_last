@@ -71,7 +71,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    if (normalizedPracticeType === 'homework') {
+    const isHomeworkSubmission =
+      normalizedPracticeType === 'homework' ||
+      String(mergedMetadata?.submission_kind || '').toLowerCase() === 'homework';
+    const isAdminSubmitter = String(authResult?.user?.role || '').toLowerCase() === 'admin';
+
+    if (isHomeworkSubmission) {
       const sessionNumber = parseSessionNumber(mergedMetadata?.session_number);
       if (!setId || !sessionNumber) {
         return res.status(400).json({
@@ -86,6 +91,32 @@ export default async function handler(req, res) {
 
       if (!classSet) {
         return res.status(404).json({ error: 'Không tìm thấy lớp học tương ứng' });
+      }
+
+      const logicalType = String(
+        classSet?.data?.__practice_type || classSet?.type || ''
+      ).toLowerCase();
+      if (logicalType !== 'homework_class') {
+        return res.status(400).json({
+          error: 'Lớp được chọn không phải lớp homework hợp lệ.'
+        });
+      }
+
+      // Học viên BẮT BUỘC đã được admin gán vào lớp này. Admin được bypass.
+      if (!isAdminSubmitter) {
+        const userAssignedClassId = String(
+          authResult?.user?.assignedClassId || ''
+        ).trim();
+        if (!userAssignedClassId) {
+          return res.status(403).json({
+            error: 'Bạn chưa được gán vào lớp học nào. Vui lòng liên hệ admin.'
+          });
+        }
+        if (userAssignedClassId !== String(setId)) {
+          return res.status(403).json({
+            error: 'Bạn không thuộc lớp này, không thể nộp bài.'
+          });
+        }
       }
 
       const sessions = Array.isArray(classSet?.data?.sessions) ? classSet.data.sessions : [];

@@ -31,8 +31,202 @@ let ACCESS_CONTEXT = {
 };
 let HOMEWORK_SUBMISSION_PROMISE = null;
 
+/* ═══════════════════════════════════════════════════════
+   SPEAKING RECORDING (B1-7, B2-10 và các speaking-audio-q)
+   ═══════════════════════════════════════════════════════ */
+
+const SPEAKING_RECORDINGS = {}; // { key: { blob, mime, durationSeconds, uploadedUrl, filePath, sizeBytes, uploadPromise } }
+let activeSpeakingRecorder = null;
+let activeSpeakingRecorderKey = null;
+let activeSpeakingRecorderStream = null;
+let activeSpeakingRecorderStartedAt = 0;
+
+function supportsSpeakingRecording() {
+  return Boolean(window.MediaRecorder && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+}
+
+function pickSpeakingRecordingMime() {
+  if (!window.MediaRecorder || typeof MediaRecorder.isTypeSupported !== 'function') return '';
+  const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
+  for (const c of candidates) if (MediaRecorder.isTypeSupported(c)) return c;
+  return '';
+}
+
+function speakingRecorderExtension(mime) {
+  const m = String(mime || '').toLowerCase();
+  if (m.includes('audio/mpeg')) return 'mp3';
+  if (m.includes('audio/ogg')) return 'ogg';
+  if (m.includes('audio/wav')) return 'wav';
+  if (m.includes('audio/mp4') || m.includes('audio/x-m4a')) return 'm4a';
+  return 'webm';
+}
+
+function sanitizeSegment(value, fallback) {
+  const s = String(value || '').trim().replace(/[^\w.-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  return s || String(fallback || 'item');
+}
+
+function buildSpeakingRecordingPath(key, mime) {
+  const user = ACCESS_CONTEXT?.user || (typeof getCurrentUser === 'function' ? getCurrentUser() : null);
+  const userCode = sanitizeSegment(user?.accountCode || user?.username || user?.id, 'user');
+  const sessionKey = sanitizeSegment(`${ACTIVE_BAND}-${SESSION}`, 'session');
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const dateFolder = stamp.slice(0, 10);
+  const ext = speakingRecorderExtension(mime);
+  return `audio/speaking_submissions/${dateFolder}/${userCode}/${sessionKey}_${sanitizeSegment(key, 'answer')}_${stamp}.${ext}`;
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const base64 = result.split(',')[1] || '';
+      if (!base64) return reject(new Error('Không đọc được nội dung file ghi âm.'));
+      resolve(base64);
+    };
+    reader.onerror = () => reject(new Error('Lỗi đọc blob ghi âm.'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function uploadSpeakingRecording(key) {
+  const rec = SPEAKING_RECORDINGS[key];
+  if (!rec || !rec.blob) return null;
+  if (rec.uploadedUrl) return rec.uploadedUrl;
+  if (rec.uploadPromise) return rec.uploadPromise;
+
+  rec.uploadPromise = (async () => {
+    const base64 = await blobToBase64(rec.blob);
+    const token = resolveToken();
+    const response = await fetch('/api/upload-speaking-recording', {
+      method: 'POST',
+      headers: buildAuthorizedHeaders({
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }),
+      body: JSON.stringify({
+        contentBase64: base64,
+        fileName: rec.filePath?.split('/').pop() || `${sanitizeSegment(key, 'answer')}.webm`,
+        mimeType: rec.mime || 'audio/webm',
+        speakingSetId: ACCESS_CONTEXT?.classSet?.id || `${ACTIVE_BAND}-${SESSION}`,
+        speakingPart: `${ACTIVE_BAND}-${SESSION}`,
+        answerKey: key
+      })
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data?.error || 'Upload ghi âm thất bại.');
+    }
+    const data = await response.json();
+    rec.uploadedUrl = data.rawUrl || data.fileUrl || '';
+    rec.filePath = data.filePath || rec.filePath;
+    return rec.uploadedUrl;
+  })();
+
+  try {
+    return await rec.uploadPromise;
+  } catch (err) {
+    rec.uploadPromise = null;
+    console.warn('Upload speaking recording failed:', err);
+    throw err;
+  }
+}
+
+async function ensureAllSpeakingRecordingsUploaded() {
+  const keys = Object.keys(SPEAKING_RECORDINGS).filter((k) => SPEAKING_RECORDINGS[k]?.blob);
+  await Promise.all(keys.map((k) => uploadSpeakingRecording(k).catch(() => null)));
+}
+
+async function startSpeakingRecording(key) {
+  if (!key || !supportsSpeakingRecording() || activeSpeakingRecorder) return false;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mime = pickSpeakingRecordingMime();
+    const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    const chunks = [];
+    recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    recorder.onstop = () => {
+      const usedMime = recorder.mimeType || mime || 'audio/webm';
+      const blob = new Blob(chunks, { type: usedMime });
+      const durationSec = activeSpeakingRecorderStartedAt
+        ? Math.max(1, Math.round((Date.now() - activeSpeakingRecorderStartedAt) / 1000))
+        : 0;
+      SPEAKING_RECORDINGS[key] = {
+        ...(SPEAKING_RECORDINGS[key] || {}),
+        blob,
+        mime: usedMime,
+        durationSeconds: durationSec,
+        sizeBytes: blob.size,
+        filePath: buildSpeakingRecordingPath(key, usedMime),
+        uploadedUrl: '',
+        uploadPromise: null
+      };
+      try { stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
+      if (activeSpeakingRecorderKey === key) {
+        activeSpeakingRecorder = null;
+        activeSpeakingRecorderKey = null;
+        activeSpeakingRecorderStream = null;
+      }
+      // Upload nền sau khi stop
+      uploadSpeakingRecording(key).catch(() => null);
+    };
+    recorder.start();
+    activeSpeakingRecorder = recorder;
+    activeSpeakingRecorderKey = key;
+    activeSpeakingRecorderStream = stream;
+    activeSpeakingRecorderStartedAt = Date.now();
+    return true;
+  } catch (err) {
+    console.warn('Không thể bật micro để ghi âm:', err);
+    return false;
+  }
+}
+
+function stopActiveSpeakingRecording() {
+  try {
+    if (activeSpeakingRecorder && activeSpeakingRecorder.state !== 'inactive') {
+      activeSpeakingRecorder.stop();
+    }
+  } catch (_) {
+    // ignore
+  }
+}
+
+function showSpeakingRecordingIndicator(key, options = {}) {
+  const containerIds = options.containerIds || ['speaking-status', 'speaking-timer-status', 'audio-status-label'];
+  const text = options.text || '🔴 Đang ghi âm... Vui lòng nói rõ vào micro.';
+  containerIds.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.innerHTML = `<span style="color:#dc2626; font-weight:600;">${text}</span>`;
+    }
+  });
+}
+
 function normalizeText(value) {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+// Filter out placeholder strings ("preview", "placeholder", trống...) khỏi danh
+// sách URL media trước khi render, tránh hiện icon ảnh bể.
+function isLikelyMediaUrl(value) {
+  const v = String(value || '').trim();
+  if (!v) return false;
+  if (/^(preview|placeholder|null|undefined|none|todo|tbd)$/i.test(v)) return false;
+  // Loại bỏ path placeholder default trong code (vd images/speaking/placeholder_part2_1.jpg)
+  // — file thực tế không tồn tại trên server, gây icon ảnh broken.
+  if (/(^|\/)placeholder[_-]/i.test(v)) return false;
+  if (/^https?:\/\//i.test(v)) return true;
+  if (v.startsWith('//') || v.startsWith('/')) return true;
+  return /\.(png|jpe?g|webp|gif|svg|mp3|wav|ogg|m4a|webm|mp4|mov|m4v|avi)(\?.*)?$/i.test(v);
+}
+
+function filterValidMediaUrls(list) {
+  const arr = Array.isArray(list) ? list : (list ? [list] : []);
+  return arr
+    .map((v) => String(v || '').trim())
+    .filter((v) => isLikelyMediaUrl(v));
 }
 
 function normalizeBand(value) {
@@ -101,6 +295,23 @@ function getDateDistanceDays(a, b) {
   return Math.abs(a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24);
 }
 
+function getAssignedClassId(user) {
+  const raw = user?.assignedClassId || user?.assigned_class_id || '';
+  return String(raw || '').trim();
+}
+
+function getAssignedClassForBand(classes, band, user) {
+  const assignedClassId = getAssignedClassId(user);
+  if (!assignedClassId) return null;
+
+  const matched = (classes || []).find((cls) => String(cls?.id || '') === assignedClassId);
+  if (!matched) return null;
+
+  const configuredBand = normalizeBand((matched?.data || {}).band || (matched?.data || {}).band_code);
+  if (configuredBand && band && configuredBand !== band) return null;
+  return matched;
+}
+
 function scoreClassForBand(cls, band, user) {
   const data = cls?.data || {};
   const configuredBand = normalizeBand(data.band || data.band_code);
@@ -122,7 +333,14 @@ function scoreClassForBand(cls, band, user) {
   return score;
 }
 
-function pickClassForBand(classes, band, user) {
+function pickClassForBand(classes, band, user, { allowHeuristic = false } = {}) {
+  const assignedClass = getAssignedClassForBand(classes, band, user);
+  if (assignedClass) return assignedClass;
+
+  // Chỉ admin (allowHeuristic=true) mới được fallback heuristic.
+  // Học viên thường không có assigned_class_id khớp → không có lớp.
+  if (!allowHeuristic) return null;
+
   const ranked = (classes || [])
     .map((cls) => ({ cls, score: scoreClassForBand(cls, band, user) }))
     .filter((entry) => entry.score > -9999)
@@ -212,7 +430,7 @@ async function resolveAccessContext() {
       classSet = classes.find((item) => String(item?.id) === String(CLASS_ID)) || null;
     }
     if (!classSet) {
-      classSet = pickClassForBand(classes, adminBand, user);
+      classSet = pickClassForBand(classes, adminBand, user, { allowHeuristic: true });
     }
 
     ACCESS_CONTEXT = {
@@ -271,11 +489,44 @@ async function resolveAccessContext() {
   }
 
   let classSet = null;
-  if (CLASS_ID) {
-    classSet = classes.find((item) => String(item?.id) === String(CLASS_ID)) || null;
+  const assignedClassId = getAssignedClassId(user);
+
+  // Học viên BẮT BUỘC phải có assigned_class_id (admin đã gán vào lớp).
+  if (!assignedClassId) {
+    ACCESS_CONTEXT = {
+      user,
+      classSet: null,
+      sessionMeta: null,
+      locked: true,
+      lockReason: 'Bạn chưa được gán vào lớp học nào. Vui lòng liên hệ admin để được thêm vào lớp.'
+    };
+    return ACCESS_CONTEXT;
   }
+
+  // Lấy đúng lớp đã được gán (không fallback heuristic).
+  classSet = classes.find((item) => String(item?.id) === String(assignedClassId)) || null;
+
   if (!classSet) {
-    classSet = pickClassForBand(classes, normalizeBand(ACTIVE_BAND), user);
+    ACCESS_CONTEXT = {
+      user,
+      classSet: null,
+      sessionMeta: null,
+      locked: true,
+      lockReason: 'Lớp đã gán cho bạn không còn tồn tại. Vui lòng liên hệ admin để được gán lại.'
+    };
+    return ACCESS_CONTEXT;
+  }
+
+  // Học viên cố ý mở buổi của lớp khác (?classId=...) → chặn.
+  if (CLASS_ID && String(CLASS_ID) !== String(assignedClassId)) {
+    ACCESS_CONTEXT = {
+      user,
+      classSet,
+      sessionMeta: null,
+      locked: true,
+      lockReason: 'Bạn không thuộc lớp này. Vui lòng quay lại trang Lớp Học.'
+    };
+    return ACCESS_CONTEXT;
   }
 
   const sessionMeta = resolveSessionMeta(classSet, SESSION);
@@ -326,6 +577,31 @@ function buildHomeworkPayload(totalCorrect = 0, totalQuestions = 0) {
   };
 }
 
+function buildSpeakingAnswersForSubmit() {
+  const speakingPages = pages.filter((p) =>
+    ['speaking-q', 'speaking-image', 'speaking-audio-q', 'speaking-intro'].includes(p.type)
+  );
+  return speakingPages
+    .map((pg) => {
+      const key = pg.data?.key || `sp-${pg.idx}`;
+      const recording = SPEAKING_RECORDINGS[key];
+      const note = userAnswers[key] || '';
+      // Bỏ qua nếu vừa không có recording vừa không có note
+      if (!recording?.uploadedUrl && !note && !recording?.blob) return null;
+      return {
+        key,
+        prompt: pg.data?.prompt || pg.data?.introText || '',
+        answer: note,
+        recording_url: recording?.uploadedUrl || '',
+        recording_duration_seconds: recording?.durationSeconds || 0,
+        recording_mime_type: recording?.mime || '',
+        recording_file_path: recording?.filePath || '',
+        recording_size_bytes: recording?.sizeBytes || 0
+      };
+    })
+    .filter(Boolean);
+}
+
 function submitHomeworkResultIfNeeded(totalCorrect = 0, totalQuestions = 0) {
   if (PREVIEW_MODE) return Promise.resolve(false);
   if (HOMEWORK_SUBMISSION_PROMISE) return HOMEWORK_SUBMISSION_PROMISE;
@@ -336,6 +612,19 @@ function submitHomeworkResultIfNeeded(totalCorrect = 0, totalQuestions = 0) {
 
   HOMEWORK_SUBMISSION_PROMISE = (async () => {
     try {
+      // Đảm bảo tất cả ghi âm đã upload xong trước khi submit homework status
+      await ensureAllSpeakingRecordingsUploaded();
+
+      const speakingAnswers = buildSpeakingAnswersForSubmit();
+      if (speakingAnswers.length) {
+        payload.metadata = {
+          ...payload.metadata,
+          session_type: 'speaking',
+          speaking_answers: speakingAnswers,
+          speaking_submitted_at: new Date().toISOString()
+        };
+      }
+
       const token = resolveToken();
       const response = await fetch('/api/practice_results/submit', {
         method: 'POST',
@@ -2181,9 +2470,12 @@ function resolvePageDisplayPartLabel(page, fallbackLabel = '') {
     page?.data?.stepLabel
   ];
 
+  // Ưu tiên label admin nhập tự do (vd "Mô tả ảnh", "Câu hỏi đặc biệt").
   for (const candidate of candidates) {
-    const num = extractPartNumberFromLabel(candidate);
-    if (num) return `Part ${num}`;
+    const value = String(candidate || '').trim();
+    if (!value) continue;
+    const num = extractPartNumberFromLabel(value);
+    return num ? `Part ${num}` : value;
   }
   return fallbackLabel;
 }
@@ -2337,6 +2629,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 function renderPage(pageIndex) {
   saveCurrent();
   clearSpeakingTimer(); // Always clear speaking timer when switching pages
+  stopActiveSpeakingRecording(); // Stop recording trước khi rời page
   currentPage = pageIndex;
   const container = document.getElementById('pageContent');
 
@@ -2996,8 +3289,8 @@ function renderWritingDescribeImage(page) {
   const partLabel = page.headerTitle || d.headerTitle || resolvePageDisplayPartLabel(page, `Câu ${fallbackIdx}`);
 
   const imgSources = Array.isArray(d.images) && d.images.length
-    ? d.images
-    : (d.image ? [d.image] : []);
+    ? filterValidMediaUrls(d.images)
+    : filterValidMediaUrls(d.image ? [d.image] : []);
 
   const imgHtml = imgSources.length
     ? `<div style="display:grid; grid-template-columns:${imgSources.length > 1 ? 'repeat(2, minmax(0, 1fr))' : '1fr'}; gap:0.75rem;">
@@ -3168,7 +3461,7 @@ function renderSpeakingImage(page) {
   const num = page.idx + 1;
   const saved = userAnswers['sp-' + page.idx] || '';
 
-  const imagesHtml = (d.images || []).map(src =>
+  const imagesHtml = filterValidMediaUrls(d.images).map(src =>
     `<img src="${src}" alt="Speaking image" onerror="this.style.display='none';">`
   ).join('');
 
@@ -3212,8 +3505,12 @@ function renderSpeakingIntro(page) {
   const d = page.data;
   const audioId = 'sp-intro-audio-' + page.idx;
 
-  const imagesHtml = (d.images || []).map(src =>
-    `<div class="col-12 col-md-6"><img class="page-image" src="${src}" alt="Speaking visual" onerror="this.alt='Hình ảnh sẽ cập nhật sau'; this.style.padding='3rem';"></div>`
+  const validImages = filterValidMediaUrls(d.images);
+  const isSingle = validImages.length === 1;
+  const colClass = isSingle ? 'col-12 d-flex justify-content-center' : 'col-12 col-md-6 d-flex justify-content-center';
+  const imgStyle = isSingle ? 'max-width:560px; width:100%; height:auto;' : 'width:100%; height:auto;';
+  const imagesHtml = validImages.map(src =>
+    `<div class="${colClass}"><img class="page-image" src="${src}" alt="Speaking visual" style="${imgStyle}" onerror="this.closest('div')?.style.setProperty('display','none','important');"></div>`
   ).join('');
 
   return `
@@ -3234,7 +3531,13 @@ function renderSpeakingIntro(page) {
               <h6 class="mb-0">Audio</h6>
               <span class="small text-muted">Audio 1 / 1</span>
             </div>
-            <audio id="${audioId}" controls preload="none" class="w-100 mb-2" src="${d.introAudio || ''}"></audio>
+            <audio id="${audioId}" controls autoplay preload="auto" class="w-100 mb-2" src="${d.introAudio || ''}"></audio>
+            <div class="d-none" id="autoplay-fallback-${page.idx}">
+              <button type="button" class="btn btn-primary btn-sm" onclick="manualPlaySpeakingIntro(${page.idx})">
+                <i class="bi bi-play-fill me-1"></i>Bắt đầu phát audio
+              </button>
+              <div class="small text-muted mt-1">Trình duyệt đã chặn tự động phát. Nhấn nút trên để tiếp tục.</div>
+            </div>
             <div class="small" id="audio-status-label">Đang phát audio 1...</div>
           </div>
         </div>
@@ -3242,29 +3545,96 @@ function renderSpeakingIntro(page) {
     </div>`;
 }
 
+function manualPlaySpeakingIntro(idx) {
+  const audio = document.getElementById('sp-intro-audio-' + idx);
+  const fallback = document.getElementById('autoplay-fallback-' + idx);
+  if (!audio) return;
+  audio.play().then(() => {
+    if (fallback) fallback.classList.add('d-none');
+  }).catch((err) => {
+    console.warn('Manual play failed:', err);
+  });
+}
+window.manualPlaySpeakingIntro = manualPlaySpeakingIntro;
+
 function playSpeakingIntroAudio(page) {
   clearSpeakingTimer();
+  stopActiveSpeakingRecording();
   const audioId = 'sp-intro-audio-' + page.idx;
   const audio = document.getElementById(audioId);
   const statusLabel = document.getElementById('audio-status-label');
 
-  if (!audio || !audio.src || audio.src.endsWith('/')) {
-    if (statusLabel) statusLabel.textContent = 'Không có audio, chuyển trang...';
-    setTimeout(() => { saveCurrent(); renderPage(currentPage + 1); }, 3000);
-    return;
-  }
+  // Nếu trang tiếp theo cũng là speaking (audio-q) → chỉ phát intro rồi chuyển trang.
+  // Nếu KHÔNG có speaking-audio-q tiếp theo → ngay tại trang intro: ghi âm 45s.
+  const nextPage = pages[currentPage + 1];
+  const nextIsSpeakingAudioQ = nextPage && nextPage.type === 'speaking-audio-q';
+  const responseSeconds = Number(page.responseSeconds || page.data?.responseSeconds || 45);
 
-  audio.play().catch(() => {});
-  if (statusLabel) statusLabel.textContent = 'Đang phát audio 1...';
-
-  audio.onended = function () {
+  const advanceToNext = () => {
     if (statusLabel) statusLabel.textContent = 'Audio xong, chuyển sang câu hỏi...';
     setTimeout(() => { saveCurrent(); renderPage(currentPage + 1); }, 1000);
   };
 
+  const startStandaloneRecording = async () => {
+    if (statusLabel) statusLabel.textContent = 'Audio xong. Bắt đầu ghi âm...';
+    const key = page.data?.key || `sp-intro-${page.idx}`;
+    const ok = await startSpeakingRecording(key);
+    if (ok) {
+      showSpeakingRecordingIndicator(key, { containerIds: ['audio-status-label', 'speaking-status'] });
+    } else if (statusLabel) {
+      statusLabel.textContent = 'Không thể bật micro — chuyển trang...';
+    }
+    // Đếm 45s rồi tự stop + advance
+    startSpeakingTimer({
+      ...page,
+      responseSeconds,
+      data: { ...(page.data || {}), key }
+    });
+  };
+
+  if (!audio || !audio.src || audio.src.endsWith('/')) {
+    if (nextIsSpeakingAudioQ) {
+      if (statusLabel) statusLabel.textContent = 'Không có audio, chuyển trang...';
+      setTimeout(() => { saveCurrent(); renderPage(currentPage + 1); }, 3000);
+    } else {
+      startStandaloneRecording();
+    }
+    return;
+  }
+
+  const fallbackEl = document.getElementById('autoplay-fallback-' + page.idx);
+
+  // Cố gắng autoplay. Browser có thể block (NotAllowedError) nếu user
+  // chưa interact với trang. Trong trường hợp đó hiện nút "Bắt đầu".
+  const playPromise = audio.play();
+  if (playPromise && typeof playPromise.then === 'function') {
+    playPromise
+      .then(() => {
+        if (fallbackEl) fallbackEl.classList.add('d-none');
+        if (statusLabel) statusLabel.textContent = 'Đang phát audio giới thiệu...';
+      })
+      .catch((err) => {
+        console.warn('Autoplay bị chặn, hiện nút bắt đầu:', err);
+        if (fallbackEl) fallbackEl.classList.remove('d-none');
+        if (statusLabel) statusLabel.textContent = 'Trình duyệt đã chặn tự động phát. Nhấn "Bắt đầu phát audio".';
+      });
+  }
+
+  audio.onended = function () {
+    if (nextIsSpeakingAudioQ) {
+      advanceToNext();
+    } else {
+      startStandaloneRecording();
+    }
+  };
+
   audio.onerror = function () {
-    if (statusLabel) statusLabel.textContent = 'Audio chưa có, chuyển trang...';
-    setTimeout(() => { saveCurrent(); renderPage(currentPage + 1); }, 3000);
+    if (nextIsSpeakingAudioQ) {
+      if (statusLabel) statusLabel.textContent = 'Audio lỗi, chuyển trang...';
+      setTimeout(() => { saveCurrent(); renderPage(currentPage + 1); }, 3000);
+    } else {
+      startStandaloneRecording();
+    }
   };
 }
 
@@ -3294,7 +3664,13 @@ function renderSpeakingAudioQ(page) {
               <h6 class="mb-0">Audio</h6>
               <span class="small text-muted">Audio 1 / 1</span>
             </div>
-            <audio id="${audioId}" controls preload="none" class="w-100 mb-2" src="${d.audio || ''}"></audio>
+            <audio id="${audioId}" controls autoplay preload="auto" class="w-100 mb-2" src="${d.audio || ''}"></audio>
+            <div class="d-none" id="autoplay-fallback-q-${page.idx}">
+              <button type="button" class="btn btn-primary btn-sm" onclick="manualPlaySpeakingQ(${page.idx})">
+                <i class="bi bi-play-fill me-1"></i>Bắt đầu phát audio câu hỏi
+              </button>
+              <div class="small text-muted mt-1">Trình duyệt đã chặn tự động phát. Nhấn nút trên để tiếp tục.</div>
+            </div>
             <div class="small" id="audio-status-label">Đang phát audio 1...</div>
           </div>
 
@@ -3321,36 +3697,71 @@ function renderSpeakingAudioQ(page) {
 
 function playSpeakingQuestionAudio(page) {
   clearSpeakingTimer();
+  stopActiveSpeakingRecording();
   const audioId = 'sp-q-audio-' + page.idx;
   const audio = document.getElementById(audioId);
   const statusLabel = document.getElementById('audio-status-label');
   const hintEl = document.getElementById('speaking-status');
   const timerStatus = document.getElementById('speaking-timer-status');
 
-  const startTimer = () => {
+  const startTimerWithRecording = async () => {
     if (statusLabel) statusLabel.textContent = 'Audio xong.';
-    if (hintEl) hintEl.textContent = `Hệ thống sẽ tự chuyển sang câu tiếp theo sau khi hết thời gian.`;
-    if (timerStatus) timerStatus.textContent = `Thời gian trả lời: ${page.responseSeconds} giây`;
+    if (hintEl) hintEl.textContent = 'Hệ thống sẽ tự chuyển sang câu tiếp theo sau khi hết thời gian.';
+    const key = page.data?.key || `sp-q-${page.idx}`;
+    const ok = await startSpeakingRecording(key);
+    if (ok) {
+      showSpeakingRecordingIndicator(key, {
+        containerIds: ['audio-status-label', 'speaking-timer-status'],
+        text: `🔴 Đang ghi âm... ${page.responseSeconds}s`
+      });
+    } else if (timerStatus) {
+      timerStatus.textContent = `Thời gian trả lời: ${page.responseSeconds} giây (không bật được micro)`;
+    }
     startSpeakingTimer(page);
   };
 
   if (!audio || !audio.src || audio.src.endsWith('/')) {
     if (statusLabel) statusLabel.textContent = 'Không có audio.';
-    startTimer();
+    startTimerWithRecording();
     return;
   }
 
-  audio.play().catch(() => { startTimer(); });
-  if (statusLabel) statusLabel.textContent = 'Đang phát audio 1...';
+  const fallbackEl = document.getElementById('autoplay-fallback-q-' + page.idx);
+
+  const playPromise = audio.play();
+  if (playPromise && typeof playPromise.then === 'function') {
+    playPromise
+      .then(() => {
+        if (fallbackEl) fallbackEl.classList.add('d-none');
+        if (statusLabel) statusLabel.textContent = 'Đang phát audio câu hỏi...';
+      })
+      .catch((err) => {
+        console.warn('Autoplay câu hỏi bị chặn, hiện nút bắt đầu:', err);
+        if (fallbackEl) fallbackEl.classList.remove('d-none');
+        if (statusLabel) statusLabel.textContent = 'Trình duyệt đã chặn tự động phát. Nhấn "Bắt đầu phát audio câu hỏi".';
+      });
+  }
 
   audio.onended = function () {
-    startTimer();
+    startTimerWithRecording();
   };
 
   audio.onerror = function () {
-    startTimer();
+    startTimerWithRecording();
   };
 }
+
+function manualPlaySpeakingQ(idx) {
+  const audio = document.getElementById('sp-q-audio-' + idx);
+  const fallback = document.getElementById('autoplay-fallback-q-' + idx);
+  if (!audio) return;
+  audio.play().then(() => {
+    if (fallback) fallback.classList.add('d-none');
+  }).catch((err) => {
+    console.warn('Manual play câu hỏi failed:', err);
+  });
+}
+window.manualPlaySpeakingQ = manualPlaySpeakingQ;
 
 function startSpeakingTimer(page) {
   clearSpeakingTimer();
@@ -3374,7 +3785,10 @@ function startSpeakingTimer(page) {
       clearSpeakingTimer();
       if (ring) ring.className = 'speaking-timer-ring expired';
       if (seconds) seconds.textContent = '0';
-      if (status) status.textContent = 'Hết giờ!';
+      if (status) status.textContent = 'Hết giờ! Đang lưu ghi âm...';
+
+      // Hết giờ → stop ghi âm (nếu đang ghi) → upload nền → chuyển trang
+      stopActiveSpeakingRecording();
 
       startWaitBeforeNext(page);
     }
@@ -4050,7 +4464,12 @@ function renderResultsPage() {
       const ansKey = pg.data.key || ('sp-' + pg.idx);
       const note = userAnswers[ansKey] || '(không có ghi chú)';
       const label = pg.partLabel || 'Speaking';
-      rows += `<tr><td>${esc(label)}</td><td>${esc(pg.data.prompt)}</td><td colspan="2"><em>${esc(note)}</em></td></tr>`;
+      const recording = SPEAKING_RECORDINGS[ansKey];
+      const recordingUrl = recording?.uploadedUrl || (recording?.blob ? URL.createObjectURL(recording.blob) : '');
+      const recordingHtml = recordingUrl
+        ? `<audio controls preload="none" style="width:100%; max-width:320px;" src="${esc(recordingUrl)}"></audio>${recording?.uploadedUrl ? '' : '<div class="small text-muted mt-1">Đang upload ghi âm...</div>'}`
+        : '<span class="text-muted small">Chưa có ghi âm</span>';
+      rows += `<tr><td>${esc(label)}</td><td>${esc(pg.data.prompt)}</td><td><em>${esc(note)}</em></td><td>${recordingHtml}</td></tr>`;
     }
   });
 

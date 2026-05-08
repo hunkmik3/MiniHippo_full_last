@@ -119,6 +119,23 @@ function classBand(data = {}) {
   return normalizeBand(data.band || data.band_code || '');
 }
 
+function getAssignedClassId(user) {
+  const raw = user?.assignedClassId || user?.assigned_class_id || '';
+  return String(raw || '').trim();
+}
+
+function getAssignedClassForBand(classes, band, user) {
+  const assignedClassId = getAssignedClassId(user);
+  if (!assignedClassId) return null;
+
+  const matched = (classes || []).find((cls) => String(cls?.id || '') === assignedClassId);
+  if (!matched) return null;
+
+  const configuredBand = classBand(matched?.data || {});
+  if (configuredBand && band && configuredBand !== band) return null;
+  return matched;
+}
+
 function scoreClassForUser(cls, band, user) {
   const data = cls?.data || {};
   const now = new Date();
@@ -146,6 +163,15 @@ function scoreClassForUser(cls, band, user) {
 }
 
 function pickActiveClassForBand(classes, band, user) {
+  const assignedClass = getAssignedClassForBand(classes, band, user);
+  if (assignedClass) return assignedClass;
+
+  // Học viên KHÔNG có assigned_class_id khớp → không gán fallback heuristic.
+  // Chỉ admin được dùng heuristic để preview class.
+  if (!isAdminUser(user)) {
+    return null;
+  }
+
   const scored = (classes || [])
     .map((cls) => ({ cls, score: scoreClassForUser(cls, band, user) }))
     .filter((entry) => entry.score > -9999)
@@ -411,6 +437,28 @@ function renderBandSessions(band) {
   if (!grid) return;
 
   const config = LOP_HOC_CONFIG[band];
+  const activeClass = lopHocRuntime.activeClassByBand[band];
+  const isAdmin = isAdminUser(lopHocRuntime.user);
+
+  // Học viên không có assigned_class_id → không thấy buổi nào, hiện thông báo
+  if (!activeClass && !isAdmin) {
+    grid.innerHTML = `
+      <div style="grid-column: 1 / -1;">
+        <div class="alert alert-warning d-flex align-items-start gap-3 mb-0" role="alert">
+          <i class="bi bi-exclamation-triangle-fill" style="font-size: 1.25rem;"></i>
+          <div>
+            <div class="fw-bold mb-1">Bạn chưa được gán vào lớp ${escapeHtml(band)} nào</div>
+            <div class="small">
+              Vui lòng liên hệ admin để được thêm vào đúng lớp học.
+              Khi đã được gán lớp, các buổi học và deadline BTVN sẽ hiển thị tại đây.
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
   const cards = [];
   for (let i = 1; i <= config.sessions; i += 1) {
     cards.push(renderSessionCard(band, i));

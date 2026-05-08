@@ -14,7 +14,11 @@ alter table public.users
     add column if not exists notes text,
     add column if not exists course text,
     add column if not exists band text,
-    add column if not exists learning_program text;
+    add column if not exists learning_program text,
+    add column if not exists assigned_class_id text;
+
+create index if not exists users_assigned_class_id_idx
+    on public.users(assigned_class_id);
 
 alter table public.users
     add column if not exists last_login timestamptz;
