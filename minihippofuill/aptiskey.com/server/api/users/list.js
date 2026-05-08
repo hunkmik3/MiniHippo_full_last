@@ -70,6 +70,7 @@ export default async function handler(req, res) {
       ? users.map(user => ({
           ...user,
           learning_program: resolveLearningProgram(user),
+          assignedClassId: user.assigned_class_id || null,
           device_count: deviceCounts[user.id] || 0
         }))
       : [];

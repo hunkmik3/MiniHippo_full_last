@@ -8,11 +8,6 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   );
 }
 
-// DEBUG LOG
-console.log('[Supabase Init] URL:', SUPABASE_URL);
-console.log('[Supabase Init] Service Key Length:', SUPABASE_SERVICE_KEY?.length);
-console.log('[Supabase Init] Service Key Start:', SUPABASE_SERVICE_KEY?.substring(0, 10));
-
 async function supabaseFetch(path, options = {}) {
   const url = `${SUPABASE_URL}${path}`;
   const headers = {

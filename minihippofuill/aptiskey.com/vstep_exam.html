@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VSTEP Exam - Mini Hippo</title>
+  <link rel="icon" href="images/favicon.ico" type="image/x-icon">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/vstep.css">
+</head>
+
+<body class="vstep-body">
+  <div id="vstepWarning" class="vstep-warning"></div>
+
+  <section id="vstepLoading" class="vstep-precheck">
+    <div class="text-center">
+      <div class="spinner-border text-primary" role="status"></div>
+      <p class="mt-3 mb-0 text-secondary">Đang tải đề VSTEP...</p>
+    </div>
+  </section>
+
+  <section id="vstepPrecheck" class="vstep-precheck vstep-hidden">
+    <div class="vstep-blue-stage">
+      <div class="vstep-candidate-header">
+        <div>
+          <div class="vstep-avatar"><i class="bi bi-person"></i></div>
+          <button type="button" class="vstep-red-button w-100" id="findWebcamBtn">TÌM WEBCAM</button>
+        </div>
+        <div>
+          <div class="fs-5 fw-bold mb-2">Họ tên: <span id="candidateName">Thí sinh</span></div>
+          <div class="mb-2">Giới tính: <span id="candidateGender">-</span></div>
+          <div class="mb-2">Tài khoản: <span id="candidateAccount">-</span></div>
+          <div class="mb-4">SBD: <span id="candidateCode">-</span></div>
+          <button type="button" class="vstep-primary-button" id="startExamBtn">NHẬN ĐỀ</button>
+        </div>
+      </div>
+
+      <div class="vstep-info-columns">
+        <div class="vstep-info-box">
+          <h2 class="h6 text-uppercase"><span class="vstep-circle-index">1</span>Bài thi bao gồm 4 kỹ năng</h2>
+          <div class="mt-3" id="examDurationSummary"></div>
+        </div>
+
+        <div class="vstep-info-box">
+          <h2 class="h6 text-uppercase"><span class="vstep-circle-index">2</span>Kiểm tra tai nghe</h2>
+          <p class="mb-2">Bước 1: Đeo tai nghe và nghe một đoạn audio bên dưới</p>
+          <div class="vstep-device-player">
+            <button type="button" id="headphonePlayBtn" aria-label="Play test audio"><i class="bi bi-play-fill"></i></button>
+            <span id="headphoneTime">0:00 / 0:00</span>
+            <i class="bi bi-volume-up-fill"></i>
+            <input type="range" min="0" max="1" step="0.05" value="1" id="headphoneVolume">
+          </div>
+          <p class="mb-2">Bước 2: Để mic sát miệng</p>
+          <p class="mb-2">Bước 3: Nhấp vào nút "Thu âm" để thu âm</p>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="vstep-muted-button" id="micTestBtn">Thu âm</button>
+            <button type="button" class="vstep-muted-button" id="micReplayBtn" disabled>Nghe lại</button>
+          </div>
+          <div class="small mt-2" id="micTestStatus">Nếu không nghe được giọng nói của mình vui lòng thông báo với giám thị.</div>
+        </div>
+
+        <div class="vstep-info-box">
+          <h2 class="h6 text-uppercase"><span class="vstep-circle-index">3</span>Các lưu ý</h2>
+          <ul class="small ps-3 mb-0">
+            <li>Khi hết thời gian của từng kỹ năng, hệ thống sẽ tự động chuyển sang kỹ năng tiếp theo.</li>
+            <li>Thí sinh phải click nút "LƯU BÀI" sau khi hoàn thành mỗi part.</li>
+            <li>Điều chuyển part hay kỹ năng bằng nút "TIẾP TỤC".</li>
+            <li>Listening/Reading chỉ dùng chuột để chọn đáp án.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="mt-4 d-flex flex-column flex-lg-row gap-3 align-items-start">
+        <video id="webcamPreview" class="vstep-camera-box" autoplay muted playsinline></video>
+        <canvas id="webcamCanvas" width="320" height="210" class="vstep-hidden"></canvas>
+        <button type="button" class="vstep-red-button" id="capturePhotoBtn">
+          <i class="bi bi-camera me-1"></i> CHỤP HÌNH
+        </button>
+        <div class="small" id="photoStatus">Chụp hình nếu được yêu cầu trước khi nhận đề.</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="vstepExam" class="vstep-exam vstep-hidden">
+    <header class="vstep-exam-top">
+      <div class="vstep-user-badge">
+        <i class="bi bi-person-circle"></i>
+        <span id="examCandidateName">Thí sinh</span>
+      </div>
+      <div class="vstep-timer" id="examTimer" aria-label="Exam timer">
+        <span class="vstep-time-block">0</span><span class="vstep-time-block">0</span><span>:</span><span class="vstep-time-block">0</span><span class="vstep-time-block">0</span>
+      </div>
+      <div class="vstep-answered">
+        Đã chọn: <span class="vstep-time-block d-inline-grid" id="answeredCount">0</span>/<span id="questionCount">0</span> câu
+        <button type="button" class="vstep-submit-top" id="submitTopBtn">NỘP BÀI</button>
+      </div>
+    </header>
+
+    <main class="vstep-work-area" id="examContent"></main>
+
+    <footer class="vstep-exam-footer">
+      <div class="vstep-tab-strip" id="vstepPartTabs"></div>
+      <button type="button" class="vstep-next-button" id="continueBtn">TIẾP TỤC</button>
+      <button type="button" class="vstep-save-footer" id="savePartBtn">LƯU BÀI</button>
+    </footer>
+  </section>
+
+  <div id="skillConfirmModal" class="vstep-modal-backdrop-lite">
+    <div class="vstep-modal-card">
+      <h2 class="h5 mb-3" id="skillConfirmTitle">Bạn muốn chuyển kỹ năng tiếp theo?</h2>
+      <p class="text-secondary" id="skillConfirmText">Sau khi chuyển kỹ năng, bạn không thể quay lại kỹ năng trước đó.</p>
+      <div class="d-flex justify-content-center gap-2">
+        <button type="button" class="vstep-red-button" id="confirmNextSkillBtn">ĐỒNG Ý</button>
+        <button type="button" class="btn btn-light border" id="cancelNextSkillBtn">HỦY BỎ</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="savedModal" class="vstep-modal-backdrop-lite">
+    <div class="vstep-modal-card">
+      <h2 class="h5 mb-3">BÀI LÀM ĐÃ ĐƯỢC LƯU VÀO HỆ THỐNG</h2>
+      <p class="text-secondary mb-3">Câu hỏi tiếp theo sẽ bắt đầu sau khi bạn chọn tiếp tục.</p>
+      <button type="button" class="vstep-red-button" id="savedModalCloseBtn">TIẾP TỤC</button>
+    </div>
+  </div>
+
+  <div id="submitModal" class="vstep-modal-backdrop-lite">
+    <div class="vstep-submit-card">
+      <div class="vstep-submit-title">NỘP BÀI THI</div>
+      <i class="bi bi-file-earmark-arrow-down text-danger" style="font-size: 4rem;"></i>
+      <p class="fw-bold mt-4">BẠN ĐÃ HOÀN THÀNH BÀI THI VÀ MUỐN NỘP BÀI.</p>
+      <p>HÃY CHẮC CHẮN VỀ ĐIỀU NÀY NẾU BẠN THỰC SỰ ĐÃ HOÀN THÀNH BÀI THI</p>
+      <div class="d-flex justify-content-center gap-2 mt-3">
+        <button type="button" class="vstep-red-button" id="confirmSubmitBtn">ĐỒNG Ý</button>
+        <button type="button" class="btn btn-light border" id="cancelSubmitBtn">HỦY BỎ</button>
+      </div>
+      <div class="small text-secondary mt-3" id="submitStatus"></div>
+    </div>
+  </div>
+
+  <audio id="precheckAudio" preload="metadata"></audio>
+  <script src="js/auth.js"></script>
+  <script src="js/vstep_exam.js"></script>
+</body>
+
+</html>

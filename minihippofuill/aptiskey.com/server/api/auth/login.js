@@ -113,7 +113,8 @@ export default async function handler(req, res) {
       notes: profile.notes || null,
       learningProgram: profile.learning_program || null,
       course: profile.course || null,
-      band: profile.band || null
+      band: profile.band || null,
+      assignedClassId: profile.assigned_class_id || null
     };
 
     return res.status(200).json({
