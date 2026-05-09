@@ -731,6 +731,122 @@ function showStudentDetail(userId) {
     document.getElementById('student-detail-panel').style.display = 'block';
     document.getElementById('sd-result').style.display = 'none';
     document.getElementById('student-detail-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // Tải danh sách thiết bị của học viên
+    loadStudentDevices(user.id).catch((err) => console.warn('Load devices error:', err));
+}
+
+/* ═══════════════════════════════════════════════════════
+   STUDENT DEVICES (list / revoke / reset)
+   ═══════════════════════════════════════════════════════ */
+
+async function loadStudentDevices(userId) {
+    const tbody = document.getElementById('sd-devices-tbody');
+    const counter = document.getElementById('sd-devices-count');
+    if (!tbody) return;
+
+    tbody.innerHTML = '<tr><td colspan="5" class="text-muted text-center py-2"><i class="spinner-border spinner-border-sm me-1"></i>Đang tải thiết bị...</td></tr>';
+    if (counter) counter.textContent = '';
+
+    try {
+        const data = await apiCall(`/api/devices/list?userId=${encodeURIComponent(userId)}`);
+        const devices = Array.isArray(data?.devices) ? data.devices : (data?.devices ? [data.devices] : []);
+        renderStudentDevices(devices);
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-danger text-center py-2">Lỗi: ${esc(err.message || 'Không tải được thiết bị')}</td></tr>`;
+    }
+}
+
+function reloadStudentDevices() {
+    const user = lopHocState.selectedStudent;
+    if (!user?.id) return;
+    loadStudentDevices(user.id).catch((err) => console.warn('Reload devices error:', err));
+}
+
+function renderStudentDevices(devices) {
+    const tbody = document.getElementById('sd-devices-tbody');
+    const counter = document.getElementById('sd-devices-count');
+    if (!tbody) return;
+
+    if (!devices.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-muted text-center py-2">Học viên chưa từng đăng nhập trên thiết bị nào.</td></tr>';
+        if (counter) counter.textContent = '(0)';
+        return;
+    }
+
+    const activeCount = devices.filter((d) => String(d?.status || '').toLowerCase() === 'active').length;
+    if (counter) counter.textContent = `(${activeCount} đang hoạt động / ${devices.length} tổng)`;
+
+    tbody.innerHTML = devices.map((d, i) => {
+        const status = String(d?.status || 'active').toLowerCase();
+        const isActive = status === 'active';
+        const badge = isActive
+            ? '<span class="badge bg-success">Đang hoạt động</span>'
+            : `<span class="badge bg-secondary">${esc(status)}</span>`;
+        const deviceName = d?.device_name || d?.deviceName || '(không tên)';
+        const last = d?.last_seen ? formatDatetime(d.last_seen) : '--';
+        const recId = String(d?.id || '');
+        const action = isActive
+            ? `<button class="btn btn-sm btn-outline-danger" onclick="revokeStudentDevice('${esc(recId)}')" title="Thu hồi thiết bị này">
+                   <i class="bi bi-x-circle me-1"></i>Thu hồi
+               </button>`
+            : '<span class="text-muted small">--</span>';
+        return `
+            <tr>
+                <td>${i + 1}</td>
+                <td>${esc(deviceName)}</td>
+                <td>${badge}</td>
+                <td>${last}</td>
+                <td>${action}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+async function resetStudentDevices() {
+    const user = lopHocState.selectedStudent;
+    if (!user?.id) return;
+    if (!confirm(`Reset toàn bộ thiết bị của "${user.full_name || user.account_code || user.email}"?\nHọc viên sẽ phải đăng nhập lại trên thiết bị mới.`)) return;
+
+    const btn = document.getElementById('sd-reset-devices-btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Đang reset...';
+    }
+
+    try {
+        await apiCall('/api/devices/reset', {
+            method: 'POST',
+            body: JSON.stringify({ userId: user.id })
+        });
+        showResult(document.getElementById('sd-result'), 'Đã reset toàn bộ thiết bị của học viên này.', 'success');
+        await loadStudentDevices(user.id);
+        await loadStudents();
+    } catch (err) {
+        showResult(document.getElementById('sd-result'), 'Lỗi reset thiết bị: ' + err.message, 'danger');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-phone-flip me-1"></i>Reset thiết bị';
+        }
+    }
+}
+
+async function revokeStudentDevice(deviceRecordId) {
+    const user = lopHocState.selectedStudent;
+    if (!user?.id || !deviceRecordId) return;
+    if (!confirm('Thu hồi thiết bị này? Học viên sẽ bị đăng xuất khỏi thiết bị đó.')) return;
+
+    try {
+        await apiCall('/api/devices/remove', {
+            method: 'POST',
+            body: JSON.stringify({ userId: user.id, deviceRecordId })
+        });
+        await loadStudentDevices(user.id);
+        await loadStudents();
+    } catch (err) {
+        showResult(document.getElementById('sd-result'), 'Lỗi thu hồi thiết bị: ' + err.message, 'danger');
+    }
 }
 
 function hideStudentDetail() {
