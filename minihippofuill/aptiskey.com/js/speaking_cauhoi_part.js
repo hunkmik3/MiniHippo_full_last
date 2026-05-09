@@ -574,6 +574,26 @@
         return Math.abs(a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24);
     }
 
+    function getAssignedClassId(user) {
+        var raw = (user && (user.assignedClassId || user.assigned_class_id)) || '';
+        return String(raw || '').trim();
+    }
+
+    function getAssignedClassForBand(classes, band, user) {
+        var assignedClassId = getAssignedClassId(user);
+        if (!assignedClassId) return null;
+
+        var matched = (classes || []).find(function (cls) {
+            return String((cls && cls.id) || '') === assignedClassId;
+        }) || null;
+        if (!matched) return null;
+
+        var data = (matched && matched.data) || {};
+        var configuredBand = normalizeBand(data.band || data.band_code);
+        if (configuredBand && band && configuredBand !== band) return null;
+        return matched;
+    }
+
     async function apiGet(url, retryWithRefresh) {
         var retry = retryWithRefresh !== false;
         var response = await fetch(url, {
@@ -615,6 +635,9 @@
     }
 
     function pickClassForBand(classes, band, user) {
+        var assignedClass = getAssignedClassForBand(classes, band, user);
+        if (assignedClass) return assignedClass;
+
         var ranked = (classes || [])
             .map(function (cls) {
                 return { cls: cls, score: scoreClassForBand(cls, band, user) };
@@ -734,24 +757,46 @@
             console.warn('Load homework classes failed:', error);
         }
 
-        var band = userBand || requestedBand || '';
         var sessionNumber = resolveSessionNumber();
         var selectedClass = null;
+        var assignedClassId = getAssignedClassId(user);
 
-        if (classId) {
-            selectedClass = classes.find(function (cls) {
-                return String(cls && cls.id) === String(classId);
-            }) || null;
+        // Học viên BẮT BUỘC phải có assigned_class_id.
+        if (!assignedClassId) {
+            accessContext.classSet = null;
+            accessContext.sessionMeta = null;
+            accessContext.locked = true;
+            accessContext.lockReason = 'Bạn chưa được gán vào lớp học nào. Vui lòng liên hệ admin để được thêm vào lớp.';
+            return accessContext;
         }
+
+        // Lấy đúng lớp đã được gán (không fallback heuristic).
+        selectedClass = classes.find(function (cls) {
+            return String(cls && cls.id) === String(assignedClassId);
+        }) || null;
+
         if (!selectedClass) {
-            selectedClass = pickClassForBand(classes, band, user);
+            accessContext.classSet = null;
+            accessContext.sessionMeta = null;
+            accessContext.locked = true;
+            accessContext.lockReason = 'Lớp đã gán cho bạn không còn tồn tại. Vui lòng liên hệ admin.';
+            return accessContext;
+        }
+
+        // Học viên cố ý mở buổi của lớp khác → chặn.
+        if (classId && String(classId) !== String(assignedClassId)) {
+            accessContext.classSet = selectedClass;
+            accessContext.sessionMeta = null;
+            accessContext.locked = true;
+            accessContext.lockReason = 'Bạn không thuộc lớp này. Vui lòng quay lại trang Lớp Học.';
+            return accessContext;
         }
 
         var sessionMeta = resolveSessionMeta(selectedClass, sessionNumber);
         var deadline = toDate(sessionMeta && sessionMeta.deadline);
         var locked = !!deadline && Date.now() > deadline.getTime();
 
-        accessContext.classSet = selectedClass || null;
+        accessContext.classSet = selectedClass;
         accessContext.sessionMeta = sessionMeta || null;
         accessContext.locked = locked;
         accessContext.lockReason = locked

@@ -995,11 +995,18 @@
                             </div>
                             <div class="col-md-2" id="sd-band-group">
                                 <label class="form-label">Band</label>
-                                <select class="form-select" id="sd-band">
+                                <select class="form-select" id="sd-band" onchange="onDetailBandChange()">
                                     <option value="">--</option>
                                     <option value="B1">B1</option>
                                     <option value="B2">B2</option>
                                 </select>
+                            </div>
+                            <div class="col-md-4" id="sd-assigned-class-group">
+                                <label class="form-label">Gán vào lớp</label>
+                                <select class="form-select" id="sd-assigned-class">
+                                    <option value="">-- Chưa gán lớp (tự động) --</option>
+                                </select>
+                                <div class="form-text">Chọn lớp thủ công cho học viên này.</div>
                             </div>
                             <div class="col-md-2">
                                 <label class="form-label">Device limit</label>
@@ -1158,7 +1165,7 @@ HV002,,Trần Thị B,0912345678,2,2025-04-01,2025-12-31,Lớp 18h 246,Lớp h�
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-bold">Band</label>
-                            <select class="form-select" id="cf-band">
+                            <select class="form-select" id="cf-band" onchange="renderClassStudentsPicker()">
                                 <option value="">-- Không --</option>
                                 <option value="B1">B1</option>
                                 <option value="B2">B2</option>
@@ -1201,6 +1208,57 @@ HV002,,Trần Thị B,0912345678,2,2025-04-01,2025-12-31,Lớp 18h 246,Lớp h�
                                 </thead>
                                 <tbody id="cf-preview-body"></tbody>
                             </table>
+                        </div>
+                    </div>
+
+                    <!-- Students in Class -->
+                    <div class="mt-3">
+                        <div class="divider"></div>
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                            <h5 class="fw-bold mb-0" style="font-size: 0.9rem;">
+                                <i class="bi bi-people me-1"></i>Học viên trong lớp
+                                <span id="cf-students-counter" class="text-muted fw-normal" style="font-size: 0.78rem;"></span>
+                            </h5>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleAllClassStudents(true)">
+                                    <i class="bi bi-check2-all me-1"></i>Chọn tất cả
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleAllClassStudents(false)">
+                                    <i class="bi bi-x-square me-1"></i>Bỏ chọn
+                                </button>
+                            </div>
+                        </div>
+                        <p class="text-muted mb-2" style="font-size: 0.78rem;">
+                            Tick vào học viên để gán vào lớp này. Khi lưu lớp, các học viên được tick sẽ
+                            có <code>assigned_class_id</code> trỏ về lớp này; những học viên đang gán vào
+                            lớp nhưng bị bỏ tick sẽ được gỡ gán.
+                        </p>
+                        <div class="row g-2 mb-2">
+                            <div class="col-md-7">
+                                <input type="text" class="form-control form-control-sm" id="cf-students-search"
+                                    placeholder="Tìm theo mã HV / tên / email / SĐT" oninput="renderClassStudentsPicker()">
+                            </div>
+                            <div class="col-md-3">
+                                <select class="form-select form-select-sm" id="cf-students-band-filter" onchange="renderClassStudentsPicker()">
+                                    <option value="match">Theo band của lớp</option>
+                                    <option value="all">Tất cả band</option>
+                                    <option value="B1">Chỉ B1</option>
+                                    <option value="B2">Chỉ B2</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <select class="form-select form-select-sm" id="cf-students-status-filter" onchange="renderClassStudentsPicker()">
+                                    <option value="any">Mọi trạng thái</option>
+                                    <option value="unassigned">Chưa gán lớp</option>
+                                    <option value="this">Đang trong lớp này</option>
+                                    <option value="other">Đang ở lớp khác</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="cf-students-list" style="max-height: 320px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 0.6rem; background: #fff;">
+                            <div class="text-muted text-center p-3" style="font-size: 0.82rem;">
+                                Đang tải danh sách học viên...
+                            </div>
                         </div>
                     </div>
 

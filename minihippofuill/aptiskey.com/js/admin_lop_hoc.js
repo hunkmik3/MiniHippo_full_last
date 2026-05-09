@@ -19,7 +19,8 @@ let lopHocState = {
     sessionContentRecords: [],
     selectedSessionContentRecord: null,
     sessionDraft: null,
-    selectedDraftPageIndex: -1
+    selectedDraftPageIndex: -1,
+    classFormSelectedStudentIds: new Set()  // student ids ticked in class create/edit form
 };
 
 // ── Tab metadata for hero header ──
@@ -725,6 +726,7 @@ function showStudentDetail(userId) {
     document.getElementById('sd-notes').value = user.notes || '';
 
     onDetailCourseChange();
+    refreshStudentAssignedClassField();
 
     document.getElementById('student-detail-panel').style.display = 'block';
     document.getElementById('sd-result').style.display = 'none';
@@ -736,6 +738,71 @@ function hideStudentDetail() {
     lopHocState.selectedStudent = null;
 }
 
+function getStudentAssignedClassId(user) {
+    const raw = user?.assigned_class_id || user?.assignedClassId || '';
+    return String(raw || '').trim();
+}
+
+function formatAssignedClassOptionLabel(cls) {
+    const data = cls?.data || {};
+    const title = cls?.title || data?.name || 'Lớp';
+    const band = (data?.band || '').trim();
+    const schedule = (data?.schedule || '').trim();
+    const suffix = [band, schedule].filter(Boolean).join(' • ');
+    return suffix ? `${title} (${suffix})` : title;
+}
+
+function isClassCompatibleWithBand(cls, band) {
+    const classBand = normalizeStr(cls?.data?.band).toUpperCase();
+    if (!classBand || !band) return true;
+    return classBand === String(band).toUpperCase();
+}
+
+function refreshStudentAssignedClassField() {
+    const course = document.getElementById('sd-course')?.value || '';
+    const band = document.getElementById('sd-band')?.value || '';
+    const group = document.getElementById('sd-assigned-class-group');
+    const select = document.getElementById('sd-assigned-class');
+    if (!group || !select) return;
+
+    if (course !== 'Lớp học') {
+        group.style.display = 'none';
+        select.innerHTML = '<option value="">-- Không áp dụng với lớp ôn thi --</option>';
+        select.value = '';
+        return;
+    }
+
+    group.style.display = 'block';
+    const fallbackStudentClassId = getStudentAssignedClassId(lopHocState.selectedStudent);
+    const selectedClassId = String(select.value || fallbackStudentClassId || '').trim();
+
+    const options = [
+        '<option value="">-- Chưa gán lớp (tự động) --</option>'
+    ];
+
+    const allowedClasses = lopHocState.classes.filter((cls) => isClassCompatibleWithBand(cls, band));
+    allowedClasses.forEach((cls) => {
+        options.push(
+            `<option value="${esc(String(cls.id || ''))}">${esc(formatAssignedClassOptionLabel(cls))}</option>`
+        );
+    });
+
+    if (selectedClassId) {
+        const selectedClassExists = lopHocState.classes.some((cls) => String(cls.id || '') === selectedClassId);
+        const selectedInAllowed = allowedClasses.some((cls) => String(cls.id || '') === selectedClassId);
+        if (selectedClassExists && !selectedInAllowed) {
+            const selectedClass = lopHocState.classes.find((cls) => String(cls.id || '') === selectedClassId);
+            const extraLabel = `${formatAssignedClassOptionLabel(selectedClass)} (khác band hiện tại)`;
+            options.push(`<option value="${esc(selectedClassId)}">${esc(extraLabel)}</option>`);
+        }
+    }
+
+    select.innerHTML = options.join('');
+    if (selectedClassId) {
+        select.value = selectedClassId;
+    }
+}
+
 function onDetailCourseChange() {
     const course = document.getElementById('sd-course').value;
     const bandGroup = document.getElementById('sd-band-group');
@@ -745,6 +812,11 @@ function onDetailCourseChange() {
     } else {
         bandGroup.style.display = 'block';
     }
+    refreshStudentAssignedClassField();
+}
+
+function onDetailBandChange() {
+    refreshStudentAssignedClassField();
 }
 
 async function saveStudentDetail() {
@@ -753,6 +825,8 @@ async function saveStudentDetail() {
 
     const resultEl = document.getElementById('sd-result');
     const course = document.getElementById('sd-course').value;
+    const selectedAssignedClassId = document.getElementById('sd-assigned-class')?.value || '';
+    const previousAssignedClassId = getStudentAssignedClassId(user);
 
     try {
         const payload = {
@@ -768,6 +842,9 @@ async function saveStudentDetail() {
             notes: document.getElementById('sd-notes').value.trim(),
             learningProgram: USER_GROUP_CLASSROOM
         };
+        if (course !== 'Lớp học' || selectedAssignedClassId || previousAssignedClassId) {
+            payload.assignedClassId = course === 'Lớp học' ? (selectedAssignedClassId || null) : null;
+        }
 
         await apiCall('/api/users/update', {
             method: 'PATCH',
@@ -1011,6 +1088,17 @@ async function loadClasses() {
         lopHocState.classes = [];
     }
     renderClassList();
+    populateClassDropdowns();
+    refreshStudentAssignedClassField();
+}
+
+function countAssignedStudents(classId) {
+    const targetId = String(classId || '').trim();
+    if (!targetId) return 0;
+    return lopHocState.students.filter((u) => {
+        const assigned = String(u?.assigned_class_id || u?.assignedClassId || '').trim();
+        return assigned && assigned === targetId;
+    }).length;
 }
 
 function renderClassList() {
@@ -1028,6 +1116,7 @@ function renderClassList() {
 
     container.innerHTML = list.map(cls => {
         const d = cls.data || {};
+        const assignedCount = countAssignedStudents(cls.id);
         return `
             <div class="class-card ${lopHocState.selectedClass?.id === cls.id ? 'selected' : ''}"
                  onclick="selectClass('${cls.id}')">
@@ -1042,13 +1131,15 @@ function renderClassList() {
                             ${bandBadge(d.band)}
                             &nbsp;|&nbsp;
                             ${d.num_sessions || 0} buổi
+                            &nbsp;|&nbsp;
+                            <i class="bi bi-people me-1"></i><strong>${assignedCount}</strong> học viên
                         </div>
                         <div class="text-muted mt-1" style="font-size: 0.75rem;">
                             Ngày bắt đầu: ${formatDate(d.first_date)}
                         </div>
                     </div>
                     <div class="d-flex gap-1">
-                        <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); editClass('${cls.id}')" title="Sửa">
+                        <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); editClass('${cls.id}')" title="Sửa & gán học viên">
                             <i class="bi bi-pencil"></i>
                         </button>
                         <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); deleteClass('${cls.id}')" title="Xóa">
@@ -1079,11 +1170,15 @@ function showCreateClassForm() {
     document.getElementById('cf-preview-section').style.display = 'none';
     document.getElementById('class-form-panel').style.display = 'block';
     document.getElementById('cf-result').style.display = 'none';
+    document.getElementById('class-form-panel').dataset.editId = '';
+    prepareClassStudentsPicker(null);
     document.getElementById('class-form-panel').scrollIntoView({ behavior: 'smooth' });
 }
 
 function hideClassForm() {
     document.getElementById('class-form-panel').style.display = 'none';
+    document.getElementById('class-form-panel').dataset.editId = '';
+    lopHocState.classFormSelectedStudentIds = new Set();
 }
 
 function editClass(classId) {
@@ -1105,6 +1200,222 @@ function editClass(classId) {
 
     // Store editing id
     document.getElementById('class-form-panel').dataset.editId = classId;
+    prepareClassStudentsPicker(classId);
+}
+
+/* ═══════════════════════════════════════════════════════
+   CLASS STUDENTS PICKER (in class create/edit form)
+   ═══════════════════════════════════════════════════════ */
+
+function prepareClassStudentsPicker(classId) {
+    // Pre-tick những học viên đã có assigned_class_id = classId.
+    const targetId = String(classId || '').trim();
+    const initial = new Set();
+    if (targetId) {
+        lopHocState.students.forEach((u) => {
+            const assigned = String(u?.assigned_class_id || u?.assignedClassId || '').trim();
+            if (assigned && assigned === targetId) {
+                initial.add(String(u.id));
+            }
+        });
+    }
+    lopHocState.classFormSelectedStudentIds = initial;
+
+    // Reset filter UI về mặc định mỗi lần mở form
+    const searchEl = document.getElementById('cf-students-search');
+    const bandFilterEl = document.getElementById('cf-students-band-filter');
+    const statusFilterEl = document.getElementById('cf-students-status-filter');
+    if (searchEl) searchEl.value = '';
+    if (bandFilterEl) bandFilterEl.value = 'match';
+    if (statusFilterEl) statusFilterEl.value = 'any';
+
+    renderClassStudentsPicker();
+}
+
+function getFilteredClassFormStudents() {
+    const editId = String(document.getElementById('class-form-panel')?.dataset.editId || '').trim();
+    const formBand = String(document.getElementById('cf-band')?.value || '').toUpperCase();
+    const search = String(document.getElementById('cf-students-search')?.value || '').toLowerCase().trim();
+    const bandFilter = String(document.getElementById('cf-students-band-filter')?.value || 'match');
+    const statusFilter = String(document.getElementById('cf-students-status-filter')?.value || 'any');
+
+    return lopHocState.students.filter((u) => {
+        if ((u.course || '') !== 'Lớp học') return false;
+
+        // Band filter
+        const userBand = String(u.band || '').toUpperCase();
+        if (bandFilter === 'match') {
+            if (formBand && userBand && userBand !== formBand) return false;
+        } else if (bandFilter === 'B1' || bandFilter === 'B2') {
+            if (userBand !== bandFilter) return false;
+        }
+
+        // Status filter (vs editId)
+        const assigned = String(u?.assigned_class_id || u?.assignedClassId || '').trim();
+        if (statusFilter === 'unassigned') {
+            if (assigned) return false;
+        } else if (statusFilter === 'this') {
+            if (!editId || assigned !== editId) return false;
+        } else if (statusFilter === 'other') {
+            if (!assigned || (editId && assigned === editId)) return false;
+        }
+
+        // Search
+        if (search) {
+            const hay = [u.account_code, u.full_name, u.email, u.phone_number]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase();
+            if (!hay.includes(search)) return false;
+        }
+
+        return true;
+    });
+}
+
+function renderClassStudentsPicker() {
+    const listEl = document.getElementById('cf-students-list');
+    const counterEl = document.getElementById('cf-students-counter');
+    if (!listEl) return;
+
+    const editId = String(document.getElementById('class-form-panel')?.dataset.editId || '').trim();
+    const filtered = getFilteredClassFormStudents();
+    const selected = lopHocState.classFormSelectedStudentIds;
+
+    if (!lopHocState.students.length) {
+        listEl.innerHTML = `
+            <div class="text-muted text-center p-3" style="font-size:0.82rem;">
+                Chưa có học viên nào trong hệ thống. Hãy tạo học viên ở tab "Danh sách học viên" trước.
+            </div>
+        `;
+    } else if (!filtered.length) {
+        listEl.innerHTML = `
+            <div class="text-muted text-center p-3" style="font-size:0.82rem;">
+                Không có học viên nào khớp bộ lọc hiện tại.
+            </div>
+        `;
+    } else {
+        listEl.innerHTML = filtered.map((u) => {
+            const id = String(u.id);
+            const checked = selected.has(id) ? 'checked' : '';
+            const assigned = String(u?.assigned_class_id || u?.assignedClassId || '').trim();
+            let badge = '';
+            if (assigned && editId && assigned === editId) {
+                badge = '<span class="badge bg-success ms-2" style="font-size:0.65rem;">Trong lớp này</span>';
+            } else if (assigned) {
+                const otherClass = lopHocState.classes.find((c) => String(c.id) === assigned);
+                const otherTitle = otherClass?.title || otherClass?.data?.name || 'lớp khác';
+                badge = `<span class="badge bg-warning text-dark ms-2" style="font-size:0.65rem;">Đang ở: ${esc(otherTitle)}</span>`;
+            } else {
+                badge = '<span class="badge bg-secondary ms-2" style="font-size:0.65rem;">Chưa gán</span>';
+            }
+
+            return `
+                <label class="d-flex align-items-center gap-2 p-2 border-bottom"
+                       style="cursor:pointer; font-size:0.85rem;">
+                    <input type="checkbox" class="form-check-input cf-student-check" data-student-id="${esc(id)}" ${checked}
+                           onchange="onClassStudentCheckChange(this)">
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold">
+                            ${esc(u.account_code || '(không có mã)')} — ${esc(u.full_name || '(chưa có tên)')}
+                            ${bandBadge(u.band)}
+                            ${badge}
+                        </div>
+                        <div class="text-muted" style="font-size:0.72rem;">
+                            ${esc(u.email || '')}${u.phone_number ? ' • ' + esc(u.phone_number) : ''}
+                        </div>
+                    </div>
+                </label>
+            `;
+        }).join('');
+    }
+
+    if (counterEl) {
+        const totalSelected = selected.size;
+        const visibleSelected = filtered.filter((u) => selected.has(String(u.id))).length;
+        counterEl.textContent = `(đã chọn ${totalSelected} học viên • hiển thị ${visibleSelected}/${filtered.length})`;
+    }
+}
+
+function onClassStudentCheckChange(input) {
+    if (!input) return;
+    const id = String(input.dataset.studentId || '').trim();
+    if (!id) return;
+    if (input.checked) {
+        lopHocState.classFormSelectedStudentIds.add(id);
+    } else {
+        lopHocState.classFormSelectedStudentIds.delete(id);
+    }
+    const counterEl = document.getElementById('cf-students-counter');
+    if (counterEl) {
+        const filtered = getFilteredClassFormStudents();
+        const totalSelected = lopHocState.classFormSelectedStudentIds.size;
+        const visibleSelected = filtered.filter((u) => lopHocState.classFormSelectedStudentIds.has(String(u.id))).length;
+        counterEl.textContent = `(đã chọn ${totalSelected} học viên • hiển thị ${visibleSelected}/${filtered.length})`;
+    }
+}
+
+function toggleAllClassStudents(check) {
+    const filtered = getFilteredClassFormStudents();
+    filtered.forEach((u) => {
+        const id = String(u.id);
+        if (check) lopHocState.classFormSelectedStudentIds.add(id);
+        else lopHocState.classFormSelectedStudentIds.delete(id);
+    });
+    renderClassStudentsPicker();
+}
+
+async function syncClassStudentAssignments(classId) {
+    // So sánh với state hiện tại của lopHocState.students:
+    //   - Tick mới → PATCH user.assignedClassId = classId
+    //   - Bỏ tick mà user trước đây gán vào classId → PATCH user.assignedClassId = null
+    const targetId = String(classId || '').trim();
+    if (!targetId) return { added: 0, removed: 0, errors: [] };
+
+    const selected = lopHocState.classFormSelectedStudentIds;
+    const toAssign = [];
+    const toUnassign = [];
+
+    lopHocState.students.forEach((u) => {
+        if ((u.course || '') !== 'Lớp học') return;
+        const id = String(u.id);
+        const currentAssigned = String(u?.assigned_class_id || u?.assignedClassId || '').trim();
+        const wantsThisClass = selected.has(id);
+
+        if (wantsThisClass && currentAssigned !== targetId) {
+            toAssign.push(u);
+        } else if (!wantsThisClass && currentAssigned === targetId) {
+            toUnassign.push(u);
+        }
+    });
+
+    const errors = [];
+
+    // Chỉ pass id + assignedClassId. Không gửi course/band để tránh re-trigger
+    // validation "Học viên lớp học bắt buộc có band" (server giữ nguyên các cột khác).
+    for (const u of toAssign) {
+        try {
+            await apiCall('/api/users/update', {
+                method: 'PATCH',
+                body: JSON.stringify({ id: u.id, assignedClassId: targetId })
+            });
+        } catch (err) {
+            errors.push(`${u.account_code || u.email || u.id}: ${err.message}`);
+        }
+    }
+
+    for (const u of toUnassign) {
+        try {
+            await apiCall('/api/users/update', {
+                method: 'PATCH',
+                body: JSON.stringify({ id: u.id, assignedClassId: null })
+            });
+        } catch (err) {
+            errors.push(`${u.account_code || u.email || u.id}: ${err.message}`);
+        }
+    }
+
+    return { added: toAssign.length - errors.length, removed: toUnassign.length, errors };
 }
 
 async function deleteClass(classId) {
@@ -1256,22 +1567,47 @@ async function submitClassForm() {
     const editId = document.getElementById('class-form-panel').dataset.editId;
 
     try {
+        let savedClassId = editId || '';
+        let savedAction = '';
         if (editId) {
             payload.id = editId;
             await apiCall(`/api/practice_sets/update?id=${editId}`, {
                 method: 'PUT',
                 body: JSON.stringify(payload)
             });
-            showResult(resultEl, 'Cập nhật lớp thành công!', 'success');
-            document.getElementById('class-form-panel').dataset.editId = '';
+            savedAction = 'Cập nhật lớp thành công';
         } else {
-            await apiCall('/api/practice_sets/create', {
+            const createRes = await apiCall('/api/practice_sets/create', {
                 method: 'POST',
                 body: JSON.stringify(payload)
             });
-            showResult(resultEl, 'Tạo lớp thành công!', 'success');
+            savedClassId = String(createRes?.set?.id || createRes?.id || '').trim();
+            if (!savedClassId) {
+                throw new Error('Không lấy được id lớp vừa tạo, vui lòng tải lại trang.');
+            }
+            savedAction = 'Tạo lớp thành công';
         }
-        loadClasses();
+
+        // Sync học viên trong lớp (gán/bỏ gán)
+        let syncMsg = '';
+        try {
+            const syncResult = await syncClassStudentAssignments(savedClassId);
+            const parts = [];
+            if (syncResult.added) parts.push(`thêm ${syncResult.added} học viên`);
+            if (syncResult.removed) parts.push(`gỡ ${syncResult.removed} học viên`);
+            if (parts.length) syncMsg = ` Đã ${parts.join(' và ')} vào lớp.`;
+            if (syncResult.errors.length) {
+                syncMsg += ` <br><small class="text-danger">Một số học viên không cập nhật được: ${syncResult.errors.map(esc).join('; ')}</small>`;
+            }
+        } catch (syncErr) {
+            syncMsg = ` <br><small class="text-danger">Đã lưu lớp nhưng cập nhật học viên thất bại: ${esc(syncErr.message || 'Unknown error')}</small>`;
+        }
+
+        showResult(resultEl, savedAction + '!' + syncMsg, 'success');
+        document.getElementById('class-form-panel').dataset.editId = savedClassId;
+        await loadStudents();
+        await loadClasses();
+        prepareClassStudentsPicker(savedClassId);
     } catch (err) {
         showResult(resultEl, 'Lỗi: ' + err.message, 'danger');
     }
@@ -1550,19 +1886,17 @@ function normalizeStr(value) {
 }
 
 function getExpectedStudentsForClass(classId) {
-    const cls = lopHocState.classes.find(c => c.id === classId);
-    const d = cls?.data || {};
-    const classBand = normalizeStr(d.band).toUpperCase();
-    const classTitle = normalizeStr(cls?.title || d.name);
+    // Strict matching: chỉ học viên có assigned_class_id KHỚP với lớp này
+    // mới được tính là "thuộc lớp". Không fallback heuristic theo band/notes
+    // để tránh đếm nhầm/phồng số liệu.
+    const classIdText = String(classId || '').trim();
+    if (!classIdText) return [];
 
-    const lopHocStudents = lopHocState.students.filter(u => normalizeStr(u.course) === 'lớp học');
-    const bandMatched = classBand
-        ? lopHocStudents.filter(u => normalizeStr(u.band).toUpperCase() === classBand)
-        : lopHocStudents;
-
-    if (!classTitle) return bandMatched;
-    const titleMatched = bandMatched.filter(u => normalizeStr(u.notes).includes(classTitle));
-    return titleMatched.length ? titleMatched : bandMatched;
+    return lopHocState.students.filter((u) => {
+        if (normalizeStr(u.course) !== 'lớp học') return false;
+        const assignedId = String(u.assigned_class_id || u.assignedClassId || '').trim();
+        return assignedId === classIdText;
+    });
 }
 
 function renderSubmissions(classId, classTitle, sessionNum) {
@@ -4634,9 +4968,21 @@ function setSessionMediaStatus(statusEl, type, message) {
         : (message || '');
 }
 
+function isLikelyMediaUrl(value) {
+    const v = String(value || '').trim();
+    if (!v) return false;
+    // Reject obvious placeholders
+    if (/^(preview|placeholder|null|undefined|none|todo|tbd)$/i.test(v)) return false;
+    // Allow http/https, protocol-relative, absolute path, or relative path with media extension
+    if (/^https?:\/\//i.test(v)) return true;
+    if (v.startsWith('//') || v.startsWith('/')) return true;
+    return /\.(png|jpe?g|webp|gif|svg|mp3|wav|ogg|m4a|webm|mp4|mov|m4v|avi)(\?.*)?$/i.test(v);
+}
+
 function createSessionMediaPreviewNode(url, kind) {
     const value = String(url || '').trim();
     if (!value) return null;
+    if (!isLikelyMediaUrl(value)) return null;
 
     if (kind === 'audio') {
         const audio = document.createElement('audio');
@@ -4644,6 +4990,7 @@ function createSessionMediaPreviewNode(url, kind) {
         audio.src = value;
         audio.style.width = '100%';
         audio.style.maxWidth = '420px';
+        audio.onerror = () => { audio.style.display = 'none'; };
         return audio;
     }
 
@@ -4656,18 +5003,21 @@ function createSessionMediaPreviewNode(url, kind) {
         video.style.border = '1px solid #cbd5e1';
         video.style.borderRadius = '8px';
         video.style.background = '#f8fafc';
+        video.onerror = () => { video.style.display = 'none'; };
         return video;
     }
 
     const img = document.createElement('img');
     img.src = value;
     img.alt = 'preview';
+    img.title = value;
     img.style.maxWidth = '220px';
     img.style.maxHeight = '150px';
     img.style.border = '1px solid #cbd5e1';
     img.style.borderRadius = '8px';
     img.style.objectFit = 'contain';
     img.style.background = '#f8fafc';
+    img.onerror = () => { img.style.display = 'none'; };
     return img;
 }
 

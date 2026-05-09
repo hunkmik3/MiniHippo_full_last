@@ -1,6 +1,6 @@
 import { parseJsonBody } from '../_utils/parseBody.js';
 import { verifyAdminRequest } from '../_utils/auth.js';
-import { updateTable } from '../_utils/supabase.js';
+import { selectFrom, updateTable } from '../_utils/supabase.js';
 
 const OPTIONAL_USER_COLUMNS = ['learning_program', 'started_on'];
 
@@ -71,6 +71,9 @@ function buildMissingSchemaMessage(error) {
   }
   if (errorMentionsColumn(message, 'course')) {
     return 'Database chưa có cột "course" trong bảng users. Hãy chạy SQL: alter table public.users add column if not exists course text;';
+  }
+  if (errorMentionsColumn(message, 'assigned_class_id')) {
+    return 'Database chưa có cột "assigned_class_id" trong bảng users. Hãy chạy SQL: alter table public.users add column if not exists assigned_class_id text;';
   }
   return '';
 }
@@ -157,6 +160,7 @@ export default async function handler(req, res) {
     notes,
     course,
     band,
+    assignedClassId,
     startedOn,
     learningProgram
   } = body || {};
@@ -192,6 +196,34 @@ export default async function handler(req, res) {
     return res.status(400).json({
       error: 'Học viên lớp học bắt buộc phải có band (B1 hoặc B2) khi cập nhật.'
     });
+  }
+
+  const resolvedAssignedClassId =
+    typeof assignedClassId === 'undefined'
+      ? undefined
+      : String(assignedClassId || '').trim();
+
+  if (resolvedAssignedClassId) {
+    const assignedClass = await selectFrom('practice_sets', {
+      filters: [{ column: 'id', value: resolvedAssignedClassId }],
+      single: true
+    });
+
+    if (!assignedClass) {
+      return res.status(400).json({ error: 'Lớp được gán không tồn tại hoặc đã bị xóa.' });
+    }
+
+    const logicalType = String(assignedClass?.data?.__practice_type || assignedClass?.type || '').toLowerCase();
+    if (logicalType !== 'homework_class') {
+      return res.status(400).json({ error: 'Chỉ được gán học viên vào lớp thuộc module lớp học.' });
+    }
+
+    const assignedBand = normalizeBand(assignedClass?.data?.band || assignedClass?.data?.band_code || '');
+    if (effectiveCourse === 'Lớp học' && resolvedBand && assignedBand && assignedBand !== resolvedBand) {
+      return res.status(400).json({
+        error: `Lớp đã chọn thuộc band ${assignedBand}, không khớp band học viên ${resolvedBand}.`
+      });
+    }
   }
 
   const payload = {};
@@ -230,6 +262,14 @@ export default async function handler(req, res) {
         ? null
         : resolvedBand || null;
   }
+  if (typeof assignedClassId !== 'undefined') {
+    payload.assigned_class_id =
+      payload.course === 'Lớp ôn thi' || payload.course === 'Aptis'
+        ? null
+        : resolvedAssignedClassId || null;
+  } else if (payload.course === 'Lớp ôn thi' || payload.course === 'Aptis') {
+    payload.assigned_class_id = null;
+  }
   if (typeof startedOn !== 'undefined') {
     payload.started_on =
       typeof startedOn === 'string' ? startedOn.trim() || null : startedOn || null;
@@ -256,7 +296,6 @@ export default async function handler(req, res) {
     });
   }
 }
-
 
 
 
