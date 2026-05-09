@@ -3,13 +3,17 @@
 const DEVICE_ID_KEY = 'mh_device_id';
 const DEVICE_NAME_KEY = 'mh_device_name';
 const DEVICE_HEADER_SAFE_NAME_KEY = 'mh_device_header_name';
+// Path constants được lưu KHÔNG kèm .html — normalizePathname() sẽ strip .html
+// để khớp với cả URL có .html lẫn URL clean (Vercel cleanUrls bật trên domain
+// production). Trước đây giữ .html gây redirect loop khi production rewrite
+// /lop_hoc.html → /lop_hoc.
 const CLASSROOM_ONLY_PATHS = new Set([
-    '/lop_hoc.html',
-    '/buoi_hoc.html',
-    '/speaking_cauhoi_part.html'
+    '/lop_hoc',
+    '/buoi_hoc',
+    '/speaking_cauhoi_part'
 ]);
 const CLASSROOM_ALLOWED_EXTRA_PATHS = new Set([
-    '/lesson_history.html'
+    '/lesson_history'
 ]);
 
 function generateDeviceId() {
@@ -83,9 +87,13 @@ function isAdminUser(user) {
 }
 
 function normalizePathname(pathname) {
-    const raw = typeof pathname === 'string' ? pathname.trim().toLowerCase() : '';
+    let raw = typeof pathname === 'string' ? pathname.trim().toLowerCase() : '';
     if (!raw || raw === '/') return '/';
-    return raw.endsWith('/') ? raw.slice(0, -1) : raw;
+    if (raw.endsWith('/')) raw = raw.slice(0, -1);
+    // Strip .html nếu có — production (Vercel cleanUrls) trả về URL không có
+    // .html, local server có. Chuẩn hoá về 1 dạng để so sánh path khỏi loop.
+    if (raw.endsWith('.html')) raw = raw.slice(0, -5);
+    return raw || '/';
 }
 
 function enforceCourseRoute(user) {
@@ -99,13 +107,15 @@ function enforceCourseRoute(user) {
         if (
             isClassroomOnlyPath ||
             CLASSROOM_ALLOWED_EXTRA_PATHS.has(path) ||
-            path === '/login.html' ||
-            path === '/lop_hoc.html' ||
+            path === '/login' ||
+            path === '/lop_hoc' ||
             path === '/'
         ) {
             return true;
         }
-        window.location.replace('/lop_hoc.html');
+        // Redirect đích để KHÔNG có .html — production cleanUrls sẽ giữ URL gọn,
+        // local server (cleanUrls=false) cũng serve đúng vì có rewrite hoặc fallback.
+        window.location.replace('/lop_hoc');
         return false;
     }
 
