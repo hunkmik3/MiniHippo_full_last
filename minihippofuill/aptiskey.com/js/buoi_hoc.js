@@ -45,6 +45,98 @@ function supportsSpeakingRecording() {
   return Boolean(window.MediaRecorder && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
 }
 
+function isSecureRecordingContext() {
+  // getUserMedia chỉ hoạt động trong secure context (HTTPS hoặc localhost).
+  if (typeof window.isSecureContext === 'boolean') return window.isSecureContext;
+  const host = String(window.location?.hostname || '').toLowerCase();
+  if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return true;
+  return window.location?.protocol === 'https:';
+}
+
+function describeRecordingError(err) {
+  // Trả về lý do tiếng Việt rõ ràng cho từng loại lỗi getUserMedia thường gặp.
+  if (!err) return 'Không thể bật micro.';
+  const name = String(err.name || '').toLowerCase();
+  if (name === 'notallowederror' || name === 'permissiondeniederror' || name === 'securityerror') {
+    return 'Trình duyệt đã chặn quyền micro. Vui lòng vào biểu tượng ổ khóa trên thanh địa chỉ → cho phép Microphone, sau đó nhấn "Bật lại micro".';
+  }
+  if (name === 'notfounderror' || name === 'devicesnotfounderror') {
+    return 'Không tìm thấy micro trên thiết bị. Hãy cắm tai nghe có micro hoặc kiểm tra lại micro hệ thống.';
+  }
+  if (name === 'notreadableerror' || name === 'trackstarterror') {
+    return 'Micro đang bị ứng dụng khác sử dụng (Zoom, Meet, Discord…). Hãy đóng các ứng dụng đó rồi nhấn "Bật lại micro".';
+  }
+  if (name === 'overconstrainederror' || name === 'constraintnotsatisfiederror') {
+    return 'Micro hiện tại không đáp ứng được yêu cầu kỹ thuật. Hãy thử thiết bị khác.';
+  }
+  if (name === 'aborterror') {
+    return 'Việc bật micro bị huỷ. Hãy nhấn "Bật lại micro" để thử lần nữa.';
+  }
+  return err.message ? `Không thể bật micro: ${err.message}` : 'Không thể bật micro.';
+}
+
+function showSpeakingRecordingError(message, retryHandlerName) {
+  // Render banner đỏ persistent + nút "Bật lại micro" trong khung audio đang hiện.
+  // Tìm container audio-panel hoặc card speaking → append banner.
+  const card = document.querySelector('.speaking-card .card-body, .question-card');
+  if (!card) {
+    alert(message);
+    return;
+  }
+  let banner = document.getElementById('speaking-mic-error');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'speaking-mic-error';
+    banner.className = 'alert alert-danger mt-3';
+    banner.style.fontSize = '0.92rem';
+    card.insertBefore(banner, card.firstChild);
+  }
+  const safeMsg = String(message || '').replace(/[<>"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const retryBtn = retryHandlerName
+    ? `<button type="button" class="btn btn-sm btn-danger ms-2" onclick="${retryHandlerName}()">
+         <i class="bi bi-arrow-clockwise me-1"></i>Bật lại micro
+       </button>`
+    : '';
+  banner.innerHTML = `
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <i class="bi bi-mic-mute-fill" style="font-size:1.1rem;"></i>
+      <div class="flex-grow-1">${safeMsg}</div>
+      ${retryBtn}
+    </div>
+  `;
+}
+
+function clearSpeakingRecordingError() {
+  const banner = document.getElementById('speaking-mic-error');
+  if (banner) banner.remove();
+}
+
+// Retry handlers gọi từ banner đỏ "Bật lại micro".
+window.retryIntroSpeakingRecording = async function retryIntroSpeakingRecording() {
+  const page = window.__retryIntroRecordingPage;
+  const key = window.__retryIntroRecordingKey;
+  if (!page || !key) return;
+  clearSpeakingRecordingError();
+  const ok = await startSpeakingRecording(key, { retryHandlerName: 'retryIntroSpeakingRecording' });
+  if (ok) {
+    showSpeakingRecordingIndicator(key, { containerIds: ['audio-status-label', 'speaking-status'] });
+  }
+};
+
+window.retryQuestionSpeakingRecording = async function retryQuestionSpeakingRecording() {
+  const page = window.__retryQRecordingPage;
+  const key = window.__retryQRecordingKey;
+  if (!page || !key) return;
+  clearSpeakingRecordingError();
+  const ok = await startSpeakingRecording(key, { retryHandlerName: 'retryQuestionSpeakingRecording' });
+  if (ok) {
+    showSpeakingRecordingIndicator(key, {
+      containerIds: ['audio-status-label', 'speaking-timer-status'],
+      text: `🔴 Đang ghi âm...`
+    });
+  }
+};
+
 function pickSpeakingRecordingMime() {
   if (!window.MediaRecorder || typeof MediaRecorder.isTypeSupported !== 'function') return '';
   const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
@@ -138,8 +230,26 @@ async function ensureAllSpeakingRecordingsUploaded() {
   await Promise.all(keys.map((k) => uploadSpeakingRecording(k).catch(() => null)));
 }
 
-async function startSpeakingRecording(key) {
-  if (!key || !supportsSpeakingRecording() || activeSpeakingRecorder) return false;
+async function startSpeakingRecording(key, { retryHandlerName = '' } = {}) {
+  if (!key) return false;
+  if (activeSpeakingRecorder) return true; // đang ghi rồi, coi như OK
+
+  if (!supportsSpeakingRecording()) {
+    showSpeakingRecordingError(
+      'Trình duyệt này không hỗ trợ ghi âm trực tiếp. Hãy mở trang bằng Chrome/Edge/Safari phiên bản mới (hoặc Firefox).',
+      ''
+    );
+    return false;
+  }
+
+  if (!isSecureRecordingContext()) {
+    showSpeakingRecordingError(
+      'Trang phải dùng HTTPS để bật micro. Vui lòng truy cập đúng địa chỉ https://www.minihippo.edu.vn (không dùng IP nội bộ).',
+      ''
+    );
+    return false;
+  }
+
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const mime = pickSpeakingRecordingMime();
@@ -176,9 +286,11 @@ async function startSpeakingRecording(key) {
     activeSpeakingRecorderKey = key;
     activeSpeakingRecorderStream = stream;
     activeSpeakingRecorderStartedAt = Date.now();
+    clearSpeakingRecordingError();
     return true;
   } catch (err) {
     console.warn('Không thể bật micro để ghi âm:', err);
+    showSpeakingRecordingError(describeRecordingError(err), retryHandlerName);
     return false;
   }
 }
@@ -2630,6 +2742,7 @@ function renderPage(pageIndex) {
   saveCurrent();
   clearSpeakingTimer(); // Always clear speaking timer when switching pages
   stopActiveSpeakingRecording(); // Stop recording trước khi rời page
+  clearSpeakingRecordingError(); // Banner mic-error chỉ thuộc page cũ
   currentPage = pageIndex;
   const container = document.getElementById('pageContent');
 
@@ -3532,11 +3645,17 @@ function renderSpeakingIntro(page) {
               <span class="small text-muted">Audio 1 / 1</span>
             </div>
             <audio id="${audioId}" controls autoplay preload="auto" class="w-100 mb-2" src="${d.introAudio || ''}"></audio>
-            <div class="d-none" id="autoplay-fallback-${page.idx}">
-              <button type="button" class="btn btn-primary btn-sm" onclick="manualPlaySpeakingIntro(${page.idx})">
-                <i class="bi bi-play-fill me-1"></i>Bắt đầu phát audio
-              </button>
-              <div class="small text-muted mt-1">Trình duyệt đã chặn tự động phát. Nhấn nút trên để tiếp tục.</div>
+            <div class="d-none alert alert-warning py-2 px-3 mb-2" id="autoplay-fallback-${page.idx}" style="font-size:0.92rem;">
+              <div class="d-flex flex-wrap align-items-center gap-2">
+                <i class="bi bi-volume-mute-fill" style="font-size:1.1rem;"></i>
+                <div class="flex-grow-1">
+                  <strong>Trình duyệt đang chặn tự động phát audio.</strong>
+                  Nhấn nút bên cạnh để tiếp tục bài học.
+                </div>
+                <button type="button" class="btn btn-warning btn-sm" onclick="manualPlaySpeakingIntro(${page.idx})">
+                  <i class="bi bi-play-fill me-1"></i>Bắt đầu phát audio
+                </button>
+              </div>
             </div>
             <div class="small" id="audio-status-label">Đang phát audio 1...</div>
           </div>
@@ -3578,13 +3697,17 @@ function playSpeakingIntroAudio(page) {
   const startStandaloneRecording = async () => {
     if (statusLabel) statusLabel.textContent = 'Audio xong. Bắt đầu ghi âm...';
     const key = page.data?.key || `sp-intro-${page.idx}`;
-    const ok = await startSpeakingRecording(key);
+    // Lưu key + page để retry button có thể truy cập.
+    window.__retryIntroRecordingPage = page;
+    window.__retryIntroRecordingKey = key;
+    const ok = await startSpeakingRecording(key, { retryHandlerName: 'retryIntroSpeakingRecording' });
     if (ok) {
       showSpeakingRecordingIndicator(key, { containerIds: ['audio-status-label', 'speaking-status'] });
     } else if (statusLabel) {
-      statusLabel.textContent = 'Không thể bật micro — chuyển trang...';
+      statusLabel.textContent = 'Đang chờ bạn cấp quyền micro… (xem cảnh báo phía trên)';
     }
-    // Đếm 45s rồi tự stop + advance
+    // Đếm 45s. Nếu không bật được mic, vẫn đếm timer để học viên có thể nhấn
+    // Bật lại và phần còn lại của đề tiếp tục theo flow.
     startSpeakingTimer({
       ...page,
       responseSeconds,
@@ -3665,11 +3788,17 @@ function renderSpeakingAudioQ(page) {
               <span class="small text-muted">Audio 1 / 1</span>
             </div>
             <audio id="${audioId}" controls autoplay preload="auto" class="w-100 mb-2" src="${d.audio || ''}"></audio>
-            <div class="d-none" id="autoplay-fallback-q-${page.idx}">
-              <button type="button" class="btn btn-primary btn-sm" onclick="manualPlaySpeakingQ(${page.idx})">
-                <i class="bi bi-play-fill me-1"></i>Bắt đầu phát audio câu hỏi
-              </button>
-              <div class="small text-muted mt-1">Trình duyệt đã chặn tự động phát. Nhấn nút trên để tiếp tục.</div>
+            <div class="d-none alert alert-warning py-2 px-3 mb-2" id="autoplay-fallback-q-${page.idx}" style="font-size:0.92rem;">
+              <div class="d-flex flex-wrap align-items-center gap-2">
+                <i class="bi bi-volume-mute-fill" style="font-size:1.1rem;"></i>
+                <div class="flex-grow-1">
+                  <strong>Trình duyệt đang chặn tự động phát audio câu hỏi.</strong>
+                  Nhấn nút bên cạnh để bắt đầu.
+                </div>
+                <button type="button" class="btn btn-warning btn-sm" onclick="manualPlaySpeakingQ(${page.idx})">
+                  <i class="bi bi-play-fill me-1"></i>Phát audio
+                </button>
+              </div>
             </div>
             <div class="small" id="audio-status-label">Đang phát audio 1...</div>
           </div>
@@ -3708,14 +3837,17 @@ function playSpeakingQuestionAudio(page) {
     if (statusLabel) statusLabel.textContent = 'Audio xong.';
     if (hintEl) hintEl.textContent = 'Hệ thống sẽ tự chuyển sang câu tiếp theo sau khi hết thời gian.';
     const key = page.data?.key || `sp-q-${page.idx}`;
-    const ok = await startSpeakingRecording(key);
+    // Lưu page hiện tại để retry button khôi phục đúng câu.
+    window.__retryQRecordingPage = page;
+    window.__retryQRecordingKey = key;
+    const ok = await startSpeakingRecording(key, { retryHandlerName: 'retryQuestionSpeakingRecording' });
     if (ok) {
       showSpeakingRecordingIndicator(key, {
         containerIds: ['audio-status-label', 'speaking-timer-status'],
         text: `🔴 Đang ghi âm... ${page.responseSeconds}s`
       });
     } else if (timerStatus) {
-      timerStatus.textContent = `Thời gian trả lời: ${page.responseSeconds} giây (không bật được micro)`;
+      timerStatus.textContent = `Thời gian trả lời: ${page.responseSeconds} giây — micro chưa sẵn sàng (xem cảnh báo phía trên)`;
     }
     startSpeakingTimer(page);
   };
