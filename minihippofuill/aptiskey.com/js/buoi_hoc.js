@@ -3683,15 +3683,69 @@ function playSpeakingIntroAudio(page) {
   const audio = document.getElementById(audioId);
   const statusLabel = document.getElementById('audio-status-label');
 
-  // Nếu trang tiếp theo cũng là speaking (audio-q) → chỉ phát intro rồi chuyển trang.
+  // Nếu trang tiếp theo cũng là speaking (audio-q) → phát intro xong, đợi
+  // prepSeconds (mặc định 45s — thời gian chuẩn bị Aptis Part 2/3) rồi chuyển.
   // Nếu KHÔNG có speaking-audio-q tiếp theo → ngay tại trang intro: ghi âm 45s.
   const nextPage = pages[currentPage + 1];
   const nextIsSpeakingAudioQ = nextPage && nextPage.type === 'speaking-audio-q';
   const responseSeconds = Number(page.responseSeconds || page.data?.responseSeconds || 45);
+  // Số giây chờ chuẩn bị giữa intro audio và câu hỏi. Mặc định 45 (theo
+  // chuẩn Aptis), admin có thể override qua page.prepSeconds / page.data.prepSeconds.
+  const prepSeconds = Math.max(0, Math.round(Number(
+    page.prepSeconds ?? page.data?.prepSeconds ?? 45
+  )));
+
+  // Render countdown ring trước khi chuyển trang.
+  function ensureIntroPrepRing() {
+    const card = document.querySelector('.speaking-card .card-body');
+    if (!card || document.getElementById('intro-prep-ring')) return;
+    const wrap = document.createElement('div');
+    wrap.id = 'intro-prep-wrap';
+    wrap.className = 'text-center mt-3';
+    wrap.innerHTML = `
+      <div class="speaking-timer-ring running" id="intro-prep-ring">
+        <span id="intro-prep-seconds">${prepSeconds}</span>
+      </div>
+      <div class="speaking-status mt-2" id="intro-prep-status">
+        Chuẩn bị câu trả lời. Tự chuyển sang câu hỏi sau <strong>${prepSeconds}</strong> giây…
+      </div>
+    `;
+    card.appendChild(wrap);
+  }
+
+  let introPrepInterval = null;
+  function clearIntroPrep() {
+    if (introPrepInterval) {
+      clearInterval(introPrepInterval);
+      introPrepInterval = null;
+    }
+    document.getElementById('intro-prep-wrap')?.remove();
+  }
 
   const advanceToNext = () => {
-    if (statusLabel) statusLabel.textContent = 'Audio xong, chuyển sang câu hỏi...';
-    setTimeout(() => { saveCurrent(); renderPage(currentPage + 1); }, 1000);
+    if (prepSeconds <= 0) {
+      if (statusLabel) statusLabel.textContent = 'Audio xong, chuyển sang câu hỏi...';
+      setTimeout(() => { saveCurrent(); renderPage(currentPage + 1); }, 800);
+      return;
+    }
+    ensureIntroPrepRing();
+    if (statusLabel) statusLabel.textContent = 'Audio xong. Hãy quan sát ảnh & chuẩn bị nội dung trả lời.';
+    let remaining = prepSeconds;
+    const ring = document.getElementById('intro-prep-ring');
+    const seconds = document.getElementById('intro-prep-seconds');
+    const status = document.getElementById('intro-prep-status');
+    introPrepInterval = setInterval(() => {
+      remaining -= 1;
+      if (seconds) seconds.textContent = String(Math.max(0, remaining));
+      if (status) status.innerHTML = `Chuẩn bị câu trả lời. Tự chuyển sang câu hỏi sau <strong>${Math.max(0, remaining)}</strong> giây…`;
+      if (remaining <= 5 && ring) ring.className = 'speaking-timer-ring warning';
+      if (remaining <= 0) {
+        clearIntroPrep();
+        if (ring) ring.className = 'speaking-timer-ring expired';
+        saveCurrent();
+        renderPage(currentPage + 1);
+      }
+    }, 1000);
   };
 
   const startStandaloneRecording = async () => {
