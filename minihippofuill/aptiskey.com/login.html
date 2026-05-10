@@ -78,6 +78,53 @@
             border-radius: 0.5rem;
         }
 
+        /* Module selector */
+        .module-tabs {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .module-tab {
+            border: 2px solid #e2e8f0;
+            background: #fff;
+            border-radius: 0.7rem;
+            padding: 0.75rem 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #64748b;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.3rem;
+        }
+        .module-tab i { font-size: 1.4rem; }
+        .module-tab:hover {
+            border-color: #93c5fd;
+            color: #1e40af;
+        }
+        .module-tab.active {
+            border-color: #2563eb;
+            background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+            color: #1e3a8a;
+            box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2);
+        }
+        .module-tab[data-module="vstep"].active {
+            border-color: #16a34a;
+            background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+            color: #14532d;
+            box-shadow: 0 4px 10px rgba(22, 163, 74, 0.2);
+        }
+        .module-tab[data-module="lop_hoc"].active {
+            border-color: #7c3aed;
+            background: linear-gradient(135deg, #ede9fe, #ddd6fe);
+            color: #4c1d95;
+            box-shadow: 0 4px 10px rgba(124, 58, 237, 0.2);
+        }
+
     </style>
 </head>
 <body>
@@ -89,12 +136,32 @@
                 <p class="text-muted">Đăng nhập vào hệ thống</p>
             </div>
             
+            <!-- Module selector -->
+            <label class="form-label fw-semibold" style="font-size:0.82rem;">
+                <i class="bi bi-grid-3x3-gap me-2"></i>Chọn module
+            </label>
+            <div class="module-tabs" id="module-tabs">
+                <div class="module-tab active" data-module="aptis">
+                    <i class="bi bi-mortarboard-fill"></i>
+                    Aptis
+                </div>
+                <div class="module-tab" data-module="vstep">
+                    <i class="bi bi-award-fill"></i>
+                    VSTEP
+                </div>
+                <div class="module-tab" data-module="lop_hoc">
+                    <i class="bi bi-people-fill"></i>
+                    Lớp Học
+                </div>
+            </div>
+
             <div id="error-alert" class="alert alert-danger" style="display: none;" role="alert">
                 <i class="bi bi-exclamation-triangle-fill me-2"></i>
                 <span id="error-message"></span>
             </div>
-            
+
             <form id="login-form">
+                <input type="hidden" id="selected-module" name="module" value="aptis">
                 <div class="mb-3">
                     <label for="email" class="form-label">
                         <i class="bi bi-envelope me-2"></i>Email
@@ -139,6 +206,13 @@
     <script src="js/auth.js"></script>
     
     <script>
+        // ─── Module selector ───
+        const MODULE_LANDINGS = {
+            aptis: '/aptis',
+            vstep: '/vstep',
+            lop_hoc: '/lop-hoc'
+        };
+
         function normalizeCourse(value) {
             return typeof value === 'string' ? value.trim().toLowerCase() : '';
         }
@@ -149,65 +223,70 @@
             return raw.endsWith('/') ? raw.slice(0, -1) : raw;
         }
 
-        function isClassroomPath(pathname) {
-            const path = normalizePath(pathname);
-            return path === '/lop_hoc.html' || path === '/buoi_hoc.html' || path === '/speaking_cauhoi_part.html';
+        function getSelectedModule() {
+            return document.getElementById('selected-module')?.value || 'aptis';
         }
 
-        function sanitizeRedirectTargetByUser(user, redirectTarget) {
-            if (!redirectTarget) return '';
-            try {
-                const parsed = new URL(
-                    redirectTarget.startsWith('http') ? redirectTarget : `${window.location.origin}${redirectTarget}`
-                );
-                const path = normalizePath(parsed.pathname || '/');
-                const course = normalizeCourse(user && user.course);
-                const role = String(user && user.role || '').toLowerCase();
-
-                if (role === 'admin') {
-                    return parsed.href;
-                }
-                if (course === 'lớp học') {
-                    // Ignore stale redirects to Aptis/admin pages for classroom users.
-                    if (!isClassroomPath(path) && path !== '/lesson_history.html') {
-                        return '';
-                    }
-                    return parsed.href;
-                }
-                // Aptis / ôn thi users should not follow classroom deep links.
-                if (isClassroomPath(path)) {
-                    return '';
-                }
-                return parsed.href;
-            } catch (_) {
-                return '';
-            }
+        function setSelectedModule(mod) {
+            const input = document.getElementById('selected-module');
+            if (input) input.value = mod;
+            document.querySelectorAll('.module-tab').forEach((el) => {
+                el.classList.toggle('active', el.dataset.module === mod);
+            });
         }
 
-        function resolveDefaultRedirect(user) {
-            if (user && user.role === 'admin') return '/home.html';
-            if (normalizeCourse(user && user.course) === 'lớp học') return '/lop_hoc.html';
-            return '/home.html';
+        document.querySelectorAll('.module-tab').forEach((tab) => {
+            tab.addEventListener('click', () => setSelectedModule(tab.dataset.module));
+        });
+
+        function userCanAccessModule(user, mod) {
+            if (!user) return false;
+            const role = String(user.role || '').toLowerCase();
+            if (role === 'admin') return true;
+            const course = normalizeCourse(user.course);
+            if (mod === 'lop_hoc') return course === 'lớp học';
+            if (mod === 'aptis') return course === 'aptis' || course === 'lớp ôn thi';
+            if (mod === 'vstep') return false; // hiện tại chỉ admin
+            return false;
+        }
+
+        function moduleForUser(user) {
+            // Suy ra module mặc định nếu user không nhập (hoặc đã đăng nhập sẵn)
+            if (!user) return 'aptis';
+            if (String(user.role || '').toLowerCase() === 'admin') return 'aptis';
+            const course = normalizeCourse(user.course);
+            if (course === 'lớp học') return 'lop_hoc';
+            return 'aptis';
+        }
+
+        function landingForModule(mod) {
+            return MODULE_LANDINGS[mod] || '/home.html';
+        }
+
+        function showError(msg) {
+            const errorAlert = document.getElementById('error-alert');
+            const errorMessage = document.getElementById('error-message');
+            errorMessage.textContent = msg;
+            errorAlert.style.display = 'block';
         }
 
         // Handle login form submission
         document.getElementById('login-form').addEventListener('submit', async function(e) {
             e.preventDefault();
-            
+
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
+            const selectedModule = getSelectedModule();
             const loginBtn = document.getElementById('login-btn');
             const errorAlert = document.getElementById('error-alert');
             const errorMessage = document.getElementById('error-message');
-            
-            // Hide error alert
+
             errorAlert.style.display = 'none';
-            
-            // Disable button and show loading
+
             loginBtn.disabled = true;
             const originalText = loginBtn.innerHTML;
             loginBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang đăng nhập...';
-            
+
             try {
                 const deviceId = typeof getDeviceId === 'function' ? getDeviceId() : null;
                 const deviceName = typeof getDeviceName === 'function' ? getDeviceName() : navigator.userAgent;
@@ -217,13 +296,15 @@
                     userAgent: navigator.userAgent || '',
                     screen: `${window.screen?.width || ''}x${window.screen?.height || ''}`
                 };
-                
+
                 const response = await fetch('/api/auth/login', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ email, password, deviceId, deviceName, deviceInfo })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email, password,
+                        module: selectedModule,
+                        deviceId, deviceName, deviceInfo
+                    })
                 });
 
                 const rawResult = await response.text();
@@ -232,14 +313,13 @@
                 try {
                     result = rawResult ? JSON.parse(rawResult) : {};
                 } catch (parseError) {
-                    throw new Error('Máy chủ API trả về dữ liệu không hợp lệ. Hãy kiểm tra local server đang chạy đúng.');
+                    throw new Error('Máy chủ API trả về dữ liệu không hợp lệ.');
                 }
-                
+
                 if (!response.ok) {
                     throw new Error(result.error || 'Đăng nhập thất bại');
                 }
-                
-                // Store token and user info
+
                 if (result.token) {
                     localStorage.setItem('auth_token', result.token);
                     if (result.refreshToken) {
@@ -249,45 +329,46 @@
                         localStorage.setItem('auth_user', JSON.stringify(result.user));
                     }
                 }
-                
-                let redirectTarget = typeof consumePostLoginRedirect === 'function' 
-                    ? consumePostLoginRedirect() 
-                    : localStorage.getItem('post_login_redirect');
-                redirectTarget = sanitizeRedirectTargetByUser(result.user || null, redirectTarget);
+
+                // Validate frontend (server đã validate, đây là double-check + user-friendly fallback).
+                if (!userCanAccessModule(result.user || null, selectedModule)) {
+                    showError(`Tài khoản này không có quyền truy cập module ${selectedModule.toUpperCase()}.`);
+                    loginBtn.disabled = false;
+                    loginBtn.innerHTML = originalText;
+                    return;
+                }
+
+                // Redirect đến landing tương ứng. Nếu admin có post_login_redirect khác thì ưu tiên (chỉ admin).
+                const role = String(result.user?.role || '').toLowerCase();
+                const isAdmin = role === 'admin';
+                let redirectTarget = '';
+                if (isAdmin) {
+                    redirectTarget = typeof consumePostLoginRedirect === 'function'
+                        ? consumePostLoginRedirect()
+                        : localStorage.getItem('post_login_redirect');
+                }
                 if (redirectTarget && !redirectTarget.includes('/login')) {
                     localStorage.removeItem('post_login_redirect');
                     window.location.href = redirectTarget;
                 } else {
-                    window.location.href = resolveDefaultRedirect(result.user || null);
+                    window.location.href = landingForModule(selectedModule);
                 }
-                
+
             } catch (error) {
-                // Show error message
-                errorMessage.textContent = error.message;
-                errorAlert.style.display = 'block';
-                
-                // Restore button
+                showError(error.message);
                 loginBtn.disabled = false;
                 loginBtn.innerHTML = originalText;
             }
         });
-        
-        // Check if already logged in
+
+        // Check if already logged in → tự redirect đến module phù hợp
         if (localStorage.getItem('auth_token')) {
-            // Verify token
             checkAuth().then(isValid => {
                 if (isValid) {
                     const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
-                    let redirectTarget = typeof consumePostLoginRedirect === 'function' 
-                        ? consumePostLoginRedirect() 
-                        : localStorage.getItem('post_login_redirect');
-                    redirectTarget = sanitizeRedirectTargetByUser(user, redirectTarget);
-                    if (redirectTarget && !redirectTarget.includes('/login')) {
-                        localStorage.removeItem('post_login_redirect');
-                        window.location.href = redirectTarget;
-                    } else {
-                        window.location.href = resolveDefaultRedirect(user);
-                    }
+                    const mod = moduleForUser(user);
+                    setSelectedModule(mod);
+                    window.location.href = landingForModule(mod);
                 }
             });
         }

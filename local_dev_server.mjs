@@ -200,12 +200,27 @@ async function readRequestBody(req) {
   });
 }
 
+// Module landing aliases — phải khớp với rewrites trong vercel.json
+const MODULE_ALIASES = {
+  '/aptis': '/home.html',
+  '/vstep': '/vstep_bode.html',
+  '/lop-hoc': '/lop_hoc.html'
+};
+
 async function resolveStaticFile(pathname) {
   let decodedPath;
   try {
     decodedPath = decodeURIComponent(pathname);
   } catch {
     return null;
+  }
+
+  // Strip trailing slash for alias check
+  const aliasKey = decodedPath.endsWith('/') && decodedPath.length > 1
+    ? decodedPath.slice(0, -1)
+    : decodedPath;
+  if (Object.prototype.hasOwnProperty.call(MODULE_ALIASES, aliasKey)) {
+    decodedPath = MODULE_ALIASES[aliasKey];
   }
 
   const candidates = [];
