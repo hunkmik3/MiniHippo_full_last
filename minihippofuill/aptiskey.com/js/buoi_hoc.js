@@ -3406,11 +3406,13 @@ function renderWritingDescribeImage(page) {
     : filterValidMediaUrls(d.image ? [d.image] : []);
 
   const imgHtml = imgSources.length
-    ? `<div style="display:grid; grid-template-columns:${imgSources.length > 1 ? 'repeat(2, minmax(0, 1fr))' : '1fr'}; gap:0.75rem;">
+    ? `<div style="display:flex; flex-wrap:wrap; gap:0.75rem; justify-content:center; align-items:flex-start;">
          ${imgSources.map(src => `
-           <img src="${src}" alt="Describe this picture"
-                style="width:100%; max-height:400px; object-fit:cover; border-radius:0.75rem; border:1px solid #cbd5e1; background:#f8fafc;"
-                onerror="this.src=''; this.alt='Hình ảnh chưa có'; this.style.padding='3rem'; this.style.background='#f8fafc'; this.style.border='2px dashed #cbd5e1'; this.style.color='#94a3b8';">`
+           <div style="flex:${imgSources.length > 1 ? '1 1 calc(50% - 0.4rem)' : '0 1 100%'}; max-width:${imgSources.length > 1 ? '480px' : '720px'}; display:flex; justify-content:center;">
+             <img src="${src}" alt="Describe this picture"
+                  style="max-width:100%; max-height:420px; width:auto; height:auto; object-fit:contain; border-radius:0.75rem; border:1px solid #cbd5e1; background:#f8fafc;"
+                  onerror="this.style.display='none'; this.parentElement?.style.setProperty('display','none','important');">
+           </div>`
          ).join('')}
        </div>`
     : `<div style="padding:3rem; background:#f8fafc; border:2px dashed #cbd5e1; border-radius:0.75rem; color:#94a3b8; text-align:center;">
@@ -3575,7 +3577,7 @@ function renderSpeakingImage(page) {
   const saved = userAnswers['sp-' + page.idx] || '';
 
   const imagesHtml = filterValidMediaUrls(d.images).map(src =>
-    `<img src="${src}" alt="Speaking image" onerror="this.style.display='none';">`
+    `<img src="${src}" alt="Speaking image" style="max-width:100%; max-height:420px; width:auto; height:auto; object-fit:contain;" onerror="this.style.display='none';">`
   ).join('');
 
   const dotsHtml = Array.from({length: page.totalQ}, (_, i) => {
@@ -4780,7 +4782,7 @@ function renderWritingResults() {
       const q = pg.data.mainQuestion;
       const ans = userAnswers[q.key] || '(chưa viết)';
       const wc = ans.split(/\s+/).filter(Boolean).length;
-      const imgHtml = pg.data.image ? `<div class="mb-2"><img src="${pg.data.image}" class="page-image" style="max-width:100%;max-height:250px;" onerror="this.style.display='none';"></div>` : '';
+      const imgHtml = pg.data.image ? `<div class="mb-2 text-center"><img src="${pg.data.image}" class="page-image" style="max-width:100%; max-height:280px; width:auto; height:auto; object-fit:contain;" onerror="this.style.display='none';"></div>` : '';
       const sectionTitle = pg.headerTitle
         ? esc(pg.headerTitle)
         : (pg.data.headerTitle ? esc(pg.data.headerTitle) : esc(resolvePageDisplayPartLabel(pg, 'Mô tả hình ảnh')));
