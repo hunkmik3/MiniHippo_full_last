@@ -207,10 +207,13 @@
     
     <script>
         // ─── Module selector ───
+        // Aliases /aptis, /vstep, /lop-hoc đã thêm vào vercel.json nhưng prod
+        // Vercel không match → 404. Dùng URL .html trực tiếp cho ổn định —
+        // tất cả 3 file static đều phục vụ qua catch-all rewrite.
         const MODULE_LANDINGS = {
-            aptis: '/aptis',
-            vstep: '/vstep',
-            lop_hoc: '/lop-hoc'
+            aptis: '/home.html',
+            vstep: '/vstep_bode.html',
+            lop_hoc: '/lop_hoc.html'
         };
 
         function normalizeCourse(value) {

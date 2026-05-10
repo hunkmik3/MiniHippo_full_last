@@ -115,9 +115,9 @@ function enforceCourseRoute(user) {
     // User thường nếu lỡ vào /vstep* → đẩy về landing phù hợp.
     if (isVstepOnlyPath) {
         if (course === 'lớp học') {
-            window.location.replace('/lop-hoc');
+            window.location.replace('/lop_hoc.html');
         } else {
-            window.location.replace('/aptis');
+            window.location.replace('/home.html');
         }
         return false;
     }
@@ -131,14 +131,14 @@ function enforceCourseRoute(user) {
         ) {
             return true;
         }
-        // Redirect đích dùng alias /lop-hoc — production cleanUrls + Vercel
-        // rewrite đều resolve về /lop_hoc.html, local server cũng có alias map.
-        window.location.replace('/lop-hoc');
+        // Production Vercel chưa match được aliases — dùng .html trực tiếp
+        // qua catch-all rewrite cho ổn định trên cả prod + local dev.
+        window.location.replace('/lop_hoc.html');
         return false;
     }
 
     if ((course === 'aptis' || course === 'lớp ôn thi' || !course) && isClassroomOnlyPath) {
-        window.location.replace('/aptis');
+        window.location.replace('/home.html');
         return false;
     }
 
