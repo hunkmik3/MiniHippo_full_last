@@ -5034,11 +5034,16 @@ function getSessionUploadFileExtension(name) {
     return match ? match[1] : '';
 }
 
+// Audio: chấp nhận đầy đủ format thường gặp giữa macOS (m4a/aac), Windows (wav/wma) và web (mp3/ogg/webm).
+const AUDIO_EXTENSIONS = ['.mp3', '.m4a', '.aac', '.wav', '.ogg', '.oga', '.opus', '.webm', '.flac'];
+
 function isAcceptedSessionMediaFile(file, kind) {
     if (!file) return false;
     const ext = getSessionUploadFileExtension(file.name);
     if (kind === 'audio') {
-        return file.type.includes('audio/mpeg') || ext === '.mp3';
+        if (AUDIO_EXTENSIONS.includes(ext)) return true;
+        const t = String(file.type || '').toLowerCase();
+        return t.startsWith('audio/');
     }
     if (kind === 'video') {
         return ['.mp4', '.webm', '.mov', '.m4v', '.avi'].includes(ext) || file.type.startsWith('video/');
@@ -5047,13 +5052,22 @@ function isAcceptedSessionMediaFile(file, kind) {
 }
 
 function getSessionMediaAccept(kind) {
-    if (kind === 'audio') return 'audio/mp3,audio/mpeg,.mp3';
+    if (kind === 'audio') {
+        return [
+            'audio/*',
+            'audio/mp3', 'audio/mpeg',
+            'audio/mp4', 'audio/x-m4a', 'audio/aac',
+            'audio/wav', 'audio/x-wav',
+            'audio/ogg', 'audio/opus', 'audio/webm',
+            'audio/flac'
+        ].concat(AUDIO_EXTENSIONS).join(',');
+    }
     if (kind === 'video') return 'video/mp4,video/webm,video/quicktime,video/x-msvideo,.mp4,.webm,.mov,.m4v,.avi';
     return 'image/png,image/jpeg,image/jpg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif';
 }
 
 function getSessionMediaInvalidFileMessage(kind) {
-    if (kind === 'audio') return 'Vui lòng chọn file MP3.';
+    if (kind === 'audio') return 'Vui lòng chọn file audio (mp3/m4a/aac/wav/ogg/opus/webm/flac).';
     if (kind === 'video') return 'Vui lòng chọn file video hợp lệ (mp4/webm/mov/m4v/avi).';
     return 'Vui lòng chọn file ảnh hợp lệ (png/jpg/jpeg/webp/gif).';
 }
