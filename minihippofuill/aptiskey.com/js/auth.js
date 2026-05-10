@@ -145,14 +145,15 @@ function enforceCourseRoute(user) {
     return true;
 }
 
-// Check if user is authenticated
-async function checkAuth() {
+// Check if user is authenticated. Tự refresh access token khi gặp 401
+// (Supabase access_token hết hạn sau ~1 giờ) — tránh F5 bị đá ra login.
+async function checkAuth({ allowRefresh = true } = {}) {
     const token = localStorage.getItem('auth_token');
-    
+
     if (!token) {
         return false;
     }
-    
+
     try {
         const response = await fetch('/api/auth/verify', {
             method: 'GET',
@@ -160,28 +161,41 @@ async function checkAuth() {
                 'Authorization': `Bearer ${token}`
             })
         });
-        
+
+        if (response.status === 401 && allowRefresh) {
+            // Access token hết hạn — thử refresh rồi verify lại 1 lần.
+            const newToken = await refreshAuthToken();
+            if (newToken) {
+                return checkAuth({ allowRefresh: false });
+            }
+            return false;
+        }
+
         if (!response.ok) {
-            // Token invalid, clear storage
             clearAuth();
             return false;
         }
-        
+
         const result = await response.json();
-        
+
         if (result.success && result.user) {
-            // Update user info in localStorage
             localStorage.setItem('auth_user', JSON.stringify(result.user));
             // Route guard should not be treated as auth failure.
-            // If redirect is needed, enforceCourseRoute will handle navigation.
             enforceCourseRoute(result.user);
             return true;
         }
-        
+
         return false;
     } catch (error) {
+        // Lỗi mạng tạm thời — KHÔNG nên xóa session ngay (sẽ làm user bị
+        // logout khi mất mạng vài giây / tab background sleep). Trả về true
+        // nếu localStorage vẫn còn user; phía route guard sẽ retry sau.
         console.error('Auth check error:', error);
-        clearAuth();
+        const storedUser = localStorage.getItem('auth_user');
+        if (storedUser) {
+            try { enforceCourseRoute(JSON.parse(storedUser)); } catch (_) {}
+            return true;
+        }
         return false;
     }
 }
