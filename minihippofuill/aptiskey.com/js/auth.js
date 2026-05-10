@@ -9,11 +9,18 @@ const DEVICE_HEADER_SAFE_NAME_KEY = 'mh_device_header_name';
 // /lop_hoc.html → /lop_hoc.
 const CLASSROOM_ONLY_PATHS = new Set([
     '/lop_hoc',
+    '/lop-hoc',
     '/buoi_hoc',
     '/speaking_cauhoi_part'
 ]);
 const CLASSROOM_ALLOWED_EXTRA_PATHS = new Set([
     '/lesson_history'
+]);
+// VSTEP routes chỉ admin được vào (giai đoạn beta).
+const VSTEP_ONLY_PATHS = new Set([
+    '/vstep',
+    '/vstep_bode',
+    '/vstep_exam'
 ]);
 
 function generateDeviceId() {
@@ -102,25 +109,36 @@ function enforceCourseRoute(user) {
     const course = normalizeCourse(user.course);
     const path = normalizePathname(window.location.pathname);
     const isClassroomOnlyPath = CLASSROOM_ONLY_PATHS.has(path);
+    const isVstepOnlyPath = VSTEP_ONLY_PATHS.has(path);
+
+    // VSTEP đang giai đoạn beta — chỉ admin (đã bypass ở dòng đầu).
+    // User thường nếu lỡ vào /vstep* → đẩy về landing phù hợp.
+    if (isVstepOnlyPath) {
+        if (course === 'lớp học') {
+            window.location.replace('/lop-hoc');
+        } else {
+            window.location.replace('/aptis');
+        }
+        return false;
+    }
 
     if (course === 'lớp học') {
         if (
             isClassroomOnlyPath ||
             CLASSROOM_ALLOWED_EXTRA_PATHS.has(path) ||
             path === '/login' ||
-            path === '/lop_hoc' ||
             path === '/'
         ) {
             return true;
         }
-        // Redirect đích để KHÔNG có .html — production cleanUrls sẽ giữ URL gọn,
-        // local server (cleanUrls=false) cũng serve đúng vì có rewrite hoặc fallback.
-        window.location.replace('/lop_hoc');
+        // Redirect đích dùng alias /lop-hoc — production cleanUrls + Vercel
+        // rewrite đều resolve về /lop_hoc.html, local server cũng có alias map.
+        window.location.replace('/lop-hoc');
         return false;
     }
 
     if ((course === 'aptis' || course === 'lớp ôn thi' || !course) && isClassroomOnlyPath) {
-        window.location.replace('/home.html');
+        window.location.replace('/aptis');
         return false;
     }
 

@@ -88,6 +88,18 @@
       "destination": "/minihippofuill/aptiskey.com/api/users/[action].js?action=:action"
     },
     {
+      "source": "/aptis",
+      "destination": "/minihippofuill/aptiskey.com/home.html"
+    },
+    {
+      "source": "/vstep",
+      "destination": "/minihippofuill/aptiskey.com/vstep_bode.html"
+    },
+    {
+      "source": "/lop-hoc",
+      "destination": "/minihippofuill/aptiskey.com/lop_hoc.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/minihippofuill/aptiskey.com/$1"
     }

@@ -25,10 +25,29 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: error.message || 'Invalid request body' });
   }
 
-  const { email, password, deviceId, deviceName, deviceInfo } = body;
+  const { email, password, deviceId, deviceName, deviceInfo, module: requestedModule } = body;
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Thiếu email hoặc mật khẩu' });
+  }
+
+  // Validate module access — admin có quyền tất cả; ngược lại check theo course.
+  function canAccessModule(profile, mod) {
+    if (!mod) return true; // không truyền module → bỏ qua check
+    const role = String(profile?.role || '').toLowerCase();
+    if (role === 'admin') return true;
+    const course = String(profile?.course || '').trim().toLowerCase();
+    const m = String(mod || '').toLowerCase();
+    if (m === 'lop_hoc') return course === 'lớp học';
+    if (m === 'aptis') return course === 'aptis' || course === 'lớp ôn thi';
+    if (m === 'vstep') return false; // hiện tại chỉ admin
+    return false;
+  }
+  function moduleLabel(mod) {
+    if (mod === 'lop_hoc') return 'Lớp Học';
+    if (mod === 'vstep') return 'VSTEP';
+    if (mod === 'aptis') return 'Aptis';
+    return String(mod || '');
   }
 
   try {
@@ -67,6 +86,13 @@ export default async function handler(req, res) {
 
     if (profile.status && profile.status !== 'active') {
       return res.status(403).json({ error: 'Tài khoản đang bị khóa' });
+    }
+
+    // Check module access — chỉ chặn nếu user truyền module và không có quyền.
+    if (requestedModule && !canAccessModule(profile, requestedModule)) {
+      return res.status(403).json({
+        error: `Tài khoản này không có quyền truy cập module ${moduleLabel(requestedModule)}.`
+      });
     }
 
     try {
