@@ -10,8 +10,7 @@ const DEVICE_HEADER_SAFE_NAME_KEY = 'mh_device_header_name';
 const CLASSROOM_ONLY_PATHS = new Set([
     '/lop_hoc',
     '/lop-hoc',
-    '/buoi_hoc',
-    '/speaking_cauhoi_part'
+    '/buoi_hoc'
 ]);
 const CLASSROOM_ALLOWED_EXTRA_PATHS = new Set([
     '/lesson_history'
@@ -108,7 +107,14 @@ function enforceCourseRoute(user) {
 
     const course = normalizeCourse(user.course);
     const path = normalizePathname(window.location.pathname);
+    const searchParams = new URLSearchParams(window.location.search);
     const isClassroomOnlyPath = CLASSROOM_ONLY_PATHS.has(path);
+    const isSpeakingQuestionPartPath = path === '/speaking_cauhoi_part';
+    const isClassroomSpeakingSession = isSpeakingQuestionPartPath && searchParams.has('buoi');
+    const isClassroomPracticeSet =
+        (path === '/reading_bode_set' || path === '/listening_bode_set') &&
+        normalizeCourse(searchParams.get('from')) === 'lop_hoc';
+    const isClassroomRoute = isClassroomOnlyPath || isClassroomSpeakingSession || isClassroomPracticeSet;
     const isVstepOnlyPath = VSTEP_ONLY_PATHS.has(path);
 
     // VSTEP đang giai đoạn beta — chỉ admin (đã bypass ở dòng đầu).
@@ -124,7 +130,7 @@ function enforceCourseRoute(user) {
 
     if (course === 'lớp học') {
         if (
-            isClassroomOnlyPath ||
+            isClassroomRoute ||
             CLASSROOM_ALLOWED_EXTRA_PATHS.has(path) ||
             path === '/login' ||
             path === '/'
@@ -137,8 +143,8 @@ function enforceCourseRoute(user) {
         return false;
     }
 
-    if ((course === 'aptis' || course === 'lớp ôn thi' || !course) && isClassroomOnlyPath) {
-        window.location.replace('/home.html');
+    if (isClassroomRoute) {
+        window.location.replace(course === 'vstep' ? '/vstep_bode.html' : '/home.html');
         return false;
     }
 
