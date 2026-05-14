@@ -20,6 +20,7 @@ let lopHocState = {
     selectedSessionContentRecord: null,
     sessionDraft: null,
     selectedDraftPageIndex: -1,
+    selectedStudentIds: new Set(),
     classFormSelectedStudentIds: new Set()  // student ids ticked in class create/edit form
 };
 
@@ -187,7 +188,20 @@ const SESSION_STRUCTURE_BLUEPRINTS = {
     'B1-6': {
         timer: 0,
         hideGlobalTimer: true,
-        pages: repeatPageSpecs('speaking-q', 5, { partLabel: 'Part 1', responseSeconds: 30, waitSeconds: 0 })
+        pages: [
+            {
+                type: 'speaking-intro',
+                partLabel: 'Part 1',
+                prepSeconds: 0,
+                data: {
+                    partLabel: 'Part 1',
+                    introText: "Part One. In this part, I'm going to ask you three short questions about yourself and your interests. You will have 30 seconds to reply to each question. Begin when you hear the sound.",
+                    introAudio: 'audio/speaking/part1/1773835214579_speaking_test_1.mp3',
+                    images: []
+                }
+            },
+            ...repeatPageSpecs('speaking-q', 5, { partLabel: 'Part 1', responseSeconds: 30, waitSeconds: 0 })
+        ]
     },
     'B1-7': {
         timer: 50,
@@ -526,10 +540,12 @@ async function loadStudents() {
     try {
         const data = await apiCall(`/api/users/list?group=${USER_GROUP_CLASSROOM}`);
         lopHocState.students = data.users || data || [];
+        syncSelectedStudentIds();
         filterStudents();
         updateStudentStats();
     } catch (err) {
         showAlert('student-table-body', 'Lỗi tải danh sách: ' + err.message, 'danger');
+        updateStudentSelectionUi();
     }
 }
 
@@ -565,36 +581,210 @@ function renderStudentTable() {
     const empty = document.getElementById('student-empty');
     const table = document.getElementById('student-table');
     const list = lopHocState.filteredStudents;
+    if (!tbody) return;
+
+    syncSelectedStudentIds();
 
     if (!list.length) {
-        if (tbody) tbody.innerHTML = '';
+        tbody.innerHTML = '';
         if (table) table.style.display = 'none';
         if (empty) empty.style.display = 'block';
+        updateStudentSelectionUi();
         return;
     }
 
     if (table) table.style.display = 'table';
     if (empty) empty.style.display = 'none';
 
-    tbody.innerHTML = list.map((u, i) => `
-        <tr>
-            <td>${i + 1}</td>
-            <td><strong>${esc(u.account_code || '')}</strong></td>
-            <td>${esc(u.full_name || '')}</td>
-            <td>${esc(u.email || '')}</td>
-            <td>${esc(u.phone_number || '')}</td>
-            <td>${courseBadge(u.course)}</td>
-            <td>${bandBadge(u.band)}</td>
-            <td>${formatDate(u.started_on)}</td>
-            <td>${formatDate(u.expires_at)}</td>
-            <td><span class="text-muted" style="font-size:0.78rem;">${esc(u.notes || '')}</span></td>
-            <td>
-                <button class="btn btn-sm btn-outline-primary" onclick="showStudentDetail('${u.id}')" title="Chi tiết">
-                    <i class="bi bi-pencil-square"></i>
-                </button>
-            </td>
-        </tr>
-    `).join('');
+    tbody.innerHTML = list.map((u, i) => {
+        const id = getStudentId(u);
+        const checked = id && lopHocState.selectedStudentIds.has(id) ? 'checked' : '';
+        const disabled = id ? '' : 'disabled';
+        return `
+            <tr>
+                <td>
+                    <input type="checkbox" class="form-check-input student-row-checkbox"
+                        data-student-id="${escAttr(id)}" ${checked} ${disabled}
+                        onchange="onStudentRowCheckChange(this)" title="Chọn học viên này">
+                </td>
+                <td>${i + 1}</td>
+                <td><strong>${esc(u.account_code || '')}</strong></td>
+                <td>${esc(u.full_name || '')}</td>
+                <td>${esc(u.email || '')}</td>
+                <td>${esc(u.phone_number || '')}</td>
+                <td>${courseBadge(u.course)}</td>
+                <td>${bandBadge(u.band)}</td>
+                <td>${formatDate(u.started_on)}</td>
+                <td>${formatDate(u.expires_at)}</td>
+                <td><span class="text-muted" style="font-size:0.78rem;">${esc(u.notes || '')}</span></td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" data-student-id="${escAttr(id)}"
+                        onclick="showStudentDetail(this.dataset.studentId)" title="Chi tiết">
+                        <i class="bi bi-pencil-square"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    updateStudentSelectionUi();
+}
+
+function getStudentId(user) {
+    return String(user?.id ?? '').trim();
+}
+
+function getStudentLabel(user) {
+    return user?.account_code || user?.email || user?.full_name || getStudentId(user) || '(không có mã)';
+}
+
+function syncSelectedStudentIds() {
+    if (!(lopHocState.selectedStudentIds instanceof Set)) {
+        lopHocState.selectedStudentIds = new Set();
+    }
+
+    const validIds = new Set(lopHocState.students.map(getStudentId).filter(Boolean));
+    lopHocState.selectedStudentIds.forEach((id) => {
+        if (!validIds.has(id)) lopHocState.selectedStudentIds.delete(id);
+    });
+}
+
+function getFilteredStudentIds() {
+    return lopHocState.filteredStudents.map(getStudentId).filter(Boolean);
+}
+
+function updateStudentSelectionUi() {
+    syncSelectedStudentIds();
+
+    const filteredIds = getFilteredStudentIds();
+    const visibleSelected = filteredIds.filter((id) => lopHocState.selectedStudentIds.has(id)).length;
+    const totalSelected = lopHocState.selectedStudentIds.size;
+
+    const countEl = document.getElementById('student-bulk-count');
+    if (countEl) {
+        countEl.textContent = totalSelected
+            ? `Đã chọn ${totalSelected} học viên${visibleSelected !== totalSelected ? ` • ${visibleSelected} đang hiển thị` : ''}`
+            : 'Chưa chọn học viên';
+    }
+
+    const clearBtn = document.getElementById('student-bulk-clear-btn');
+    const deleteBtn = document.getElementById('student-bulk-delete-btn');
+    if (clearBtn) clearBtn.disabled = totalSelected === 0;
+    if (deleteBtn) deleteBtn.disabled = totalSelected === 0;
+
+    const selectAll = document.getElementById('student-select-all');
+    if (selectAll) {
+        selectAll.disabled = filteredIds.length === 0;
+        selectAll.checked = filteredIds.length > 0 && visibleSelected === filteredIds.length;
+        selectAll.indeterminate = visibleSelected > 0 && visibleSelected < filteredIds.length;
+    }
+
+    document.querySelectorAll('.student-row-checkbox').forEach((checkbox) => {
+        const id = String(checkbox.dataset.studentId || '').trim();
+        checkbox.checked = Boolean(id && lopHocState.selectedStudentIds.has(id));
+    });
+}
+
+function onStudentRowCheckChange(input) {
+    if (!input) return;
+    const id = String(input.dataset.studentId || '').trim();
+    if (!id) return;
+
+    if (input.checked) {
+        lopHocState.selectedStudentIds.add(id);
+    } else {
+        lopHocState.selectedStudentIds.delete(id);
+    }
+    updateStudentSelectionUi();
+}
+
+function toggleSelectAllStudents(checked) {
+    getFilteredStudentIds().forEach((id) => {
+        if (checked) {
+            lopHocState.selectedStudentIds.add(id);
+        } else {
+            lopHocState.selectedStudentIds.delete(id);
+        }
+    });
+    updateStudentSelectionUi();
+}
+
+function clearStudentSelection() {
+    lopHocState.selectedStudentIds.clear();
+    updateStudentSelectionUi();
+}
+
+async function deleteSelectedStudents() {
+    syncSelectedStudentIds();
+
+    const usersById = new Map();
+    lopHocState.students.forEach((user) => {
+        const id = getStudentId(user);
+        if (id) usersById.set(id, user);
+    });
+
+    const ids = Array.from(lopHocState.selectedStudentIds).filter((id) => usersById.has(id));
+    const resultEl = document.getElementById('student-bulk-result');
+    if (!ids.length) {
+        clearStudentSelection();
+        showResult(resultEl, 'Chưa chọn học viên nào để xóa.', 'warning');
+        return;
+    }
+
+    const preview = ids
+        .slice(0, 5)
+        .map((id) => `- ${getStudentLabel(usersById.get(id))}`)
+        .join('\n');
+    const more = ids.length > 5 ? `\n- ... và ${ids.length - 5} tài khoản khác` : '';
+    if (!confirm(`Xóa ${ids.length} tài khoản đã chọn?\n${preview}${more}\nHành động này không thể hoàn tác.`)) {
+        return;
+    }
+
+    const clearBtn = document.getElementById('student-bulk-clear-btn');
+    const deleteBtn = document.getElementById('student-bulk-delete-btn');
+    const selectAll = document.getElementById('student-select-all');
+    if (clearBtn) clearBtn.disabled = true;
+    if (deleteBtn) deleteBtn.disabled = true;
+    if (selectAll) selectAll.disabled = true;
+    showResult(resultEl, `Đang xóa ${ids.length} tài khoản...`, 'warning');
+
+    const deletedIds = [];
+    const errors = [];
+    for (const id of ids) {
+        try {
+            await apiCall(`/api/users/delete?id=${encodeURIComponent(id)}`, {
+                method: 'DELETE'
+            });
+            deletedIds.push(id);
+        } catch (err) {
+            errors.push({
+                label: getStudentLabel(usersById.get(id)),
+                message: err.message
+            });
+        }
+    }
+
+    deletedIds.forEach((id) => lopHocState.selectedStudentIds.delete(id));
+    if (lopHocState.selectedStudent && deletedIds.includes(getStudentId(lopHocState.selectedStudent))) {
+        hideStudentDetail();
+    }
+    if (deletedIds.length) {
+        await loadStudents();
+    }
+
+    if (errors.length) {
+        const visibleErrors = errors.slice(0, 5)
+            .map((item) => `${esc(item.label)}: ${esc(item.message)}`)
+            .join('<br>');
+        const hiddenCount = errors.length > 5 ? `<br>... còn ${errors.length - 5} lỗi khác` : '';
+        showResult(
+            resultEl,
+            `Đã xóa ${deletedIds.length}/${ids.length} tài khoản. Lỗi:<br>${visibleErrors}${hiddenCount}`,
+            deletedIds.length ? 'warning' : 'danger'
+        );
+    } else {
+        showResult(resultEl, `Đã xóa ${deletedIds.length} tài khoản đã chọn.`, 'success');
+    }
+    updateStudentSelectionUi();
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -707,7 +897,8 @@ async function submitStudentForm() {
    ═══════════════════════════════════════════════════════ */
 
 function showStudentDetail(userId) {
-    const user = lopHocState.students.find(u => u.id === userId);
+    const targetId = String(userId || '').trim();
+    const user = lopHocState.students.find(u => getStudentId(u) === targetId);
     if (!user) return;
 
     lopHocState.selectedStudent = user;
@@ -988,8 +1179,9 @@ async function deleteStudent() {
         await apiCall(`/api/users/delete?id=${encodeURIComponent(userId)}`, {
             method: 'DELETE'
         });
+        lopHocState.selectedStudentIds.delete(userId);
         hideStudentDetail();
-        loadStudents();
+        await loadStudents();
     } catch (err) {
         showResult(document.getElementById('sd-result'), 'Lỗi xóa: ' + err.message, 'danger');
     }
@@ -4443,11 +4635,14 @@ function getTemplateForSession(sessionKey) {
             const pageType = normalizedSpec.type || 'reading-gap';
             const page = createDefaultPageByType(pageType, normalizedSpec);
 
-            ['partTitle', 'partLabel', 'headerTitle', 'stepLabel', 'idx', 'totalInPart', 'pageIdx', 'totalPages', 'responseSeconds', 'waitSeconds', 'partKey', 'partNum'].forEach((field) => {
+            ['partTitle', 'partLabel', 'headerTitle', 'stepLabel', 'idx', 'totalInPart', 'pageIdx', 'totalPages', 'responseSeconds', 'waitSeconds', 'prepSeconds', 'displayIdx', 'questionIndex', 'totalSpeakingPages', 'partKey', 'partNum'].forEach((field) => {
                 if (Object.prototype.hasOwnProperty.call(normalizedSpec, field)) {
                     page[field] = normalizedSpec[field];
                 }
             });
+            if (normalizedSpec.data && typeof normalizedSpec.data === 'object' && !Array.isArray(normalizedSpec.data)) {
+                page.data = { ...(page.data || {}), ...deepClone(normalizedSpec.data) };
+            }
 
             return normalizeDraftPage(page);
         });
@@ -4477,11 +4672,15 @@ function updateSessionStatus(record) {
     const defaultCountText = Number.isFinite(defaultPageCount)
         ? ` | Mẫu chuẩn: ${defaultPageCount} page`
         : '';
+    const draftPageCount = lopHocState.sessionDraft?.pages?.length;
+    const draftCountText = Number.isFinite(Number(draftPageCount))
+        ? ` | Đang mở: ${draftPageCount} page`
+        : '';
     if (!record) {
         statusEl.className = 'mt-3 alert alert-warning border';
         statusEl.innerHTML = `
             <strong>${esc(key)}</strong>: chưa có custom.<br>
-            <small>Fallback đang dùng hard-code mặc định. Cấu trúc: ${esc(hint)}${esc(defaultCountText)}</small>
+            <small>Fallback đang dùng hard-code mặc định. Cấu trúc: ${esc(hint)}${esc(defaultCountText)}${esc(draftCountText)}</small>
         `;
         return;
     }
@@ -4491,8 +4690,24 @@ function updateSessionStatus(record) {
     statusEl.className = 'mt-3 alert alert-success border';
     statusEl.innerHTML = `
         <strong>${esc(key)}</strong>: đang dùng custom content.<br>
-        <small>Cập nhật: ${esc(updatedText)} | Cấu trúc mặc định: ${esc(hint)}${esc(defaultCountText)}</small>
+        <small>Cập nhật: ${esc(updatedText)} | Cấu trúc mặc định: ${esc(hint)}${esc(defaultCountText)}${esc(draftCountText)}</small>
     `;
+}
+
+function ensureSessionContentIntroPage(sessionKey, config) {
+    const key = String(sessionKey || '').toUpperCase();
+    const draft = normalizeSessionDraft(config || {});
+    if (key !== 'B1-6') return draft;
+
+    const hasIntro = draft.pages.some((page) => page?.type === 'speaking-intro');
+    if (hasIntro) return draft;
+
+    const template = getTemplateForSession(key);
+    const introPage = template.pages.find((page) => page?.type === 'speaking-intro');
+    if (!introPage) return draft;
+
+    draft.pages.unshift(deepClone(introPage));
+    return normalizeSessionDraft(draft);
 }
 
 function loadSessionTemplate() {
@@ -4531,14 +4746,22 @@ async function loadSessionContentEditor(options = {}) {
         return;
     }
 
-    const config = record?.data?.session_config || {};
+    const rawConfig = record?.data?.session_config || {};
+    const config = ensureSessionContentIntroPage(key, rawConfig);
+    const introInserted = key === 'B1-6'
+        && Array.isArray(rawConfig?.pages)
+        && !rawConfig.pages.some((page) => page?.type === 'speaking-intro')
+        && config.pages.some((page) => page?.type === 'speaking-intro');
     if (editor) editor.value = JSON.stringify(config, null, 2);
     if (notes) notes.value = record?.data?.notes || '';
     lopHocState.selectedSessionContentRecord = record;
     applyDraftConfig(config);
     updateSessionStatus(record);
     if (!quiet) {
-        showResult(resultEl, `Đã nạp custom cho <strong>${esc(key)}</strong>.`, 'success');
+        const msg = introInserted
+            ? `Đã nạp custom cho <strong>${esc(key)}</strong> và tự chèn page giới thiệu còn thiếu. Bấm <strong>Lưu custom</strong> để ghi vào database.`
+            : `Đã nạp custom cho <strong>${esc(key)}</strong>.`;
+        showResult(resultEl, msg, introInserted ? 'warning' : 'success');
     }
 }
 
@@ -4666,11 +4889,14 @@ function buildDefaultVocabData(partKey) {
 
 function applyPageSpecOverrides(page, spec = {}) {
     const output = normalizeDraftPage(page);
-    ['partTitle', 'partLabel', 'headerTitle', 'stepLabel', 'idx', 'totalInPart', 'pageIdx', 'totalPages', 'responseSeconds', 'waitSeconds'].forEach((field) => {
+    ['partTitle', 'partLabel', 'headerTitle', 'stepLabel', 'idx', 'totalInPart', 'pageIdx', 'totalPages', 'responseSeconds', 'waitSeconds', 'prepSeconds', 'displayIdx', 'questionIndex', 'totalSpeakingPages'].forEach((field) => {
         if (Object.prototype.hasOwnProperty.call(spec, field)) {
             output[field] = spec[field];
         }
     });
+    if (spec.data && typeof spec.data === 'object' && !Array.isArray(spec.data)) {
+        output.data = { ...(output.data || {}), ...deepClone(spec.data) };
+    }
     return output;
 }
 
@@ -4845,12 +5071,13 @@ function createDefaultPageByType(type, spec = {}) {
         case 'speaking-intro':
             return applyPageSpecOverrides({
                 ...base,
-                partLabel: 'Part 1 - Speaking',
+                partLabel: 'Part 1',
+                prepSeconds: 0,
                 data: {
-                    partLabel: 'Part 1 - Speaking',
-                    introText: 'Listen to the introduction.',
-                    introAudio: 'audio/speaking/intro.mp3',
-                    images: ['images/speaking/placeholder.jpg']
+                    partLabel: 'Part 1',
+                    introText: "Part One. In this part, I'm going to ask you three short questions about yourself and your interests. You will have 30 seconds to reply to each question. Begin when you hear the sound.",
+                    introAudio: 'audio/speaking/part1/1773835214579_speaking_test_1.mp3',
+                    images: []
                 }
             }, spec);
         case 'speaking-audio-q':
@@ -5804,6 +6031,7 @@ function renderTypeSpecificForm(page) {
                     <div class="col-12"><label class="builder-form-label">Part label</label><input id="tf-part-label" class="form-control" value="${esc(d.partLabel || page.partLabel || '')}"></div>
                     <div class="col-12"><label class="builder-form-label">Intro text</label><textarea id="tf-intro-text" class="form-control" rows="3">${esc(d.introText || '')}</textarea></div>
                     <div class="col-12"><label class="builder-form-label">Intro audio</label><input id="tf-intro-audio" class="form-control" value="${esc(d.introAudio || '')}"></div>
+                    <div class="col-12"><label class="builder-form-label">Prep seconds sau audio</label><input id="tf-prep-seconds" type="number" class="form-control" value="${esc(String(page.prepSeconds ?? d.prepSeconds ?? 0))}" min="0"></div>
                     <div class="col-12"><label class="builder-form-label">Images (comma)</label><input id="tf-images-csv" class="form-control" value="${esc((d.images || []).join(', '))}"></div>
                     <div class="col-12"><label class="builder-form-label">Videos (comma, optional)</label><input id="tf-videos-csv" class="form-control" value="${esc((d.videos || []).join(', '))}" placeholder="video/.../clip1.mp4, video/.../clip2.mp4"></div>
                 </div>`;
@@ -6413,6 +6641,7 @@ function applyTypeFormToPage(options = {}) {
             d.images = parseCsvValues(byId('tf-images-csv'));
             d.videos = parseCsvValues(byId('tf-videos-csv'));
             page.partLabel = d.partLabel || page.partLabel || '';
+            page.prepSeconds = toInt(byId('tf-prep-seconds'), 0);
             break;
         case 'speaking-audio-q':
             d.key = byId('tf-key').trim();
@@ -6834,7 +7063,7 @@ async function saveSessionContent() {
     const notes = document.getElementById('sc-notes')?.value.trim() || '';
     const resultEl = document.getElementById('sc-result');
     commitCurrentSessionBuilderPage();
-    const config = normalizeSessionDraft(lopHocState.sessionDraft || getTemplateForSession(key));
+    const config = ensureSessionContentIntroPage(key, lopHocState.sessionDraft || getTemplateForSession(key));
 
     const errors = validateSessionConfig(config);
     if (errors.length) {
@@ -6955,7 +7184,7 @@ function showResult(el, html, type) {
 function showAlert(containerId, msg, type) {
     const container = document.getElementById(containerId);
     if (container) {
-        container.innerHTML = `<tr><td colspan="11"><div class="alert alert-${type} mb-0">${msg}</div></td></tr>`;
+        container.innerHTML = `<tr><td colspan="12"><div class="alert alert-${type} mb-0">${msg}</div></td></tr>`;
     }
 }
 
