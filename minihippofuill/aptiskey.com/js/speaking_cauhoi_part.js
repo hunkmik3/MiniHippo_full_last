@@ -16,6 +16,8 @@
             data: {
                 part: 1,
                 pages: [{
+                    introText: "Part One. In this part, I'm going to ask you three short questions about yourself and your interests. You will have 30 seconds to reply to each question. Begin when you hear the sound.",
+                    introAudioUrl: 'audio/speaking/part1/1773835214579_speaking_test_1.mp3',
                     questions: [
                         { prompt: 'What do you enjoy doing in your free time?' },
                         { prompt: 'Tell me about your favourite place to visit.' },

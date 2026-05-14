@@ -848,11 +848,33 @@
                         </select>
                     </div>
 
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3 p-2 border rounded bg-light">
+                        <div class="text-muted small">
+                            <i class="bi bi-check2-square me-1"></i>
+                            <span id="student-bulk-count">Chưa chọn học viên</span>
+                        </div>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="student-bulk-clear-btn"
+                                onclick="clearStudentSelection()" disabled>
+                                <i class="bi bi-x-square me-1"></i>Bỏ chọn
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger" id="student-bulk-delete-btn"
+                                onclick="deleteSelectedStudents()" disabled>
+                                <i class="bi bi-trash3 me-1"></i>Xóa đã chọn
+                            </button>
+                        </div>
+                    </div>
+                    <div id="student-bulk-result" style="display: none;"></div>
+
                     <!-- Student Table -->
                     <div class="table-responsive">
                         <table class="data-table" id="student-table">
                             <thead>
                                 <tr>
+                                    <th style="width: 44px;">
+                                        <input class="form-check-input" type="checkbox" id="student-select-all"
+                                            onchange="toggleSelectAllStudents(this.checked)" title="Chọn tất cả học viên đang hiển thị">
+                                    </th>
                                     <th style="width: 40px;">STT</th>
                                     <th>Mã HV</th>
                                     <th>Họ tên</th>

@@ -1402,18 +1402,39 @@ SESSIONS['B1-6'] = {
   timer: 0, // Timer riêng cho speaking, không dùng global timer
   hideGlobalTimer: true,
   buildPages: function (data) {
-    return data.questions.map((q, i) => ({
+    const introPage = {
+      type: 'speaking-intro',
+      idx: 0,
+      displayIdx: 0,
+      data: {
+        partLabel: data.partLabel || 'Part 1',
+        introText: data.introText,
+        introAudio: data.introAudio,
+        images: []
+      },
+      totalSpeakingPages: data.questions.length + 1,
+      partLabel: data.partLabel || 'Part 1',
+      prepSeconds: 0
+    };
+
+    const questionPages = data.questions.map((q, i) => ({
       type: 'speaking-q',
       idx: i,
+      displayIdx: i + 1,
+      questionIndex: i,
       data: q,
       totalQ: data.questions.length,
+      totalSpeakingPages: data.questions.length + 1,
       partLabel: data.partLabel || 'Part 1',
       responseSeconds: data.responseSeconds,
       waitSeconds: data.waitSeconds
     }));
+    return [introPage, ...questionPages];
   },
   data: {
     partLabel: 'Part 1',
+    introText: "Part One. In this part, I'm going to ask you three short questions about yourself and your interests. You will have 30 seconds to reply to each question. Begin when you hear the sound.",
+    introAudio: 'audio/speaking/part1/1773835214579_speaking_test_1.mp3',
     responseSeconds: 30,
     waitSeconds: 0,
     questions: [
@@ -2634,13 +2655,23 @@ function normalizeCustomPages(rawPages) {
     }
   });
 
-  const speakingPages = list.filter((p) => p.type === 'speaking-intro' || p.type === 'speaking-audio-q');
+  const speakingPages = list.filter((p) =>
+    ['speaking-intro', 'speaking-audio-q', 'speaking-q', 'speaking-image'].includes(p.type)
+  );
   if (speakingPages.length) {
     const totalSpeakingPages = speakingPages.length;
+    let speakingQuestionIndex = 0;
     speakingPages.forEach((page, i) => {
-      if (page.idx === undefined || page.idx === null) page.idx = i;
+      if (page.idx === undefined || page.idx === null) page.idx = page.type === 'speaking-intro' ? i : speakingQuestionIndex;
+      if (page.displayIdx === undefined || page.displayIdx === null) page.displayIdx = i;
       if (page.totalSpeakingPages === undefined || page.totalSpeakingPages === null) {
         page.totalSpeakingPages = totalSpeakingPages;
+      }
+      if ((page.type === 'speaking-q' || page.type === 'speaking-image') && (page.questionIndex === undefined || page.questionIndex === null)) {
+        page.questionIndex = speakingQuestionIndex;
+      }
+      if (page.type === 'speaking-q' || page.type === 'speaking-image') {
+        speakingQuestionIndex += 1;
       }
     });
   }
@@ -3479,7 +3510,9 @@ let speakingTimerInterval = null;
 
 function renderSpeakingQ(page) {
   const d = page.data;
-  const num = page.idx + 1;
+  const num = Number.isFinite(Number(page.questionIndex)) ? Number(page.questionIndex) + 1 : page.idx + 1;
+  const displayNum = Number.isFinite(Number(page.displayIdx)) ? Number(page.displayIdx) + 1 : num;
+  const totalDisplay = Number(page.totalSpeakingPages || page.totalQ || 0) || page.totalQ;
   const partLabel = resolvePageDisplayPartLabel(page, page.partLabel || 'Part 1');
   const saved = userAnswers['sp-' + page.idx] || '';
   const wc = saved.split(/\s+/).filter(Boolean).length;
@@ -3506,7 +3539,7 @@ function renderSpeakingQ(page) {
       <div class="card shadow-sm border-0 speaking-card page-fade">
         <div class="card-body p-3 p-md-4">
           <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-2 mb-3">
-            <span class="badge bg-primary">Trang ${num} / ${page.totalQ}</span>
+            <span class="badge bg-primary">Trang ${displayNum} / ${totalDisplay}</span>
             <span class="page-hint" id="speaking-status">${hintText}</span>
           </div>
           <h4 class="mb-2">Speaking ${esc(partLabel)} – Câu ${num}</h4>
@@ -3689,7 +3722,8 @@ function playSpeakingIntroAudio(page) {
   // prepSeconds (mặc định 45s — thời gian chuẩn bị Aptis Part 2/3) rồi chuyển.
   // Nếu KHÔNG có speaking-audio-q tiếp theo → ngay tại trang intro: ghi âm 45s.
   const nextPage = pages[currentPage + 1];
-  const nextIsSpeakingAudioQ = nextPage && nextPage.type === 'speaking-audio-q';
+  const nextIntroQuestionTypes = ['speaking-audio-q', 'speaking-q', 'speaking-image'];
+  const nextIsSpeakingQuestion = nextPage && nextIntroQuestionTypes.includes(nextPage.type);
   const responseSeconds = Number(page.responseSeconds || page.data?.responseSeconds || 45);
   // Số giây chờ chuẩn bị giữa intro audio và câu hỏi. Mặc định 45 (theo
   // chuẩn Aptis), admin có thể override qua page.prepSeconds / page.data.prepSeconds.
@@ -3772,7 +3806,7 @@ function playSpeakingIntroAudio(page) {
   };
 
   if (!audio || !audio.src || audio.src.endsWith('/')) {
-    if (nextIsSpeakingAudioQ) {
+    if (nextIsSpeakingQuestion) {
       if (statusLabel) statusLabel.textContent = 'Không có audio, chuyển trang...';
       setTimeout(() => { saveCurrent(); renderPage(currentPage + 1); }, 3000);
     } else {
@@ -3800,7 +3834,7 @@ function playSpeakingIntroAudio(page) {
   }
 
   audio.onended = function () {
-    if (nextIsSpeakingAudioQ) {
+    if (nextIsSpeakingQuestion) {
       advanceToNext();
     } else {
       startStandaloneRecording();
@@ -3808,7 +3842,7 @@ function playSpeakingIntroAudio(page) {
   };
 
   audio.onerror = function () {
-    if (nextIsSpeakingAudioQ) {
+    if (nextIsSpeakingQuestion) {
       if (statusLabel) statusLabel.textContent = 'Audio lỗi, chuyển trang...';
       setTimeout(() => { saveCurrent(); renderPage(currentPage + 1); }, 3000);
     } else {
