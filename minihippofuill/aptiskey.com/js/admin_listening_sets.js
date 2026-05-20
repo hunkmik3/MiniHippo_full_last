@@ -1000,12 +1000,10 @@
 
     if (refs.addPart1Btn) {
         refs.addPart1Btn.addEventListener('click', () => {
-            const count = parseInt(refs.part1Count.value, 10) || 13;
-            if (refs.part1Container.children.length < count) {
-                refs.part1Container.appendChild(createPart1QuestionRow());
-                refreshPart1Indexes();
-            } else {
-                alert(`Tối đa ${count} câu hỏi cho Part 1.`);
+            refs.part1Container.appendChild(createPart1QuestionRow());
+            refreshPart1Indexes();
+            if (refs.part1Count) {
+                refs.part1Count.value = refs.part1Container.children.length;
             }
         });
     }

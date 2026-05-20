@@ -933,7 +933,7 @@ function collectListeningSet1_13() {
         }
 
         questions.push({
-            heading: heading || `Question ${index + 1} of 17`,
+            heading: heading || `Question ${index + 1}`,
             audioUrl: audioUrl,
             question: question,
             options: [option1, option2, option3],
@@ -1123,11 +1123,6 @@ function addListeningQuestion1_13() {
     if (!container) return;
 
     const questionCount = container.children.length;
-    if (questionCount >= 13) {
-        alert('Tối đa 13 câu hỏi!');
-        return;
-    }
-
     const questionIndex = questionCount + 1;
     const questionHtml = `
         <div class="question-item mb-3" data-question-index="${questionIndex}">
@@ -1139,7 +1134,7 @@ function addListeningQuestion1_13() {
             </div>
             <div class="mb-2">
                 <label class="form-label">Heading</label>
-                <input type="text" class="form-control" placeholder="Question ${questionIndex} of 17" data-field="heading">
+                <input type="text" class="form-control" placeholder="Question ${questionIndex}" data-field="heading">
             </div>
             <div class="mb-2">
                 <label class="form-label">Upload Audio (MP3)</label>
@@ -2701,7 +2696,7 @@ function renderListening1_13Preview(container, sets, currentIndex) {
     questions.forEach((q, index) => {
         html += `
             <div class="mb-4 p-3 border rounded" data-question-index="${index}">
-                <h5 class="mb-2">${q.heading || `Question ${index + 1} of 17`}</h5>
+                <h5 class="mb-2">${q.heading || `Question ${index + 1}`}</h5>
                 ${q.audioUrl ? `
                     <div class="mb-3">
                         <audio controls class="w-100">
@@ -3097,7 +3092,7 @@ function saveListeningPart1_13Set() {
     }
 
     container.querySelectorAll('.question-item').forEach((item, index) => {
-        const heading = item.querySelector('[data-field="heading"]')?.value.trim() || `Question ${index + 1} of 17`;
+        const heading = item.querySelector('[data-field="heading"]')?.value.trim() || `Question ${index + 1}`;
         const question = item.querySelector('[data-field="question"]')?.value.trim() || '';
         const option1 = item.querySelector('[data-field="option1"]')?.value.trim() || '';
         const option2 = item.querySelector('[data-field="option2"]')?.value.trim() || '';
@@ -3447,4 +3442,3 @@ function saveListeningPart16_17Set() {
 
     alert('Đã lưu bộ đề thành công!');
 }
-
