@@ -59,17 +59,8 @@ const question2Content_6 = [
     'Now things have changed, actors and filmmakers can earn millions of dollars from film production.',
 ];
 
-// READING EXTRA P2-7 - Topic: Tech fair
-const question2Content_7 = [
-    'The tech fair took place on Saturday morning, showcasing a variety of exciting new gadgets.',
-    'More than 60 exhibitors participated, with Mr. A presenting an impressive robot demonstration.',
-    'After the demonstrations, awards were given to the creators of the most innovative products.',
-    'The event featured engaging activities such as VR gaming, coding workshops, and thrilling drone races.',
-    'Visitors enjoyed complimentary coffee and snacks while exploring the interactive exhibits.',
-];
-
 // READING EXTRA P2-8 - Topic: The famous singer (2)
-const question2Content_8 = [
+const question2Content_7 = [
     'He is a famous singer.',
     'Before becoming famous, he studied music at school when he was 15.',
     'His unique way of dressing and performing made him stand out from others.',
@@ -78,7 +69,7 @@ const question2Content_8 = [
 ];
 
 // READING EXTRA P2-9 - Topic: The famous singer (3)
-const question2Content_9 = [
+const question2Content_8 = [
     'Jaden Nobelton is only 18 years old and he is a famous singer',
     'Before becoming famous at his age, he studied art and music in high school.',
     'During his studies, he studied creativity and singing on stage.',
@@ -88,7 +79,7 @@ const question2Content_9 = [
 ];
 
 // READING EXTRA P2-10 - Topic: Writing about a place (2)
-const question2Content_10 = [
+const question2Content_9 = [
     'Before writing, it is important to research the place thoroughly.',
     'To prepare well, you should learn about the people and the history of the area.',
     'Sometimes you may not be able to visit the place, but you can still find similar information from other sources.',
@@ -97,7 +88,7 @@ const question2Content_10 = [
 ];
 
 // READING EXTRA P2-11 - Topic: My visit to a new coffee shop
-const question2Content_11 = [
+const question2Content_10 = [
     'It was my first time visiting a new local coffee shop.',
     'At first, I didn’t think it would be good, but I decided to give it a try.',
     'I looked at the menu and saw many different kinds of food and drinks.',
@@ -106,7 +97,7 @@ const question2Content_11 = [
 ];
 
 // READING EXTRA P2-12 - Topic: History to travel
-const question2Content_12 = [
+const question2Content_11 = [
     'In the past, only very rich people could afford to travel long distances.',
     'The invention of cars and trains had changed everything and made travelling cheaper.',
     'After these two means of transport, travelling becomes even easier with aeroplanes.',
@@ -115,12 +106,21 @@ const question2Content_12 = [
 ];
 
 // READING EXTRA P2-13 - Topic: University open day
-const question2Content_13 = [
+const question2Content_12 = [
     'Before the open day, please contact us by phone or email so we can record your personal details.',
     'Using this information, we’ll prepare an identification card for you to collect upon arrival.',
     'You’ll need to show this card to enter the introductory talk and morning lectures.',
     'Every visitor will have the chance to join a Q&A session with current students.',
     'After the presentations, you’ll be able to explore different departments across the campus.',
+];
+
+// READING EXTRA P2-7 - Topic: Tech fair
+const question2Content_13 = [
+    'The tech fair took place on Saturday morning, showcasing a variety of exciting new gadgets.',
+    'More than 60 exhibitors participated, with Mr. A presenting an impressive robot demonstration.',
+    'After the demonstrations, awards were given to the creators of the most innovative products.',
+    'The event featured engaging activities such as VR gaming, coding workshops, and thrilling drone races.',
+    'Visitors enjoyed complimentary coffee and snacks while exploring the interactive exhibits.',
 ];
 
 const questionSets = [
@@ -148,13 +148,13 @@ const questheader1 = {
     question2Content_4: "Means of transportation",
     question2Content_5: "A new coffee shop (2)",
     question2Content_6: "Making films",
-    question2Content_7: "Tech fair",
-    question2Content_8: "The famous singer (2)",
-    question2Content_9: "The famous singer (3)",
-    question2Content_10: "Writing about a place (2)",
-    question2Content_11: "My visit to a new coffee shop",
-    question2Content_12: "History to travel",
-    question2Content_13: "University open day",
+    question2Content_7: "The famous singer (2)",
+    question2Content_8: "The famous singer (3)",
+    question2Content_9: "Writing about a place (2)",
+    question2Content_10: "My visit to a new coffee shop",
+    question2Content_11: "History to travel",
+    question2Content_12: "University open day",
+    question2Content_13: "Tech fair",
 };
 
 function getQuestHeaders(obj) {
@@ -470,20 +470,6 @@ if (document.readyState === 'loading') {
     },
     {
       "id": 7,
-      "title": "READING EXTRA P2-7",
-      "data": {
-        "topic": "Tech fair",
-        "sentences": [
-          "The tech fair took place on Saturday morning, showcasing a variety of exciting new gadgets.",
-          "More than 60 exhibitors participated, with Mr. A presenting an impressive robot demonstration.",
-          "After the demonstrations, awards were given to the creators of the most innovative products.",
-          "The event featured engaging activities such as VR gaming, coding workshops, and thrilling drone races.",
-          "Visitors enjoyed complimentary coffee and snacks while exploring the interactive exhibits."
-        ]
-      }
-    },
-    {
-      "id": 8,
       "title": "READING EXTRA P2-8",
       "data": {
         "topic": "The famous singer (2)",
@@ -497,7 +483,7 @@ if (document.readyState === 'loading') {
       }
     },
     {
-      "id": 9,
+      "id": 8,
       "title": "READING EXTRA P2-9",
       "data": {
         "topic": "The famous singer (3)",
@@ -512,7 +498,7 @@ if (document.readyState === 'loading') {
       }
     },
     {
-      "id": 10,
+      "id": 9,
       "title": "READING EXTRA P2-10",
       "data": {
         "topic": "Writing about a place (2)",
@@ -526,7 +512,7 @@ if (document.readyState === 'loading') {
       }
     },
     {
-      "id": 11,
+      "id": 10,
       "title": "READING EXTRA P2-11",
       "data": {
         "topic": "My visit to a new coffee shop",
@@ -540,7 +526,7 @@ if (document.readyState === 'loading') {
       }
     },
     {
-      "id": 12,
+      "id": 11,
       "title": "READING EXTRA P2-12",
       "data": {
         "topic": "History to travel",
@@ -554,7 +540,7 @@ if (document.readyState === 'loading') {
       }
     },
     {
-      "id": 13,
+      "id": 12,
       "title": "READING EXTRA P2-13",
       "data": {
         "topic": "University open day",
@@ -564,6 +550,20 @@ if (document.readyState === 'loading') {
           "You’ll need to show this card to enter the introductory talk and morning lectures.",
           "Every visitor will have the chance to join a Q&A session with current students.",
           "After the presentations, you’ll be able to explore different departments across the campus."
+        ]
+      }
+    },
+    {
+      "id": 13,
+      "title": "READING EXTRA P2-7",
+      "data": {
+        "topic": "Tech fair",
+        "sentences": [
+          "The tech fair took place on Saturday morning, showcasing a variety of exciting new gadgets.",
+          "More than 60 exhibitors participated, with Mr. A presenting an impressive robot demonstration.",
+          "After the demonstrations, awards were given to the creators of the most innovative products.",
+          "The event featured engaging activities such as VR gaming, coding workshops, and thrilling drone races.",
+          "Visitors enjoyed complimentary coffee and snacks while exploring the interactive exhibits."
         ]
       }
     }
