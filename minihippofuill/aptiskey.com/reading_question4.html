@@ -124,28 +124,11 @@
             
             async function loadLessonScript() {
                 setLoadingState(true);
-                // If no lesson ID, try to load latest uploaded lesson
+                // If no lesson ID, load original static lesson.
                 if (!lessonId) {
-                    console.log('No lesson parameter - trying to load latest uploaded lesson');
-                    try {
-                        const listResponse = await fetch(`/api/lessons/list?part=4`);
-                        const listResult = await listResponse.json();
-                        if (listResult.success && listResult.lessons && listResult.lessons.length > 0) {
-                            const latestLesson = listResult.lessons[0];
-                            console.log('Found latest lesson, loading:', latestLesson.id);
-                            window.location.href = `${window.location.pathname}?lesson=${latestLesson.id}`;
-                            return;
-                        } else {
-                            console.log('No uploaded lessons found - loading default/original lesson');
-                            loadDefaultScript();
-                            return;
-                        }
-                    } catch (error) {
-                        console.error('Error fetching latest lesson:', error);
-                        console.log('Falling back to default/original lesson');
+                    console.log('No lesson parameter - loading default/original lesson');
                     loadDefaultScript();
-                        return;
-                    }
+                    return;
                 }
                 
                 // Only proceed with lesson loading if lessonId exists

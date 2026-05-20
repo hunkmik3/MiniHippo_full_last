@@ -58,17 +58,17 @@ function createLessonCard(part, lesson) {
     // Determine which page to link to
     // Support both string and number for backward compatibility
     const pageMap = {
-        '1': 'reading_question1.html',
-        '2': 'reading_question2.html',
-        '4': 'reading_question4.html',
-        '5': 'reading_question5.html',
-        1: 'reading_question1.html', // Backward compatibility
-        2: 'reading_question2.html',
-        4: 'reading_question4.html',
-        5: 'reading_question5.html'
+        '1': 'reading_question1',
+        '2': 'reading_question2',
+        '4': 'reading_question4',
+        '5': 'reading_question5',
+        1: 'reading_question1', // Backward compatibility
+        2: 'reading_question2',
+        4: 'reading_question4',
+        5: 'reading_question5'
     };
     
-    const pageUrl = pageMap[part] || pageMap[String(part)] || 'reading_question1.html';
+    const pageUrl = pageMap[part] || pageMap[String(part)] || 'reading_question1';
     
     // Map part to button style (matching Part buttons)
     const partStyleMap = {
@@ -86,7 +86,7 @@ function createLessonCard(part, lesson) {
     
     // Create button/link matching Part button style
     const link = document.createElement('a');
-    link.href = `${pageUrl}?lesson=${lesson.id}`;
+    link.href = `${pageUrl}?lesson=${encodeURIComponent(lesson.id)}`;
     link.className = `btn ${style.btnClass} btn-lg w-100 mb-1 d-flex align-items-center justify-content-center text-decoration-none`;
     link.style.textDecoration = 'none';
     link.style.padding = '0.75rem';
@@ -146,4 +146,3 @@ if (document.readyState === 'loading') {
 } else {
     loadAllLessons();
 }
-

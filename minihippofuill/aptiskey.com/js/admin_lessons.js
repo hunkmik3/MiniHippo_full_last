@@ -3,14 +3,14 @@
 let deleteLessonId = null;
 
 const PART_CONFIGS = [
-    { key: '1', containerId: 'part1-lessons-container', label: 'Part 1', viewPage: 'reading_question1.html' },
-    { key: '2', containerId: 'part2-lessons-container', label: 'Part 2 & 3', viewPage: 'reading_question2.html' },
-    { key: '4', containerId: 'part4-lessons-container', label: 'Part 4', viewPage: 'reading_question4.html' },
-    { key: '5', containerId: 'part5-lessons-container', label: 'Part 5', viewPage: 'reading_question5.html' },
-    { key: 'listening_1_13', containerId: 'listening_1_13-lessons-container', label: 'Listening 1-13', viewPage: 'listening_question1_13.html' },
-    { key: 'listening_14', containerId: 'listening_14-lessons-container', label: 'Listening 14', viewPage: 'listening_question14.html' },
-    { key: 'listening_15', containerId: 'listening_15-lessons-container', label: 'Listening 15', viewPage: 'listening_question15.html' },
-    { key: 'listening_16_17', containerId: 'listening_16_17-lessons-container', label: 'Listening 16 & 17', viewPage: 'listening_question16_17.html' }
+    { key: '1', containerId: 'part1-lessons-container', label: 'Part 1', viewPage: 'reading_question1' },
+    { key: '2', containerId: 'part2-lessons-container', label: 'Part 2 & 3', viewPage: 'reading_question2' },
+    { key: '4', containerId: 'part4-lessons-container', label: 'Part 4', viewPage: 'reading_question4' },
+    { key: '5', containerId: 'part5-lessons-container', label: 'Part 5', viewPage: 'reading_question5' },
+    { key: 'listening_1_13', containerId: 'listening_1_13-lessons-container', label: 'Listening 1-13', viewPage: 'listening_question1_13' },
+    { key: 'listening_14', containerId: 'listening_14-lessons-container', label: 'Listening 14', viewPage: 'listening_question14' },
+    { key: 'listening_15', containerId: 'listening_15-lessons-container', label: 'Listening 15', viewPage: 'listening_question15' },
+    { key: 'listening_16_17', containerId: 'listening_16_17-lessons-container', label: 'Listening 16 & 17', viewPage: 'listening_question16_17' }
 ];
 
 const PART_CONFIG_MAP = PART_CONFIGS.reduce((acc, cfg) => {
@@ -185,8 +185,8 @@ function createLessonCard(part, lesson) {
 // View lesson details
 function viewLesson(part, lessonId) {
     const config = PART_CONFIG_MAP[part];
-    const pageUrl = config?.viewPage || 'reading_question1.html';
-    window.open(`${pageUrl}?lesson=${lessonId}`, '_blank');
+    const pageUrl = config?.viewPage || 'reading_question1';
+    window.open(`${pageUrl}?lesson=${encodeURIComponent(lessonId)}`, '_blank');
 }
 
 // Edit lesson - redirect to upload page with lesson ID
@@ -196,7 +196,7 @@ function editLesson(part, lessonId) {
     localStorage.setItem('editLessonPart', part);
     
     // Redirect to upload page
-    window.location.href = `admin_upload.html?edit=${lessonId}&part=${part}`;
+    window.location.href = `admin_upload?edit=${encodeURIComponent(lessonId)}&part=${encodeURIComponent(part)}`;
 }
 
 // Confirm delete lesson
