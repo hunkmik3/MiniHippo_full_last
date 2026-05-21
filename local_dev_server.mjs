@@ -25,8 +25,8 @@ const directApiRoutes = {
   '/api/upload-lesson.js': 'api/upload-lesson.js',
   '/api/visitor-count': 'api/visitor-count.js',
   '/api/visitor-count.js': 'api/visitor-count.js',
-  '/api/github-media': 'api/github-media.js',
-  '/api/github-media.js': 'api/github-media.js'
+  '/api/github-media': 'api/upload-audio.js',
+  '/api/github-media.js': 'api/upload-audio.js'
 };
 
 const dynamicApiRoutes = [
@@ -36,12 +36,7 @@ const dynamicApiRoutes = [
   { regex: /^\/api\/practice_results\/([^/]+)\/?$/, modulePath: 'api/practice_results/[action].js', param: 'action' },
   { regex: /^\/api\/practice_sets\/([^/]+)\/?$/, modulePath: 'api/practice_sets/[action].js', param: 'action' },
   { regex: /^\/api\/users\/([^/]+)\/?$/, modulePath: 'api/users/[action].js', param: 'action' },
-  { regex: /^\/api\/vstep\/assignments\/([^/]+)\/?$/, modulePath: 'api/vstep/assignments/[action].js', param: 'action' },
-  { regex: /^\/api\/vstep\/classes\/([^/]+)\/?$/, modulePath: 'api/vstep/classes/[action].js', param: 'action' },
-  { regex: /^\/api\/vstep\/contents\/([^/]+)\/?$/, modulePath: 'api/vstep/contents/[action].js', param: 'action' },
-  { regex: /^\/api\/vstep\/resources\/([^/]+)\/?$/, modulePath: 'api/vstep/resources/[action].js', param: 'action' },
-  { regex: /^\/api\/vstep\/results\/([^/]+)\/?$/, modulePath: 'api/vstep/results/[action].js', param: 'action' },
-  { regex: /^\/api\/vstep\/students\/([^/]+)\/?$/, modulePath: 'api/vstep/students/[action].js', param: 'action' }
+  { regex: /^\/api\/vstep\/([^/]+)\/([^/]+)\/?$/, modulePath: 'api/vstep/[resource]/[action].js', params: ['resource', 'action'] }
 ];
 
 const contentTypes = {
@@ -157,8 +152,14 @@ async function handleApi(req, res, url) {
     for (const route of dynamicApiRoutes) {
       const match = pathname.match(route.regex);
       if (!match) continue;
-      const action = decodeURIComponent(match[1]);
-      query[route.param] = query[route.param] || action;
+      if (Array.isArray(route.params)) {
+        route.params.forEach((param, index) => {
+          query[param] = query[param] || decodeURIComponent(match[index + 1] || '');
+        });
+      } else {
+        const action = decodeURIComponent(match[1]);
+        query[route.param] = query[route.param] || action;
+      }
       handler = await importHandler(route.modulePath);
       break;
     }

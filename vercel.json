@@ -10,6 +10,10 @@
       "use": "@vercel/node"
     },
     {
+      "src": "minihippofuill/aptiskey.com/api/upload-speaking-recording.js",
+      "use": "@vercel/node"
+    },
+    {
       "src": "minihippofuill/aptiskey.com/api/upload-lesson.js",
       "use": "@vercel/node"
     },
@@ -42,6 +46,10 @@
       "use": "@vercel/node"
     },
     {
+      "src": "minihippofuill/aptiskey.com/api/vstep/[resource]/[action].js",
+      "use": "@vercel/node"
+    },
+    {
       "src": "minihippofuill/aptiskey.com/**/*",
       "use": "@vercel/static"
     }
@@ -54,6 +62,14 @@
     {
       "source": "/api/upload-audio",
       "destination": "/minihippofuill/aptiskey.com/api/upload-audio.js"
+    },
+    {
+      "source": "/api/upload-speaking-recording",
+      "destination": "/minihippofuill/aptiskey.com/api/upload-speaking-recording.js"
+    },
+    {
+      "source": "/api/github-media",
+      "destination": "/minihippofuill/aptiskey.com/api/upload-audio.js?action=github-media"
     },
     {
       "source": "/api/upload-lesson",
@@ -86,6 +102,10 @@
     {
       "source": "/api/users/:action",
       "destination": "/minihippofuill/aptiskey.com/api/users/[action].js?action=:action"
+    },
+    {
+      "source": "/api/vstep/:resource/:action",
+      "destination": "/minihippofuill/aptiskey.com/api/vstep/[resource]/[action].js?resource=:resource&action=:action"
     },
     {
       "source": "/aptis",
