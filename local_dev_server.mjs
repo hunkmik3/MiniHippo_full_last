@@ -24,7 +24,9 @@ const directApiRoutes = {
   '/api/upload-lesson': 'api/upload-lesson.js',
   '/api/upload-lesson.js': 'api/upload-lesson.js',
   '/api/visitor-count': 'api/visitor-count.js',
-  '/api/visitor-count.js': 'api/visitor-count.js'
+  '/api/visitor-count.js': 'api/visitor-count.js',
+  '/api/github-media': 'api/github-media.js',
+  '/api/github-media.js': 'api/github-media.js'
 };
 
 const dynamicApiRoutes = [
@@ -33,7 +35,13 @@ const dynamicApiRoutes = [
   { regex: /^\/api\/lessons\/([^/]+)\/?$/, modulePath: 'api/lessons/[action].js', param: 'action' },
   { regex: /^\/api\/practice_results\/([^/]+)\/?$/, modulePath: 'api/practice_results/[action].js', param: 'action' },
   { regex: /^\/api\/practice_sets\/([^/]+)\/?$/, modulePath: 'api/practice_sets/[action].js', param: 'action' },
-  { regex: /^\/api\/users\/([^/]+)\/?$/, modulePath: 'api/users/[action].js', param: 'action' }
+  { regex: /^\/api\/users\/([^/]+)\/?$/, modulePath: 'api/users/[action].js', param: 'action' },
+  { regex: /^\/api\/vstep\/assignments\/([^/]+)\/?$/, modulePath: 'api/vstep/assignments/[action].js', param: 'action' },
+  { regex: /^\/api\/vstep\/classes\/([^/]+)\/?$/, modulePath: 'api/vstep/classes/[action].js', param: 'action' },
+  { regex: /^\/api\/vstep\/contents\/([^/]+)\/?$/, modulePath: 'api/vstep/contents/[action].js', param: 'action' },
+  { regex: /^\/api\/vstep\/resources\/([^/]+)\/?$/, modulePath: 'api/vstep/resources/[action].js', param: 'action' },
+  { regex: /^\/api\/vstep\/results\/([^/]+)\/?$/, modulePath: 'api/vstep/results/[action].js', param: 'action' },
+  { regex: /^\/api\/vstep\/students\/([^/]+)\/?$/, modulePath: 'api/vstep/students/[action].js', param: 'action' }
 ];
 
 const contentTypes = {

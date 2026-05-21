@@ -1,5 +1,6 @@
 import { parseJsonBody } from './_utils/parseBody.js';
 import { putGithubContent } from './_utils/supabase.js';
+import { isR2Configured, putR2Object } from './_utils/r2.js';
 import { verifyUserRequest } from './_utils/auth.js';
 
 const MAX_AUDIO_BYTES = 12 * 1024 * 1024; // 12MB
@@ -106,6 +107,24 @@ export default async function handler(req, res) {
   const repoPath = normalizeRepoPath(relativePath);
 
   try {
+    if (isR2Configured()) {
+      const uploaded = await putR2Object(relativePath, {
+        content: base64,
+        contentType: mimeType || undefined,
+        encoding: 'base64'
+      });
+
+      return res.status(200).json({
+        success: true,
+        rawUrl: uploaded.publicUrl,
+        fileUrl: uploaded.publicUrl,
+        filePath: uploaded.key,
+        sizeBytes: uploaded.sizeBytes,
+        mimeType: mimeType || uploaded.contentType || null,
+        storage: 'r2'
+      });
+    }
+
     const result = await putGithubContent(repoPath, {
       content: base64,
       message: `Upload speaking recording ${safeUser} ${safeSetId} ${safeAnswerKey}`,
@@ -128,7 +147,8 @@ export default async function handler(req, res) {
       fileUrl: githubContent?.html_url || null,
       filePath: relativePath,
       sizeBytes: approxBytes,
-      mimeType: mimeType || null
+      mimeType: mimeType || null,
+      storage: 'github'
     });
   } catch (error) {
     console.error('upload-speaking-recording error:', error);

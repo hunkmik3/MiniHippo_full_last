@@ -11,150 +11,658 @@
   <link rel="stylesheet" href="css/vstep.css">
 </head>
 
-<body class="vstep-body">
+<body class="vstep-body vstep-admin-body">
   <div class="vstep-admin-shell">
-    <header class="vstep-admin-header">
-      <div class="d-flex flex-column flex-lg-row gap-3 justify-content-between align-items-lg-center">
-        <div>
-          <div class="text-uppercase text-secondary fw-bold small">Admin Workspace / VSTEP</div>
-          <h1 class="h3 mb-1">VSTEP exam builder</h1>
-          <p class="mb-0 text-secondary">Tạo đề full 4 kỹ năng theo giao diện thi VSTEP trong file hướng dẫn.</p>
-        </div>
-        <div class="d-flex flex-wrap gap-2">
-          <a href="admin_upload.html" class="btn btn-outline-secondary">
-            <i class="bi bi-kanban me-1"></i> Workspace
-          </a>
-          <a href="vstep_bode.html" class="btn btn-outline-primary" target="_blank" rel="noopener">
-            <i class="bi bi-eye me-1"></i> Xem trang học viên
-          </a>
-          <button type="button" class="btn btn-primary" id="newVstepSetBtn">
-            <i class="bi bi-plus-circle me-1"></i> Tạo đề mới
-          </button>
-        </div>
+    <aside class="vstep-admin-sidebar">
+      <a href="home.html" class="vstep-admin-brand">
+        <img src="images/assets/img/AdminLTELogo.png" alt="Mini Hippo" class="vstep-admin-logo">
+        <span>
+          <strong>Mini Hippo</strong>
+          <small>VSTEP Admin</small>
+        </span>
+      </a>
+
+      <nav class="vstep-admin-tabs" aria-label="VSTEP admin navigation">
+        <button type="button" class="vstep-admin-tab active" data-vstep-panel="students">
+          <i class="bi bi-people"></i>
+          <span>Học viên</span>
+        </button>
+        <button type="button" class="vstep-admin-tab" data-vstep-panel="resources">
+          <i class="bi bi-folder2-open"></i>
+          <span>Kho tài nguyên</span>
+        </button>
+        <button type="button" class="vstep-admin-tab" data-vstep-panel="classes">
+          <i class="bi bi-calendar2-week"></i>
+          <span>Lớp học VSTEP</span>
+        </button>
+        <button type="button" class="vstep-admin-tab" data-vstep-flow="practice">
+          <i class="bi bi-journal-check"></i>
+          <span>Ôn thi VSTEP</span>
+        </button>
+        <button type="button" class="vstep-admin-tab" data-vstep-flow="lesson_exam">
+          <i class="bi bi-clipboard2-pulse"></i>
+          <span>Học tập VSTEP</span>
+        </button>
+        <button type="button" class="vstep-admin-tab" data-vstep-panel="results">
+          <i class="bi bi-bar-chart-line"></i>
+          <span>Kết quả</span>
+        </button>
+      </nav>
+
+      <div class="vstep-admin-sidebar-actions">
+        <a href="vstep_home.html" class="btn btn-light w-100" target="_blank" rel="noopener">
+          <i class="bi bi-box-arrow-up-right me-1"></i> Trang VSTEP
+        </a>
+        <a href="admin_upload.html" class="btn btn-outline-light w-100">
+          <i class="bi bi-kanban me-1"></i> Admin cũ
+        </a>
       </div>
-    </header>
+    </aside>
 
-    <main class="vstep-admin-layout">
-      <aside class="vstep-panel">
-        <div class="vstep-panel-header d-flex justify-content-between align-items-center">
-          <strong>Danh sách đề VSTEP</strong>
-          <button type="button" class="btn btn-sm btn-outline-primary" id="refreshVstepSetsBtn">
-            <i class="bi bi-arrow-clockwise"></i>
+    <div class="vstep-admin-main">
+      <header class="vstep-admin-header">
+        <div>
+          <div class="vstep-admin-eyebrow">Admin Workspace / VSTEP</div>
+          <h1>Quản lý VSTEP</h1>
+          <p>Hai phân khu riêng: ôn thi VSTEP theo bộ đề và học tập VSTEP theo lớp/deadline.</p>
+        </div>
+        <div class="vstep-admin-header-actions">
+          <button type="button" class="btn btn-primary" id="newVstepSetBtn">
+            <i class="bi bi-plus-circle me-1"></i> Tạo nội dung
           </button>
         </div>
-        <div class="vstep-panel-body">
-          <div class="alert alert-info small mb-3">
-            Đề nháp không hiện ở trang học viên. Chọn <strong>published</strong> khi đã kiểm tra xong.
-          </div>
-          <div id="vstepSetList" class="vstep-set-list">
-            <div class="text-secondary small">Đang tải dữ liệu...</div>
-          </div>
-        </div>
-      </aside>
+      </header>
 
-      <section class="vstep-panel">
-        <div class="vstep-panel-header">
-          <div class="d-flex flex-column flex-lg-row gap-2 justify-content-between align-items-lg-center">
-            <div>
-              <strong id="vstepFormTitle">Tạo đề VSTEP mới</strong>
-              <div class="vstep-help">Listening 3 parts, Reading 4 parts, Writing 2 parts, Speaking 3 parts.</div>
-            </div>
-            <div class="d-flex flex-wrap gap-2">
-              <button type="button" class="btn btn-outline-secondary btn-sm" id="resetVstepFormBtn">
-                <i class="bi bi-arrow-counterclockwise me-1"></i> Đặt lại
-              </button>
-              <button type="button" class="btn btn-outline-primary btn-sm" id="previewVstepJsonBtn">
-                <i class="bi bi-code-square me-1"></i> Preview JSON
-              </button>
-              <button type="button" class="btn btn-success btn-sm" id="saveVstepSetBtn">
-                <i class="bi bi-cloud-upload me-1"></i> Lưu đề
-              </button>
-            </div>
+      <section class="vstep-admin-overview" aria-label="VSTEP overview">
+        <div class="vstep-admin-metric">
+          <span class="vstep-metric-icon vstep-metric-students"><i class="bi bi-people"></i></span>
+          <div>
+            <strong id="vstepOverviewStudents">0</strong>
+            <small>Học viên</small>
           </div>
         </div>
-
-        <div class="vstep-panel-body">
-          <form id="vstepSetForm" class="vstep-builder-grid">
-            <div class="row g-3">
-              <div class="col-lg-5">
-                <label class="form-label fw-semibold" for="vstep-title">Tên đề</label>
-                <input type="text" class="form-control" id="vstep-title" placeholder="Ví dụ: VSTEP Mock Test #001" required>
-              </div>
-              <div class="col-lg-4">
-                <label class="form-label fw-semibold" for="vstep-description">Mô tả</label>
-                <input type="text" class="form-control" id="vstep-description" placeholder="Ghi chú nội bộ">
-              </div>
-              <div class="col-lg-3">
-                <label class="form-label fw-semibold" for="vstep-status">Trạng thái</label>
-                <select class="form-select" id="vstep-status">
-                  <option value="draft">draft</option>
-                  <option value="published">published</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="row g-3">
-              <div class="col-6 col-lg-3">
-                <label class="form-label" for="vstep-duration-listening">Listening phút</label>
-                <input type="number" min="1" class="form-control" id="vstep-duration-listening" value="45">
-              </div>
-              <div class="col-6 col-lg-3">
-                <label class="form-label" for="vstep-duration-reading">Reading phút</label>
-                <input type="number" min="1" class="form-control" id="vstep-duration-reading" value="60">
-              </div>
-              <div class="col-6 col-lg-3">
-                <label class="form-label" for="vstep-duration-writing">Writing phút</label>
-                <input type="number" min="1" class="form-control" id="vstep-duration-writing" value="60">
-              </div>
-              <div class="col-6 col-lg-3">
-                <label class="form-label" for="vstep-duration-speaking">Speaking phút</label>
-                <input type="number" min="1" class="form-control" id="vstep-duration-speaking" value="12">
-              </div>
-            </div>
-
-            <details class="vstep-skill-card" open>
-              <summary><i class="bi bi-headphones me-2"></i>Listening - 3 parts</summary>
-              <div id="vstep-listening-editors"></div>
-            </details>
-
-            <details class="vstep-skill-card" open>
-              <summary><i class="bi bi-book me-2"></i>Reading - 4 parts</summary>
-              <div id="vstep-reading-editors"></div>
-            </details>
-
-            <details class="vstep-skill-card" open>
-              <summary><i class="bi bi-pencil-square me-2"></i>Writing - 2 parts</summary>
-              <div id="vstep-writing-editors"></div>
-            </details>
-
-            <details class="vstep-skill-card" open>
-              <summary><i class="bi bi-mic me-2"></i>Speaking - 3 parts</summary>
-              <div class="p-3 border-bottom">
-                <div class="row g-3">
-                  <div class="col-md-4">
-                    <label class="form-label" for="vstep-speaking-ready-seconds">Chuẩn bị trước Speaking</label>
-                    <input type="number" min="0" class="form-control" id="vstep-speaking-ready-seconds" value="60">
-                  </div>
-                  <div class="col-md-8">
-                    <label class="form-label" for="vstep-speaking-ready-message">Thông báo trước Speaking</label>
-                    <input type="text" class="form-control" id="vstep-speaking-ready-message" value="Bạn đeo tai nghe để làm bài thi nói. Bài làm sẽ được thu âm trực tiếp.">
-                  </div>
-                </div>
-              </div>
-              <div id="vstep-speaking-editors"></div>
-            </details>
-          </form>
-
-          <div class="mt-3">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <strong>Preview JSON</strong>
-              <span class="vstep-help">Dùng để kiểm tra nhanh cấu trúc trước khi lưu.</span>
-            </div>
-            <pre id="vstepJsonPreview" class="vstep-json-preview">{}</pre>
+        <div class="vstep-admin-metric">
+          <span class="vstep-metric-icon vstep-metric-practice"><i class="bi bi-journal-check"></i></span>
+          <div>
+            <strong id="vstepOverviewPractice">0</strong>
+            <small>Bộ ôn thi</small>
+          </div>
+        </div>
+        <div class="vstep-admin-metric">
+          <span class="vstep-metric-icon vstep-metric-lesson"><i class="bi bi-clipboard2-pulse"></i></span>
+          <div>
+            <strong id="vstepOverviewLessons">0</strong>
+            <small>Học tập VSTEP</small>
+          </div>
+        </div>
+        <div class="vstep-admin-metric">
+          <span class="vstep-metric-icon vstep-metric-results"><i class="bi bi-bar-chart-line"></i></span>
+          <div>
+            <strong id="vstepOverviewResults">0</strong>
+            <small>Bài đã nộp</small>
           </div>
         </div>
       </section>
-    </main>
+
+      <main class="vstep-admin-workspace">
+        <section class="vstep-admin-section active" id="vstep-students-panel">
+          <div class="vstep-admin-grid">
+            <article class="vstep-panel">
+              <div class="vstep-panel-header">
+                <div>
+                  <strong>Tạo học viên VSTEP</strong>
+                  <div class="vstep-help">Tài khoản được gắn course VSTEP để tách khỏi các module khác.</div>
+                </div>
+              </div>
+              <div class="vstep-panel-body">
+                <form id="vstepStudentForm" class="vstep-builder-grid vstep-admin-form">
+                  <div id="vstepStudentAlert" class="alert alert-info small mb-0">Nhập mã học viên và mật khẩu, hoặc để trống mật khẩu để hệ thống tự tạo.</div>
+                  <div>
+                    <label class="form-label fw-semibold" for="vstep-student-account">Mã học viên</label>
+                    <input class="form-control" id="vstep-student-account" placeholder="VD: VSTEP001" required>
+                  </div>
+                  <div>
+                    <label class="form-label fw-semibold" for="vstep-student-name">Họ tên</label>
+                    <input class="form-control" id="vstep-student-name" placeholder="Nguyễn Văn A">
+                  </div>
+                  <div>
+                    <label class="form-label fw-semibold" for="vstep-student-email">Email</label>
+                    <input type="email" class="form-control" id="vstep-student-email" placeholder="Có thể bỏ trống nếu có mã học viên">
+                  </div>
+                  <div>
+                    <label class="form-label fw-semibold" for="vstep-student-phone">Số điện thoại</label>
+                    <input class="form-control" id="vstep-student-phone">
+                  </div>
+                  <div class="row g-3">
+                    <div class="col-md-6">
+                      <label class="form-label" for="vstep-student-band">Level</label>
+                      <select class="form-select" id="vstep-student-band">
+                        <option value="B1">B1</option>
+                        <option value="B2">B2</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="vstep-student-device-limit">Giới hạn thiết bị</label>
+                      <input type="number" min="1" class="form-control" id="vstep-student-device-limit" value="2">
+                    </div>
+                  </div>
+                  <div class="row g-3">
+                    <div class="col-md-6">
+                      <label class="form-label" for="vstep-student-expires">Hết hạn</label>
+                      <input type="date" class="form-control" id="vstep-student-expires">
+                    </div>
+                    <div class="col-md-6 d-flex align-items-end">
+                      <div class="form-check vstep-check-row">
+                        <input class="form-check-input" type="checkbox" id="vstep-student-practice-access" checked>
+                        <label class="form-check-label fw-semibold" for="vstep-student-practice-access">
+                          Cấp quyền Ôn thi
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="form-label fw-semibold" for="vstep-student-password">Mật khẩu</label>
+                    <input class="form-control" id="vstep-student-password" placeholder="Để trống để tự tạo">
+                  </div>
+                  <div>
+                    <label class="form-label fw-semibold" for="vstep-student-notes">Ghi chú</label>
+                    <textarea class="form-control" id="vstep-student-notes" rows="2" placeholder="Nhóm lớp, ca học, ghi chú nội bộ"></textarea>
+                  </div>
+                  <button type="submit" class="btn btn-primary" id="createVstepStudentBtn">
+                    <i class="bi bi-person-plus me-1"></i> Tạo học viên
+                  </button>
+                </form>
+
+                <hr>
+
+                <div class="vstep-form-section bg-white">
+                  <div class="vstep-form-section-title mb-2">
+                    <i class="bi bi-file-earmark-spreadsheet"></i>
+                    <span>Import học viên từ Excel</span>
+                  </div>
+                  <div class="vstep-help mb-2">Dán dữ liệu copy từ Excel. Hàng đầu có thể là: accountCode, fullName, email, phone, band, expiresAt, practiceAccess, password.</div>
+                  <textarea class="form-control" id="vstepImportText" rows="5" placeholder="VSTEP001&#9;Nguyễn Văn A&#9;student@example.com&#9;090...&#9;B1&#9;2026-12-31&#9;true"></textarea>
+                  <div id="vstepImportAlert" class="alert alert-info small mt-3 mb-0">Chưa import dữ liệu.</div>
+                  <button type="button" class="btn btn-outline-primary mt-3" id="importVstepStudentsBtn">
+                    <i class="bi bi-upload me-1"></i> Import học viên
+                  </button>
+                </div>
+              </div>
+            </article>
+
+            <article class="vstep-panel">
+              <div class="vstep-panel-header vstep-panel-header-row">
+                <div>
+                  <strong>Danh sách học viên</strong>
+                  <div class="vstep-help">Chỉ hiển thị hồ sơ học viên VSTEP.</div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="refreshVstepUsersBtn">
+                  <i class="bi bi-arrow-clockwise me-1"></i> Tải lại
+                </button>
+              </div>
+              <div class="vstep-panel-body">
+                <div class="vstep-filter-row mb-3">
+                  <i class="bi bi-search"></i>
+                  <input type="search" class="form-control" id="vstepStudentSearch" placeholder="Tìm theo mã, tên hoặc email">
+                </div>
+                <div class="table-responsive vstep-table-shell">
+                  <table class="table table-hover align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Mã</th>
+                        <th>Học viên</th>
+                        <th>Level</th>
+                        <th>Ôn thi</th>
+                        <th>Email</th>
+                        <th>Thiết bị</th>
+                        <th>Hết hạn</th>
+                      </tr>
+                    </thead>
+                    <tbody id="vstepUsersTableBody">
+                      <tr>
+                        <td colspan="7" class="text-center text-muted py-3">Đang tải học viên...</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="vstep-admin-section" id="vstep-resources-panel">
+          <div class="vstep-admin-grid">
+            <article class="vstep-panel">
+              <div class="vstep-panel-header">
+                <div>
+                  <strong>Kho tài nguyên VSTEP</strong>
+                  <div class="vstep-help">Lưu audio, hình ảnh, văn bản hoặc tài liệu dùng lại khi soạn bài.</div>
+                </div>
+              </div>
+              <div class="vstep-panel-body">
+                <form id="vstepResourceForm" class="vstep-builder-grid">
+                  <div id="vstepResourceAlert" class="alert alert-info small mb-0">Upload file hoặc dán URL tài nguyên.</div>
+                  <div>
+                    <label class="form-label fw-semibold" for="vstep-resource-title">Tên tài nguyên</label>
+                    <input class="form-control" id="vstep-resource-title" placeholder="VD: Listening Part 1 audio">
+                  </div>
+                  <div class="row g-3">
+                    <div class="col-md-5">
+                      <label class="form-label fw-semibold" for="vstep-resource-type">Loại</label>
+                      <select class="form-select" id="vstep-resource-type">
+                        <option value="audio">Audio</option>
+                        <option value="image">Hình ảnh</option>
+                        <option value="text">Văn bản</option>
+                        <option value="document">Tài liệu</option>
+                        <option value="file">File khác</option>
+                      </select>
+                    </div>
+                    <div class="col-md-7">
+                      <label class="form-label fw-semibold" for="vstep-resource-file">Upload file</label>
+                      <input type="file" class="form-control" id="vstep-resource-file">
+                    </div>
+                  </div>
+                  <div>
+                    <label class="form-label fw-semibold" for="vstep-resource-url">URL / đường dẫn</label>
+                    <input class="form-control" id="vstep-resource-url" placeholder="https://... hoặc audio/vstep/...">
+                  </div>
+                  <div>
+                    <label class="form-label fw-semibold" for="vstep-resource-description">Mô tả</label>
+                    <textarea class="form-control" id="vstep-resource-description" rows="3"></textarea>
+                  </div>
+                  <button type="submit" class="btn btn-primary" id="saveVstepResourceBtn">
+                    <i class="bi bi-folder-plus me-1"></i> Lưu tài nguyên
+                  </button>
+                </form>
+              </div>
+            </article>
+
+            <article class="vstep-panel">
+              <div class="vstep-panel-header vstep-panel-header-row">
+                <div>
+                  <strong>Danh sách tài nguyên</strong>
+                  <div class="vstep-help">Dùng nút copy URL để đưa vào audio/image/text prompt.</div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="refreshVstepResourcesBtn">
+                  <i class="bi bi-arrow-clockwise me-1"></i> Tải lại
+                </button>
+              </div>
+              <div class="vstep-panel-body">
+                <div class="table-responsive vstep-table-shell">
+                  <table class="table table-hover align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Loại</th>
+                        <th>Tên</th>
+                        <th>URL</th>
+                        <th>Ngày tạo</th>
+                      </tr>
+                    </thead>
+                    <tbody id="vstepResourcesTableBody">
+                      <tr>
+                        <td colspan="4" class="text-center text-muted py-3">Đang tải tài nguyên...</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="vstep-admin-section" id="vstep-classes-panel">
+          <div class="vstep-admin-grid">
+            <article class="vstep-panel">
+              <div class="vstep-panel-header">
+                <div>
+                  <strong>Lớp học VSTEP</strong>
+                  <div class="vstep-help">Tạo lớp B1/B2, lịch học, ngày nghỉ và gán học viên.</div>
+                </div>
+              </div>
+              <div class="vstep-panel-body">
+                <form id="vstepClassForm" class="vstep-builder-grid">
+                  <div id="vstepClassAlert" class="alert alert-info small mb-0">Tạo lớp trước, sau đó giao bài theo lớp hoặc học viên.</div>
+                  <div>
+                    <label class="form-label fw-semibold" for="vstep-class-title">Tên lớp</label>
+                    <input class="form-control" id="vstep-class-title" placeholder="VD: VSTEP B1 tối 2-4-6">
+                  </div>
+                  <div class="row g-3">
+                    <div class="col-md-4">
+                      <label class="form-label" for="vstep-class-band">Level</label>
+                      <select class="form-select" id="vstep-class-band">
+                        <option value="B1">B1</option>
+                        <option value="B2">B2</option>
+                      </select>
+                    </div>
+                    <div class="col-md-8">
+                      <label class="form-label" for="vstep-class-teacher">Giáo viên</label>
+                      <input class="form-control" id="vstep-class-teacher" placeholder="Tên giáo viên">
+                    </div>
+                  </div>
+                  <div class="row g-3">
+                    <div class="col-md-6">
+                      <label class="form-label" for="vstep-class-starts">Ngày bắt đầu</label>
+                      <input type="datetime-local" class="form-control" id="vstep-class-starts">
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="vstep-class-ends">Ngày kết thúc</label>
+                      <input type="datetime-local" class="form-control" id="vstep-class-ends">
+                    </div>
+                  </div>
+                  <div>
+                    <label class="form-label" for="vstep-class-schedule">Lịch học JSON</label>
+                    <textarea class="form-control" id="vstep-class-schedule" rows="3" placeholder='[{"weekday":2,"time":"19:30-21:00"}]'></textarea>
+                  </div>
+                  <div>
+                    <label class="form-label" for="vstep-class-holidays">Ngày nghỉ JSON</label>
+                    <textarea class="form-control" id="vstep-class-holidays" rows="2" placeholder='["2026-09-02"]'></textarea>
+                  </div>
+                  <div>
+                    <label class="form-label" for="vstep-class-students">Học viên trong lớp</label>
+                    <select class="form-select" id="vstep-class-students" multiple size="7"></select>
+                    <div class="vstep-help mt-1">Giữ Ctrl/Cmd để chọn nhiều học viên.</div>
+                  </div>
+                  <button type="submit" class="btn btn-primary" id="saveVstepClassBtn">
+                    <i class="bi bi-calendar-plus me-1"></i> Tạo lớp
+                  </button>
+                </form>
+              </div>
+            </article>
+
+            <div class="vstep-builder-grid">
+              <article class="vstep-panel">
+                <div class="vstep-panel-header vstep-panel-header-row">
+                  <div>
+                    <strong>Danh sách lớp</strong>
+                    <div class="vstep-help">Theo dõi lớp, lịch và số học viên.</div>
+                  </div>
+                  <button type="button" class="btn btn-sm btn-outline-primary" id="refreshVstepClassesBtn">
+                    <i class="bi bi-arrow-clockwise me-1"></i> Tải lại
+                  </button>
+                </div>
+                <div class="vstep-panel-body">
+                  <div id="vstepClassesList" class="vstep-class-list">
+                    <div class="text-secondary small">Đang tải lớp...</div>
+                  </div>
+                </div>
+              </article>
+
+              <article class="vstep-panel">
+                <div class="vstep-panel-header">
+                  <div>
+                    <strong>Giao bài / deadline</strong>
+                    <div class="vstep-help">Giao nội dung học tập cho lớp hoặc từng học viên, kèm hạn nộp.</div>
+                  </div>
+                </div>
+                <div class="vstep-panel-body">
+                  <form id="vstepAssignmentForm" class="vstep-builder-grid">
+                    <div id="vstepAssignmentAlert" class="alert alert-info small mb-0">Chọn nội dung và lớp/học viên để giao.</div>
+                    <div>
+                      <label class="form-label" for="vstep-assignment-content">Nội dung</label>
+                      <select class="form-select" id="vstep-assignment-content"></select>
+                    </div>
+                    <div class="row g-3">
+                      <div class="col-md-6">
+                        <label class="form-label" for="vstep-assignment-class">Lớp</label>
+                        <select class="form-select" id="vstep-assignment-class"></select>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label" for="vstep-assignment-student">Hoặc học viên</label>
+                        <select class="form-select" id="vstep-assignment-student">
+                          <option value="">Theo lớp</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="row g-3">
+                      <div class="col-md-6">
+                        <label class="form-label" for="vstep-assignment-available">Mở lúc</label>
+                        <input type="datetime-local" class="form-control" id="vstep-assignment-available">
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label" for="vstep-assignment-due">Deadline</label>
+                        <input type="datetime-local" class="form-control" id="vstep-assignment-due">
+                      </div>
+                    </div>
+                    <div>
+                      <label class="form-label" for="vstep-assignment-notes">Ghi chú</label>
+                      <input class="form-control" id="vstep-assignment-notes" placeholder="VD: Bài tập buổi 3">
+                    </div>
+                    <button type="submit" class="btn btn-success" id="createVstepAssignmentBtn">
+                      <i class="bi bi-send-check me-1"></i> Giao bài
+                    </button>
+                  </form>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="vstep-admin-section" id="vstep-content-panel">
+          <div class="vstep-admin-layout">
+            <aside class="vstep-panel vstep-content-index">
+              <div class="vstep-panel-header vstep-panel-header-row">
+                <div>
+                  <strong id="vstepSetListTitle">Danh sách nội dung VSTEP</strong>
+                  <div class="vstep-help" id="vstepSetListHelp">Đề published sẽ hiện ở trang học viên tương ứng.</div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="refreshVstepSetsBtn" aria-label="Tải lại nội dung">
+                  <i class="bi bi-arrow-clockwise"></i>
+                </button>
+              </div>
+              <div class="vstep-panel-body">
+                <div class="vstep-filter-row mb-3">
+                  <i class="bi bi-search"></i>
+                  <input type="search" class="form-control" id="vstepSetSearch" placeholder="Tìm nội dung VSTEP">
+                </div>
+                <div class="vstep-module-stats mb-3">
+                  <div><strong id="vstepStatTotal">0</strong><span>Tổng</span></div>
+                  <div><strong id="vstepStatPublished">0</strong><span>Published</span></div>
+                  <div><strong id="vstepStatDraft">0</strong><span>Draft</span></div>
+                </div>
+                <div id="vstepSetList" class="vstep-set-list">
+                  <div class="text-secondary small">Đang tải dữ liệu...</div>
+                </div>
+              </div>
+            </aside>
+
+            <section class="vstep-panel vstep-content-builder">
+              <div class="vstep-panel-header">
+                <div class="vstep-content-toolbar">
+                  <div>
+                    <strong id="vstepFormTitle">Tạo nội dung VSTEP mới</strong>
+                    <div class="vstep-help" id="vstepFormSubtitle">Cấu trúc theo giao diện thi VSTEP: Listening, Reading, Writing, Speaking.</div>
+                  </div>
+                  <div class="vstep-admin-actions">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="resetVstepFormBtn">
+                      <i class="bi bi-arrow-counterclockwise me-1"></i> Đặt lại
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="previewVstepJsonBtn">
+                      <i class="bi bi-code-square me-1"></i> Preview JSON
+                    </button>
+                    <button type="button" class="btn btn-success btn-sm" id="saveVstepSetBtn">
+                      <i class="bi bi-cloud-upload me-1"></i> Lưu nội dung
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="vstep-panel-body">
+                <form id="vstepSetForm" class="vstep-builder-grid">
+                  <div class="vstep-form-section">
+                    <div class="vstep-form-section-title">
+                      <i class="bi bi-sliders"></i>
+                      <span>Thông tin chung</span>
+                    </div>
+                    <div class="row g-3">
+                      <div class="col-xl-4">
+                        <label class="form-label fw-semibold" for="vstep-title">Tên nội dung</label>
+                        <input type="text" class="form-control" id="vstep-title" placeholder="VD: VSTEP B1 Mock Test 01" required>
+                      </div>
+                      <div class="col-xl-2">
+                        <label class="form-label fw-semibold" for="vstep-description">Mô tả</label>
+                        <input type="text" class="form-control" id="vstep-description" placeholder="Ghi chú nội bộ">
+                      </div>
+                      <div class="col-md-4 col-xl-2">
+                        <label class="form-label fw-semibold" for="vstep-flow">Nhóm module</label>
+                        <select class="form-select" id="vstep-flow">
+                          <option value="practice">Ôn thi VSTEP</option>
+                          <option value="lesson_exam">Học tập VSTEP</option>
+                        </select>
+                      </div>
+                      <div class="col-md-4 col-xl-2">
+                        <label class="form-label fw-semibold" for="vstep-practice-skill">Kỹ năng bộ đề</label>
+                        <select class="form-select" id="vstep-practice-skill">
+                          <option value="full_test">Full 4 kỹ năng</option>
+                          <option value="listening">Listening set</option>
+                          <option value="reading">Reading set</option>
+                          <option value="writing">Writing set</option>
+                          <option value="speaking">Speaking set</option>
+                        </select>
+                      </div>
+                      <div class="col-md-4 col-xl-2">
+                        <label class="form-label fw-semibold" for="vstep-content-kind">Loại</label>
+                        <select class="form-select" id="vstep-content-kind">
+                          <option value="mock_test">Bộ đề thi</option>
+                          <option value="lesson">Bài học</option>
+                          <option value="assigned_exam">Bài thi giao</option>
+                        </select>
+                      </div>
+                      <div class="col-md-4 col-xl-2">
+                        <label class="form-label fw-semibold" for="vstep-status">Trạng thái</label>
+                        <select class="form-select" id="vstep-status">
+                          <option value="draft">draft</option>
+                          <option value="published">published</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="vstep-form-section">
+                    <div class="vstep-form-section-title">
+                      <i class="bi bi-stopwatch"></i>
+                      <span>Thời lượng</span>
+                    </div>
+                    <div class="row g-3">
+                      <div class="col-6 col-lg-3">
+                        <label class="form-label" for="vstep-duration-listening">Listening phút</label>
+                        <input type="number" min="1" class="form-control" id="vstep-duration-listening" value="45">
+                      </div>
+                      <div class="col-6 col-lg-3">
+                        <label class="form-label" for="vstep-duration-reading">Reading phút</label>
+                        <input type="number" min="1" class="form-control" id="vstep-duration-reading" value="60">
+                      </div>
+                      <div class="col-6 col-lg-3">
+                        <label class="form-label" for="vstep-duration-writing">Writing phút</label>
+                        <input type="number" min="1" class="form-control" id="vstep-duration-writing" value="60">
+                      </div>
+                      <div class="col-6 col-lg-3">
+                        <label class="form-label" for="vstep-duration-speaking">Speaking phút</label>
+                        <input type="number" min="1" class="form-control" id="vstep-duration-speaking" value="12">
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="vstep-skill-stack">
+                    <details class="vstep-skill-card" data-vstep-skill="listening" open>
+                      <summary><i class="bi bi-headphones"></i><span>Listening</span><small>3 parts</small></summary>
+                      <div id="vstep-listening-editors"></div>
+                    </details>
+
+                    <details class="vstep-skill-card" data-vstep-skill="reading">
+                      <summary><i class="bi bi-book"></i><span>Reading</span><small>4 parts</small></summary>
+                      <div id="vstep-reading-editors"></div>
+                    </details>
+
+                    <details class="vstep-skill-card" data-vstep-skill="writing">
+                      <summary><i class="bi bi-pencil-square"></i><span>Writing</span><small>2 parts</small></summary>
+                      <div id="vstep-writing-editors"></div>
+                    </details>
+
+                    <details class="vstep-skill-card" data-vstep-skill="speaking">
+                      <summary><i class="bi bi-mic"></i><span>Speaking</span><small>3 parts</small></summary>
+                      <div class="vstep-part-editor">
+                        <div class="row g-3">
+                          <div class="col-md-4">
+                            <label class="form-label" for="vstep-speaking-ready-seconds">Chuẩn bị trước Speaking</label>
+                            <input type="number" min="0" class="form-control" id="vstep-speaking-ready-seconds" value="60">
+                          </div>
+                          <div class="col-md-8">
+                            <label class="form-label" for="vstep-speaking-ready-message">Thông báo trước Speaking</label>
+                            <input type="text" class="form-control" id="vstep-speaking-ready-message" value="Bạn đeo tai nghe để làm bài thi nói. Bài làm sẽ được thu âm trực tiếp.">
+                          </div>
+                        </div>
+                      </div>
+                      <div id="vstep-speaking-editors"></div>
+                    </details>
+                  </div>
+                </form>
+
+                <details class="vstep-json-shell mt-3">
+                  <summary>
+                    <span><i class="bi bi-braces me-1"></i> Preview JSON</span>
+                    <small>Dữ liệu gửi lên API</small>
+                  </summary>
+                  <pre id="vstepJsonPreview" class="vstep-json-preview">{}</pre>
+                </details>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="vstep-admin-section" id="vstep-results-panel">
+          <div class="vstep-panel">
+            <div class="vstep-panel-header vstep-panel-header-row">
+              <div>
+                <strong>Kết quả học viên VSTEP</strong>
+                <div class="vstep-help">Hiển thị bài nộp từ cả phân khu ôn thi và học tập VSTEP.</div>
+              </div>
+              <div class="vstep-admin-actions">
+                <div class="vstep-filter-row vstep-filter-row-compact">
+                  <i class="bi bi-search"></i>
+                  <input type="search" class="form-control form-control-sm" id="vstepResultSearch" placeholder="Tìm kết quả">
+                </div>
+                <select class="form-select form-select-sm" id="vstepResultFlowFilter">
+                  <option value="">Tất cả</option>
+                  <option value="practice">Ôn thi VSTEP</option>
+                  <option value="lesson_exam">Học tập VSTEP</option>
+                </select>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="refreshVstepResultsBtn">
+                  <i class="bi bi-arrow-clockwise me-1"></i> Tải lại
+                </button>
+              </div>
+            </div>
+            <div class="vstep-panel-body">
+              <div class="vstep-results-layout">
+                <div class="table-responsive vstep-table-shell">
+                  <table class="table table-hover align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Thời gian</th>
+                        <th>Học viên</th>
+                        <th>Nội dung</th>
+                        <th>Nhóm</th>
+                        <th>Điểm tự động</th>
+                        <th>Chấm tay</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody id="vstepResultsTableBody">
+                      <tr>
+                        <td colspan="7" class="text-center text-muted py-3">Đang tải kết quả...</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <aside class="vstep-result-detail">
+                  <div class="fw-bold mb-2">Chi tiết bài nộp</div>
+                  <div id="vstepResultDetail" class="vstep-result-detail-content">Chọn một kết quả để xem metadata, câu trả lời Writing và file Speaking.</div>
+                </aside>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

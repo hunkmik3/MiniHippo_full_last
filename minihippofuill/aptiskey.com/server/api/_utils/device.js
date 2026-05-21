@@ -29,7 +29,8 @@ export async function ensureDeviceAccess({
   deviceId,
   deviceName,
   userAgent,
-  deviceLimit
+  deviceLimit,
+  allowRevokedReactivation = false
 }) {
   if (!userId || !deviceId) {
     const error = new Error('Thiếu thông tin thiết bị để xác thực');
@@ -51,6 +52,12 @@ export async function ensureDeviceAccess({
     });
 
     if (existing) {
+      if (existing.status === 'revoked' && !allowRevokedReactivation) {
+        const error = new Error('Phiên đăng nhập trên thiết bị này đã bị đăng xuất do có thiết bị khác đăng nhập');
+        error.status = 401;
+        error.code = 'DEVICE_REVOKED';
+        throw error;
+      }
       await updateTable(
         'user_devices',
         [{ column: 'id', value: existing.id }],
@@ -79,11 +86,16 @@ export async function ensureDeviceAccess({
   });
 
   if (Array.isArray(activeDevices) && activeDevices.length >= limit) {
-    const error = new Error('Tài khoản đã đạt giới hạn thiết bị cho phép');
-    error.status = 403;
-    error.code = 'DEVICE_LIMIT';
-    error.details = { limit };
-    throw error;
+    const sorted = activeDevices
+      .slice()
+      .sort((a, b) => new Date(a.last_seen || a.created_at || 0) - new Date(b.last_seen || b.created_at || 0));
+    const revokeCount = activeDevices.length - limit + 1;
+    const toRevoke = sorted.slice(0, Math.max(1, revokeCount));
+    await Promise.all(toRevoke.map(device => updateTable(
+      'user_devices',
+      [{ column: 'id', value: device.id }],
+      { status: 'revoked' }
+    )));
   }
 
   await insertInto('user_devices', [
@@ -138,7 +150,6 @@ export async function revokeAllDevices(userId) {
     }
   );
 }
-
 
 
 

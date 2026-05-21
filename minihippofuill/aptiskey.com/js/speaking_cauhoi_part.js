@@ -7,6 +7,7 @@
     var bandFromQuery = query.get('band') || '';
     var CACHE_PREFIX = 'speaking_cauhoi_cache_';
     var cacheKey = setId ? CACHE_PREFIX + setId : null;
+    var SESSION_CONTENT_TYPE = 'session_content';
 
     // ── Inline data for Lớp Học buổi speaking ──
     var BUOI_SPEAKING_DATA = {
@@ -103,6 +104,42 @@
             }
         }
         return fallback || '';
+    }
+
+    function extractPartNumber(value, fallback) {
+        var match = String(value || '').match(/\bpart\s*(\d+)\b/i);
+        if (!match) return fallback || 1;
+        var num = Number(match[1]);
+        return Number.isFinite(num) && num > 0 ? num : (fallback || 1);
+    }
+
+    function getSessionPageData(page) {
+        if (!page || typeof page !== 'object') return {};
+        return page.data && typeof page.data === 'object' && !Array.isArray(page.data)
+            ? page.data
+            : {};
+    }
+
+    function normalizeAudioField(obj, fallback) {
+        return normalizeUrl(firstVal(obj, [
+            'audioUrl',
+            'audio',
+            'audio_url',
+            'questionAudio',
+            'questionAudioUrl',
+            'question_audio_url',
+            'introAudio',
+            'introAudioUrl',
+            'intro_audio_url'
+        ], fallback || ''));
+    }
+
+    function normalizeImageList(value) {
+        if (Array.isArray(value)) {
+            return value.map(normalizeUrl).filter(Boolean);
+        }
+        var single = normalizeUrl(value);
+        return single ? [single] : [];
     }
 
     function getWordCount(value) {
@@ -1202,7 +1239,7 @@
         return {
             sourceIndex: Number(firstVal(question, ['sourceIndex'], 0)) || 0,
             prompt: safeText(firstVal(question, ['prompt', 'question', 'text'], fallbackPrompt || '')),
-            audioUrl: normalizeUrl(firstVal(question, ['audioUrl', 'audio', 'audio_url'], ''))
+            audioUrl: normalizeAudioField(question)
         };
     }
 
@@ -1212,6 +1249,7 @@
 
     function getPartImages(partNum, pageData) {
         var images = [];
+        images = images.concat(normalizeImageList(pageData && pageData.images));
         if (partNum === 2) {
             var imageUrl = normalizeUrl(firstVal(pageData, ['imageUrl', 'image'], ''));
             if (imageUrl) images.push(imageUrl);
@@ -1234,6 +1272,8 @@
 
     function getIntroImages(partNum, pageData) {
         var images = [];
+        images = images.concat(normalizeImageList(pageData && pageData.introImages));
+        images = images.concat(normalizeImageList(pageData && pageData.images));
         var introImageUrl = normalizeUrl(firstVal(pageData, ['introImageUrl', 'introImage'], ''));
         if (introImageUrl) images.push(introImageUrl);
 
@@ -1650,10 +1690,132 @@
         }
     }
 
+    function findSessionContentRecord(sets, sessionKey) {
+        var key = String(sessionKey || '').toUpperCase();
+        return (Array.isArray(sets) ? sets : [])
+            .filter(function (set) {
+                var data = set && set.data ? set.data : {};
+                var marker = String(data.__practice_type || set.type || '').toLowerCase();
+                var recordKey = String(data.session_key || '').toUpperCase();
+                return marker === SESSION_CONTENT_TYPE && recordKey === key;
+            })
+            .sort(function (a, b) {
+                var ta = new Date((a && (a.updated_at || a.created_at)) || 0).getTime();
+                var tb = new Date((b && (b.updated_at || b.created_at)) || 0).getTime();
+                return tb - ta;
+            })[0] || null;
+    }
+
+    function makeIntroPageFromSessionPage(page) {
+        var data = getSessionPageData(page);
+        var fallbackAudio = normalizeAudioField(page);
+        return {
+            introText: safeText(firstVal(data, ['introText', 'instruction', 'prompt', 'text'], firstVal(page, ['introText', 'instruction', 'prompt', 'text'], ''))),
+            introAudioUrl: normalizeAudioField(data, fallbackAudio),
+            introImages: normalizeImageList(data.introImages || data.images || page.introImages || page.images)
+        };
+    }
+
+    function getFallbackIntroPage(sessionKey) {
+        var fallbackSet = BUOI_SPEAKING_DATA[sessionKey];
+        var fallbackPages = fallbackSet && fallbackSet.data && Array.isArray(fallbackSet.data.pages)
+            ? fallbackSet.data.pages
+            : [];
+        for (var i = 0; i < fallbackPages.length; i += 1) {
+            var page = fallbackPages[i];
+            var intro = makeIntroPageFromSessionPage({
+                data: {
+                    introText: firstVal(page, ['introText', 'instruction'], ''),
+                    introAudioUrl: firstVal(page, ['introAudioUrl', 'introAudio', 'audioUrl'], ''),
+                    introImages: page.introImages || page.images || []
+                }
+            });
+            if (intro.introText || intro.introAudioUrl || intro.introImages.length) return intro;
+        }
+        return null;
+    }
+
+    function makeQuestionFromSessionPage(page, index) {
+        var data = getSessionPageData(page);
+        var fallbackAudio = normalizeAudioField(page);
+        return {
+            sourceIndex: index + 1,
+            prompt: safeText(firstVal(data, ['prompt', 'question', 'text', 'instruction'], firstVal(page, ['prompt', 'question', 'text', 'instruction'], ''))),
+            audioUrl: normalizeAudioField(data, fallbackAudio)
+        };
+    }
+
+    function convertSessionContentToSpeakingSet(sessionKey, record, config) {
+        var rawPages = config && Array.isArray(config.pages) ? config.pages : [];
+        var speakingPages = rawPages.filter(function (page) {
+            return ['speaking-intro', 'speaking-q', 'speaking-audio-q', 'speaking-image'].indexOf(page && page.type) >= 0;
+        });
+        if (!speakingPages.length) return null;
+
+        var fallbackSet = BUOI_SPEAKING_DATA[sessionKey] || null;
+        var partNum = Number(fallbackSet && fallbackSet.data && fallbackSet.data.part) || 1;
+        for (var i = 0; i < speakingPages.length; i += 1) {
+            var page = speakingPages[i];
+            partNum = extractPartNumber(
+                page.partLabel || page.partTitle || page.headerTitle || getSessionPageData(page).partLabel,
+                partNum
+            );
+            if (partNum) break;
+        }
+
+        var introPages = speakingPages
+            .filter(function (page) { return page && page.type === 'speaking-intro'; })
+            .map(makeIntroPageFromSessionPage)
+            .filter(function (page) {
+                return page.introText || page.introAudioUrl || (Array.isArray(page.introImages) && page.introImages.length);
+            });
+
+        if (!introPages.length) {
+            var fallbackIntro = getFallbackIntroPage(sessionKey);
+            if (fallbackIntro) introPages.push(fallbackIntro);
+        }
+
+        var questions = speakingPages
+            .filter(function (page) { return page && page.type !== 'speaking-intro'; })
+            .map(makeQuestionFromSessionPage)
+            .filter(hasQuestionContent);
+
+        var combinedPage = introPages.length ? Object.assign({}, introPages[0]) : {};
+        if (questions.length) {
+            combinedPage.questions = questions;
+        }
+
+        if (!combinedPage.introText && !combinedPage.introAudioUrl && !questions.length) return null;
+
+        return {
+            id: (record && record.id) || ('session-content-' + sessionKey),
+            title: (record && record.title) || ((fallbackSet && fallbackSet.title) || ('Session Content ' + sessionKey)),
+            type: 'speaking',
+            data: {
+                part: partNum,
+                pages: [combinedPage]
+            }
+        };
+    }
+
+    async function fetchSessionContentSpeakingSet(sessionKey) {
+        try {
+            var payload = await apiGet('/api/practice_sets/list?type=' + encodeURIComponent(SESSION_CONTENT_TYPE));
+            var record = findSessionContentRecord(payload && payload.sets, sessionKey);
+            var config = record && record.data ? record.data.session_config : null;
+            if (!config || typeof config !== 'object' || !Array.isArray(config.pages)) return null;
+            return convertSessionContentToSpeakingSet(sessionKey, record, config);
+        } catch (error) {
+            console.warn('Load speaking session content failed:', error);
+            return null;
+        }
+    }
+
     async function fetchSetData() {
-        // If buoi param, return inline data
-        if (buoiId && BUOI_SPEAKING_DATA[buoiId]) {
-            return BUOI_SPEAKING_DATA[buoiId];
+        if (buoiId) {
+            var customSet = await fetchSessionContentSpeakingSet(buoiId);
+            if (customSet) return customSet;
+            if (BUOI_SPEAKING_DATA[buoiId]) return BUOI_SPEAKING_DATA[buoiId];
         }
         if (!setId) throw new Error('Thiếu tham số.');
 

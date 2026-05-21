@@ -40,7 +40,7 @@ export default async function handler(req, res) {
     const m = String(mod || '').toLowerCase();
     if (m === 'lop_hoc') return course === 'lớp học';
     if (m === 'aptis') return course === 'aptis' || course === 'lớp ôn thi';
-    if (m === 'vstep') return false; // hiện tại chỉ admin
+    if (m === 'vstep') return course === 'vstep';
     return false;
   }
   function moduleLabel(mod) {
@@ -48,6 +48,12 @@ export default async function handler(req, res) {
     if (mod === 'vstep') return 'VSTEP';
     if (mod === 'aptis') return 'Aptis';
     return String(mod || '');
+  }
+
+  function isExpired(profile) {
+    if (!profile?.expires_at) return false;
+    const expires = new Date(profile.expires_at).getTime();
+    return Number.isFinite(expires) && expires < Date.now();
   }
 
   try {
@@ -88,6 +94,10 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Tài khoản đang bị khóa' });
     }
 
+    if (isExpired(profile)) {
+      return res.status(403).json({ error: 'Tài khoản đã hết hạn sử dụng' });
+    }
+
     // Check module access — chỉ chặn nếu user truyền module và không có quyền.
     if (requestedModule && !canAccessModule(profile, requestedModule)) {
       return res.status(403).json({
@@ -116,7 +126,8 @@ export default async function handler(req, res) {
         deviceId: deviceIdentifier,
         deviceName: deviceName || deviceInfo?.name,
         userAgent: req.headers['user-agent'],
-        deviceLimit: resolveDeviceLimit(profile)
+        deviceLimit: resolveDeviceLimit(profile),
+        allowRevokedReactivation: true
       });
     } catch (deviceError) {
       return res.status(deviceError.status || 500).json({

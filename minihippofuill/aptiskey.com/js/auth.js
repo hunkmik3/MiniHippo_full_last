@@ -18,7 +18,11 @@ const CLASSROOM_ALLOWED_EXTRA_PATHS = new Set([
 // VSTEP routes chỉ admin được vào (giai đoạn beta).
 const VSTEP_ONLY_PATHS = new Set([
     '/vstep',
+    '/vstep_home',
     '/vstep_bode',
+    '/vstep_full_test',
+    '/vstep_skill',
+    '/vstep_lessons',
     '/vstep_exam'
 ]);
 
@@ -117,9 +121,11 @@ function enforceCourseRoute(user) {
     const isClassroomRoute = isClassroomOnlyPath || isClassroomSpeakingSession || isClassroomPracticeSet;
     const isVstepOnlyPath = VSTEP_ONLY_PATHS.has(path);
 
-    // VSTEP đang giai đoạn beta — chỉ admin (đã bypass ở dòng đầu).
-    // User thường nếu lỡ vào /vstep* → đẩy về landing phù hợp.
+    // VSTEP là module riêng. Admin được bypass ở trên, học viên cần course VSTEP.
     if (isVstepOnlyPath) {
+        if (course === 'vstep') {
+            return true;
+        }
         if (course === 'lớp học') {
             window.location.replace('/lop_hoc.html');
         } else {

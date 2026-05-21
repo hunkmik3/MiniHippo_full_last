@@ -3,7 +3,7 @@
 
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>Ôn thi VSTEP - Mini Hippo</title>
+  <title>VSTEP Full Test - Mini Hippo</title>
   <link rel="icon" href="images/favicon.ico" type="image/x-icon">
 
   <script src="js/home.js"></script>
@@ -12,10 +12,10 @@
   <meta name="color-scheme" content="light dark" />
   <meta name="theme-color" content="#007bff" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)" />
-  <meta name="title" content="Ôn thi VSTEP - Mini Hippo" />
+  <meta name="title" content="VSTEP Full Test - Mini Hippo" />
   <meta name="author" content="Mini Hippo" />
-  <meta name="description" content="Phân khu ôn thi VSTEP theo 4 kỹ năng Listening, Reading, Writing và Speaking." />
-  <meta name="keywords" content="VSTEP, Mini Hippo, luyện nghe VSTEP, luyện đọc VSTEP, luyện viết VSTEP, luyện nói VSTEP" />
+  <meta name="description" content="Danh sách đề thi thử VSTEP full test đủ 4 kỹ năng." />
+  <meta name="keywords" content="VSTEP, Mini Hippo, full test VSTEP, luyện thi VSTEP" />
   <meta name="supported-color-schemes" content="light dark" />
   <link rel="preload" href="css/adminlte/adminlte.css" as="style" />
 
@@ -32,7 +32,7 @@
   <link rel="stylesheet" href="css/vstep.css">
 </head>
 
-<body class="layout-fixed sidebar-expand-lg sidebar-open bg-body-tertiary">
+<body class="layout-fixed sidebar-expand-lg sidebar-open bg-body-tertiary" data-vstep-flow="practice">
   <div class="app-wrapper">
     <nav class="app-header navbar navbar-expand bg-body">
       <div class="container-fluid">
@@ -72,9 +72,9 @@
           <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" role="navigation"
             aria-label="VSTEP navigation" data-accordion="false" id="navigation">
             <li class="nav-item">
-              <a href="vstep_bode.html" class="nav-link active">
+              <a href="vstep_bode.html" class="nav-link">
                 <i class="nav-icon bi bi-speedometer2"></i>
-                <p>Trang chủ ôn thi</p>
+                <p>Tổng quan ôn thi</p>
               </a>
             </li>
             <li class="nav-item menu-open">
@@ -116,7 +116,7 @@
               </ul>
             </li>
             <li class="nav-item">
-              <a href="vstep_full_test.html" class="nav-link">
+              <a href="vstep_full_test.html" class="nav-link active">
                 <i class="nav-icon bi bi-stack"></i>
                 <p>Thi thử full test</p>
               </a>
@@ -153,85 +153,26 @@
       <div class="app-content">
         <div class="container-fluid">
           <div id="content-wrapper" class="d-flex flex-column">
-            <section class="container my-3 vstep-practice-options">
-              <div class="vstep-practice-hero mb-4">
+            <div class="container my-3 vstep-list-page">
+              <div class="vstep-bode-hero mb-4">
                 <div>
                   <div class="text-uppercase fw-bold small text-primary mb-1">Mini Hippo / VSTEP</div>
-                  <h1 class="mb-2">VSTEP Practice Options</h1>
-                  <p class="text-secondary mb-0">Chọn kỹ năng để luyện theo câu hỏi, theo bộ đề hoặc vào thi thử full test đủ 4 kỹ năng.</p>
+                  <h1 class="text-center text-md-start mb-2">Thi thử VSTEP full test</h1>
+                  <p class="text-secondary mb-0">Chọn bộ đề VSTEP để luyện đủ Listening, Reading, Writing và Speaking theo giao diện thi mẫu.</p>
                 </div>
-                <a href="vstep_full_test.html" class="btn btn-primary fw-semibold">
-                  <i class="bi bi-stack me-1"></i> Thi thử full test
-                </a>
+                <button type="button" class="btn btn-primary fw-semibold" id="reloadVstepListBtn">
+                  <i class="bi bi-arrow-clockwise me-1"></i> Tải lại
+                </button>
               </div>
 
-              <div class="vstep-skill-options-grid">
-                <article class="vstep-skill-option">
-                  <div class="vstep-skill-option-head">
-                    <i class="bi bi-book"></i>
-                    <h2>Reading</h2>
-                  </div>
-                  <a href="vstep_skill?skill=reading&mode=question" class="vstep-option-button vstep-option-green">
-                    <i class="bi bi-question-circle"></i>
-                    <span>Học theo câu hỏi</span>
-                  </a>
-                  <a href="vstep_skill?skill=reading&mode=set" class="vstep-option-button vstep-option-blue">
-                    <i class="bi bi-journals"></i>
-                    <span>Học theo bộ đề</span>
-                  </a>
-                </article>
-
-                <article class="vstep-skill-option">
-                  <div class="vstep-skill-option-head">
-                    <i class="bi bi-headphones"></i>
-                    <h2>Listening</h2>
-                  </div>
-                  <a href="vstep_skill?skill=listening&mode=question" class="vstep-option-button vstep-option-red">
-                    <i class="bi bi-question-circle"></i>
-                    <span>Học theo câu hỏi</span>
-                  </a>
-                  <a href="vstep_skill?skill=listening&mode=set" class="vstep-option-button vstep-option-cyan">
-                    <i class="bi bi-soundwave"></i>
-                    <span>Học theo bộ đề</span>
-                  </a>
-                </article>
-
-                <article class="vstep-skill-option">
-                  <div class="vstep-skill-option-head">
-                    <i class="bi bi-pencil-square"></i>
-                    <h2>Writing</h2>
-                  </div>
-                  <a href="vstep_skill?skill=writing&mode=set" class="vstep-option-button vstep-option-blue">
-                    <i class="bi bi-stack"></i>
-                    <span>Học theo bộ đề</span>
-                  </a>
-                </article>
-
-                <article class="vstep-skill-option">
-                  <div class="vstep-skill-option-head">
-                    <i class="bi bi-mic"></i>
-                    <h2>Speaking</h2>
-                  </div>
-                  <a href="vstep_skill?skill=speaking&mode=question" class="vstep-option-button vstep-option-red">
-                    <i class="bi bi-mic-fill"></i>
-                    <span>Học theo câu hỏi</span>
-                  </a>
-                </article>
+              <div class="mb-4">
+                <h2 class="text-success fs-4 mb-3">
+                  <i class="bi bi-cloud-upload-fill me-2"></i>Thư viện đề ôn thi VSTEP
+                </h2>
+                <div id="vstepListState" class="alert alert-info">Đang tải danh sách đề VSTEP...</div>
+                <div id="vstepListGrid" class="row vstep-list-grid"></div>
               </div>
-
-              <div class="vstep-practice-strip mt-4">
-                <a href="vstep_full_test.html">
-                  <i class="bi bi-stack"></i>
-                  <span>Thi thử full test VSTEP đủ 4 kỹ năng</span>
-                  <i class="bi bi-arrow-right"></i>
-                </a>
-                <a href="vstep_lessons.html">
-                  <i class="bi bi-calendar2-week"></i>
-                  <span>Vào phân khu học tập VSTEP</span>
-                  <i class="bi bi-arrow-right"></i>
-                </a>
-              </div>
-            </section>
+            </div>
           </div>
         </div>
       </div>
@@ -281,6 +222,7 @@
       }
     });
   </script>
+  <script src="js/vstep_bode.js"></script>
   <script src="js/copy_paste_guard.js"></script>
 </body>
 

@@ -328,10 +328,109 @@ function isLikelyMediaUrl(value) {
   if (/^(preview|placeholder|null|undefined|none|todo|tbd)$/i.test(v)) return false;
   // Loại bỏ path placeholder default trong code (vd images/speaking/placeholder_part2_1.jpg)
   // — file thực tế không tồn tại trên server, gây icon ảnh broken.
-  if (/(^|\/)placeholder[_-]/i.test(v)) return false;
+  if (/(^|\/)placeholder(?:[_-].*)?\.(png|jpe?g|webp|gif|svg)$/i.test(v)) return false;
   if (/^https?:\/\//i.test(v)) return true;
   if (v.startsWith('//') || v.startsWith('/')) return true;
   return /\.(png|jpe?g|webp|gif|svg|mp3|wav|ogg|m4a|webm|mp4|mov|m4v|avi)(\?.*)?$/i.test(v);
+}
+
+function resolveGithubMediaProxySrc(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const url = new URL(raw, window.location.origin);
+    if (url.origin === window.location.origin && url.pathname === '/api/github-media') {
+      return raw;
+    }
+    if (url.hostname === 'raw.githubusercontent.com') {
+      return `/api/github-media?url=${encodeURIComponent(raw)}`;
+    }
+    if (url.hostname === 'github.com' && /\/(blob|raw)\//.test(url.pathname)) {
+      return `/api/github-media?url=${encodeURIComponent(raw)}`;
+    }
+  } catch (_) {
+    return raw;
+  }
+  return raw;
+}
+
+function resolvePlayableAudioSrc(value) {
+  const v = String(value || '').trim();
+  if (!isLikelyMediaUrl(v)) return '';
+  if (/^https?:\/\//i.test(v) || v.startsWith('//') || v.startsWith('/') || v.startsWith('data:') || v.startsWith('blob:')) {
+    return resolveGithubMediaProxySrc(v);
+  }
+  return /\.(mp3|mpeg|wav|ogg|opus|m4a|aac|webm|mp4)(\?.*)?$/i.test(v) ? v : '';
+}
+
+function isUnsupportedAudioError(error) {
+  const name = String(error?.name || '');
+  const message = String(error?.message || '');
+  return name === 'NotSupportedError' || /no supported source|not supported/i.test(message);
+}
+
+function speakTextFallback(text) {
+  const clean = String(text || '').trim();
+  if (!clean || !window.speechSynthesis || !window.SpeechSynthesisUtterance) {
+    return Promise.reject(new Error('Không có file audio hợp lệ cho câu này.'));
+  }
+  return new Promise((resolve, reject) => {
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(clean);
+      utterance.lang = 'en-US';
+      utterance.rate = 0.92;
+      utterance.pitch = 1;
+      utterance.onend = resolve;
+      utterance.onerror = () => reject(new Error('Trình duyệt không phát được giọng đọc tự động.'));
+      window.speechSynthesis.speak(utterance);
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+function playMediaOrSpeechUntilEnded(mediaEl, fallbackText) {
+  const text = String(fallbackText || mediaEl?.dataset?.ttsText || '').trim();
+  const hasAudioFile = mediaEl?.dataset?.hasAudio === '1' && mediaEl?.play;
+  if (!hasAudioFile) {
+    return speakTextFallback(text);
+  }
+
+  return new Promise((resolve, reject) => {
+    let finished = false;
+    const cleanup = () => {
+      if (!mediaEl) return;
+      mediaEl.onended = null;
+      mediaEl.onerror = null;
+    };
+    const done = () => {
+      if (finished) return;
+      finished = true;
+      cleanup();
+      resolve();
+    };
+    const fail = (error) => {
+      if (finished) return;
+      cleanup();
+      if (isUnsupportedAudioError(error)) {
+        speakTextFallback(text).then(resolve).catch(reject);
+        return;
+      }
+      reject(error);
+    };
+
+    mediaEl.onended = done;
+    mediaEl.onerror = () => fail(mediaEl.error || new Error('Audio không phát được.'));
+    try {
+      const playPromise = mediaEl.play();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(fail);
+      }
+    } catch (error) {
+      fail(error);
+    }
+  });
 }
 
 function filterValidMediaUrls(list) {
@@ -3507,6 +3606,8 @@ function renderWritingFollowup(page) {
    ═══════════════════════════════════════════════════════ */
 
 let speakingTimerInterval = null;
+const speakingIntroManualHandlers = new Map();
+const speakingQuestionManualHandlers = new Map();
 
 function renderSpeakingQ(page) {
   const d = page.data;
@@ -3518,7 +3619,8 @@ function renderSpeakingQ(page) {
   const wc = saved.split(/\s+/).filter(Boolean).length;
   const audioId = `sp-basic-audio-${page.idx}`;
   const audioStatusId = `sp-basic-audio-status-${page.idx}`;
-  const hasAudio = !!String(d.audio || '').trim();
+  const audioSrc = resolvePlayableAudioSrc(d.audio);
+  const hasAudio = !!audioSrc;
   const audioPanelHtml = hasAudio
     ? `
           <div class="audio-panel mb-3">
@@ -3526,7 +3628,7 @@ function renderSpeakingQ(page) {
               <h6 class="mb-0">Audio</h6>
               <span class="small text-muted">Audio 1 / 1</span>
             </div>
-            <audio id="${audioId}" controls preload="none" class="w-100 mb-2" src="${d.audio}"></audio>
+            <audio id="${audioId}" controls preload="none" class="w-100 mb-2" data-has-audio="1" data-tts-text="${esc(d.prompt || '')}" src="${esc(audioSrc)}"></audio>
             <div class="small" id="${audioStatusId}">Đang phát audio 1...</div>
           </div>`
     : '';
@@ -3586,22 +3688,13 @@ function playSpeakingQAudio(page) {
     startSpeakingTimer(page);
   };
 
-  if (!audio || !audio.src || audio.src.endsWith('/')) {
-    startTimer();
-    return;
-  }
-
   if (statusLabel) statusLabel.textContent = 'Đang phát audio 1...';
   if (hintEl) hintEl.textContent = 'Đang phát audio câu hỏi...';
   if (timerStatus) timerStatus.textContent = 'Đang chờ audio...';
 
-  audio.play().catch(() => { startTimer(); });
-  audio.onended = function () {
-    startTimer();
-  };
-  audio.onerror = function () {
-    startTimer();
-  };
+  playMediaOrSpeechUntilEnded(audio, d.prompt || '')
+    .then(startTimer)
+    .catch(() => { startTimer(); });
 }
 
 function renderSpeakingImage(page) {
@@ -3652,6 +3745,8 @@ function renderSpeakingImage(page) {
 function renderSpeakingIntro(page) {
   const d = page.data;
   const audioId = 'sp-intro-audio-' + page.idx;
+  const introAudioSrc = resolvePlayableAudioSrc(d.introAudio);
+  const fallbackText = d.introText || d.partLabel || page.partLabel || 'Speaking introduction';
 
   const validImages = filterValidMediaUrls(d.images);
   const isSingle = validImages.length === 1;
@@ -3679,13 +3774,15 @@ function renderSpeakingIntro(page) {
               <h6 class="mb-0">Audio</h6>
               <span class="small text-muted">Audio 1 / 1</span>
             </div>
-            <audio id="${audioId}" controls autoplay preload="auto" class="w-100 mb-2" src="${d.introAudio || ''}"></audio>
-            <div class="d-none alert alert-warning py-2 px-3 mb-2" id="autoplay-fallback-${page.idx}" style="font-size:0.92rem;">
+            ${introAudioSrc
+              ? `<audio id="${audioId}" controls autoplay preload="auto" class="w-100 mb-2" data-has-audio="1" data-tts-text="${esc(fallbackText)}" src="${esc(introAudioSrc)}"></audio>`
+              : `<span id="${audioId}" class="d-none" data-has-audio="0" data-tts-text="${esc(fallbackText)}"></span>`}
+            <div class="${introAudioSrc ? 'd-none ' : ''}alert alert-warning py-2 px-3 mb-2" id="autoplay-fallback-${page.idx}" style="font-size:0.92rem;">
               <div class="d-flex flex-wrap align-items-center gap-2">
                 <i class="bi bi-volume-mute-fill" style="font-size:1.1rem;"></i>
                 <div class="flex-grow-1">
-                  <strong>Trình duyệt đang chặn tự động phát audio.</strong>
-                  Nhấn nút bên cạnh để tiếp tục bài học.
+                  <strong>${introAudioSrc ? 'Trình duyệt đang chặn tự động phát audio.' : 'Trang này chưa có file audio hợp lệ.'}</strong>
+                  Nhấn nút bên cạnh để phát audio.
                 </div>
                 <button type="button" class="btn btn-warning btn-sm" onclick="manualPlaySpeakingIntro(${page.idx})">
                   <i class="bi bi-play-fill me-1"></i>Bắt đầu phát audio
@@ -3700,12 +3797,14 @@ function renderSpeakingIntro(page) {
 }
 
 function manualPlaySpeakingIntro(idx) {
+  const handler = speakingIntroManualHandlers.get(idx);
+  if (handler) {
+    handler(true);
+    return;
+  }
   const audio = document.getElementById('sp-intro-audio-' + idx);
-  const fallback = document.getElementById('autoplay-fallback-' + idx);
   if (!audio) return;
-  audio.play().then(() => {
-    if (fallback) fallback.classList.add('d-none');
-  }).catch((err) => {
+  playMediaOrSpeechUntilEnded(audio, audio.dataset?.ttsText || '').catch((err) => {
     console.warn('Manual play failed:', err);
   });
 }
@@ -3805,35 +3904,11 @@ function playSpeakingIntroAudio(page) {
     });
   };
 
-  if (!audio || !audio.src || audio.src.endsWith('/')) {
-    if (nextIsSpeakingQuestion) {
-      if (statusLabel) statusLabel.textContent = 'Không có audio, chuyển trang...';
-      setTimeout(() => { saveCurrent(); renderPage(currentPage + 1); }, 3000);
-    } else {
-      startStandaloneRecording();
-    }
-    return;
-  }
-
   const fallbackEl = document.getElementById('autoplay-fallback-' + page.idx);
-
-  // Cố gắng autoplay. Browser có thể block (NotAllowedError) nếu user
-  // chưa interact với trang. Trong trường hợp đó hiện nút "Bắt đầu".
-  const playPromise = audio.play();
-  if (playPromise && typeof playPromise.then === 'function') {
-    playPromise
-      .then(() => {
-        if (fallbackEl) fallbackEl.classList.add('d-none');
-        if (statusLabel) statusLabel.textContent = 'Đang phát audio giới thiệu...';
-      })
-      .catch((err) => {
-        console.warn('Autoplay bị chặn, hiện nút bắt đầu:', err);
-        if (fallbackEl) fallbackEl.classList.remove('d-none');
-        if (statusLabel) statusLabel.textContent = 'Trình duyệt đã chặn tự động phát. Nhấn "Bắt đầu phát audio".';
-      });
-  }
-
-  audio.onended = function () {
+  let playbackFinished = false;
+  const finishAfterPlayback = () => {
+    if (playbackFinished) return;
+    playbackFinished = true;
     if (nextIsSpeakingQuestion) {
       advanceToNext();
     } else {
@@ -3841,14 +3916,30 @@ function playSpeakingIntroAudio(page) {
     }
   };
 
-  audio.onerror = function () {
-    if (nextIsSpeakingQuestion) {
-      if (statusLabel) statusLabel.textContent = 'Audio lỗi, chuyển trang...';
-      setTimeout(() => { saveCurrent(); renderPage(currentPage + 1); }, 3000);
-    } else {
-      startStandaloneRecording();
-    }
+  const startPlayback = (manual = false) => {
+    if (fallbackEl) fallbackEl.classList.add('d-none');
+    if (statusLabel) statusLabel.textContent = audio?.dataset?.hasAudio === '1'
+      ? 'Đang phát audio giới thiệu...'
+      : 'Đang phát giọng đọc tự động...';
+    playMediaOrSpeechUntilEnded(audio, page.data?.introText || page.data?.partLabel || page.partLabel || '')
+      .then(finishAfterPlayback)
+      .catch((err) => {
+        console.warn(manual ? 'Manual play failed:' : 'Autoplay bị chặn, hiện nút bắt đầu:', err);
+        if (playbackFinished) return;
+        if (fallbackEl) fallbackEl.classList.remove('d-none');
+        if (statusLabel) {
+          statusLabel.textContent = manual
+            ? (err.message || 'Không phát được audio. Vui lòng kiểm tra file audio.')
+            : 'Trình duyệt đã chặn tự động phát. Nhấn "Bắt đầu phát audio".';
+        }
+      });
   };
+
+  speakingIntroManualHandlers.set(page.idx, startPlayback);
+
+  // Cố gắng autoplay. Browser có thể block (NotAllowedError) nếu user
+  // chưa interact với trang. Trong trường hợp đó hiện nút "Bắt đầu".
+  startPlayback(false);
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -3860,6 +3951,8 @@ function renderSpeakingAudioQ(page) {
   const audioId = 'sp-q-audio-' + page.idx;
   const saved = userAnswers[d.key] || '';
   const wc = saved.split(/\s+/).filter(Boolean).length;
+  const questionAudioSrc = resolvePlayableAudioSrc(d.audio);
+  const fallbackText = d.prompt || 'Speaking question';
 
   return `
     <div class="container py-5">
@@ -3877,13 +3970,15 @@ function renderSpeakingAudioQ(page) {
               <h6 class="mb-0">Audio</h6>
               <span class="small text-muted">Audio 1 / 1</span>
             </div>
-            <audio id="${audioId}" controls autoplay preload="auto" class="w-100 mb-2" src="${d.audio || ''}"></audio>
-            <div class="d-none alert alert-warning py-2 px-3 mb-2" id="autoplay-fallback-q-${page.idx}" style="font-size:0.92rem;">
+            ${questionAudioSrc
+              ? `<audio id="${audioId}" controls autoplay preload="auto" class="w-100 mb-2" data-has-audio="1" data-tts-text="${esc(fallbackText)}" src="${esc(questionAudioSrc)}"></audio>`
+              : `<span id="${audioId}" class="d-none" data-has-audio="0" data-tts-text="${esc(fallbackText)}"></span>`}
+            <div class="${questionAudioSrc ? 'd-none ' : ''}alert alert-warning py-2 px-3 mb-2" id="autoplay-fallback-q-${page.idx}" style="font-size:0.92rem;">
               <div class="d-flex flex-wrap align-items-center gap-2">
                 <i class="bi bi-volume-mute-fill" style="font-size:1.1rem;"></i>
                 <div class="flex-grow-1">
-                  <strong>Trình duyệt đang chặn tự động phát audio câu hỏi.</strong>
-                  Nhấn nút bên cạnh để bắt đầu.
+                  <strong>${questionAudioSrc ? 'Trình duyệt đang chặn tự động phát audio câu hỏi.' : 'Câu này chưa có file audio hợp lệ.'}</strong>
+                  Nhấn nút bên cạnh để phát audio.
                 </div>
                 <button type="button" class="btn btn-warning btn-sm" onclick="manualPlaySpeakingQ(${page.idx})">
                   <i class="bi bi-play-fill me-1"></i>Phát audio
@@ -3942,44 +4037,48 @@ function playSpeakingQuestionAudio(page) {
     startSpeakingTimer(page);
   };
 
-  if (!audio || !audio.src || audio.src.endsWith('/')) {
-    if (statusLabel) statusLabel.textContent = 'Không có audio.';
-    startTimerWithRecording();
-    return;
-  }
-
   const fallbackEl = document.getElementById('autoplay-fallback-q-' + page.idx);
+  let playbackFinished = false;
+  const finishAfterPlayback = () => {
+    if (playbackFinished) return;
+    playbackFinished = true;
+    startTimerWithRecording();
+  };
+  const startPlayback = (manual = false) => {
+    if (fallbackEl) fallbackEl.classList.add('d-none');
+    if (statusLabel) statusLabel.textContent = audio?.dataset?.hasAudio === '1'
+      ? 'Đang phát audio câu hỏi...'
+      : 'Đang phát giọng đọc tự động...';
+    if (hintEl) hintEl.textContent = 'Đang phát audio câu hỏi...';
+    if (timerStatus) timerStatus.textContent = 'Đang chờ audio...';
 
-  const playPromise = audio.play();
-  if (playPromise && typeof playPromise.then === 'function') {
-    playPromise
-      .then(() => {
-        if (fallbackEl) fallbackEl.classList.add('d-none');
-        if (statusLabel) statusLabel.textContent = 'Đang phát audio câu hỏi...';
-      })
+    playMediaOrSpeechUntilEnded(audio, page.data?.prompt || '')
+      .then(finishAfterPlayback)
       .catch((err) => {
-        console.warn('Autoplay câu hỏi bị chặn, hiện nút bắt đầu:', err);
+        console.warn(manual ? 'Manual play câu hỏi failed:' : 'Autoplay câu hỏi bị chặn, hiện nút bắt đầu:', err);
+        if (playbackFinished) return;
         if (fallbackEl) fallbackEl.classList.remove('d-none');
-        if (statusLabel) statusLabel.textContent = 'Trình duyệt đã chặn tự động phát. Nhấn "Bắt đầu phát audio câu hỏi".';
+        if (statusLabel) {
+          statusLabel.textContent = manual
+            ? (err.message || 'Không phát được audio câu hỏi. Vui lòng kiểm tra file audio.')
+            : 'Trình duyệt đã chặn tự động phát. Nhấn "Phát audio".';
+        }
       });
-  }
-
-  audio.onended = function () {
-    startTimerWithRecording();
   };
 
-  audio.onerror = function () {
-    startTimerWithRecording();
-  };
+  speakingQuestionManualHandlers.set(page.idx, startPlayback);
+  startPlayback(false);
 }
 
 function manualPlaySpeakingQ(idx) {
+  const handler = speakingQuestionManualHandlers.get(idx);
+  if (handler) {
+    handler(true);
+    return;
+  }
   const audio = document.getElementById('sp-q-audio-' + idx);
-  const fallback = document.getElementById('autoplay-fallback-q-' + idx);
   if (!audio) return;
-  audio.play().then(() => {
-    if (fallback) fallback.classList.add('d-none');
-  }).catch((err) => {
+  playMediaOrSpeechUntilEnded(audio, audio.dataset?.ttsText || '').catch((err) => {
     console.warn('Manual play câu hỏi failed:', err);
   });
 }

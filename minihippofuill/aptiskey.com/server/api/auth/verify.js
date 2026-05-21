@@ -4,6 +4,12 @@ import { ensureDeviceAccess, resolveDeviceLimit } from '../_utils/device.js';
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
+function isExpired(profile) {
+  if (!profile?.expires_at) return false;
+  const expires = new Date(profile.expires_at).getTime();
+  return Number.isFinite(expires) && expires < Date.now();
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -53,6 +59,10 @@ export default async function handler(req, res) {
 
     if (profile.status && profile.status !== 'active') {
       return res.status(403).json({ error: 'Tài khoản đang bị khóa' });
+    }
+
+    if (isExpired(profile)) {
+      return res.status(403).json({ error: 'Tài khoản đã hết hạn sử dụng' });
     }
 
     const userPayload = {

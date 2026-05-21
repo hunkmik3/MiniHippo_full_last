@@ -112,7 +112,9 @@ await Promise.all([
 
 const payload = {
   title: 'VSTEP Complete Mock Test #003 - Drive Format',
-  type: 'reading',
+  flow: 'practice',
+  content_kind: 'mock_test',
+  status: 'published',
   description: 'Complete VSTEP mock set with Listening 3 parts, Reading 4 parts, Writing 2 parts, and Speaking 3 parts.',
   duration_minutes: 177,
   data: {
@@ -120,6 +122,9 @@ const payload = {
     __storage_type: 'reading',
     schemaVersion: 1,
     sample: true,
+    vstep_module: true,
+    vstep_flow: 'practice',
+    vstep_content_kind: 'mock_test',
     status: 'published',
     durations: {
       listening: 45,
@@ -364,14 +369,14 @@ Follow-up questions:
 await loadLocalEnv();
 const { insertInto, selectFrom, updateTable } = await import('../server/api/_utils/supabase.js');
 
-const existing = await selectFrom('practice_sets', {
+const existing = await selectFrom('vstep_contents', {
   filters: [{ column: 'title', value: payload.title }],
   single: true
 });
 
 const saved = existing?.id
-  ? await updateTable('practice_sets', [{ column: 'id', value: existing.id }], payload)
-  : await insertInto('practice_sets', payload);
+  ? await updateTable('vstep_contents', [{ column: 'id', value: existing.id }], payload)
+  : await insertInto('vstep_contents', payload);
 
 const record = Array.isArray(saved) ? saved[0] : saved;
 const counts = {

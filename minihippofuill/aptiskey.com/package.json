@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "if [ -f .env.local ]; then set -a; . ./.env.local; set +a; fi; vercel dev --listen 3100",
-    "dev:vstep": "if [ -f .env.local ]; then set -a; . ./.env.local; set +a; fi; vercel dev --listen 3100"
+    "dev:vstep": "if [ -f .env.local ]; then set -a; . ./.env.local; set +a; fi; vercel dev --listen ${PORT:-3005}"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1048.0"
   }
 }

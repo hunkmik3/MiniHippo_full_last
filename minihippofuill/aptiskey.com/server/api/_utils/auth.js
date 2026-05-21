@@ -25,6 +25,12 @@ function buildUserPayload(profile, supabaseUser) {
   };
 }
 
+function isExpired(profile) {
+  if (!profile?.expires_at) return false;
+  const expires = new Date(profile.expires_at).getTime();
+  return Number.isFinite(expires) && expires < Date.now();
+}
+
 export async function verifyAdminRequest(req) {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     return {
@@ -96,6 +102,14 @@ export async function verifyAdminRequest(req) {
       };
     }
 
+    if (isExpired(profile)) {
+      return {
+        success: false,
+        status: 403,
+        error: 'Tài khoản đã hết hạn sử dụng'
+      };
+    }
+
     // Check if user is admin
     if (profile.role !== 'admin') {
       return {
@@ -109,13 +123,21 @@ export async function verifyAdminRequest(req) {
 
     const deviceId = req.headers['x-device-id'] || req.headers['X-Device-Id'];
     if (deviceId) {
-      await ensureDeviceAccess({
-        userId: user.id,
-        deviceId,
-        deviceName: req.headers['x-device-name'] || req.headers['X-Device-Name'],
-        userAgent: req.headers['user-agent'],
-        deviceLimit: user.deviceLimit
-      });
+      try {
+        await ensureDeviceAccess({
+          userId: user.id,
+          deviceId,
+          deviceName: req.headers['x-device-name'] || req.headers['X-Device-Name'],
+          userAgent: req.headers['user-agent'],
+          deviceLimit: user.deviceLimit
+        });
+      } catch (deviceError) {
+        return {
+          success: false,
+          status: deviceError.status || 403,
+          error: deviceError.message || 'Thiết bị không được phép sử dụng tài khoản này'
+        };
+      }
     }
 
     return {
@@ -209,16 +231,32 @@ export async function verifyUserRequest(req, { requireDevice = false } = {}) {
       };
     }
 
+    if (isExpired(profile)) {
+      return {
+        success: false,
+        status: 403,
+        error: 'Tài khoản đã hết hạn sử dụng'
+      };
+    }
+
     const user = buildUserPayload(profile, data);
 
     if (deviceId) {
-      await ensureDeviceAccess({
-        userId: user.id,
-        deviceId,
-        deviceName: req.headers['x-device-name'] || req.headers['X-Device-Name'],
-        userAgent: req.headers['user-agent'],
-        deviceLimit: user.deviceLimit
-      });
+      try {
+        await ensureDeviceAccess({
+          userId: user.id,
+          deviceId,
+          deviceName: req.headers['x-device-name'] || req.headers['X-Device-Name'],
+          userAgent: req.headers['user-agent'],
+          deviceLimit: user.deviceLimit
+        });
+      } catch (deviceError) {
+        return {
+          success: false,
+          status: deviceError.status || 403,
+          error: deviceError.message || 'Thiết bị không được phép sử dụng tài khoản này'
+        };
+      }
     }
 
     return {

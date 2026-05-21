@@ -1,5 +1,6 @@
 import parseBody from './_utils/parseBody.js';
 import { putGithubContent } from './_utils/supabase.js';
+import { isR2Configured, normalizeR2Key, putR2Object } from './_utils/r2.js';
 import { verifyAdminRequest, verifyUserRequest } from './_utils/auth.js';
 
 const MAX_AUDIO_BYTES = 12 * 1024 * 1024; // 12MB
@@ -74,7 +75,14 @@ export default async function handler(req, res) {
       .json({ error: `File audio vượt giới hạn cho phép (${MAX_AUDIO_BYTES / (1024 * 1024)}MB).` });
   }
 
-  // Normalize file path - remove leading slashes and ensure proper format
+  let r2Key;
+  try {
+    r2Key = normalizeR2Key(normalizedInputPath);
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'filePath không hợp lệ' });
+  }
+
+  // Normalize file path - remove leading slashes and ensure proper GitHub format
   let normalizedPath = normalizedInputPath;
   
   // Ensure path starts with minihippofuill/aptiskey.com/ if not already
@@ -83,6 +91,24 @@ export default async function handler(req, res) {
   }
 
   try {
+    if (isR2Configured()) {
+      console.log('Uploading media to R2:', r2Key);
+      const uploaded = await putR2Object(r2Key, {
+        content,
+        encoding: 'base64'
+      });
+
+      return res.status(200).json({
+        success: true,
+        rawUrl: uploaded.publicUrl,
+        fileUrl: uploaded.publicUrl,
+        filePath: uploaded.key,
+        storage: 'r2',
+        sizeBytes: uploaded.sizeBytes,
+        contentType: uploaded.contentType
+      });
+    }
+
     console.log('Uploading audio to:', normalizedPath);
     const result = await putGithubContent(normalizedPath, {
       content,
@@ -102,10 +128,15 @@ export default async function handler(req, res) {
       throw new Error('Không thể lấy URL của file đã upload');
     }
 
+    const proxiedMediaUrl = `/api/github-media?path=${encodeURIComponent(normalizedPath)}`;
+
     return res.status(200).json({
       success: true,
-      rawUrl,
+      rawUrl: proxiedMediaUrl,
+      githubRawUrl: rawUrl,
       fileUrl: githubContent.html_url,
+      filePath: normalizedPath,
+      storage: 'github',
       sha: githubContent.sha
     });
   } catch (error) {
@@ -117,4 +148,3 @@ export default async function handler(req, res) {
     });
   }
 }
-
