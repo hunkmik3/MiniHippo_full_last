@@ -1065,38 +1065,6 @@ function collectPart5Data() {
     };
 }
 
-// ============================================
-// Export to JS Format
-// ============================================
-
-function exportToJS() {
-    let jsCode = '';
-    
-    switch(currentPart) {
-        case 1:
-            jsCode = generatePart1JS();
-            break;
-        case 2:
-            jsCode = generatePart2JS();
-            break;
-        case 4:
-            jsCode = generatePart4JS();
-            break;
-        case 5:
-            jsCode = generatePart5JS();
-            break;
-    }
-    
-    // Copy to clipboard
-    navigator.clipboard.writeText(jsCode).then(() => {
-        alert('Đã copy code JS vào clipboard! Bạn có thể paste vào file tương ứng.');
-    });
-    
-    // Also show in preview
-    document.getElementById('js-preview').textContent = jsCode;
-    document.getElementById('preview-section').style.display = 'block';
-}
-
 function ensureCurrentSetPersisted(part) {
     const editForm = document.getElementById(`part${part}-edit-form`);
     if (editForm && editForm.style.display !== 'none') {

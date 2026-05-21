@@ -403,7 +403,7 @@ function setupTypeSelector() {
     console.log('Setting up type selector, found', typeSelectors.length, 'selectors');
 
     if (typeSelectors.length === 0) {
-        console.error('No type selectors found!');
+        console.debug('No legacy type selectors found; sidebar module switcher is active.');
         return;
     }
 
