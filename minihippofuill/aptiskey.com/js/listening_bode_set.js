@@ -142,6 +142,32 @@
             .replace(/'/g, '&#39;');
     }
 
+    function resolveLogicalType(set) {
+        const marker = set?.data?.__practice_type;
+        if (typeof marker === 'string' && marker.trim()) {
+            return marker.trim().toLowerCase();
+        }
+        return typeof set?.type === 'string' ? set.type.toLowerCase() : '';
+    }
+
+    function isKeyListeningSet() {
+        const logicalType = resolveLogicalType(state.data);
+        const title = String(state.data?.title || state.setTitle || '').trim().toLowerCase();
+        return logicalType === 'key_listening' || title.includes('key listening');
+    }
+
+    function clearAudioSource(audio) {
+        if (!audio) return;
+        audio.pause();
+        audio.currentTime = 0;
+        audio.src = '';
+    }
+
+    function setAudioBarVisible(audioBar, visible) {
+        if (!audioBar) return;
+        audioBar.style.setProperty('display', visible ? 'flex' : 'none', 'important');
+    }
+
     // Stop all audio players
     function stopAllAudio() {
         // Stop all audio elements on the page
@@ -530,10 +556,13 @@
         const audio = document.getElementById('part1-audioPlayer');
         const audioBar = document.querySelector('#part1-section .top-bar');
         
-        // Ẩn thanh audio nếu câu hỏi này không có audio
+        // Key Listening không dùng audio, chỉ học key + làm lại câu hỏi.
         if (audioBar) {
-            if (question.audioUrl && question.audioUrl.trim()) {
-                audioBar.style.display = 'flex';
+            if (isKeyListeningSet()) {
+                setAudioBarVisible(audioBar, false);
+                clearAudioSource(audio);
+            } else if (question.audioUrl && question.audioUrl.trim()) {
+                setAudioBarVisible(audioBar, true);
                 if (audio) {
                     // Stop and reset audio first
                     audio.pause();
@@ -545,12 +574,8 @@
                     setupAudioPlayer('part1-audioPlayer', 'part1-playButton', 'part1-playIcon', 'part1-playCountLabel');
                 }
             } else {
-                audioBar.style.display = 'none';
-                if (audio) {
-                    audio.pause();
-                    audio.currentTime = 0;
-                    audio.src = '';
-                }
+                setAudioBarVisible(audioBar, false);
+                clearAudioSource(audio);
             }
         }
 
@@ -652,21 +677,20 @@
         const audio = document.getElementById('part2-audioPlayer');
         const audioBar = document.querySelector('#part2-section .top-bar');
         
-        // Ẩn thanh audio nếu không có audio URL
+        // Key Listening không dùng audio, chỉ học key + làm lại câu hỏi.
         if (audioBar) {
-            if (part2.audioUrl && part2.audioUrl.trim()) {
-                audioBar.style.display = 'flex';
+            if (isKeyListeningSet()) {
+                setAudioBarVisible(audioBar, false);
+                clearAudioSource(audio);
+            } else if (part2.audioUrl && part2.audioUrl.trim()) {
+                setAudioBarVisible(audioBar, true);
                 if (audio) {
                     audio.src = normalizeAudioUrl(part2.audioUrl);
                     setupAudioPlayer('part2-audioPlayer', 'part2-playButton', 'part2-playIcon', 'part2-playCountLabel');
                 }
             } else {
-                audioBar.style.display = 'none';
-                if (audio) {
-                    audio.pause();
-                    audio.currentTime = 0;
-                    audio.src = '';
-                }
+                setAudioBarVisible(audioBar, false);
+                clearAudioSource(audio);
             }
         }
 
@@ -750,21 +774,20 @@
         const audio = document.getElementById('part3-audioPlayer');
         const audioBar = document.querySelector('#part3-section .top-bar');
         
-        // Ẩn thanh audio nếu không có audio URL
+        // Key Listening không dùng audio, chỉ học key + làm lại câu hỏi.
         if (audioBar) {
-            if (part3.audioUrl && part3.audioUrl.trim()) {
-                audioBar.style.display = 'flex';
+            if (isKeyListeningSet()) {
+                setAudioBarVisible(audioBar, false);
+                clearAudioSource(audio);
+            } else if (part3.audioUrl && part3.audioUrl.trim()) {
+                setAudioBarVisible(audioBar, true);
                 if (audio) {
                     audio.src = normalizeAudioUrl(part3.audioUrl);
                     setupAudioPlayer('part3-audioPlayer', 'part3-playButton', 'part3-playIcon', 'part3-playCountLabel');
                 }
             } else {
-                audioBar.style.display = 'none';
-                if (audio) {
-                    audio.pause();
-                    audio.currentTime = 0;
-                    audio.src = '';
-                }
+                setAudioBarVisible(audioBar, false);
+                clearAudioSource(audio);
             }
         }
 
@@ -970,22 +993,21 @@
         const audio = document.getElementById(audioId);
         const audioBar = questionDiv.querySelector('.top-bar');
         
-        // Ẩn thanh audio nếu không có audio URL
+        // Key Listening không dùng audio, chỉ học key + làm lại câu hỏi.
         if (audioBar) {
-            if (question.audioUrl && question.audioUrl.trim()) {
-                audioBar.style.display = 'flex';
+            if (isKeyListeningSet()) {
+                setAudioBarVisible(audioBar, false);
+                clearAudioSource(audio);
+            } else if (question.audioUrl && question.audioUrl.trim()) {
+                setAudioBarVisible(audioBar, true);
                 if (audio) {
                     audio.src = normalizeAudioUrl(question.audioUrl);
                     // Setup audio player
                     setupAudioPlayer(audioId, playButtonId, playIconId, playCountLabelId);
                 }
             } else {
-                audioBar.style.display = 'none';
-                if (audio) {
-                    audio.pause();
-                    audio.currentTime = 0;
-                    audio.src = '';
-                }
+                setAudioBarVisible(audioBar, false);
+                clearAudioSource(audio);
             }
         }
 
