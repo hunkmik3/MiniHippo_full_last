@@ -765,9 +765,25 @@ function ensureSessionUnlockedOrNotify() {
   return false;
 }
 
-function buildHomeworkPayload(totalCorrect = 0, totalQuestions = 0) {
+function inferHomeworkSessionType() {
+  const types = new Set();
+  pages.forEach((page) => {
+    const type = String(page?.type || '');
+    if (type.startsWith('writing-')) types.add('writing');
+    else if (type.startsWith('speaking-')) types.add('speaking');
+    else if (type.startsWith('listening-')) types.add('listening');
+    else if (type.startsWith('reading-')) types.add('reading');
+    else if (type === 'grammar' || type === 'vocab') types.add('practice');
+  });
+  if (types.size === 1) return [...types][0];
+  if (types.size > 1) return 'mixed';
+  return 'homework';
+}
+
+function buildHomeworkPayload(totalCorrect = 0, totalQuestions = 0, detail = {}) {
   const classSet = ACCESS_CONTEXT?.classSet;
   if (!classSet?.id) return null;
+  const resultRowsHtml = String(detail?.resultRowsHtml || '').trim();
   return {
     practiceType: 'homework',
     mode: 'session',
@@ -782,8 +798,12 @@ function buildHomeworkPayload(totalCorrect = 0, totalQuestions = 0) {
       class_title: classSet.title || classSet?.data?.name || '',
       session_key: `${ACTIVE_BAND}-${SESSION}`,
       session_number: SESSION,
+      session_type: inferHomeworkSessionType(),
       band: ACTIVE_BAND,
-      homework_submitted_at: new Date().toISOString()
+      homework_submitted_at: new Date().toISOString(),
+      total_correct: Math.max(0, Number(totalCorrect) || 0),
+      total_questions: Math.max(0, Number(totalQuestions) || 0),
+      ...(resultRowsHtml ? { result_rows_html: resultRowsHtml } : {})
     }
   };
 }
@@ -813,12 +833,12 @@ function buildSpeakingAnswersForSubmit() {
     .filter(Boolean);
 }
 
-function submitHomeworkResultIfNeeded(totalCorrect = 0, totalQuestions = 0) {
+function submitHomeworkResultIfNeeded(totalCorrect = 0, totalQuestions = 0, detail = {}) {
   if (PREVIEW_MODE) return Promise.resolve(false);
   if (HOMEWORK_SUBMISSION_PROMISE) return HOMEWORK_SUBMISSION_PROMISE;
   if (ACCESS_CONTEXT?.locked) return Promise.resolve(false);
 
-  const payload = buildHomeworkPayload(totalCorrect, totalQuestions);
+  const payload = buildHomeworkPayload(totalCorrect, totalQuestions, detail);
   if (!payload) return Promise.resolve(false);
 
   HOMEWORK_SUBMISSION_PROMISE = (async () => {
@@ -4393,16 +4413,9 @@ async function submitWritingForGrading() {
   };
 
   try {
-    const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
-    const deviceId = localStorage.getItem('device_id') || 'browser';
     const res = await fetch('/api/practice_results/submit', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        'X-Device-Id': deviceId,
-        'X-Device-Name': navigator.userAgent.substring(0, 50)
-      },
+      headers: buildAuthorizedHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         practiceType: 'writing',
         mode: 'set',
@@ -4798,12 +4811,11 @@ function renderResultsPage() {
   const writingTypes = ['writing-short','writing-email','writing-sentences','writing-chat','writing-describe-image','writing-followup'];
   const hasWriting = pages.some(p => writingTypes.includes(p.type));
 
-  submitHomeworkResultIfNeeded(totalCorrect, totalQ);
-
   if (hasSpeaking) clearSpeakingTimer();
 
   // Pure speaking session
   if (hasSpeaking && !hasWriting) {
+    submitHomeworkResultIfNeeded(totalCorrect, totalQ, { resultRowsHtml: rows });
     return `
       <div class="question-card">
         <div class="card shadow-sm border-0 mb-4">
@@ -4826,6 +4838,8 @@ function renderResultsPage() {
   if (hasWriting) {
     return renderWritingResults();
   }
+
+  submitHomeworkResultIfNeeded(totalCorrect, totalQ, { resultRowsHtml: rows });
 
   return `
     <div class="question-card">

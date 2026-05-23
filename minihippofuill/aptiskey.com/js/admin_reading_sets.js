@@ -348,7 +348,10 @@
                 const action = e.currentTarget.dataset.action;
                 if (!setId) return;
                 if (action === 'view') {
-                    window.open(`reading_bode_set.html?set=${setId}`, '_blank');
+                    const viewUrl = isKeyReadingMode
+                        ? `reading_bode_set.html?set=${setId}&from=lop_hoc`
+                        : `reading_bode_set.html?set=${setId}`;
+                    window.open(viewUrl, '_blank');
                 } else if (action === 'open') {
                     openReadingSetForm(setId);
                 } else if (action === 'delete') {

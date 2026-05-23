@@ -2078,7 +2078,9 @@ function isWritingSubmissionRecord(submission) {
     if (md?.auto_writing_feedback && typeof md.auto_writing_feedback === 'object') return true;
     const sessionType = normalizeStr(md?.session_type);
     const practiceType = normalizeStr(submission?.practice_type);
-    return sessionType === 'writing' || practiceType === 'writing';
+    if (sessionType === 'writing') return true;
+    if (normalizeStr(md?.submission_kind) === 'homework') return false;
+    return practiceType === 'writing';
 }
 
 function isSpeakingSubmissionRecord(submission) {
@@ -2090,17 +2092,33 @@ function isSpeakingSubmissionRecord(submission) {
 }
 
 function hasSubmissionDetailRecord(submission) {
-    return isWritingSubmissionRecord(submission) || isSpeakingSubmissionRecord(submission);
+    return isWritingSubmissionRecord(submission) || isSpeakingSubmissionRecord(submission) || hasHomeworkResultDetailRecord(submission);
+}
+
+function hasHomeworkResultDetailRecord(submission) {
+    const md = submission?.metadata || {};
+    return Boolean(
+        normalizeStr(md?.submission_kind) === 'homework' &&
+        (
+            String(md?.result_rows_html || '').trim() ||
+            Number.isFinite(Number(md?.total_questions)) ||
+            Number.isFinite(Number(submission?.max_score))
+        )
+    );
 }
 
 function renderSubmissionTypeBadges(submission) {
     const detailRows = submission?._detailRows || {};
     const hasWriting = !!detailRows.writing || isWritingSubmissionRecord(submission);
     const hasSpeaking = !!detailRows.speaking || isSpeakingSubmissionRecord(submission);
+    const hasHomeworkResult = !!detailRows.homework || hasHomeworkResultDetailRecord(submission);
     const tags = [];
 
     if (hasWriting) tags.push('<span class="badge bg-light text-dark border me-1">Writing</span>');
     if (hasSpeaking) tags.push('<span class="badge bg-light text-dark border">Speaking</span>');
+    if (hasHomeworkResult && !hasWriting && !hasSpeaking) {
+        tags.push('<span class="badge bg-light text-dark border me-1">BTVN</span>');
+    }
     if (!tags.length) return '<span class="text-muted">--</span>';
     return tags.join('');
 }
@@ -2166,14 +2184,16 @@ async function loadSubmissions() {
             const latestRow = rows[0] || null;
             const writingRow = rows.find(isWritingSubmissionRecord) || null;
             const speakingRow = rows.find(isSpeakingSubmissionRecord) || null;
-            const primary = writingRow || speakingRow || latestRow;
+            const homeworkRow = rows.find(hasHomeworkResultDetailRecord) || null;
+            const primary = writingRow || speakingRow || homeworkRow || latestRow;
             if (!primary) return;
 
             merged.push({
                 ...primary,
                 _detailRows: {
                     writing: writingRow,
-                    speaking: speakingRow
+                    speaking: speakingRow,
+                    homework: homeworkRow
                 },
                 _latestRow: latestRow
             });
@@ -2434,6 +2454,41 @@ function buildSpeakingDetailHtml(speakingRow) {
     `;
 }
 
+function buildHomeworkResultDetailHtml(homeworkRow) {
+    if (!homeworkRow) return '';
+    const md = homeworkRow.metadata || {};
+    const totalScore = Number.isFinite(Number(homeworkRow?.total_score))
+        ? Number(homeworkRow.total_score)
+        : Number(md?.total_correct || 0);
+    const maxScore = Number.isFinite(Number(homeworkRow?.max_score))
+        ? Number(homeworkRow.max_score)
+        : Number(md?.total_questions || 0);
+    const rowsHtml = String(md?.result_rows_html || '').trim();
+
+    return `
+        <div class="submission-detail-section-title"><i class="bi bi-clipboard-check"></i> Kết quả BTVN</div>
+        <div class="submission-detail-card">
+            <div class="prompt">Điểm</div>
+            <div class="answer">${esc(totalScore)} / ${esc(maxScore)}</div>
+        </div>
+        ${rowsHtml ? `
+            <div class="table-responsive mt-3">
+                <table class="table table-sm table-striped align-middle">
+                    <thead>
+                        <tr>
+                            <th>Câu</th>
+                            <th>Nội dung</th>
+                            <th>Bạn chọn</th>
+                            <th>Đáp án</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+            </div>
+        ` : '<div class="text-muted">Bài nộp cũ chỉ lưu điểm, chưa lưu bảng câu trả lời chi tiết.</div>'}
+    `;
+}
+
 function openSubmissionDetailByUser(userId) {
     const target = lopHocState.submissions.find((sub) => String(sub?.user_id || '') === String(userId || ''));
     if (!target) return;
@@ -2447,6 +2502,7 @@ function openSubmissionDetailByUser(userId) {
 
     const writingRow = target?._detailRows?.writing || (isWritingSubmissionRecord(target) ? target : null);
     const speakingRow = target?._detailRows?.speaking || (isSpeakingSubmissionRecord(target) ? target : null);
+    const homeworkRow = target?._detailRows?.homework || (hasHomeworkResultDetailRecord(target) ? target : null);
 
     titleEl.textContent = `Chi tiết bài nộp - ${user?.full_name || user?.account_code || target.user_id || ''}`;
     metaEl.innerHTML = buildSubmissionMetaChips(target, user);
@@ -2454,6 +2510,7 @@ function openSubmissionDetailByUser(userId) {
     const sections = [];
     if (writingRow) sections.push(buildWritingDetailHtml(writingRow));
     if (speakingRow) sections.push(buildSpeakingDetailHtml(speakingRow));
+    if (!writingRow && !speakingRow && homeworkRow) sections.push(buildHomeworkResultDetailHtml(homeworkRow));
     if (!sections.length) {
         sections.push('<div class="text-muted">Bài nộp này chưa có dữ liệu chi tiết Writing/Speaking.</div>');
     }

@@ -42,6 +42,15 @@
     const checkHandlers = {};
     let part5ControlsBound = false;
 
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     const state = {
         data: null,
         currentStep: 1,
@@ -373,10 +382,14 @@
             container.appendChild(card);
         });
 
-        Sortable.create(container, {
-            animation: 150,
-            draggable: '.draggable-card'
-        });
+        if (typeof Sortable !== 'undefined' && Sortable?.create) {
+            Sortable.create(container, {
+                animation: 150,
+                draggable: '.draggable-card'
+            });
+        } else {
+            console.warn('SortableJS is not loaded; Reading ordering question rendered without drag support.');
+        }
 
         return true;
     }
@@ -1023,11 +1036,19 @@
         state.activeSections = buildActiveSections(set);
         state.totalSteps = state.activeSections.length;
 
-        renderIntro(set.data?.intro);
-        renderPart1(set.data?.part1);
-        renderPart2(set.data?.part2);
-        renderPart4(set.data?.part4);
-        renderPart5(set.data?.part5);
+        const safeRender = (label, renderer, payload) => {
+            try {
+                renderer(payload);
+            } catch (error) {
+                console.error(`Không thể render ${label}:`, error);
+            }
+        };
+
+        safeRender('Intro', renderIntro, set.data?.intro);
+        safeRender('Reading Part 1', renderPart1, set.data?.part1);
+        safeRender('Reading Part 2', renderPart2, set.data?.part2);
+        safeRender('Reading Part 4', renderPart4, set.data?.part4);
+        safeRender('Reading Part 5', renderPart5, set.data?.part5);
 
         startCountdown(set.duration_minutes);
         attachNavigation();

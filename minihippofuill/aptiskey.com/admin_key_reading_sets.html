@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Key Reading - Mini Hippo</title>
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/modern-ui.css">
+    <style>
+        :root {
+            --mh-bg: #f6f8fb;
+            --mh-border: #dbe3ef;
+            --mh-text: #102033;
+            --mh-muted: #64748b;
+            --mh-green: #16a34a;
+            --mh-green-dark: #166534;
+        }
+
+        body {
+            min-height: 100vh;
+            margin: 0;
+            background: var(--mh-bg);
+            color: var(--mh-text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+        }
+
+        .admin-shell {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 24px 16px 40px;
+        }
+
+        .admin-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
+        .admin-title {
+            margin: 0;
+            font-size: 1.35rem;
+            font-weight: 800;
+            letter-spacing: 0;
+        }
+
+        .admin-subtitle {
+            margin: 4px 0 0;
+            color: var(--mh-muted);
+            font-size: 0.9rem;
+        }
+
+        .form-section {
+            background: #fff;
+            border: 1px solid var(--mh-border);
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+            padding: 18px;
+        }
+
+        .empty-state-notice {
+            border: 1px dashed #b7c5d8;
+            background: #f8fafc;
+            color: var(--mh-muted);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .reading-set-card {
+            border: 1px solid var(--mh-border);
+            border-radius: 8px;
+            background: #fff;
+            padding: 14px;
+            margin-bottom: 12px;
+        }
+
+        .reading-set-form .accordion-button {
+            font-weight: 700;
+        }
+
+        .reading-set-form .form-text {
+            color: var(--mh-muted);
+        }
+
+        .btn-primary,
+        .btn-success {
+            background: var(--mh-green);
+            border-color: var(--mh-green);
+        }
+
+        .btn-primary:hover,
+        .btn-success:hover {
+            background: var(--mh-green-dark);
+            border-color: var(--mh-green-dark);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="admin-shell">
+        <div class="admin-topbar">
+            <div>
+                <h1 class="admin-title"><i class="bi bi-book me-2"></i>Admin Key Reading</h1>
+                <p class="admin-subtitle">Tạo và quản lý bộ đề Key Reading riêng cho module Lớp học.</p>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="admin_lop_hoc.html#tab-session-content" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left me-1"></i>Admin lớp học
+                </a>
+                <a href="lop_hoc.html" class="btn btn-outline-success btn-sm" target="_blank" rel="noopener">
+                    <i class="bi bi-box-arrow-up-right me-1"></i>Xem lớp học
+                </a>
+            </div>
+        </div>
+
+        <div id="reading-set-module" class="form-section reading-set-form">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-2">
+                <div>
+                    <h3 class="mb-1" id="reading-page-title" style="font-size: 1rem;">
+                        <i class="bi bi-collection me-2"></i>Key Reading sets
+                    </h3>
+                    <p class="text-muted small mb-0" id="reading-page-description" style="font-size: 0.75rem;">
+                        Tạo bộ Key Reading: trang mở đầu admin tự nhập + full bộ đề Reading theo cấu trúc Aptis.
+                    </p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="refreshReadingSetsBtn">
+                        <i class="bi bi-arrow-repeat me-1"></i>Tải lại
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" id="createReadingSetBtn">
+                        <i class="bi bi-plus-circle me-1"></i>Tạo Key Reading set mới
+                    </button>
+                </div>
+            </div>
+
+            <div id="reading-set-list" class="mb-4"></div>
+            <div id="reading-set-empty" class="empty-state-notice" style="display: none;">
+                <i class="bi bi-info-circle me-2"></i>Chưa có Key Reading set nào. Hãy tạo bộ đầu tiên để bắt đầu.
+            </div>
+
+            <div id="reading-set-form-card" class="card" style="display: none;">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0" id="reading-set-form-title">Tạo bộ đề Key Reading</h5>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="cancelReadingSetBtn">
+                        <i class="bi bi-x-lg me-1"></i>Đóng
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Tiêu đề bộ đề</label>
+                            <input type="text" class="form-control" id="reading-set-title" placeholder="Ví dụ: KEY READING ĐỀ 02">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Thời lượng (phút)</label>
+                            <input type="number" class="form-control" id="reading-set-duration" min="10" max="60" value="50">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Mô tả ngắn</label>
+                            <textarea class="form-control" id="reading-set-description" rows="2" placeholder="Thông tin nổi bật..."></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Tiêu đề trang mở đầu</label>
+                            <input type="text" class="form-control" id="reading-intro-title" placeholder="Ví dụ: Em học keys ở trang này trước nha">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Nội dung trang mở đầu</label>
+                            <textarea class="form-control" id="reading-intro-content" rows="8" placeholder="Nhập keys, ghi chú, hướng dẫn..."></textarea>
+                            <div class="form-text">Trang này hiển thị đầu tiên trước các Question Reading.</div>
+                        </div>
+                    </div>
+
+                    <div class="accordion mt-4" id="readingSetAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="headingPart1">
+                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePart1" aria-expanded="true">
+                                    Question 1
+                                </button>
+                            </h2>
+                            <div id="collapsePart1" class="accordion-collapse collapse show" data-bs-parent="#readingSetAccordion">
+                                <div class="accordion-body">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Giới thiệu</label>
+                                        <textarea class="form-control" id="reading-part1-intro" rows="2" placeholder="Choose the best word to complete each sentence."></textarea>
+                                    </div>
+                                    <div id="reading-part1-questions" class="mb-3"></div>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" id="addReadingPart1QuestionBtn">
+                                        <i class="bi bi-plus-circle me-1"></i>Thêm câu hỏi
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="headingPart2">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePart2">
+                                    Question 2 &amp; 3
+                                </button>
+                            </h2>
+                            <div id="collapsePart2" class="accordion-collapse collapse" data-bs-parent="#readingSetAccordion">
+                                <div class="accordion-body">
+                                    <div class="card border-0 shadow-sm mb-4">
+                                        <div class="card-body">
+                                            <h6 class="fw-semibold text-primary mb-3">Question 2</h6>
+                                            <div class="row g-3">
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-bold">Topic</label>
+                                                    <input type="text" class="form-control" id="reading-part2-topic">
+                                                </div>
+                                                <div class="col-12">
+                                                    <label class="form-label fw-bold">Danh sách câu</label>
+                                                    <textarea class="form-control" id="reading-part2-sentences" rows="5" placeholder="Mỗi câu một dòng. Thứ tự nhập = đáp án đúng."></textarea>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="card border-0 shadow-sm">
+                                        <div class="card-body">
+                                            <h6 class="fw-semibold text-primary mb-3">Question 3</h6>
+                                            <div class="row g-3">
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-bold">Topic</label>
+                                                    <input type="text" class="form-control" id="reading-part3-topic">
+                                                </div>
+                                                <div class="col-12">
+                                                    <label class="form-label fw-bold">Danh sách câu</label>
+                                                    <textarea class="form-control" id="reading-part3-sentences" rows="5" placeholder="Mỗi câu một dòng. Thứ tự nhập = đáp án đúng."></textarea>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="headingPart4">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePart4">
+                                    Question 4
+                                </button>
+                            </h2>
+                            <div id="collapsePart4" class="accordion-collapse collapse" data-bs-parent="#readingSetAccordion">
+                                <div class="accordion-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Topic</label>
+                                            <input type="text" class="form-control" id="reading-part4-topic">
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label fw-bold">Đoạn giới thiệu</label>
+                                            <textarea class="form-control" id="reading-part4-intro" rows="2"></textarea>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Đoạn A</label>
+                                            <textarea class="form-control" id="reading-part4-text-a" rows="3"></textarea>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Đoạn B</label>
+                                            <textarea class="form-control" id="reading-part4-text-b" rows="3"></textarea>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Đoạn C</label>
+                                            <textarea class="form-control" id="reading-part4-text-c" rows="3"></textarea>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Đoạn D</label>
+                                            <textarea class="form-control" id="reading-part4-text-d" rows="3"></textarea>
+                                        </div>
+                                    </div>
+                                    <hr>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="mb-0 fw-semibold">Câu hỏi</h6>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" id="addReadingPart4QuestionBtn">
+                                            <i class="bi bi-plus-circle me-1"></i>Thêm câu hỏi
+                                        </button>
+                                    </div>
+                                    <div id="reading-part4-questions"></div>
+                                    <div class="form-text">Đáp án hợp lệ: A, B, C, D.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="headingPart5">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePart5">
+                                    Question 5
+                                </button>
+                            </h2>
+                            <div id="collapsePart5" class="accordion-collapse collapse" data-bs-parent="#readingSetAccordion">
+                                <div class="accordion-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Topic</label>
+                                            <input type="text" class="form-control" id="reading-part5-topic">
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label fw-bold">Options/Headings</label>
+                                            <textarea class="form-control" id="reading-part5-options" rows="5" placeholder="-- Chọn --&#10;Heading 1&#10;Heading 2"></textarea>
+                                        </div>
+                                    </div>
+                                    <hr>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="mb-0 fw-semibold">Đoạn văn & đáp án</h6>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" id="addReadingPart5ParagraphBtn">
+                                            <i class="bi bi-plus-circle me-1"></i>Thêm đoạn văn
+                                        </button>
+                                    </div>
+                                    <div id="reading-part5-paragraphs"></div>
+                                    <div class="row g-3 mt-2">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Mẹo học - Keyword</label>
+                                            <textarea class="form-control" id="reading-part5-keyword" rows="2"></textarea>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Mẹo học - Nhớ theo đoạn văn</label>
+                                            <textarea class="form-control" id="reading-part5-meo" rows="2"></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-column flex-md-row gap-2 mt-4">
+                        <button type="button" class="btn btn-success" id="saveReadingSetBtn">
+                            <i class="bi bi-cloud-arrow-up me-2"></i>Lưu bộ đề Key Reading
+                        </button>
+                        <button type="button" class="btn btn-outline-primary" id="previewReadingSetBtn" disabled title="Preview trực tiếp sẽ khả dụng sau khi lưu bộ đề.">
+                            <i class="bi bi-eye me-2"></i>Preview nhanh
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        window.__READING_SET_TYPE = 'key_reading';
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof requireAdmin === 'function') {
+                requireAdmin();
+            }
+        });
+    </script>
+    <script src="js/admin_reading_sets.js"></script>
+</body>
+
+</html>
