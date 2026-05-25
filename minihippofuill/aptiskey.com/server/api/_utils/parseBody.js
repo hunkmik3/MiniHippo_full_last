@@ -26,15 +26,15 @@ export default function parseBody(req) {
 
     req.on('data', chunk => {
       data += chunk;
-      // Basic guard to prevent oversized payloads from crashing the function
-      // Increased limit to 50MB for audio file uploads
-      if (data.length > 50 * 1024 * 1024) { // 50MB
+      // Basic guard to prevent oversized payloads from crashing the function.
+      // Base64 expands binary uploads, so this stays above the 50MB media cap.
+      if (data.length > 75 * 1024 * 1024) { // 75MB
         if (typeof req.destroy === 'function') {
           req.destroy();
         } else if (req.socket && typeof req.socket.destroy === 'function') {
           req.socket.destroy();
         }
-        reject(new Error('Payload too large (max 50MB)'));
+        reject(new Error('Payload too large (max 75MB)'));
       }
     });
 

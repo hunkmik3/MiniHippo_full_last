@@ -10,9 +10,7 @@
     const requestedSkill = skills.includes(String(query.get('skill') || '').toLowerCase())
         ? String(query.get('skill')).toLowerCase()
         : '';
-    const requestedMode = ['question', 'set'].includes(String(query.get('mode') || '').toLowerCase())
-        ? String(query.get('mode')).toLowerCase()
-        : '';
+    const requestedMode = String(query.get('mode') || '').toLowerCase() === 'set' ? 'set' : '';
     const requestedPartOneBased = Number(query.get('part') || '');
     const requestedPartZeroBased = Number(query.get('partIndex') || '');
     const requestedPartIndex = Number.isFinite(requestedPartOneBased) && requestedPartOneBased > 0
@@ -332,7 +330,7 @@
             const parts = getParts(skill).length;
             document.getElementById('examDurationSummary').innerHTML = `
                 <div>${skillLabels[skill]}: ${parts} part - ${getDuration(skill)} phút</div>
-                <div>Chế độ: ${requestedMode === 'question' ? 'luyện theo câu hỏi' : 'luyện theo bộ đề'}</div>
+                <div>Chế độ: luyện theo bộ đề</div>
             `;
         } else {
             document.getElementById('examDurationSummary').innerHTML = `

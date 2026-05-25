@@ -215,6 +215,8 @@
             vstep: '/vstep_bode.html',
             lop_hoc: '/lop_hoc.html'
         };
+        const SELECTED_MODULE_STORAGE_KEY = 'mh_selected_module';
+        const VALID_MODULES = new Set(Object.keys(MODULE_LANDINGS));
 
         function normalizeCourse(value) {
             return typeof value === 'string' ? value.trim().toLowerCase() : '';
@@ -223,24 +225,61 @@
         function normalizePath(pathname) {
             const raw = typeof pathname === 'string' ? pathname.trim().toLowerCase() : '';
             if (!raw || raw === '/') return '/';
-            return raw.endsWith('/') ? raw.slice(0, -1) : raw;
+            const withoutSlash = raw.endsWith('/') ? raw.slice(0, -1) : raw;
+            return withoutSlash.endsWith('.html') ? withoutSlash.slice(0, -5) : withoutSlash;
         }
 
         function getSelectedModule() {
             return document.getElementById('selected-module')?.value || 'aptis';
         }
 
+        function getStoredSelectedModule() {
+            try {
+                const stored = localStorage.getItem(SELECTED_MODULE_STORAGE_KEY);
+                return VALID_MODULES.has(stored) ? stored : '';
+            } catch (_) {
+                return '';
+            }
+        }
+
         function setSelectedModule(mod) {
+            const selected = VALID_MODULES.has(mod) ? mod : 'aptis';
             const input = document.getElementById('selected-module');
-            if (input) input.value = mod;
+            if (input) input.value = selected;
             document.querySelectorAll('.module-tab').forEach((el) => {
-                el.classList.toggle('active', el.dataset.module === mod);
+                el.classList.toggle('active', el.dataset.module === selected);
             });
+            try {
+                localStorage.setItem(SELECTED_MODULE_STORAGE_KEY, selected);
+            } catch (_) {}
         }
 
         document.querySelectorAll('.module-tab').forEach((tab) => {
             tab.addEventListener('click', () => setSelectedModule(tab.dataset.module));
         });
+
+        function moduleForPath(pathname) {
+            const path = normalizePath(pathname);
+            if (path === '/') return '';
+            if (path.startsWith('/vstep') || path.startsWith('/admin_vstep')) return 'vstep';
+            if (path === '/lop_hoc' || path === '/lop-hoc' || path === '/buoi_hoc' || path.startsWith('/admin_lop_hoc')) {
+                return 'lop_hoc';
+            }
+            return 'aptis';
+        }
+
+        function moduleForRedirect(redirectTarget) {
+            if (!redirectTarget || redirectTarget.includes('/login')) return '';
+            try {
+                return moduleForPath(new URL(redirectTarget, window.location.origin).pathname);
+            } catch (_) {
+                return moduleForPath(String(redirectTarget).split('?')[0].split('#')[0]);
+            }
+        }
+
+        function shouldUseRedirectForModule(redirectTarget, mod) {
+            return Boolean(redirectTarget && moduleForRedirect(redirectTarget) === mod);
+        }
 
         function userCanAccessModule(user, mod) {
             if (!user) return false;
@@ -249,16 +288,19 @@
             const course = normalizeCourse(user.course);
             if (mod === 'lop_hoc') return course === 'lớp học';
             if (mod === 'aptis') return course === 'aptis' || course === 'lớp ôn thi';
-            if (mod === 'vstep') return false; // hiện tại chỉ admin
+            if (mod === 'vstep') return course === 'vstep';
             return false;
         }
 
         function moduleForUser(user) {
             // Suy ra module mặc định nếu user không nhập (hoặc đã đăng nhập sẵn)
+            const stored = getStoredSelectedModule();
+            if (stored && userCanAccessModule(user, stored)) return stored;
             if (!user) return 'aptis';
             if (String(user.role || '').toLowerCase() === 'admin') return 'aptis';
             const course = normalizeCourse(user.course);
             if (course === 'lớp học') return 'lop_hoc';
+            if (course === 'vstep') return 'vstep';
             return 'aptis';
         }
 
@@ -341,7 +383,8 @@
                     return;
                 }
 
-                // Redirect đến landing tương ứng. Nếu admin có post_login_redirect khác thì ưu tiên (chỉ admin).
+                // Redirect về trang cũ nếu trang đó thuộc đúng module đang chọn.
+                // Redirect gốc "/" không có module rõ ràng, nên dùng landing module.
                 const role = String(result.user?.role || '').toLowerCase();
                 const isAdmin = role === 'admin';
                 let redirectTarget = '';
@@ -350,7 +393,7 @@
                         ? consumePostLoginRedirect()
                         : localStorage.getItem('post_login_redirect');
                 }
-                if (redirectTarget && !redirectTarget.includes('/login')) {
+                if (redirectTarget && shouldUseRedirectForModule(redirectTarget, selectedModule)) {
                     localStorage.removeItem('post_login_redirect');
                     window.location.href = redirectTarget;
                 } else {
@@ -363,6 +406,9 @@
                 loginBtn.innerHTML = originalText;
             }
         });
+
+        const redirectModule = moduleForRedirect(localStorage.getItem('post_login_redirect'));
+        setSelectedModule(redirectModule || getStoredSelectedModule() || getSelectedModule());
 
         // Check if already logged in → tự redirect đến module phù hợp
         if (localStorage.getItem('auth_token')) {

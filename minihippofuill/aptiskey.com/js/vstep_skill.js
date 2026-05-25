@@ -1,42 +1,35 @@
 (function () {
     const query = new URLSearchParams(window.location.search);
     const allowedSkills = ['reading', 'listening', 'writing', 'speaking'];
-    const allowedModes = ['question', 'set'];
     const skill = allowedSkills.includes(String(query.get('skill') || '').toLowerCase())
         ? String(query.get('skill')).toLowerCase()
         : 'reading';
-    const mode = allowedModes.includes(String(query.get('mode') || '').toLowerCase())
-        ? String(query.get('mode')).toLowerCase()
-        : 'set';
+    const mode = 'set';
 
     const skillMeta = {
         reading: {
             label: 'Reading',
             icon: 'bi-book',
-            description: 'Luyện Reading VSTEP theo câu hỏi hoặc theo bộ đề từ thư viện đề ôn thi.',
-            setCta: 'Luyện Reading',
-            questionCta: 'Luyện part này'
+            description: 'Luyện Reading VSTEP theo bộ đề từ thư viện đề ôn thi.',
+            setCta: 'Luyện Reading'
         },
         listening: {
             label: 'Listening',
             icon: 'bi-headphones',
-            description: 'Luyện Listening VSTEP theo từng part hoặc theo bộ đề có audio.',
-            setCta: 'Luyện Listening',
-            questionCta: 'Luyện part này'
+            description: 'Luyện Listening VSTEP theo bộ đề có audio.',
+            setCta: 'Luyện Listening'
         },
         writing: {
             label: 'Writing',
             icon: 'bi-pencil-square',
             description: 'Luyện Writing VSTEP theo bộ đề placeholder, có lưu bài để giáo viên chấm thủ công.',
-            setCta: 'Luyện Writing',
-            questionCta: 'Luyện task này'
+            setCta: 'Luyện Writing'
         },
         speaking: {
             label: 'Speaking',
             icon: 'bi-mic',
-            description: 'Luyện Speaking VSTEP theo câu hỏi, thu âm và nộp bài để giáo viên chấm.',
-            setCta: 'Luyện Speaking',
-            questionCta: 'Luyện câu hỏi này'
+            description: 'Luyện Speaking VSTEP theo bộ đề, thu âm và nộp bài để giáo viên chấm.',
+            setCta: 'Luyện Speaking'
         }
     };
 
@@ -158,37 +151,6 @@
         }).join('');
     }
 
-    function renderQuestionMode(sets) {
-        const meta = skillMeta[skill];
-        const cards = [];
-        sets.forEach(set => {
-            getParts(set).forEach((part, partIndex) => {
-                const questionTotal = countQuestions([part]);
-                cards.push(`
-                    <div class="col-sm-6 col-xl-4">
-                        <article class="vstep-skill-library-card vstep-skill-library-card-soft h-100">
-                            <div class="vstep-skill-library-card-top">
-                                <span>${escapeHtml(meta.label)} Part ${partIndex + 1}</span>
-                                <i class="bi ${escapeHtml(meta.icon)}"></i>
-                            </div>
-                            <h3>${escapeHtml(part.title || `${set.title || 'VSTEP'} - Part ${partIndex + 1}`)}</h3>
-                            <p>${escapeHtml(part.instructions || part.prompt || set.description || 'Bài luyện placeholder theo cấu trúc VSTEP.')}</p>
-                            <div class="vstep-skill-library-card-meta">
-                                <span><i class="bi bi-folder2-open"></i>${escapeHtml(set.title || 'VSTEP set')}</span>
-                                <span><i class="bi bi-question-circle"></i>${questionTotal} câu/task</span>
-                                <span><i class="bi bi-clock"></i>${totalDuration(set) || '-'} phút</span>
-                            </div>
-                            <a href="${escapeHtml(buildExamUrl(set, partIndex))}" class="btn btn-primary fw-bold w-100 vstep-skill-start-link" data-id="${escapeHtml(set.id)}">
-                                ${escapeHtml(meta.questionCta)}
-                            </a>
-                        </article>
-                    </div>
-                `);
-            });
-        });
-        refs.grid.innerHTML = cards.join('');
-    }
-
     function bindStartLinks(sets) {
         refs.grid.querySelectorAll('.vstep-skill-start-link').forEach(link => {
             link.addEventListener('click', event => {
@@ -216,11 +178,7 @@
         }
 
         setState('', 'info');
-        if (mode === 'question') {
-            renderQuestionMode(usableSets);
-        } else {
-            renderSetMode(usableSets);
-        }
+        renderSetMode(usableSets);
         bindStartLinks(usableSets);
     }
 
@@ -243,7 +201,7 @@
 
     function setupPage() {
         const meta = skillMeta[skill];
-        const modeLabel = mode === 'question' ? 'theo câu hỏi' : 'theo bộ đề';
+        const modeLabel = 'theo bộ đề';
         document.title = `${meta.label} VSTEP ${modeLabel} - Mini Hippo`;
         refs.title.textContent = `${meta.label} VSTEP - ${modeLabel}`;
         refs.description.textContent = meta.description;

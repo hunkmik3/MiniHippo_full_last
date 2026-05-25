@@ -3,6 +3,13 @@
 const DEVICE_ID_KEY = 'mh_device_id';
 const DEVICE_NAME_KEY = 'mh_device_name';
 const DEVICE_HEADER_SAFE_NAME_KEY = 'mh_device_header_name';
+const AUTH_SELECTED_MODULE_STORAGE_KEY = 'mh_selected_module';
+const AUTH_MODULE_LANDINGS = {
+    aptis: '/home.html',
+    vstep: '/vstep_bode.html',
+    lop_hoc: '/lop_hoc.html'
+};
+const AUTH_VALID_MODULES = new Set(Object.keys(AUTH_MODULE_LANDINGS));
 // Path constants được lưu KHÔNG kèm .html — normalizePathname() sẽ strip .html
 // để khớp với cả URL có .html lẫn URL clean (Vercel cleanUrls bật trên domain
 // production). Trước đây giữ .html gây redirect loop khi production rewrite
@@ -15,7 +22,7 @@ const CLASSROOM_ONLY_PATHS = new Set([
 const CLASSROOM_ALLOWED_EXTRA_PATHS = new Set([
     '/lesson_history'
 ]);
-// VSTEP routes chỉ admin được vào (giai đoạn beta).
+// VSTEP routes là module riêng; admin bypass, học viên cần course VSTEP.
 const VSTEP_ONLY_PATHS = new Set([
     '/vstep',
     '/vstep_home',
@@ -96,6 +103,29 @@ function isAdminUser(user) {
     return normalizeRole(user && user.role) === 'admin';
 }
 
+function getStoredSelectedModule() {
+    try {
+        const stored = localStorage.getItem(AUTH_SELECTED_MODULE_STORAGE_KEY);
+        return AUTH_VALID_MODULES.has(stored) ? stored : '';
+    } catch (_) {
+        return '';
+    }
+}
+
+function moduleForUser(user) {
+    const stored = getStoredSelectedModule();
+    if (isAdminUser(user) && stored) return stored;
+
+    const course = normalizeCourse(user && user.course);
+    if (course === 'vstep') return 'vstep';
+    if (course === 'lớp học') return 'lop_hoc';
+    return 'aptis';
+}
+
+function landingForModule(mod) {
+    return AUTH_MODULE_LANDINGS[mod] || AUTH_MODULE_LANDINGS.aptis;
+}
+
 function normalizePathname(pathname) {
     let raw = typeof pathname === 'string' ? pathname.trim().toLowerCase() : '';
     if (!raw || raw === '/') return '/';
@@ -107,7 +137,7 @@ function normalizePathname(pathname) {
 }
 
 function enforceCourseRoute(user) {
-    if (!user || isAdminUser(user)) return true;
+    if (!user) return true;
 
     const course = normalizeCourse(user.course);
     const path = normalizePathname(window.location.pathname);
@@ -120,6 +150,13 @@ function enforceCourseRoute(user) {
         normalizeCourse(searchParams.get('from')) === 'lop_hoc';
     const isClassroomRoute = isClassroomOnlyPath || isClassroomSpeakingSession || isClassroomPracticeSet;
     const isVstepOnlyPath = VSTEP_ONLY_PATHS.has(path);
+
+    if (path === '/' || path === '/index') {
+        window.location.replace(landingForModule(moduleForUser(user)));
+        return false;
+    }
+
+    if (isAdminUser(user)) return true;
 
     // VSTEP là module riêng. Admin được bypass ở trên, học viên cần course VSTEP.
     if (isVstepOnlyPath) {

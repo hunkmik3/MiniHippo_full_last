@@ -4,6 +4,9 @@ const REPO_PREFIX = 'minihippofuill/aptiskey.com/';
 
 const CONTENT_TYPES = {
   aac: 'audio/aac',
+  csv: 'text/csv',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   gif: 'image/gif',
   jpeg: 'image/jpeg',
   jpg: 'image/jpeg',
@@ -16,9 +19,12 @@ const CONTENT_TYPES = {
   pdf: 'application/pdf',
   png: 'image/png',
   svg: 'image/svg+xml',
+  txt: 'text/plain',
   wav: 'audio/wav',
   webm: 'video/webm',
-  webp: 'image/webp'
+  webp: 'image/webp',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 };
 
 let cachedClient = null;

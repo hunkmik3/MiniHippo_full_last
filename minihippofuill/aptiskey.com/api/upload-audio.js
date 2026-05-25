@@ -3,15 +3,19 @@ import { buildGithubHeaders, putGithubContent } from './_utils/supabase.js';
 import { isR2Configured, normalizeR2Key, putR2Object } from './_utils/r2.js';
 import { verifyAdminRequest, verifyUserRequest } from './_utils/auth.js';
 
-const MAX_AUDIO_BYTES = 12 * 1024 * 1024; // 12MB
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024; // 50MB
 const SITE_PREFIX = 'minihippofuill/aptiskey.com/';
 const ALLOWED_MEDIA_PREFIXES = [
   `${SITE_PREFIX}audio/`,
+  `${SITE_PREFIX}documents/`,
   `${SITE_PREFIX}images/`,
   `${SITE_PREFIX}video/`
 ];
 const MIME_BY_EXT = {
   aac: 'audio/aac',
+  csv: 'text/csv',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   gif: 'image/gif',
   jpeg: 'image/jpeg',
   jpg: 'image/jpeg',
@@ -20,14 +24,18 @@ const MIME_BY_EXT = {
   mov: 'video/quicktime',
   mp3: 'audio/mpeg',
   mp4: 'video/mp4',
+  pdf: 'application/pdf',
   oga: 'audio/ogg',
   ogg: 'audio/ogg',
   opus: 'audio/ogg',
   png: 'image/png',
   svg: 'image/svg+xml',
+  txt: 'text/plain',
   wav: 'audio/wav',
   webm: 'audio/webm',
-  webp: 'image/webp'
+  webp: 'image/webp',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 };
 
 function normalizePath(value) {
@@ -230,10 +238,10 @@ export default async function handler(req, res) {
   }
 
   const approxBytes = Math.floor((content.length * 3) / 4);
-  if (approxBytes <= 0 || approxBytes > MAX_AUDIO_BYTES) {
+  if (approxBytes <= 0 || approxBytes > MAX_UPLOAD_BYTES) {
     return res
       .status(400)
-      .json({ error: `File audio vượt giới hạn cho phép (${MAX_AUDIO_BYTES / (1024 * 1024)}MB).` });
+      .json({ error: `File upload vượt giới hạn cho phép (${MAX_UPLOAD_BYTES / (1024 * 1024)}MB).` });
   }
 
   let r2Key;
