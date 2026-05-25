@@ -1851,7 +1851,7 @@ async function submitClassForm() {
     const sessions = generateSessionsPreview(schedule, firstDate, startTime, numSessions);
     const sessionsData = sessions.map(s => ({
         number: s.number,
-        date: s.date.toISOString().split('T')[0],
+        date: formatDateInputValue(s.date),
         deadline: s.deadline.toISOString(),
         day_name: s.dayName
     }));
@@ -2005,7 +2005,7 @@ function openEditDeadline(classId, sessionNumber, currentDeadline) {
     document.getElementById('edit-session-label').textContent = `Buổi ${sessionNumber}`;
 
     const d = new Date(currentDeadline);
-    document.getElementById('edit-deadline-date').value = d.toISOString().split('T')[0];
+    document.getElementById('edit-deadline-date').value = formatDateInputValue(d);
     document.getElementById('edit-deadline-time').value = d.toTimeString().substring(0, 5);
 
     const modal = new bootstrap.Modal(document.getElementById('editDeadlineModal'));
@@ -2143,7 +2143,12 @@ async function loadSubmissions() {
 
     // Load submissions from practice_results filtered by this class+session
     try {
-        const data = await apiCall('/api/practice_results/list?limit=200');
+        const submissionQuery = new URLSearchParams({
+            setId: classId,
+            sessionNumber: String(parseInt(sessionNum, 10)),
+            limit: '1000'
+        });
+        const data = await apiCall(`/api/practice_results/list?${submissionQuery.toString()}`);
         const results = data.results || data || [];
 
         // Filter results for this class and session
@@ -7207,6 +7212,14 @@ function formatDate(dateStr) {
 
 function formatDateObj(date) {
     return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function formatDateInputValue(date) {
+    if (!(date instanceof Date) || isNaN(date)) return '';
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
 }
 
 function formatDatetime(dateStr) {

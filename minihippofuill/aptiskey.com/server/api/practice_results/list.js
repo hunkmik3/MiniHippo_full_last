@@ -13,7 +13,16 @@ export default async function handler(req, res) {
       .json({ error: adminCheck.error || 'Unauthorized' });
   }
 
-  const { userId, type, limit = 50, mode } = req.query || {};
+  const {
+    userId,
+    type,
+    limit = 50,
+    mode,
+    setId,
+    classId,
+    sessionNumber,
+    submissionKind
+  } = req.query || {};
 
   try {
     const filters = [];
@@ -26,8 +35,18 @@ export default async function handler(req, res) {
     if (mode) {
       filters.push({ column: 'practice_mode', value: mode });
     }
+    const targetSetId = setId || classId;
+    if (targetSetId) {
+      filters.push({ column: 'set_id', value: targetSetId });
+    }
+    if (sessionNumber) {
+      filters.push({ column: 'metadata->>session_number', value: sessionNumber });
+    }
+    if (submissionKind) {
+      filters.push({ column: 'metadata->>submission_kind', value: submissionKind });
+    }
 
-    const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+    const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 1000);
 
     const results = await selectFrom('practice_results', {
       filters,
@@ -43,7 +62,6 @@ export default async function handler(req, res) {
     });
   }
 }
-
 
 
 
