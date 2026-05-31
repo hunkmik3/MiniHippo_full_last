@@ -339,14 +339,20 @@ function resolveGithubMediaProxySrc(value) {
   if (!raw) return '';
   try {
     const url = new URL(raw, window.location.origin);
-    if (url.origin === window.location.origin && url.pathname === '/api/github-media') {
-      return raw;
+    if (url.origin === window.location.origin) {
+      // Đã là URL proxy. Route /api/github-media không phân giải được trên Vercel
+      // (giới hạn 12 function của gói Hobby), nên chuẩn hoá về /api/upload-audio —
+      // cùng handler media, đã có sẵn function nên luôn hoạt động.
+      if (url.pathname === '/api/upload-audio') return raw;
+      if (url.pathname === '/api/github-media') {
+        return raw.replace('/api/github-media', '/api/upload-audio');
+      }
     }
     if (url.hostname === 'raw.githubusercontent.com') {
-      return `/api/github-media?url=${encodeURIComponent(raw)}`;
+      return `/api/upload-audio?url=${encodeURIComponent(raw)}`;
     }
     if (url.hostname === 'github.com' && /\/(blob|raw)\//.test(url.pathname)) {
-      return `/api/github-media?url=${encodeURIComponent(raw)}`;
+      return `/api/upload-audio?url=${encodeURIComponent(raw)}`;
     }
   } catch (_) {
     return raw;

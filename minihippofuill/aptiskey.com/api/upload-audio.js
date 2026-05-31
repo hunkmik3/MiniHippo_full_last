@@ -315,7 +315,7 @@ export default async function handler(req, res) {
       throw new Error('Không thể lấy URL của file đã upload');
     }
 
-    const proxiedMediaUrl = `/api/github-media?path=${encodeURIComponent(normalizedPath)}`;
+    const proxiedMediaUrl = `/api/upload-audio?path=${encodeURIComponent(normalizedPath)}`;
 
     return res.status(200).json({
       success: true,
