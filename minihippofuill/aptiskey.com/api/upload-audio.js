@@ -148,20 +148,38 @@ async function handleGithubMedia(req, res) {
   }
 
   const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${encodeURIComponent(target.branch)}/${encodePath(target.path)}`;
-  const headers = {
-    ...buildGithubHeaders(),
-    Accept: '*/*'
-  };
+  const baseHeaders = { Accept: '*/*' };
   if (req.headers.range) {
-    headers.Range = req.headers.range;
+    baseHeaders.Range = req.headers.range;
   }
 
-  try {
-    const upstream = await fetch(rawUrl, { headers });
+  // Media sống trên raw.githubusercontent.com. Với repo PUBLIC thì không cần token —
+  // và một GITHUB_TOKEN hết hạn hoặc dính khoảng trắng sẽ khiến GitHub trả 404 cho
+  // file vốn có thật. Vì vậy fetch KHÔNG token trước, hỏng mới thử lại VỚI token
+  // (chỉ cần cho repo private). Như vậy token lỗi không còn làm chết audio.
+  const fetchRaw = async (withAuth) => {
+    const headers = { ...baseHeaders };
+    if (withAuth) {
+      try {
+        const auth = buildGithubHeaders();
+        if (auth.Authorization) headers.Authorization = String(auth.Authorization).trim();
+      } catch {
+        return null;
+      }
+    }
+    return fetch(rawUrl, { headers });
+  };
 
-    if (!upstream.ok && upstream.status !== 206) {
-      const message = await upstream.text().catch(() => '');
-      return res.status(upstream.status).send(message || 'Không tải được media.');
+  try {
+    let upstream = await fetchRaw(false);
+    if (!upstream || (!upstream.ok && upstream.status !== 206)) {
+      const authed = await fetchRaw(true);
+      if (authed) upstream = authed;
+    }
+
+    if (!upstream || (!upstream.ok && upstream.status !== 206)) {
+      const message = upstream ? await upstream.text().catch(() => '') : '';
+      return res.status(upstream?.status || 502).send(message || 'Không tải được media.');
     }
 
     res.setHeader('Content-Type', inferContentType(target.path, upstream.headers.get('content-type')));
