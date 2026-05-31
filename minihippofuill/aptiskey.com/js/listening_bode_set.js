@@ -1242,6 +1242,32 @@
         totalEl.innerHTML = `<strong>Your score: ${result.score} / ${result.total}</strong>`;
     }
 
+    // Chuẩn hoá dữ liệu chấm điểm từng câu để admin xem chi tiết bài Key.
+    function normalizeKeyRow(r, i) {
+        return {
+            q: String(r.q ?? r.question ?? r.person ?? r.label ?? r.prompt ?? `Câu ${i + 1}`),
+            user: String(r.user ?? ''),
+            correct: String(r.correct ?? ''),
+            ok: !!r.isCorrect
+        };
+    }
+
+    function buildKeyReview(parts) {
+        return parts.map(([label, result]) => {
+            let rows = [];
+            if (Array.isArray(result?.rows)) {
+                rows = result.rows.map((r, i) => normalizeKeyRow(r, i));
+            } else if (Array.isArray(result?.breakdown)) {
+                result.breakdown.forEach((sec) => {
+                    (sec.rows || []).forEach((r, i) => {
+                        rows.push(normalizeKeyRow({ ...r, q: `${sec.label || ''} #${i + 1}` }, i));
+                    });
+                });
+            }
+            return { label, score: result?.score || 0, total: result?.total || 0, rows };
+        }).filter((p) => p.rows.length || p.total);
+    }
+
     function completePractice() {
         const data = state.data?.data || {};
         const part1Result = evaluatePart1(data.part1);
@@ -1299,6 +1325,25 @@
         state.completed = true;
 
         if (typeof submitPracticeResult === 'function') {
+            const submissionMetadata = { source: 'listening_bode_set' };
+            // Bộ đề Key Listening (mở từ Lớp học): gắn cờ + lớp/band để kết quả
+            // hiện nhãn riêng trong Lịch sử học viên và tổng hợp được ở trang admin Lớp học.
+            if (isKeyListeningSet()) {
+                const currentUser = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+                submissionMetadata.submission_kind = 'key_listening';
+                submissionMetadata.set_kind = 'key_listening';
+                if (fromSource) submissionMetadata.from = fromSource;
+                if (currentUser?.band) submissionMetadata.band = currentUser.band;
+                if (currentUser?.assignedClassId) {
+                    submissionMetadata.class_id = String(currentUser.assignedClassId);
+                }
+                submissionMetadata.key_review = buildKeyReview([
+                    ['Part 1', part1Result],
+                    ['Part 2', part2Result],
+                    ['Part 3', part3Result],
+                    ['Part 4', part4Result]
+                ]);
+            }
             submitPracticeResult({
                 practiceType: 'listening',
                 mode: 'set',
@@ -1313,9 +1358,7 @@
                     part3: { score: part3Result.score, total: part3Result.total },
                     part4: { score: part4Result.score, total: part4Result.total }
                 },
-                metadata: {
-                    source: 'listening_bode_set'
-                }
+                metadata: submissionMetadata
             });
         }
 

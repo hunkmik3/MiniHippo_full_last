@@ -62,6 +62,11 @@
     }
 
     function resolveDisplayBand(result, metadata = {}) {
+        // Bài Key Listening/Reading không hiển thị band điểm (CEFR).
+        const kind = String(metadata?.submission_kind || '').toLowerCase();
+        if (kind === 'key_listening' || kind === 'key_reading') {
+            return '—';
+        }
         const practiceType = String(result?.practice_type || '').toLowerCase();
         if (practiceType === 'writing') {
             if (!metadata.admin_graded_at) return 'Pending';
@@ -87,6 +92,48 @@
             return 'Pending';
         }
         return `${result?.total_score || 0}/${result?.max_score || 0}`;
+    }
+
+    // Nhãn loại bài: ưu tiên submission_kind (Key Listening/Reading từ Lớp học),
+    // nếu không thì viết hoa practice_type như cũ.
+    function resolveDisplayType(result) {
+        const kind = String(result?.metadata?.submission_kind || '').toLowerCase();
+        if (kind === 'key_listening') return 'Key Listening';
+        if (kind === 'key_reading') return 'Key Reading';
+        const practiceType = result?.practice_type;
+        return practiceType
+            ? practiceType.charAt(0).toUpperCase() + practiceType.slice(1)
+            : '—';
+    }
+
+    // Chi tiết bài làm Key (đáp án từng câu, theo từng part) — đọc metadata.key_review.
+    function renderKeyReviewDetail(review = []) {
+        if (!Array.isArray(review) || !review.length) {
+            return '<div class="text-muted small">Không có dữ liệu chi tiết.</div>';
+        }
+        return review.map((part) => {
+            const rows = (part.rows || []).map((row, i) => `
+                <tr>
+                    <td>${escapeHtml(row.q || `Câu ${i + 1}`)}</td>
+                    <td class="${row.ok ? 'text-success' : 'text-danger'} fw-semibold">${escapeHtml(row.user || '(không trả lời)')}</td>
+                    <td class="text-success">${escapeHtml(row.correct || '')}</td>
+                </tr>
+            `).join('');
+            return `
+                <div class="border rounded p-2 mb-2">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <strong class="small">${escapeHtml(part.label || '')}</strong>
+                        <span class="badge bg-light text-dark border">${escapeHtml(String(part.score ?? 0))}/${escapeHtml(String(part.total ?? 0))}</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered mb-0" style="font-size:0.82rem;">
+                            <thead><tr><th>Câu</th><th>Đáp án của bạn</th><th>Đáp án đúng</th></tr></thead>
+                            <tbody>${rows || '<tr><td colspan="3" class="text-muted">Không có dữ liệu.</td></tr>'}</tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }).join('');
     }
 
     function getAiUsageInfo(metadata = {}) {
@@ -243,6 +290,10 @@
                                 <h6 class="mb-2">Nhận xét admin</h6>
                                 <div id="history-detail-admin-note" class="border rounded p-2 small"></div>
                             </div>
+                            <div class="mt-3" id="history-detail-key-review-wrap" style="display: none;">
+                                <h6 class="mb-2">Chi tiết bài làm</h6>
+                                <div id="history-detail-key-review"></div>
+                            </div>
                             <div class="mt-3" id="history-detail-writing-auto-wrap" style="display: none;">
                                 <h6 class="mb-2">Sửa lỗi tự động</h6>
                                 <div id="history-detail-writing-auto-summary"></div>
@@ -273,9 +324,7 @@
         if (refs.totalLabel) refs.totalLabel.textContent = `${results.length} bài`;
 
         refs.tableBody.innerHTML = results.map((item) => {
-            const practiceType = item.practice_type
-                ? item.practice_type.charAt(0).toUpperCase() + item.practice_type.slice(1)
-                : '—';
+            const practiceType = resolveDisplayType(item);
             const submittedAt = formatDateTime(item.submitted_at);
             const duration = formatDurationSeconds(item.duration_seconds);
             const metadata = item.metadata && typeof item.metadata === 'object' ? item.metadata : {};
@@ -292,7 +341,7 @@
                     <td>${escapeHtml(practiceType)}</td>
                     <td>${escapeHtml(item.set_title || item.set_id || '—')}</td>
                     <td><strong>${escapeHtml(score)}</strong></td>
-                    <td><span class="badge bg-info">${escapeHtml(band || '—')}</span></td>
+                    <td>${band && band !== '—' ? `<span class="badge bg-info">${escapeHtml(band)}</span>` : '—'}</td>
                     <td>${escapeHtml(duration)}</td>
                     <td>${aiUsage ? `<span class="badge ${aiUsage.badgeClass}">${escapeHtml(aiUsageText)}</span>` : '—'}</td>
                     <td>
@@ -315,7 +364,13 @@
         `;
         const selectedType = refs.typeFilter?.value || '';
         const query = new URLSearchParams({ limit: '150' });
-        if (selectedType) query.set('type', selectedType);
+        // Key Listening/Reading lưu practice_type là listening/reading nhưng có
+        // submission_kind riêng -> lọc qua submissionKind thay vì type.
+        if (selectedType.startsWith('key_')) {
+            query.set('submissionKind', selectedType);
+        } else if (selectedType) {
+            query.set('type', selectedType);
+        }
         try {
             const data = await fetchJson(`/api/practice_results/my-list?${query.toString()}`);
             state.results = data.results || [];
@@ -337,9 +392,7 @@
         const modalEl = ensureDetailModal();
         const metadata = result.metadata && typeof result.metadata === 'object' ? result.metadata : {};
         const score = resolveDisplayScore(result, metadata);
-        const type = result.practice_type
-            ? result.practice_type.charAt(0).toUpperCase() + result.practice_type.slice(1)
-            : '—';
+        const type = resolveDisplayType(result);
         const band = resolveDisplayBand(result, metadata);
         const aiUsage = result.practice_type === 'writing' ? getAiUsageInfo(metadata) : null;
         const aiUsageText = aiUsage
@@ -356,7 +409,7 @@
                 <div><strong>Ngày nộp:</strong> ${escapeHtml(formatDateTime(result.submitted_at))}</div>
                 <div><strong>Bài:</strong> ${escapeHtml(result.set_title || result.set_id || '—')}</div>
                 <div><strong>Điểm:</strong> ${escapeHtml(score)}</div>
-                <div><strong>Band:</strong> ${escapeHtml(band || '—')}</div>
+                ${band && band !== '—' ? `<div><strong>Band:</strong> ${escapeHtml(band)}</div>` : ''}
                 <div><strong>Thời gian làm:</strong> ${escapeHtml(formatDurationSeconds(result.duration_seconds))}</div>
                 ${aiUsageText ? `<div><strong>AI Usage:</strong> ${escapeHtml(aiUsageText)}</div>` : ''}
             `;
@@ -368,6 +421,17 @@
                 : 'Chưa có ghi chú từ admin.';
             const gradedAt = metadata.admin_graded_at ? `\n\nCập nhật: ${formatDateTime(metadata.admin_graded_at)}` : '';
             adminNoteEl.textContent = `${note}${gradedAt}`;
+        }
+        // Chi tiết bài làm Key Listening/Reading (đáp án từng câu).
+        const keyReviewWrapEl = document.getElementById('history-detail-key-review-wrap');
+        const keyReviewEl = document.getElementById('history-detail-key-review');
+        const keyReview = Array.isArray(metadata.key_review) ? metadata.key_review : null;
+        if (keyReview && keyReview.length) {
+            if (keyReviewWrapEl) keyReviewWrapEl.style.display = 'block';
+            if (keyReviewEl) keyReviewEl.innerHTML = renderKeyReviewDetail(keyReview);
+        } else {
+            if (keyReviewWrapEl) keyReviewWrapEl.style.display = 'none';
+            if (keyReviewEl) keyReviewEl.innerHTML = '';
         }
         const writingFeedbackWrapEl = document.getElementById('history-detail-writing-feedback-wrap');
         const writingFeedbackEl = document.getElementById('history-detail-writing-feedback');

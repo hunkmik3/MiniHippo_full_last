@@ -3301,8 +3301,14 @@ function initSortable(page) {
   setTimeout(() => {
     const containerId = `order-container-${page.idx}`;
     const container = document.getElementById(containerId);
+    const compactLayout = !!(window.MobileReorder && window.MobileReorder.isCompact());
     if (container && typeof Sortable !== 'undefined') {
-      Sortable.create(container, { animation: 150, draggable: '.draggable-card' });
+      // Mobile/tablet: tắt kéo-thả, dùng nút mũi tên thay thế.
+      Sortable.create(container, { animation: 150, draggable: '.draggable-card', disabled: compactLayout });
+    }
+    // Thêm nút mũi tên Lên/Xuống (hiện trên mobile/tablet, ẩn trên desktop).
+    if (container && window.MobileReorder) {
+      window.MobileReorder.enhance(container);
     }
   }, 50);
 }

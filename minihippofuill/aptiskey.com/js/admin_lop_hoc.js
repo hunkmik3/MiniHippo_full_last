@@ -51,6 +51,11 @@ const TAB_META = {
         description: 'Xem và export danh sách học viên đã nộp BTVN.',
         breadcrumb: 'Lớp Học / BTVN / DS Trả BTVN'
     },
+    'tab-key-results': {
+        title: 'Kết quả Key',
+        description: 'Tổng hợp kết quả Key Listening & Key Reading theo lớp/band.',
+        breadcrumb: 'Lớp Học / BTVN / Kết quả Key'
+    },
     'tab-session-content': {
         title: 'Nội dung buổi học',
         description: 'Quản lý câu hỏi và cấu trúc từng buổi học B1/B2.',
@@ -427,6 +432,9 @@ function switchTab(tabId) {
     // Tab-specific initialization
     if (tabId === 'tab-homework' || tabId === 'tab-submissions') {
         populateClassDropdowns();
+    } else if (tabId === 'tab-key-results') {
+        populateKeyResultClassDropdown();
+        loadKeyResults();
     } else if (tabId === 'tab-session-content') {
         refreshSessionContentList();
     }
@@ -2290,6 +2298,240 @@ function renderSubmissions(classId, classTitle, sessionNum) {
     document.getElementById('sub-submitted').textContent = submissions.length;
     document.getElementById('sub-missing').textContent =
         Math.max(0, expectedStudents.length - submissions.length);
+}
+
+/* ═══════════════════════════════════════════════════════
+   KẾT QUẢ KEY (Key Listening / Key Reading)
+   Bộ đề key được nộp qua listening_bode_set/reading_bode_set với
+   metadata.submission_kind = key_listening|key_reading + band + class_id.
+   ═══════════════════════════════════════════════════════ */
+
+function populateKeyResultClassDropdown() {
+    const sel = document.getElementById('kr-class-select');
+    if (!sel) return;
+    const currentVal = sel.value;
+    sel.innerHTML = '<option value="">-- Tất cả lớp --</option>';
+    lopHocState.classes.forEach(cls => {
+        const d = cls.data || {};
+        sel.innerHTML += `<option value="${cls.id}">${esc(cls.title)} (${d.schedule || ''})</option>`;
+    });
+    sel.value = currentVal;
+}
+
+
+async function loadKeyResults() {
+    const tbody = document.getElementById('kr-table-body');
+    const table = document.getElementById('kr-table');
+    const empty = document.getElementById('kr-empty');
+    if (!tbody) return;
+
+    const classId = String(document.getElementById('kr-class-select')?.value || '').trim();
+    const bandFilter = document.getElementById('kr-band-select')?.value || '';
+    const kindFilter = document.getElementById('kr-type-select')?.value || '';
+
+    if (table) table.style.display = 'table';
+    if (empty) empty.style.display = 'none';
+    tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted py-3">
+        <i class="spinner-border spinner-border-sm me-2"></i>Đang tải kết quả Key...</td></tr>`;
+
+    // Cần danh sách học viên để map band/lớp/họ tên.
+    if (!Array.isArray(lopHocState.students) || !lopHocState.students.length) {
+        try { await loadStudents(); } catch (_) { /* ignore */ }
+    }
+
+    const kinds = kindFilter ? [kindFilter] : ['key_listening', 'key_reading'];
+    let rows = [];
+    try {
+        for (const kind of kinds) {
+            const data = await apiCall(`/api/practice_results/list?submissionKind=${encodeURIComponent(kind)}&limit=1000`);
+            rows = rows.concat(data.results || data || []);
+        }
+    } catch (err) {
+        console.error('Load key results error:', err);
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center text-danger py-3">Không tải được kết quả Key.</td></tr>`;
+        const summary = document.getElementById('kr-summary');
+        if (summary) summary.style.display = 'none';
+        return;
+    }
+
+    const enriched = rows.map((r) => {
+        const student = lopHocState.students.find(u => u.id === r.user_id) || {};
+        const md = r.metadata || {};
+        const studentClassId = String(md.class_id || student.assigned_class_id || student.assignedClassId || '').trim();
+        const band = md.band || student.band || '';
+        return { result: r, student, studentClassId, band };
+    }).filter((row) => {
+        if (classId && row.studentClassId !== classId) return false;
+        if (bandFilter && String(row.band).toUpperCase() !== bandFilter) return false;
+        return true;
+    });
+
+    enriched.sort((a, b) =>
+        new Date(b.result.submitted_at || 0).getTime() - new Date(a.result.submitted_at || 0).getTime());
+
+    lopHocState.keyResults = enriched;
+    renderKeyResults(enriched);
+}
+
+function renderKeyResults(rows) {
+    const tbody = document.getElementById('kr-table-body');
+    const table = document.getElementById('kr-table');
+    const empty = document.getElementById('kr-empty');
+    const summary = document.getElementById('kr-summary');
+    if (!tbody) return;
+
+    if (!rows.length) {
+        tbody.innerHTML = '';
+        if (table) table.style.display = 'none';
+        if (empty) {
+            empty.style.display = 'block';
+            empty.innerHTML = `<i class="bi bi-key d-block"></i><p class="mb-0">Chưa có kết quả Key nào khớp bộ lọc hiện tại.</p>`;
+        }
+        if (summary) summary.style.display = 'none';
+        return;
+    }
+
+    if (table) table.style.display = 'table';
+    if (empty) empty.style.display = 'none';
+    if (summary) summary.style.display = 'block';
+
+    tbody.innerHTML = rows.map((row, i) => {
+        const r = row.result;
+        const kind = String(r.metadata?.submission_kind || '').toLowerCase();
+        const typeLabel = kind === 'key_listening'
+            ? '<span class="badge bg-info text-dark">Key Listening</span>'
+            : (kind === 'key_reading' ? '<span class="badge bg-success">Key Reading</span>' : '--');
+        const score = `${r.total_score ?? 0}/${r.max_score ?? 0}`;
+        const durationSec = Number(r.duration_seconds);
+        const durationText = Number.isFinite(durationSec) && durationSec > 0
+            ? `${Math.floor(durationSec / 60)}p ${String(Math.round(durationSec % 60)).padStart(2, '0')}s`
+            : '--';
+        return `
+            <tr>
+                <td>${i + 1}</td>
+                <td>${formatDatetime(r.submitted_at)}</td>
+                <td>${esc(row.student.account_code || '')}</td>
+                <td>${esc(row.student.full_name || '')}</td>
+                <td>${bandBadge(row.band)}</td>
+                <td>${typeLabel}</td>
+                <td>${esc(r.set_title || r.set_id || '--')}</td>
+                <td><strong>${esc(score)}</strong></td>
+                <td>${esc(durationText)}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary"
+                        onclick="openKeyResultDetail('${escAttr(String(r.id || ''))}')">
+                        <i class="bi bi-eye me-1"></i>Xem
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    const listeningCount = rows.filter(row => String(row.result.metadata?.submission_kind).toLowerCase() === 'key_listening').length;
+    const readingCount = rows.filter(row => String(row.result.metadata?.submission_kind).toLowerCase() === 'key_reading').length;
+    const studentCount = new Set(rows.map(row => row.result.user_id)).size;
+    const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+    setText('kr-total', rows.length);
+    setText('kr-students', studentCount);
+    setText('kr-listening', listeningCount);
+    setText('kr-reading', readingCount);
+}
+
+function openKeyResultDetail(resultId) {
+    const row = (lopHocState.keyResults || []).find(x => String(x.result?.id || '') === String(resultId));
+    if (!row) return;
+    const r = row.result;
+    const md = r.metadata || {};
+    const kind = String(md.submission_kind || '').toLowerCase();
+    const typeLabel = kind === 'key_listening' ? 'Key Listening' : (kind === 'key_reading' ? 'Key Reading' : 'Key');
+    const durationSec = Number(r.duration_seconds);
+    const durationText = Number.isFinite(durationSec) && durationSec > 0
+        ? `${Math.floor(durationSec / 60)}p ${String(Math.round(durationSec % 60)).padStart(2, '0')}s`
+        : '--';
+
+    const titleEl = document.getElementById('submission-detail-title');
+    if (titleEl) titleEl.textContent = `Chi tiết Key — ${r.set_title || r.set_id || ''}`;
+
+    const metaEl = document.getElementById('submission-detail-meta');
+    if (metaEl) {
+        const chips = [
+            ['Học viên', row.student.full_name || row.student.account_code || '--'],
+            ['Mã HV', row.student.account_code || '--'],
+            ['Band HV', row.band || '--'],
+            ['Loại', typeLabel],
+            ['Bộ đề', r.set_title || r.set_id || '--'],
+            ['Nộp lúc', formatDatetime(r.submitted_at)],
+            ['Điểm', `${r.total_score ?? 0}/${r.max_score ?? 0}`],
+            ['Thời gian', durationText]
+        ];
+        metaEl.innerHTML = chips.map(([label, value]) => `
+            <div class="submission-detail-chip">
+                <span class="label">${esc(label)}</span>
+                <span>${esc(String(value))}</span>
+            </div>
+        `).join('');
+    }
+
+    const contentEl = document.getElementById('submission-detail-content');
+    if (contentEl) contentEl.innerHTML = buildKeyResultDetailHtml(r);
+
+    const modalEl = document.getElementById('submissionDetailModal');
+    if (modalEl && window.bootstrap) {
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+}
+
+function buildKeyResultDetailHtml(r) {
+    const md = r.metadata || {};
+    const review = Array.isArray(md.key_review) ? md.key_review : null;
+
+    if (review && review.length) {
+        return review.map((part) => {
+            const rowsHtml = (part.rows || []).map((row, i) => `
+                <tr>
+                    <td>${esc(row.q || `Câu ${i + 1}`)}</td>
+                    <td class="${row.ok ? 'text-success' : 'text-danger'} fw-semibold">${esc(row.user || '(không trả lời)')}</td>
+                    <td class="text-success">${esc(row.correct || '')}</td>
+                </tr>
+            `).join('');
+            return `
+                <div class="submission-detail-card mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <strong>${esc(part.label || '')}</strong>
+                        <span class="badge bg-light text-dark border">${esc(String(part.score ?? 0))}/${esc(String(part.total ?? 0))}</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table" style="font-size:0.82rem;">
+                            <thead><tr><th>Câu</th><th>Đáp án HV</th><th>Đáp án đúng</th></tr></thead>
+                            <tbody>${rowsHtml || '<tr><td colspan="3" class="text-muted">Không có dữ liệu.</td></tr>'}</tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Fallback: bài nộp cũ chỉ có điểm theo part (chưa lưu chi tiết từng câu).
+    const partScores = r.part_scores && typeof r.part_scores === 'object' ? r.part_scores : null;
+    if (partScores) {
+        const rowsHtml = Object.keys(partScores).map((key) => {
+            const ps = partScores[key] || {};
+            return `<tr><td>${esc(key)}</td><td>${esc(String(ps.score ?? 0))}/${esc(String(ps.total ?? 0))}</td></tr>`;
+        }).join('');
+        return `
+            <div class="alert alert-info py-2" style="font-size:0.82rem;">
+                Bài nộp này chưa lưu chi tiết từng câu (chỉ có điểm theo part). Các bài nộp mới sẽ hiển thị đầy đủ đáp án.
+            </div>
+            <div class="table-responsive">
+                <table class="data-table" style="font-size:0.85rem;">
+                    <thead><tr><th>Part</th><th>Điểm</th></tr></thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    return '<div class="text-muted">Không có dữ liệu chi tiết cho bài nộp này.</div>';
 }
 
 function flattenWritingAnswersFromMetadata(metadata) {

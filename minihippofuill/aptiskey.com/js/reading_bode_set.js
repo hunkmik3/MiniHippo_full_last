@@ -382,13 +382,21 @@
             container.appendChild(card);
         });
 
+        const compactLayout = !!(window.MobileReorder && window.MobileReorder.isCompact());
         if (typeof Sortable !== 'undefined' && Sortable?.create) {
             Sortable.create(container, {
                 animation: 150,
-                draggable: '.draggable-card'
+                draggable: '.draggable-card',
+                // Mobile/tablet: tắt kéo-thả, dùng nút mũi tên thay thế.
+                disabled: compactLayout
             });
         } else {
             console.warn('SortableJS is not loaded; Reading ordering question rendered without drag support.');
+        }
+
+        // Thêm nút mũi tên Lên/Xuống (hiện trên mobile/tablet, ẩn trên desktop).
+        if (window.MobileReorder) {
+            window.MobileReorder.enhance(container);
         }
 
         return true;
@@ -885,6 +893,32 @@
         });
     }
 
+    // Chuẩn hoá dữ liệu chấm điểm từng câu để admin xem chi tiết bài Key.
+    function normalizeKeyRow(r, i) {
+        return {
+            q: String(r.q ?? r.question ?? r.person ?? r.label ?? r.prompt ?? `Câu ${i + 1}`),
+            user: String(r.user ?? ''),
+            correct: String(r.correct ?? ''),
+            ok: !!r.isCorrect
+        };
+    }
+
+    function buildKeyReview(parts) {
+        return parts.map(([label, result]) => {
+            let rows = [];
+            if (Array.isArray(result?.rows)) {
+                rows = result.rows.map((r, i) => normalizeKeyRow(r, i));
+            } else if (Array.isArray(result?.breakdown)) {
+                result.breakdown.forEach((sec) => {
+                    (sec.rows || []).forEach((r, i) => {
+                        rows.push(normalizeKeyRow({ ...r, q: `${sec.label || ''} #${i + 1}` }, i));
+                    });
+                });
+            }
+            return { label, score: result?.score || 0, total: result?.total || 0, rows };
+        }).filter((p) => p.rows.length || p.total);
+    }
+
     function completePractice() {
         const data = state.data?.data || {};
         const part1Result = evaluatePart1(data.part1);
@@ -922,6 +956,25 @@
         state.completed = true;
 
         if (typeof submitPracticeResult === 'function') {
+            const submissionMetadata = { source: 'reading_bode_set' };
+            // Bộ đề Key Reading (mở từ Lớp học): gắn cờ + lớp/band để kết quả
+            // hiện nhãn riêng trong Lịch sử học viên và tổng hợp được ở trang admin Lớp học.
+            if (isKeyReadingSet()) {
+                const currentUser = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+                submissionMetadata.submission_kind = 'key_reading';
+                submissionMetadata.set_kind = 'key_reading';
+                if (fromSource) submissionMetadata.from = fromSource;
+                if (currentUser?.band) submissionMetadata.band = currentUser.band;
+                if (currentUser?.assignedClassId) {
+                    submissionMetadata.class_id = String(currentUser.assignedClassId);
+                }
+                submissionMetadata.key_review = buildKeyReview([
+                    ['Part 1', part1Result],
+                    ['Part 2 & 3', part2Result],
+                    ['Part 4', part4Result],
+                    ['Part 5', part5Result]
+                ]);
+            }
             submitPracticeResult({
                 practiceType: 'reading',
                 mode: 'set',
@@ -936,9 +989,7 @@
                     part4: { score: part4Result.score, total: part4Result.total },
                     part5: { score: part5Result.score, total: part5Result.total }
                 },
-                metadata: {
-                    source: 'reading_bode_set'
-                }
+                metadata: submissionMetadata
             });
         }
 
@@ -989,6 +1040,12 @@
             return marker.trim().toLowerCase();
         }
         return typeof set?.type === 'string' ? set.type.toLowerCase() : '';
+    }
+
+    function isKeyReadingSet() {
+        const logicalType = resolveLogicalType(state.data);
+        const title = String(state.data?.title || state.setTitle || '').trim().toLowerCase();
+        return logicalType === 'key_reading' || title.includes('key reading');
     }
 
     function buildActiveSections(set) {

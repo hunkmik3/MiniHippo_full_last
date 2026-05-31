@@ -733,6 +733,11 @@
                     <i class="bi bi-clipboard-data"></i>
                     DS Trả BTVN
                 </a>
+                <a href="#" class="menu-item" data-tab="tab-key-results"
+                    onclick="switchTab('tab-key-results'); return false;">
+                    <i class="bi bi-key"></i>
+                    Kết quả Key
+                </a>
                 <a href="#" class="menu-item" data-tab="tab-session-content"
                     onclick="switchTab('tab-session-content'); return false;">
                     <i class="bi bi-pencil-square"></i>
@@ -1476,6 +1481,79 @@ HV002,,Trần Thị B,0912345678,2,2025-04-01,2025-12-31,Lớp 18h 246,Lớp h�
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Đóng</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════ -->
+            <!-- TAB: KET QUA KEY (Listening/Reading)  -->
+            <!-- ════════════════════════════════════ -->
+            <div id="tab-key-results" class="tab-content" style="display: none;">
+                <div class="form-section">
+                    <h3><i class="bi bi-key"></i> Kết quả Key Listening / Reading</h3>
+                    <p class="text-muted mb-3" style="font-size: 0.82rem;">
+                        Tổng hợp kết quả học viên làm bộ đề Key Listening & Key Reading trong lớp học. Lọc theo lớp và band.
+                    </p>
+
+                    <div class="filter-bar mb-3">
+                        <select class="form-select" id="kr-class-select" onchange="loadKeyResults()" style="max-width: 260px;">
+                            <option value="">-- Tất cả lớp --</option>
+                        </select>
+                        <select class="form-select" id="kr-band-select" onchange="loadKeyResults()" style="max-width: 160px;">
+                            <option value="">-- Tất cả band --</option>
+                            <option value="B1">B1</option>
+                            <option value="B2">B2</option>
+                        </select>
+                        <select class="form-select" id="kr-type-select" onchange="loadKeyResults()" style="max-width: 200px;">
+                            <option value="">Listening + Reading</option>
+                            <option value="key_listening">Key Listening</option>
+                            <option value="key_reading">Key Reading</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="loadKeyResults()">
+                            <i class="bi bi-arrow-clockwise me-1"></i>Tải lại
+                        </button>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="data-table" id="kr-table" style="display: none;">
+                            <thead>
+                                <tr>
+                                    <th>STT</th>
+                                    <th>Ngày nộp</th>
+                                    <th>Mã HV</th>
+                                    <th>Họ tên</th>
+                                    <th>Band HV</th>
+                                    <th>Loại</th>
+                                    <th>Bộ đề</th>
+                                    <th>Điểm</th>
+                                    <th>Thời gian</th>
+                                    <th>Chi tiết</th>
+                                </tr>
+                            </thead>
+                            <tbody id="kr-table-body"></tbody>
+                        </table>
+                    </div>
+
+                    <div id="kr-empty" class="empty-state">
+                        <i class="bi bi-key d-block"></i>
+                        <p class="mb-0">Chưa có học viên nào làm bộ đề Key.</p>
+                    </div>
+
+                    <div id="kr-summary" class="mt-3" style="display: none;">
+                        <div class="d-flex gap-3 flex-wrap">
+                            <span class="badge bg-light text-dark border" style="font-size: 0.82rem;">
+                                <i class="bi bi-clipboard-check me-1"></i>Lượt nộp: <strong id="kr-total">0</strong>
+                            </span>
+                            <span class="badge bg-light text-dark border" style="font-size: 0.82rem;">
+                                <i class="bi bi-people me-1"></i>Học viên: <strong id="kr-students">0</strong>
+                            </span>
+                            <span class="badge bg-light text-dark border" style="font-size: 0.82rem;">
+                                <i class="bi bi-headphones me-1"></i>Listening: <strong id="kr-listening">0</strong>
+                            </span>
+                            <span class="badge bg-light text-dark border" style="font-size: 0.82rem;">
+                                <i class="bi bi-book me-1"></i>Reading: <strong id="kr-reading">0</strong>
+                            </span>
                         </div>
                     </div>
                 </div>

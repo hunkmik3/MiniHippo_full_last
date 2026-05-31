@@ -13,7 +13,7 @@ export default async function handler(req, res) {
       .json({ error: authResult.error || 'Unauthorized' });
   }
 
-  const { type, mode, limit = 100 } = req.query || {};
+  const { type, mode, submissionKind, limit = 100 } = req.query || {};
 
   try {
     const filters = [{ column: 'user_id', value: authResult.user.id }];
@@ -22,6 +22,9 @@ export default async function handler(req, res) {
     }
     if (mode) {
       filters.push({ column: 'practice_mode', value: mode });
+    }
+    if (submissionKind) {
+      filters.push({ column: 'metadata->>submission_kind', value: submissionKind });
     }
 
     const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 300);
