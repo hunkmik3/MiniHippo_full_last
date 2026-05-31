@@ -10,6 +10,10 @@
       "use": "@vercel/node"
     },
     {
+      "src": "minihippofuill/aptiskey.com/api/github-media.js",
+      "use": "@vercel/node"
+    },
+    {
       "src": "minihippofuill/aptiskey.com/api/upload-speaking-recording.js",
       "use": "@vercel/node"
     },
