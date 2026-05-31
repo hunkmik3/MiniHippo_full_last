@@ -28,14 +28,18 @@ export default async function handler(req, res) {
     if (!title) return res.status(400).json({ error: 'Vui lòng nhập tên tài nguyên' });
     if (!fileUrl && !filePath) return res.status(400).json({ error: 'Thiếu URL hoặc đường dẫn tài nguyên' });
 
+    // Bảng vstep_resources KHÔNG có cột "description" -> lưu mô tả vào metadata.description (jsonb).
+    const description = String(body?.description || '').trim();
+    const metadata = body?.metadata && typeof body.metadata === 'object' ? { ...body.metadata } : {};
+    if (description) metadata.description = description;
+
     const [resource] = await insertInto('vstep_resources', [{
       resource_type: normalizeResourceType(body?.resourceType || body?.resource_type),
       title,
-      description: body?.description || '',
       file_url: fileUrl || filePath,
       file_path: filePath || null,
       mime_type: body?.mimeType || body?.mime_type || null,
-      metadata: body?.metadata && typeof body.metadata === 'object' ? body.metadata : {},
+      metadata,
       created_by: adminCheck.user.id
     }]);
 

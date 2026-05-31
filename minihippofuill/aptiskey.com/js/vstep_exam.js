@@ -20,9 +20,17 @@
             : 0;
     const focusedSkillPractice = Boolean(requestedSkill);
     const singlePartPractice = false;
-    const speakingTestSkipEnabled = ['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname)
-        || query.get('test') === '1'
-        || query.get('debug') === '1';
+    // Nút "Bỏ qua chờ" Speaking dành cho admin debug: bật theo QUYỀN ADMIN
+    // (hoạt động ở mọi môi trường, kể cả production), kèm ?debug=1 làm cửa hậu cho dev.
+    // Trước đây gate theo hostname (localhost) nên admin không dùng được trên production,
+    // còn học viên thường lại thấy nút khi chạy localhost.
+    const isAdminUser = (() => {
+        try { return typeof isAdmin === 'function' && isAdmin(); }
+        catch { return false; }
+    })();
+    const speakingTestSkipEnabled = isAdminUser
+        || query.get('debug') === '1'
+        || query.get('test') === '1';
     let setId = query.get('set') || query.get('id') || '';
     let assignmentId = query.get('assignment') || query.get('assignmentId') || '';
     if (!assignmentId && !setId) {
@@ -75,7 +83,8 @@
         savedModal: document.getElementById('savedModal'),
         skillConfirmModal: document.getElementById('skillConfirmModal'),
         submitModal: document.getElementById('submitModal'),
-        submitStatus: document.getElementById('submitStatus')
+        submitStatus: document.getElementById('submitStatus'),
+        proctorModal: document.getElementById('proctorModal')
     };
 
     const state = {
@@ -666,10 +675,9 @@
     }
 
     function formatWritingCounter(value, part) {
+        // Theo yêu cầu: chỉ hiển thị số từ, không hiện min/max.
         const count = wordCount(value);
-        const minimum = part.minWords ? ` / min ${part.minWords}` : '';
-        const maximum = part.maxWords ? ` / max ${part.maxWords}` : '';
-        return `Word count: ${count}${minimum}${maximum}`;
+        return `Word count: ${count}`;
     }
 
     function renderWriting(part, partIndex) {
@@ -1409,7 +1417,10 @@
         }
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         canvas.classList.remove('vstep-hidden');
-        document.getElementById('photoStatus').textContent = 'Đã chụp hình thí sinh.';
+        // Hiện ảnh vừa chụp + cho phép chụp lại nếu chưa ưng ý.
+        const captureBtn = document.getElementById('capturePhotoBtn');
+        if (captureBtn) captureBtn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i> CHỤP LẠI';
+        document.getElementById('photoStatus').textContent = 'Đã chụp hình. Nếu chưa ưng ý, bấm "CHỤP LẠI".';
     }
 
     async function runMicTest() {
@@ -1447,6 +1458,30 @@
         if (!state.micTestBlob) return;
         const audio = new Audio(URL.createObjectURL(state.micTestBlob));
         audio.play().catch(() => showWarning('Không thể phát lại file thu âm.'));
+    }
+
+    function requestExamFullscreen() {
+        const el = document.documentElement;
+        const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+        if (typeof req !== 'function') return;
+        try {
+            const result = req.call(el);
+            // Trình duyệt/người dùng có thể từ chối fullscreen — vẫn cho làm bài bình thường.
+            if (result && typeof result.catch === 'function') result.catch(() => {});
+        } catch (error) {
+            console.warn('Không thể bật toàn màn hình:', error);
+        }
+    }
+
+    function openProctorModal() {
+        showModal(refs.proctorModal);
+    }
+
+    // Sau khi thí sinh "Xác nhận": vào toàn màn hình rồi bắt đầu làm bài.
+    function beginExamSession() {
+        hideModal(refs.proctorModal);
+        requestExamFullscreen();
+        startExam();
     }
 
     function startExam() {
@@ -1576,7 +1611,9 @@
             localStorage.removeItem(attemptKey);
             refs.submitStatus.textContent = `Đã nộp bài thành công. Điểm tự động Listening + Reading: ${totalScore}/${maxScore}.`;
             confirmBtn.style.display = 'none';
-            document.getElementById('cancelSubmitBtn').textContent = 'ĐÓNG';
+            // Đã nộp xong: đổi nút thành "Quay về trang chủ" (xem handler ở bindEvents).
+            state.submitted = true;
+            document.getElementById('cancelSubmitBtn').textContent = 'QUAY VỀ TRANG CHỦ';
             clearInterval(state.timerInterval);
         } catch (error) {
             refs.submitStatus.textContent = error.message;
@@ -1591,7 +1628,15 @@
         document.getElementById('capturePhotoBtn').addEventListener('click', capturePhoto);
         document.getElementById('micTestBtn').addEventListener('click', runMicTest);
         document.getElementById('micReplayBtn').addEventListener('click', replayMicTest);
-        document.getElementById('startExamBtn').addEventListener('click', startExam);
+        // "NHẬN ĐỀ" -> hiện cảnh báo giám sát; "Xác nhận" -> fullscreen + bắt đầu làm bài.
+        document.getElementById('startExamBtn').addEventListener('click', openProctorModal);
+        document.getElementById('confirmProctorBtn').addEventListener('click', beginExamSession);
+        document.addEventListener('fullscreenchange', () => {
+            const inExam = refs.exam && !refs.exam.classList.contains('vstep-hidden');
+            if (inExam && !document.fullscreenElement && !state.submitted) {
+                showWarning('Bạn đã thoát toàn màn hình. Vui lòng giữ chế độ làm bài để kết quả được ghi nhận.');
+            }
+        });
         refs.continueBtn.addEventListener('click', continueFlow);
         refs.savePartBtn.addEventListener('click', () => saveCurrentPart(true));
         refs.submitTopBtn.addEventListener('click', openSubmitModal);
@@ -1615,7 +1660,14 @@
             }
             moveToSkill(target.skillIndex, target.partIndex);
         });
-        document.getElementById('cancelSubmitBtn').addEventListener('click', () => hideModal(refs.submitModal));
+        document.getElementById('cancelSubmitBtn').addEventListener('click', () => {
+            // Sau khi đã nộp bài, nút này đưa thí sinh quay về trang chủ VSTEP.
+            if (state.submitted) {
+                window.location.href = '/vstep_bode.html';
+                return;
+            }
+            hideModal(refs.submitModal);
+        });
         document.getElementById('confirmSubmitBtn').addEventListener('click', submitExam);
 
         document.addEventListener('keydown', event => {

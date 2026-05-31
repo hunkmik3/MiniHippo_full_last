@@ -1,3 +1,7 @@
+/* Font tiếng Việt có đủ các độ đậm (400-800) — tránh "giả đậm" Arial gây lỗi font
+   trên chữ có dấu ở tiêu đề/câu hỏi/modal/màn Speaking. */
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap');
+
 :root {
   --vstep-blue: #087fd1;
   --vstep-blue-dark: #0b5f95;
@@ -23,7 +27,7 @@ body.vstep-body {
   margin: 0;
   background: var(--vstep-bg);
   color: var(--vstep-text);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Be Vietnam Pro', Arial, Helvetica, sans-serif;
 }
 
 .vstep-admin-shell {

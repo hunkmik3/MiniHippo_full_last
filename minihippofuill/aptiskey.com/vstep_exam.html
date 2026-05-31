@@ -140,9 +140,22 @@
     </div>
   </div>
 
+  <div id="proctorModal" class="vstep-modal-backdrop-lite">
+    <div class="vstep-modal-card">
+      <div class="d-flex align-items-start gap-2 mb-3 text-start">
+        <i class="bi bi-exclamation-triangle-fill text-warning fs-3"></i>
+        <p class="mb-0 fw-semibold">Đây là bài thi được "Giám sát". Kết quả bài thi sẽ KHÔNG được ghi nhận nếu bạn thoát ra khỏi chế độ làm bài (thoát toàn màn hình).</p>
+      </div>
+      <div class="d-flex justify-content-end">
+        <button type="button" class="vstep-primary-button" id="confirmProctorBtn">Xác nhận</button>
+      </div>
+    </div>
+  </div>
+
   <audio id="precheckAudio" preload="metadata"></audio>
   <script src="js/auth.js"></script>
   <script src="js/vstep_exam.js"></script>
+  <script src="js/copy_paste_guard.js"></script>
 </body>
 
 </html>
