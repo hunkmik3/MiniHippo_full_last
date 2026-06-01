@@ -1517,6 +1517,23 @@
     function showResultDetail(id) {
         const result = state.results.find(item => String(item.id) === String(id));
         if (!result) return;
+
+        // Ảnh giám thị (chụp lúc nhận đề) lưu trong metadata.proctor_photo (data URL).
+        const proctorPhoto = result.metadata?.proctor_photo || '';
+        const photoHtml = proctorPhoto
+            ? `
+            <div class="vstep-grade-box mb-3">
+                <label class="form-label text-white">Ảnh giám thị (lúc nhận đề)</label>
+                <div><img src="${escapeHtml(proctorPhoto)}" alt="Ảnh giám thị" style="max-width:320px;width:100%;border-radius:8px;border:1px solid #94c7f0;display:block;"></div>
+            </div>`
+            : '';
+
+        // Bỏ chuỗi base64 ảnh khỏi JSON dump cho gọn (đã hiển thị ảnh ở trên).
+        const resultForDump = { ...result };
+        if (resultForDump.metadata?.proctor_photo) {
+            resultForDump.metadata = { ...resultForDump.metadata, proctor_photo: '[ảnh giám thị - xem ở trên]' };
+        }
+
         refs.resultDetail.innerHTML = `
             <div class="vstep-grade-box mb-3">
                 <label class="form-label text-white" for="vstep-manual-score">Điểm chấm tay</label>
@@ -1528,7 +1545,8 @@
                 </button>
                 <div class="small mt-2" id="vstepGradeStatus"></div>
             </div>
-            <pre class="mb-0">${escapeHtml(JSON.stringify(result, null, 2))}</pre>
+            ${photoHtml}
+            <pre class="mb-0">${escapeHtml(JSON.stringify(resultForDump, null, 2))}</pre>
         `;
         $('saveVstepGradeBtn')?.addEventListener('click', () => saveManualGrade(result.id));
     }

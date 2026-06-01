@@ -1416,6 +1416,12 @@
             return;
         }
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        // Lưu ảnh giám thị (JPEG nén nhỏ) để gửi kèm khi nộp bài.
+        try {
+            state.proctorPhoto = canvas.toDataURL('image/jpeg', 0.5);
+        } catch (error) {
+            state.proctorPhoto = null;
+        }
         canvas.classList.remove('vstep-hidden');
         // Hiện ảnh vừa chụp + cho phép chụp lại nếu chưa ưng ý.
         const captureBtn = document.getElementById('capturePhotoBtn');
@@ -1539,7 +1545,8 @@
     }
 
     async function submitExam() {
-        if (state.submitting) return;
+        // Chống nộp trùng: đang nộp HOẶC đã nộp thành công thì bỏ qua.
+        if (state.submitting || state.submitted) return;
         state.submitting = true;
         const confirmBtn = document.getElementById('confirmSubmitBtn');
         confirmBtn.disabled = true;
@@ -1573,6 +1580,7 @@
                 vstep_initial_part: singlePartPractice ? state.currentPartIndex + 1 : null,
                 assignment_id: assignmentId || state.set?.assignment?.id || null,
                 submitted_at: new Date().toISOString(),
+                proctor_photo: state.proctorPhoto || null,
                 answers: state.answers,
                 listening_details: listening.details,
                 reading_details: reading.details,

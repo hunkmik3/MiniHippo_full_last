@@ -10,6 +10,15 @@ function generatePassword() {
   return (random || fallback || 'MiniHippo123!').toUpperCase();
 }
 
+// Band tùy chọn: rỗng -> null (cho phép), B1/B2 hợp lệ, còn lại -> báo lỗi rõ ràng.
+function resolveBand(value) {
+  const raw = value === undefined || value === null ? '' : String(value).trim();
+  if (!raw) return { ok: true, band: null };
+  const upper = raw.toUpperCase();
+  if (upper === 'B1' || upper === 'B2') return { ok: true, band: upper };
+  return { ok: false };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -35,6 +44,12 @@ export default async function handler(req, res) {
     const password = String(body?.password || '').trim() || generatePassword();
     const generated = !String(body?.password || '').trim();
     const username = String(body?.username || accountCode || email.split('@')[0]).trim();
+
+    const bandResult = resolveBand(body?.band);
+    if (!bandResult.ok) {
+      return res.status(400).json({ error: 'Band không hợp lệ. Chỉ chấp nhận B1 hoặc B2.' });
+    }
+    const band = bandResult.band;
 
     const existingStudent = await selectFrom('vstep_students', {
       filters: [{ column: 'email', value: email }],
@@ -81,7 +96,7 @@ export default async function handler(req, res) {
       notes: body?.notes || null,
       learning_program: 'vstep',
       course: 'VSTEP',
-      band: body?.band || null
+      band
     };
 
     await insertInto('users', [publicUserPayload]);
@@ -93,7 +108,7 @@ export default async function handler(req, res) {
       account_code: accountCode || null,
       full_name: body?.fullName || body?.full_name || null,
       phone_number: body?.phone || body?.phone_number || null,
-      band: body?.band || null,
+      band,
       practice_access: body?.practiceAccess === false || body?.practice_access === false ? false : true,
       status: body?.status || 'active',
       device_limit: publicUserPayload.device_limit,
