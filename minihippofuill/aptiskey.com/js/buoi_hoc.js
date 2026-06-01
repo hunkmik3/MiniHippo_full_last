@@ -2738,6 +2738,64 @@ function resolvePageDisplayPartLabel(page, fallbackLabel = '') {
   return fallbackLabel;
 }
 
+function normalizeAnswerKeySegment(value, fallback) {
+  const raw = String(value || fallback || 'answer').trim();
+  const normalized = raw.replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '');
+  return normalized || String(fallback || 'answer');
+}
+
+function buildCustomAnswerScope(page, absoluteIndex) {
+  const type = normalizeAnswerKeySegment(page?.type || 'page', 'page');
+  const index = Number.isFinite(Number(absoluteIndex)) ? Number(absoluteIndex) : 0;
+  return `${type}-${index}`;
+}
+
+function buildCustomAnswerKey(page, absoluteIndex, rawKey, fallback) {
+  const scope = buildCustomAnswerScope(page, absoluteIndex);
+  const raw = String(rawKey || '').trim();
+  if (raw && raw.startsWith(`${scope}__`)) return raw;
+  return `${scope}__${normalizeAnswerKeySegment(raw, fallback)}`;
+}
+
+function namespaceCustomPageAnswerKeys(page, absoluteIndex) {
+  if (!page?.data || typeof page.data !== 'object') return;
+  const data = page.data;
+
+  if (page.type === 'writing-short' && Array.isArray(data.questions)) {
+    data.questions.forEach((q, index) => {
+      if (!q || typeof q !== 'object') return;
+      q.key = buildCustomAnswerKey(page, absoluteIndex, q.key, `q${index + 1}`);
+    });
+  } else if (page.type === 'writing-sentences' && Array.isArray(data.questions)) {
+    data.questions.forEach((q, index) => {
+      if (!q || typeof q !== 'object') return;
+      q.key = buildCustomAnswerKey(page, absoluteIndex, q.key, `q2_${index + 1}`);
+    });
+  } else if (page.type === 'writing-chat' && Array.isArray(data.questions)) {
+    data.questions.forEach((q, index) => {
+      if (!q || typeof q !== 'object') return;
+      q.key = buildCustomAnswerKey(page, absoluteIndex, q.key, `q3_${index + 1}`);
+    });
+  } else if (page.type === 'writing-email' && Array.isArray(data.emails)) {
+    data.emails.forEach((email, index) => {
+      if (!email || typeof email !== 'object') return;
+      email.key = buildCustomAnswerKey(page, absoluteIndex, email.key, `q4_${index + 1}`);
+    });
+  } else if (page.type === 'writing-describe-image') {
+    if (!data.mainQuestion || typeof data.mainQuestion !== 'object') {
+      data.mainQuestion = {};
+    }
+    data.mainQuestion.key = buildCustomAnswerKey(page, absoluteIndex, data.mainQuestion.key, 'q_img_1');
+  } else if (page.type === 'writing-followup' && Array.isArray(data.followUps)) {
+    data.followUps.forEach((q, index) => {
+      if (!q || typeof q !== 'object') return;
+      q.key = buildCustomAnswerKey(page, absoluteIndex, q.key, `q_fu_${index + 1}`);
+    });
+  } else if (page.type === 'speaking-audio-q') {
+    data.key = buildCustomAnswerKey(page, absoluteIndex, data.key, `sp_${absoluteIndex + 1}`);
+  }
+}
+
 function normalizeCustomPages(rawPages) {
   const list = (Array.isArray(rawPages) ? rawPages : []).map((page) => {
     const copy = page && typeof page === 'object' ? { ...page } : {};
@@ -2779,6 +2837,8 @@ function normalizeCustomPages(rawPages) {
       if (page.totalPages === undefined || page.totalPages === null) page.totalPages = groupCounts[key];
     }
   });
+
+  list.forEach((page, absoluteIndex) => namespaceCustomPageAnswerKeys(page, absoluteIndex));
 
   const speakingPages = list.filter((p) =>
     ['speaking-intro', 'speaking-audio-q', 'speaking-q', 'speaking-image'].includes(p.type)
@@ -3006,26 +3066,35 @@ function renderListeningQ(page) {
     </div>`;
 }
 
+function getRuntimePageAnswerIndex(page) {
+  const absoluteIndex = pages.indexOf(page);
+  if (absoluteIndex >= 0) return absoluteIndex;
+  if (Number.isFinite(Number(page?.idx))) return Number(page.idx);
+  return 0;
+}
+
 /* ═══════════════════════════════════════════════════════
    RENDER – LISTENING Part 2 (topic + 4 persons / trang)
    ═══════════════════════════════════════════════════════ */
 
 function renderListeningTopic(page) {
   const d = page.data;
-  const audioId = 'audio-p2';
+  const pageAnswerIndex = getRuntimePageAnswerIndex(page);
+  const audioId = `audio-p2-${pageAnswerIndex}`;
   if (audioPlaysLeft[audioId] === undefined) audioPlaysLeft[audioId] = 2;
   const playsLeft = audioPlaysLeft[audioId];
   const partTitle = resolvePageDisplayPartLabel(page, 'Part 2');
 
   const personsHtml = d.persons.map((person, i) => {
-    const saved = userAnswers['lt-' + i] || '';
+    const key = `lt-${pageAnswerIndex}-${i}`;
+    const saved = userAnswers[key] || '';
     const opts = d.options.map((opt, oi) =>
       `<option value="${oi}" ${saved == oi ? 'selected' : ''}>${esc(opt)}</option>`
     ).join('');
     return `
       <div class="person-row">
         <span class="person-label">${esc(person)}</span>
-        <select class="form-select" onchange="userAnswers['lt-${i}']=this.value">
+        <select class="form-select" onchange="userAnswers['${key}']=this.value">
           <option value="">-- Select an answer --</option>
           ${opts}
         </select>
@@ -4711,9 +4780,10 @@ function renderResultsPage() {
       rows += `<tr><td>Listening ${pg.idx+1}</td><td>${esc(pg.data.q)}</td><td class="${ok?'result-correct':'result-incorrect'}">${esc(user)}</td><td class="result-correct">${esc(pg.data.answer)}</td></tr>`;
     }
     else if (pg.type === 'listening-topic') {
+      const pageAnswerIndex = getRuntimePageAnswerIndex(pg);
       pg.data.persons.forEach((person, pi) => {
         totalQ++;
-        const user = userAnswers['lt-' + pi];
+        const user = userAnswers[`lt-${pageAnswerIndex}-${pi}`];
         const correctIdx = pg.data.answers[pi];
         const ok = user == correctIdx;
         if (ok) totalCorrect++;
