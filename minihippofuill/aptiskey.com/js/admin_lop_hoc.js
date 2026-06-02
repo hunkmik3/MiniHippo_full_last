@@ -205,7 +205,7 @@ const SESSION_STRUCTURE_BLUEPRINTS = {
                     images: []
                 }
             },
-            ...repeatPageSpecs('speaking-q', 5, { partLabel: 'Part 1', responseSeconds: 30, waitSeconds: 0 })
+            ...repeatPageSpecs('speaking-audio-q', 5, { partLabel: 'Part 1', responseSeconds: 30, waitSeconds: 0 })
         ]
     },
     'B1-7': {
