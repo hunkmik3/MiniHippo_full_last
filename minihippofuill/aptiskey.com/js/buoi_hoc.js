@@ -213,14 +213,17 @@ async function uploadSpeakingRecording(key) {
     const data = await response.json();
     rec.uploadedUrl = data.rawUrl || data.fileUrl || '';
     rec.filePath = data.filePath || rec.filePath;
+    refreshSpeakingRecordingControls(key);
     return rec.uploadedUrl;
   })();
+  refreshSpeakingRecordingControls(key);
 
   try {
     return await rec.uploadPromise;
   } catch (err) {
     rec.uploadPromise = null;
     console.warn('Upload speaking recording failed:', err);
+    refreshSpeakingRecordingControls(key, { uploadError: err.message || 'Upload ghi âm thất bại.' });
     throw err;
   }
 }
@@ -232,7 +235,10 @@ async function ensureAllSpeakingRecordingsUploaded() {
 
 async function startSpeakingRecording(key, { retryHandlerName = '' } = {}) {
   if (!key) return false;
-  if (activeSpeakingRecorder) return true; // đang ghi rồi, coi như OK
+  if (activeSpeakingRecorder) {
+    refreshSpeakingRecordingControls(activeSpeakingRecorderKey || key);
+    return activeSpeakingRecorderKey === key; // đang ghi đúng câu thì coi như OK
+  }
 
   if (!supportsSpeakingRecording()) {
     showSpeakingRecordingError(
@@ -262,15 +268,20 @@ async function startSpeakingRecording(key, { retryHandlerName = '' } = {}) {
       const durationSec = activeSpeakingRecorderStartedAt
         ? Math.max(1, Math.round((Date.now() - activeSpeakingRecorderStartedAt) / 1000))
         : 0;
+      const previous = SPEAKING_RECORDINGS[key] || {};
+      if (previous.previewUrl) {
+        try { URL.revokeObjectURL(previous.previewUrl); } catch (_) {}
+      }
       SPEAKING_RECORDINGS[key] = {
-        ...(SPEAKING_RECORDINGS[key] || {}),
+        ...previous,
         blob,
         mime: usedMime,
         durationSeconds: durationSec,
         sizeBytes: blob.size,
         filePath: buildSpeakingRecordingPath(key, usedMime),
         uploadedUrl: '',
-        uploadPromise: null
+        uploadPromise: null,
+        previewUrl: URL.createObjectURL(blob)
       };
       try { stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
       if (activeSpeakingRecorderKey === key) {
@@ -278,6 +289,7 @@ async function startSpeakingRecording(key, { retryHandlerName = '' } = {}) {
         activeSpeakingRecorderKey = null;
         activeSpeakingRecorderStream = null;
       }
+      refreshSpeakingRecordingControls(key);
       // Upload nền sau khi stop
       uploadSpeakingRecording(key).catch(() => null);
     };
@@ -287,10 +299,12 @@ async function startSpeakingRecording(key, { retryHandlerName = '' } = {}) {
     activeSpeakingRecorderStream = stream;
     activeSpeakingRecorderStartedAt = Date.now();
     clearSpeakingRecordingError();
+    refreshSpeakingRecordingControls(key);
     return true;
   } catch (err) {
     console.warn('Không thể bật micro để ghi âm:', err);
     showSpeakingRecordingError(describeRecordingError(err), retryHandlerName);
+    refreshSpeakingRecordingControls(key);
     return false;
   }
 }
@@ -314,7 +328,170 @@ function showSpeakingRecordingIndicator(key, options = {}) {
       el.innerHTML = `<span style="color:#dc2626; font-weight:600;">${text}</span>`;
     }
   });
+  refreshSpeakingRecordingControls(key);
 }
+
+function getSpeakingRecordingKey(page) {
+  const rawKey = String(page?.data?.key || '').trim();
+  const fallbackKey = `sp-${page?.idx ?? currentPage}`;
+  if (!rawKey) return fallbackKey;
+
+  const speakingTypes = ['speaking-intro', 'speaking-audio-q', 'speaking-q', 'speaking-image'];
+  const duplicateCount = Array.isArray(pages)
+    ? pages.filter((p) => speakingTypes.includes(p?.type) && String(p?.data?.key || '').trim() === rawKey).length
+    : 0;
+  if (duplicateCount > 1) {
+    const pageSegment = page?.displayIdx ?? page?.idx ?? currentPage;
+    return `${rawKey}-${pageSegment}`;
+  }
+  return rawKey;
+}
+
+function speakingRecordingElementId(prefix, key) {
+  return `${prefix}-${sanitizeSegment(key, 'answer')}`;
+}
+
+function jsString(value) {
+  return String(value || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n');
+}
+
+function renderSpeakingRecordingControls(key, options = {}) {
+  const safeKey = String(key || '').trim();
+  if (!safeKey) return '';
+  const statusId = speakingRecordingElementId('speaking-recording-status', safeKey);
+  const startId = speakingRecordingElementId('speaking-recording-start', safeKey);
+  const stopId = speakingRecordingElementId('speaking-recording-stop', safeKey);
+  const redoId = speakingRecordingElementId('speaking-recording-redo', safeKey);
+  const previewId = speakingRecordingElementId('speaking-recording-preview', safeKey);
+  const uploadId = speakingRecordingElementId('speaking-recording-upload', safeKey);
+  const hint = options.hint || 'Ghi âm sẽ tự bật khi đến giờ trả lời. Bạn cũng có thể bấm ghi/dừng/ghi lại thủ công nếu cần.';
+  const label = options.label || 'Ghi âm câu trả lời';
+
+  return `
+    <div class="speaking-recording-panel mt-3" data-recording-key="${esc(safeKey)}">
+      <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start gap-2">
+        <div>
+          <div class="fw-semibold"><i class="bi bi-mic-fill me-1"></i>${esc(label)}</div>
+          <div class="text-muted small">${esc(hint)}</div>
+        </div>
+        <div class="speaking-recording-actions d-flex flex-wrap gap-2">
+          <button type="button" class="btn btn-sm btn-danger" id="${startId}" onclick="manualStartSpeakingRecording('${jsString(safeKey)}')">
+            <i class="bi bi-record-circle me-1"></i>Ghi âm
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="${stopId}" onclick="manualStopSpeakingRecording('${jsString(safeKey)}')" disabled>
+            <i class="bi bi-stop-fill me-1"></i>Dừng
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-primary" id="${redoId}" onclick="manualRedoSpeakingRecording('${jsString(safeKey)}')">
+            <i class="bi bi-arrow-clockwise me-1"></i>Ghi lại
+          </button>
+        </div>
+      </div>
+      <div class="small mt-2" id="${statusId}">Chưa có ghi âm.</div>
+      <audio id="${previewId}" controls preload="none" class="w-100 mt-2 d-none"></audio>
+      <div class="small text-muted mt-1" id="${uploadId}"></div>
+    </div>`;
+}
+
+function refreshSpeakingRecordingControls(key, options = {}) {
+  const safeKey = String(key || '').trim();
+  if (!safeKey) return;
+  const statusEl = document.getElementById(speakingRecordingElementId('speaking-recording-status', safeKey));
+  const startBtn = document.getElementById(speakingRecordingElementId('speaking-recording-start', safeKey));
+  const stopBtn = document.getElementById(speakingRecordingElementId('speaking-recording-stop', safeKey));
+  const redoBtn = document.getElementById(speakingRecordingElementId('speaking-recording-redo', safeKey));
+  const previewEl = document.getElementById(speakingRecordingElementId('speaking-recording-preview', safeKey));
+  const uploadEl = document.getElementById(speakingRecordingElementId('speaking-recording-upload', safeKey));
+  if (!statusEl && !startBtn && !stopBtn && !previewEl) return;
+
+  const rec = SPEAKING_RECORDINGS[safeKey] || {};
+  const isRecording =
+    activeSpeakingRecorderKey === safeKey &&
+    activeSpeakingRecorder &&
+    activeSpeakingRecorder.state !== 'inactive';
+
+  if (startBtn) startBtn.disabled = !!isRecording;
+  if (stopBtn) stopBtn.disabled = !isRecording;
+  if (redoBtn) redoBtn.disabled = !!isRecording;
+
+  if (statusEl) {
+    if (isRecording) {
+      statusEl.innerHTML = '<span class="text-danger fw-semibold">Đang ghi âm... nói rõ vào micro.</span>';
+    } else if (rec.blob) {
+      statusEl.innerHTML = `<span class="text-success fw-semibold">Đã ghi ${rec.durationSeconds || 0}s.</span>`;
+    } else {
+      statusEl.textContent = 'Chưa có ghi âm.';
+    }
+  }
+
+  if (previewEl) {
+    const previewUrl = rec.previewUrl || rec.uploadedUrl || '';
+    if (previewUrl) {
+      previewEl.src = previewUrl;
+      previewEl.classList.remove('d-none');
+    } else {
+      previewEl.removeAttribute('src');
+      previewEl.classList.add('d-none');
+    }
+  }
+
+  if (uploadEl) {
+    if (options.uploadError) {
+      uploadEl.innerHTML = `<span class="text-danger">${esc(options.uploadError)}</span>`;
+    } else if (rec.uploadedUrl) {
+      uploadEl.innerHTML = '<span class="text-success">Đã upload ghi âm.</span>';
+    } else if (rec.uploadPromise) {
+      uploadEl.textContent = 'Đang upload ghi âm...';
+    } else if (rec.blob) {
+      uploadEl.textContent = 'Ghi âm đã lưu tạm, hệ thống sẽ upload khi nộp bài.';
+    } else {
+      uploadEl.textContent = '';
+    }
+  }
+}
+
+window.retryManualSpeakingRecording = async function retryManualSpeakingRecording() {
+  const key = window.__retryManualRecordingKey;
+  if (!key) return;
+  clearSpeakingRecordingError();
+  const ok = await startSpeakingRecording(key, { retryHandlerName: 'retryManualSpeakingRecording' });
+  if (ok) showSpeakingRecordingIndicator(key);
+};
+
+window.manualStartSpeakingRecording = async function manualStartSpeakingRecording(key) {
+  const safeKey = String(key || '').trim();
+  if (!safeKey) return;
+  window.__retryManualRecordingKey = safeKey;
+  clearSpeakingRecordingError();
+  const ok = await startSpeakingRecording(safeKey, { retryHandlerName: 'retryManualSpeakingRecording' });
+  if (ok) showSpeakingRecordingIndicator(safeKey);
+};
+
+window.manualStopSpeakingRecording = function manualStopSpeakingRecording(key) {
+  const safeKey = String(key || activeSpeakingRecorderKey || '').trim();
+  stopActiveSpeakingRecording();
+  if (safeKey) refreshSpeakingRecordingControls(safeKey);
+};
+
+window.manualRedoSpeakingRecording = async function manualRedoSpeakingRecording(key) {
+  const safeKey = String(key || '').trim();
+  if (!safeKey) return;
+  if (activeSpeakingRecorderKey === safeKey && activeSpeakingRecorder) {
+    stopActiveSpeakingRecording();
+    setTimeout(() => window.manualRedoSpeakingRecording(safeKey), 350);
+    return;
+  }
+  const previous = SPEAKING_RECORDINGS[safeKey];
+  if (previous?.previewUrl) {
+    try { URL.revokeObjectURL(previous.previewUrl); } catch (_) {}
+  }
+  delete SPEAKING_RECORDINGS[safeKey];
+  refreshSpeakingRecordingControls(safeKey);
+  await window.manualStartSpeakingRecording(safeKey);
+};
 
 function normalizeText(value) {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
@@ -457,6 +634,21 @@ function normalizeRole(value) {
 
 function isAdminUser(user) {
   return normalizeRole(user?.role) === 'admin';
+}
+
+function resolveLessonUserCourse(user) {
+  if (typeof window.resolveMiniHippoCourse === 'function') {
+    return window.resolveMiniHippoCourse(user);
+  }
+
+  const course = normalizeText(user?.course);
+  if (course) return course;
+
+  const program = normalizeText(user?.learningProgram || user?.learning_program);
+  if (program === 'classroom' || program === 'class') return 'lớp học';
+  if (program === 'vstep') return 'vstep';
+  if (program === 'aptis') return 'aptis';
+  return '';
 }
 
 function resolveToken() {
@@ -627,7 +819,7 @@ async function resolveAccessContext() {
 
   const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
   const isAdmin = isAdminUser(user);
-  const course = normalizeText(user?.course);
+  const course = resolveLessonUserCourse(user);
   const userBand = normalizeBand(user?.band);
 
   if (isAdmin) {
@@ -820,7 +1012,7 @@ function buildSpeakingAnswersForSubmit() {
   );
   return speakingPages
     .map((pg) => {
-      const key = pg.data?.key || `sp-${pg.idx}`;
+      const key = getSpeakingRecordingKey(pg);
       const recording = SPEAKING_RECORDINGS[key];
       const note = userAnswers[key] || '';
       // Bỏ qua nếu vừa không có recording vừa không có note
@@ -2974,7 +3166,7 @@ function renderPage(pageIndex) {
       case 'listening-opinion': container.innerHTML = renderListeningOpinion(page); break;
       case 'listening-mcq-batch': container.innerHTML = renderListeningMcqBatch(page); break;
       case 'reading-gap':    container.innerHTML = renderReadingGap(page); break;
-      case 'reading-order':  container.innerHTML = renderReadingOrder(page); initSortable(page); break;
+      case 'reading-order':  container.innerHTML = renderReadingOrder(page); break;
       case 'reading-match':   container.innerHTML = renderReadingMatch(page); break;
       case 'reading-heading': container.innerHTML = renderReadingHeading(page); break;
       case 'writing-short':     container.innerHTML = renderWritingShort(page); break;
@@ -3324,19 +3516,69 @@ function renderReadingGap(page) {
 }
 
 /* ═══════════════════════════════════════════════════════
-   RENDER – READING Part 2: Sentence ordering (drag & drop)
+   RENDER – READING Part 2: Sentence ordering
    ═══════════════════════════════════════════════════════ */
+
+function getReadingOrderCards(container) {
+  return Array.from(container?.querySelectorAll('.reading-order-card[data-text]') || []);
+}
+
+function saveReadingOrderContainer(container) {
+  if (!container) return;
+  const key = container.dataset.orderKey || '';
+  if (!key) return;
+  const order = getReadingOrderCards(container).map((card) => card.dataset.text || '');
+  if (order.length) userAnswers[key] = order;
+}
+
+function syncReadingOrderButtons(container) {
+  const cards = getReadingOrderCards(container);
+  cards.forEach((card, index) => {
+    card.dataset.orderIndex = String(index);
+    const up = card.querySelector('[data-order-action="up"]');
+    const down = card.querySelector('[data-order-action="down"]');
+    if (up) up.disabled = index === 0;
+    if (down) down.disabled = index === cards.length - 1;
+  });
+}
+
+function moveReadingOrderItem(containerId, index, delta) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const cards = getReadingOrderCards(container);
+  const from = Number(index);
+  const to = from + Number(delta);
+  if (!Number.isInteger(from) || !Number.isInteger(to) || to < 0 || to >= cards.length) return;
+
+  const moving = cards[from];
+  const target = cards[to];
+  if (!moving || !target) return;
+
+  if (delta < 0) {
+    container.insertBefore(moving, target);
+  } else {
+    container.insertBefore(target, moving);
+  }
+  syncReadingOrderButtons(container);
+  saveReadingOrderContainer(container);
+}
+window.moveReadingOrderItem = moveReadingOrderItem;
 
 function renderReadingOrder(page) {
   const d = page.data;
   const num = page.idx + 1;
   const title = page.partTitle ? esc(page.partTitle) : `Reading Question 2 &amp; 3 (${num}/${page.totalInPart})`;
   const containerId = `order-container-${page.idx}`;
+  const orderKey = `order-${page.idx}`;
 
   // First sentence locked, rest shuffled
   const first = d.sentences[0];
   const rest = d.sentences.slice(1);
-  const shuffled = shuffleArr([...rest]);
+  const savedOrder = Array.isArray(userAnswers[orderKey])
+    ? userAnswers[orderKey].filter((text) => rest.includes(text))
+    : [];
+  const missingSaved = rest.filter((text) => !savedOrder.includes(text));
+  const shuffled = savedOrder.length ? [...savedOrder, ...missingSaved] : shuffleArr([...rest]);
 
   const lockedHtml = `
     <div class="locked-sentence">
@@ -3347,10 +3589,23 @@ function renderReadingOrder(page) {
     </div>`;
 
   const cardsHtml = shuffled.map((s, i) => `
-    <div class="draggable-card" data-text="${esc(s)}">
-      <div class="d-flex align-items-center">
-        <i class="bi bi-grip-vertical me-2 text-muted" style="font-size:1.2rem;"></i>
-        <span>${esc(s)}</span>
+    <div class="reading-order-card" data-text="${esc(s)}" data-order-index="${i}">
+      <div class="reading-order-card-body">
+        <span class="reading-order-text">${esc(s)}</span>
+        <div class="reading-order-actions" aria-label="Đổi vị trí câu">
+          <button type="button" class="btn btn-sm btn-outline-primary reading-order-move-btn"
+                  data-order-action="up"
+                  onclick="moveReadingOrderItem('${containerId}', Number(this.closest('.reading-order-card').dataset.orderIndex), -1)"
+                  ${i === 0 ? 'disabled' : ''} title="Chuyển lên">
+            <i class="bi bi-arrow-up"></i>
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-primary reading-order-move-btn"
+                  data-order-action="down"
+                  onclick="moveReadingOrderItem('${containerId}', Number(this.closest('.reading-order-card').dataset.orderIndex), 1)"
+                  ${i === shuffled.length - 1 ? 'disabled' : ''} title="Chuyển xuống">
+            <i class="bi bi-arrow-down"></i>
+          </button>
+        </div>
       </div>
     </div>`).join('');
 
@@ -3359,27 +3614,11 @@ function renderReadingOrder(page) {
       <div class="q-number-label">${title}</div>
       <p class="text-danger fw-semibold mb-2">Topic: ${esc(d.topic)}</p>
       <p class="text-muted small mb-3">Put the sentences below in the right order. The first sentence is done for you.</p>
-      <div id="${containerId}">
+      <div id="${containerId}" data-order-key="${orderKey}">
         ${lockedHtml}
         ${cardsHtml}
       </div>
     </div>`;
-}
-
-function initSortable(page) {
-  setTimeout(() => {
-    const containerId = `order-container-${page.idx}`;
-    const container = document.getElementById(containerId);
-    const compactLayout = !!(window.MobileReorder && window.MobileReorder.isCompact());
-    if (container && typeof Sortable !== 'undefined') {
-      // Mobile/tablet: tắt kéo-thả, dùng nút mũi tên thay thế.
-      Sortable.create(container, { animation: 150, draggable: '.draggable-card', disabled: compactLayout });
-    }
-    // Thêm nút mũi tên Lên/Xuống (hiện trên mobile/tablet, ẩn trên desktop).
-    if (container && window.MobileReorder) {
-      window.MobileReorder.enhance(container);
-    }
-  }, 50);
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -3716,7 +3955,8 @@ function renderSpeakingQ(page) {
   const displayNum = Number.isFinite(Number(page.displayIdx)) ? Number(page.displayIdx) + 1 : num;
   const totalDisplay = Number(page.totalSpeakingPages || page.totalQ || 0) || page.totalQ;
   const partLabel = resolvePageDisplayPartLabel(page, page.partLabel || 'Part 1');
-  const saved = userAnswers['sp-' + page.idx] || '';
+  const recordingKey = getSpeakingRecordingKey(page);
+  const saved = userAnswers[recordingKey] || '';
   const wc = saved.split(/\s+/).filter(Boolean).length;
   const audioId = `sp-basic-audio-${page.idx}`;
   const audioStatusId = `sp-basic-audio-status-${page.idx}`;
@@ -3753,13 +3993,15 @@ function renderSpeakingQ(page) {
           <p class="fw-semibold mb-3" style="font-size:1.1rem;">${esc(d.prompt)}</p>
 
           <label class="form-label fw-semibold">Câu trả lời của bạn</label>
-          <textarea class="form-control answer-box" name="sp-${page.idx}"
+          <textarea class="form-control answer-box" name="${esc(recordingKey)}"
                     placeholder="Nhập câu trả lời hoặc transcript bạn nói..."
-                    oninput="userAnswers['sp-${page.idx}']=this.value; document.getElementById('wc-sp-${page.idx}').textContent=this.value.split(/\\s+/).filter(Boolean).length+' từ';">${esc(saved)}</textarea>
+                    oninput="userAnswers['${jsString(recordingKey)}']=this.value; document.getElementById('wc-${sanitizeSegment(recordingKey, 'sp')}').textContent=this.value.split(/\\s+/).filter(Boolean).length+' từ';">${esc(saved)}</textarea>
           <div class="d-flex justify-content-between align-items-center mt-2">
             <small class="text-muted">Bạn có thể quay lại để chỉnh sửa trước khi nộp bài.</small>
-            <span class="badge bg-light text-dark" id="wc-sp-${page.idx}">${wc} từ</span>
+            <span class="badge bg-light text-dark" id="wc-${sanitizeSegment(recordingKey, 'sp')}">${wc} từ</span>
           </div>
+
+          ${renderSpeakingRecordingControls(recordingKey)}
         </div>
       </div>
 
@@ -3801,7 +4043,8 @@ function playSpeakingQAudio(page) {
 function renderSpeakingImage(page) {
   const d = page.data;
   const num = page.idx + 1;
-  const saved = userAnswers['sp-' + page.idx] || '';
+  const recordingKey = getSpeakingRecordingKey(page);
+  const saved = userAnswers[recordingKey] || '';
 
   const imagesHtml = filterValidMediaUrls(d.images).map(src =>
     `<img src="${src}" alt="Speaking image" style="max-width:100%; max-height:420px; width:auto; height:auto; object-fit:contain;" onerror="this.style.display='none';">`
@@ -3834,8 +4077,10 @@ function renderSpeakingImage(page) {
         <label class="form-label fw-bold">Ghi chú câu trả lời (tùy chọn):</label>
         <textarea class="form-control writing-textarea" name="sp-${page.idx}" rows="3"
                   placeholder="Ghi nhanh ý chính..."
-                  oninput="userAnswers['sp-${page.idx}']=this.value;">${esc(saved)}</textarea>
+                  oninput="userAnswers['${jsString(recordingKey)}']=this.value;">${esc(saved)}</textarea>
       </div>
+
+      ${renderSpeakingRecordingControls(recordingKey)}
     </div>`;
 }
 
@@ -3848,6 +4093,10 @@ function renderSpeakingIntro(page) {
   const audioId = 'sp-intro-audio-' + page.idx;
   const introAudioSrc = resolvePlayableAudioSrc(d.introAudio);
   const fallbackText = d.introText || d.partLabel || page.partLabel || 'Speaking introduction';
+  const recordingKey = getSpeakingRecordingKey(page);
+  const prepSeconds = Math.max(0, Math.round(Number(
+    page.prepSeconds ?? page.data?.prepSeconds ?? 45
+  )));
 
   const validImages = filterValidMediaUrls(d.images);
   const isSingle = validImages.length === 1;
@@ -3863,7 +4112,7 @@ function renderSpeakingIntro(page) {
         <div class="card-body p-3 p-md-4">
           <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-2 mb-3">
             <span class="badge bg-primary">Trang ${page.idx + 1} / ${page.totalSpeakingPages}</span>
-            <span class="page-hint" id="speaking-status">Hệ thống sẽ tự chuyển sang câu hỏi sau khi audio giới thiệu phát xong.</span>
+            <span class="page-hint" id="speaking-status">Audio xong sẽ chờ ${prepSeconds} giây chuẩn bị rồi tự chuyển sang câu hỏi.</span>
           </div>
           <h4 class="mb-2">${esc(d.partLabel)} – Giới thiệu</h4>
           <p class="text-muted mb-3">${esc(d.introText)}</p>
@@ -3892,6 +4141,11 @@ function renderSpeakingIntro(page) {
             </div>
             <div class="small" id="audio-status-label">Đang phát audio 1...</div>
           </div>
+
+          ${renderSpeakingRecordingControls(recordingKey, {
+            label: 'Ghi âm trang giới thiệu',
+            hint: `Trang intro hiện chờ ${prepSeconds} giây chuẩn bị sau audio rồi chuyển sang câu hỏi. Nút này dùng khi cần ghi thử hoặc ghi lại ngay trên trang đầu.`
+          })}
         </div>
       </div>
     </div>`;
@@ -3986,7 +4240,7 @@ function playSpeakingIntroAudio(page) {
 
   const startStandaloneRecording = async () => {
     if (statusLabel) statusLabel.textContent = 'Audio xong. Bắt đầu ghi âm...';
-    const key = page.data?.key || `sp-intro-${page.idx}`;
+    const key = getSpeakingRecordingKey(page);
     // Lưu key + page để retry button có thể truy cập.
     window.__retryIntroRecordingPage = page;
     window.__retryIntroRecordingKey = key;
@@ -4050,7 +4304,10 @@ function playSpeakingIntroAudio(page) {
 function renderSpeakingAudioQ(page) {
   const d = page.data;
   const audioId = 'sp-q-audio-' + page.idx;
-  const saved = userAnswers[d.key] || '';
+  const recordingKey = getSpeakingRecordingKey(page);
+  const answerId = speakingRecordingElementId('answer', recordingKey);
+  const wordCountId = speakingRecordingElementId('wc', recordingKey);
+  const saved = userAnswers[recordingKey] || '';
   const wc = saved.split(/\s+/).filter(Boolean).length;
   const questionAudioSrc = resolvePlayableAudioSrc(d.audio);
   const fallbackText = d.prompt || 'Speaking question';
@@ -4091,13 +4348,15 @@ function renderSpeakingAudioQ(page) {
 
           <p class="fw-semibold mb-2">Câu hỏi: ${esc(d.prompt)}</p>
           <label class="form-label fw-semibold">Câu trả lời của bạn</label>
-          <textarea class="form-control answer-box" id="answer-${d.key}"
+          <textarea class="form-control answer-box" id="${answerId}"
                     placeholder="Nhập câu trả lời hoặc transcript bạn nói..."
-                    oninput="userAnswers['${d.key}']=this.value; document.getElementById('wc-${d.key}').textContent=this.value.split(/\\s+/).filter(Boolean).length+' từ';">${esc(saved)}</textarea>
+                    oninput="userAnswers['${jsString(recordingKey)}']=this.value; document.getElementById('${jsString(wordCountId)}').textContent=this.value.split(/\\s+/).filter(Boolean).length+' từ';">${esc(saved)}</textarea>
           <div class="d-flex justify-content-between align-items-center mt-2">
             <small class="text-muted">Bạn có thể quay lại để chỉnh sửa trước khi nộp bài.</small>
-            <span class="badge bg-light text-dark" id="wc-${d.key}">${wc} từ</span>
+            <span class="badge bg-light text-dark" id="${wordCountId}">${wc} từ</span>
           </div>
+
+          ${renderSpeakingRecordingControls(recordingKey)}
         </div>
       </div>
 
@@ -4122,7 +4381,7 @@ function playSpeakingQuestionAudio(page) {
   const startTimerWithRecording = async () => {
     if (statusLabel) statusLabel.textContent = 'Audio xong.';
     if (hintEl) hintEl.textContent = 'Hệ thống sẽ tự chuyển sang câu tiếp theo sau khi hết thời gian.';
-    const key = page.data?.key || `sp-q-${page.idx}`;
+    const key = getSpeakingRecordingKey(page);
     // Lưu page hiện tại để retry button khôi phục đúng câu.
     window.__retryQRecordingPage = page;
     window.__retryQRecordingKey = key;
@@ -4586,10 +4845,10 @@ function saveCurrent() {
   document.querySelectorAll('.vocab-select, .reading-gap-select, .reading-heading-select, [name^="rm-"]').forEach(sel => {
     if (sel.name && sel.value) userAnswers[sel.name] = sel.value;
   });
-  // Save ordering state from drag containers
+  // Save ordering state from sentence ordering containers
   document.querySelectorAll('[id^="order-container-"]').forEach(container => {
     const idx = container.id.replace('order-container-', '');
-    const cards = container.querySelectorAll('.draggable-card');
+    const cards = container.querySelectorAll('.reading-order-card[data-text], .draggable-card[data-text]');
     const order = [];
     cards.forEach(c => order.push(c.dataset.text));
     if (order.length) userAnswers['order-' + idx] = order;
@@ -4873,11 +5132,21 @@ function renderResultsPage() {
       });
     }
     else if (pg.type === 'speaking-intro') {
-      // Intro pages have no answers, skip
+      const ansKey = getSpeakingRecordingKey(pg);
+      const note = userAnswers[ansKey] || '';
+      const recording = SPEAKING_RECORDINGS[ansKey];
+      if (recording?.uploadedUrl || recording?.blob || note) {
+        totalQ++;
+        const recordingUrl = recording?.uploadedUrl || (recording?.blob ? URL.createObjectURL(recording.blob) : '');
+        const recordingHtml = recordingUrl
+          ? `<audio controls preload="none" style="width:100%; max-width:320px;" src="${esc(recordingUrl)}"></audio>${recording?.uploadedUrl ? '' : '<div class="small text-muted mt-1">Đang upload ghi âm...</div>'}`
+          : '<span class="text-muted small">Chưa có ghi âm</span>';
+        rows += `<tr><td>${esc(pg.partLabel || 'Speaking Intro')}</td><td>${esc(pg.data?.introText || '')}</td><td><em>${esc(note || '(không có ghi chú)')}</em></td><td>${recordingHtml}</td></tr>`;
+      }
     }
     else if (pg.type === 'speaking-q' || pg.type === 'speaking-image' || pg.type === 'speaking-audio-q') {
       totalQ++;
-      const ansKey = pg.data.key || ('sp-' + pg.idx);
+      const ansKey = getSpeakingRecordingKey(pg);
       const note = userAnswers[ansKey] || '(không có ghi chú)';
       const label = pg.partLabel || 'Speaking';
       const recording = SPEAKING_RECORDINGS[ansKey];

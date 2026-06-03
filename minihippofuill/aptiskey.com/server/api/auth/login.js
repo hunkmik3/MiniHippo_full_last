@@ -31,13 +31,28 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Thiếu email hoặc mật khẩu' });
   }
 
+  function normalizeText(value) {
+    return typeof value === 'string' ? value.trim().toLowerCase() : '';
+  }
+
+  function resolveCourse(profile) {
+    const course = normalizeText(profile?.course);
+    if (course) return course;
+
+    const program = normalizeText(profile?.learning_program || profile?.learningProgram);
+    if (program === 'vstep') return 'vstep';
+    if (program === 'classroom' || program === 'class') return 'lớp học';
+    if (program === 'aptis') return 'aptis';
+    return '';
+  }
+
   // Validate module access — admin có quyền tất cả; ngược lại check theo course.
   function canAccessModule(profile, mod) {
     if (!mod) return true; // không truyền module → bỏ qua check
-    const role = String(profile?.role || '').toLowerCase();
+    const role = normalizeText(profile?.role);
     if (role === 'admin') return true;
-    const course = String(profile?.course || '').trim().toLowerCase();
-    const m = String(mod || '').toLowerCase();
+    const course = resolveCourse(profile);
+    const m = normalizeText(mod);
     if (m === 'lop_hoc') return course === 'lớp học';
     if (m === 'aptis') return course === 'aptis' || course === 'lớp ôn thi';
     if (m === 'vstep') return course === 'vstep';

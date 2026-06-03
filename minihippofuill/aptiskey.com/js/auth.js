@@ -95,6 +95,14 @@ function normalizeCourse(value) {
     return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
 
+function normalizeLearningProgram(value) {
+    const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (normalized === 'class' || normalized === 'classroom') return 'classroom';
+    if (normalized === 'aptis') return 'aptis';
+    if (normalized === 'vstep') return 'vstep';
+    return '';
+}
+
 function normalizeRole(value) {
     return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
@@ -116,10 +124,23 @@ function moduleForUser(user) {
     const stored = getStoredSelectedModule();
     if (isAdminUser(user) && stored) return stored;
 
-    const course = normalizeCourse(user && user.course);
+    const course = resolveUserCourse(user);
     if (course === 'vstep') return 'vstep';
     if (course === 'lớp học') return 'lop_hoc';
     return 'aptis';
+}
+
+function resolveUserCourse(user) {
+    const course = normalizeCourse(user && user.course);
+    if (course) return course;
+
+    const program = normalizeLearningProgram(
+        user && (user.learningProgram || user.learning_program)
+    );
+    if (program === 'vstep') return 'vstep';
+    if (program === 'classroom') return 'lớp học';
+    if (program === 'aptis') return 'aptis';
+    return '';
 }
 
 function landingForModule(mod) {
@@ -139,7 +160,7 @@ function normalizePathname(pathname) {
 function enforceCourseRoute(user) {
     if (!user) return true;
 
-    const course = normalizeCourse(user.course);
+    const course = resolveUserCourse(user);
     const path = normalizePathname(window.location.pathname);
     const searchParams = new URLSearchParams(window.location.search);
     const isClassroomOnlyPath = CLASSROOM_ONLY_PATHS.has(path);
@@ -431,6 +452,8 @@ window.getDeviceId = getDeviceId;
 window.getDeviceName = getDeviceName;
 window.buildDeviceHeaders = buildDeviceHeaders;
 window.submitPracticeResult = submitPracticeResult;
+window.resolveMiniHippoCourse = resolveUserCourse;
+window.moduleForMiniHippoUser = moduleForUser;
 window.consumePostLoginRedirect = function consumePostLoginRedirect() {
     try {
         const url = localStorage.getItem('post_login_redirect');
