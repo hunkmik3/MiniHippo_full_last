@@ -287,15 +287,19 @@
                                         <span class="badge bg-light text-dark" id="wordCountLabel">0 từ</span>
                                     </div>
                                     <div class="recording-panel">
+                                        <div class="mb-2">
+                                            <div class="fw-semibold"><i class="bi bi-mic-fill me-1"></i>Ghi âm câu trả lời</div>
+                                            <div class="text-muted small">Ghi âm sẽ tự bật khi đến giờ trả lời. Bạn cũng có thể bấm ghi/dừng/ghi lại thủ công nếu cần.</div>
+                                        </div>
                                         <div class="recording-actions">
-                                            <button type="button" class="btn btn-sm btn-outline-danger" id="recordStartBtn">
-                                                <i class="bi bi-mic-fill me-1"></i>Bắt đầu ghi âm
+                                            <button type="button" class="btn btn-sm btn-danger" id="recordStartBtn">
+                                                <i class="bi bi-record-circle me-1"></i>Ghi âm
                                             </button>
                                             <button type="button" class="btn btn-sm btn-outline-secondary" id="recordStopBtn" disabled>
                                                 <i class="bi bi-stop-fill me-1"></i>Dừng
                                             </button>
-                                            <button type="button" class="btn btn-sm btn-outline-warning" id="recordClearBtn" disabled>
-                                                <i class="bi bi-trash me-1"></i>Xóa bản ghi
+                                            <button type="button" class="btn btn-sm btn-outline-primary" id="recordClearBtn">
+                                                <i class="bi bi-arrow-clockwise me-1"></i>Ghi lại
                                             </button>
                                         </div>
                                         <div class="recording-status" id="recordStatusText">

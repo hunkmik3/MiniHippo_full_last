@@ -261,7 +261,7 @@
         if (!supported) {
             refs.start.disabled = true;
             refs.stop.disabled = true;
-            refs.clear.disabled = true;
+            if (refs.redo) refs.redo.disabled = true;
             if (refs.audio) {
                 refs.audio.pause();
                 refs.audio.removeAttribute('src');
@@ -273,7 +273,8 @@
 
         refs.start.disabled = isCurrentRecording;
         refs.stop.disabled = !isCurrentRecording;
-        refs.clear.disabled = !recording;
+        // "Ghi lại" luôn dùng được, trừ khi đang ghi âm (giống buoi_hoc.js).
+        if (refs.redo) refs.redo.disabled = isCurrentRecording;
 
         if (refs.audio) {
             var source = recording && (recording.uploadedUrl || recording.objectUrl);
@@ -970,13 +971,55 @@
         };
     }
 
+    // Trang câu hỏi Speaking thường có đúng 1 câu trả lời -> lấy key đầu tiên để tự ghi âm.
+    // Trang intro/prep không có câu trả lời nên trả về '' (không ghi âm).
+    function getPageAnswerKey(page) {
+        if (!page || page.kind === 'intro' || page.kind === 'prep') return '';
+        var items = Array.isArray(page.answerItems) ? page.answerItems : [];
+        for (var i = 0; i < items.length; i++) {
+            if (items[i] && items[i].key) return items[i].key;
+        }
+        return '';
+    }
+
+    // Tự bật ghi âm khi vào "giờ trả lời" (giống buoi_hoc.js). Không ghi đè bản ghi đã có,
+    // không khởi động lại nếu đang ghi đúng câu đó. Lỗi micro được startRecordingForKey xử lý.
+    function autoStartRecordingForPage(page) {
+        if (!supportsAudioRecording()) return;
+        var key = getPageAnswerKey(page);
+        if (!key) return;
+        if (practiceState.recordings[key]) return;
+        if (practiceState.recordingActive && practiceState.recordingActive.key === key) return;
+        startRecordingForKey(key);
+    }
+
+    // Hết giờ trả lời -> dừng ghi âm rồi upload nền (submit vẫn đảm bảo upload qua ensureRecordingsUploaded).
+    function finishAnswerPhaseRecording(page) {
+        var key = getPageAnswerKey(page);
+        if (!key) return;
+        if (!(practiceState.recordingActive && practiceState.recordingActive.key === key)) return;
+        stopActiveRecording('auto').then(function () {
+            var recording = practiceState.recordings[key];
+            if (recording && recording.blob && !recording.uploadedUrl) {
+                uploadRecordingForKey(key).then(function () {
+                    renderRecordingForKey(key);
+                }).catch(function () { });
+            }
+        });
+    }
+
     function playAudiosSequentially(page, audioElements, onComplete) {
         practiceState.currentAudioElements = audioElements.slice();
         var waitPlan = Array.isArray(page.audioWaitSeconds) ? page.audioWaitSeconds : [];
         var fallbackSeconds = Math.max(0, Number(page.responseSeconds) || 0);
 
         if (!audioElements.length) {
-            startResponseTimer(fallbackSeconds, onComplete, getTimerOptions(page, false));
+            // Trang câu hỏi không có audio -> giờ trả lời bắt đầu ngay: tự ghi âm.
+            if (fallbackSeconds > 0) autoStartRecordingForPage(page);
+            startResponseTimer(fallbackSeconds, function () {
+                finishAnswerPhaseRecording(page);
+                if (typeof onComplete === 'function') onComplete();
+            }, getTimerOptions(page, false));
             return;
         }
 
@@ -1013,12 +1056,21 @@
                 };
 
                 if (waitSeconds > 0) {
-                    startResponseTimer(waitSeconds, continueFlow, timerOptions);
+                    // Sau audio cuối, khoảng thời gian này chính là giờ trả lời -> tự ghi âm.
+                    if (!hasNextAudio) autoStartRecordingForPage(page);
+                    startResponseTimer(waitSeconds, function () {
+                        if (!hasNextAudio) finishAnswerPhaseRecording(page);
+                        continueFlow();
+                    }, timerOptions);
                     return;
                 }
 
                 if (!hasNextAudio && fallbackSeconds > 0) {
-                    startResponseTimer(fallbackSeconds, continueFlow, timerOptions);
+                    autoStartRecordingForPage(page);
+                    startResponseTimer(fallbackSeconds, function () {
+                        finishAnswerPhaseRecording(page);
+                        continueFlow();
+                    }, timerOptions);
                     return;
                 }
 
@@ -1154,13 +1206,25 @@
         var recordingPanel = document.createElement('div');
         recordingPanel.className = 'recording-panel';
 
+        var recordingHead = document.createElement('div');
+        recordingHead.className = 'mb-2';
+        var recordingTitle = document.createElement('div');
+        recordingTitle.className = 'fw-semibold';
+        recordingTitle.innerHTML = '<i class="bi bi-mic-fill me-1"></i>Ghi âm câu trả lời';
+        var recordingHint = document.createElement('div');
+        recordingHint.className = 'text-muted small';
+        recordingHint.textContent = 'Ghi âm sẽ tự bật khi đến giờ trả lời. Bạn cũng có thể bấm ghi/dừng/ghi lại thủ công nếu cần.';
+        recordingHead.appendChild(recordingTitle);
+        recordingHead.appendChild(recordingHint);
+        recordingPanel.appendChild(recordingHead);
+
         var actions = document.createElement('div');
         actions.className = 'recording-actions';
 
         var startBtn = document.createElement('button');
         startBtn.type = 'button';
-        startBtn.className = 'btn btn-sm btn-outline-danger';
-        startBtn.innerHTML = '<i class="bi bi-mic-fill me-1"></i>Bắt đầu ghi âm';
+        startBtn.className = 'btn btn-sm btn-danger';
+        startBtn.innerHTML = '<i class="bi bi-record-circle me-1"></i>Ghi âm';
 
         var stopBtn = document.createElement('button');
         stopBtn.type = 'button';
@@ -1168,15 +1232,14 @@
         stopBtn.innerHTML = '<i class="bi bi-stop-fill me-1"></i>Dừng';
         stopBtn.disabled = true;
 
-        var clearBtn = document.createElement('button');
-        clearBtn.type = 'button';
-        clearBtn.className = 'btn btn-sm btn-outline-warning';
-        clearBtn.innerHTML = '<i class="bi bi-trash me-1"></i>Xóa bản ghi';
-        clearBtn.disabled = true;
+        var redoBtn = document.createElement('button');
+        redoBtn.type = 'button';
+        redoBtn.className = 'btn btn-sm btn-outline-primary';
+        redoBtn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Ghi lại';
 
         actions.appendChild(startBtn);
         actions.appendChild(stopBtn);
-        actions.appendChild(clearBtn);
+        actions.appendChild(redoBtn);
         recordingPanel.appendChild(actions);
 
         var status = document.createElement('div');
@@ -1195,7 +1258,7 @@
         practiceState.recorderRefs[item.key] = {
             start: startBtn,
             stop: stopBtn,
-            clear: clearBtn,
+            redo: redoBtn,
             status: status,
             audio: preview
         };
@@ -1218,8 +1281,10 @@
             }
         });
 
-        clearBtn.addEventListener('click', async function () {
+        // "Ghi lại" = xoá bản ghi hiện tại rồi bắt đầu ghi âm mới ngay (giống buoi_hoc.js).
+        redoBtn.addEventListener('click', async function () {
             await clearRecordingForKey(item.key);
+            await startRecordingForKey(item.key);
         });
 
         renderRecordingForKey(item.key);

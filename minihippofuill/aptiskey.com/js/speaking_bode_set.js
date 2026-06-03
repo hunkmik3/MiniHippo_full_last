@@ -222,7 +222,8 @@
 
         refs.recordStartBtn.disabled = isRecording;
         refs.recordStopBtn.disabled = !isRecording;
-        refs.recordClearBtn.disabled = !recording;
+        // "Ghi lại" luôn dùng được, trừ khi đang ghi âm (giống buoi_hoc.js).
+        refs.recordClearBtn.disabled = isRecording;
 
         if (refs.recordPreviewAudio) {
             const sourceUrl = recording && (recording.uploadedUrl || recording.objectUrl);
@@ -505,6 +506,31 @@
             delete state.recordings[answerKey];
         }
         renderRecordingUI(state.pages[state.currentPage - 1]);
+    }
+
+    // Tự bật ghi âm khi vào "giờ trả lời" (giống buoi_hoc.js). Không ghi đè bản ghi đã có,
+    // không khởi động lại nếu đang ghi đúng câu đó. Lỗi micro do startRecordingForCurrentPage xử lý.
+    function autoStartRecordingForCurrentPage() {
+        if (!supportsAudioRecording()) return;
+        const key = getCurrentAnswerKey();
+        if (!key) return;
+        if (state.recordings[key]) return;
+        if (state.recordingActive && state.recordingActive.key === key) return;
+        startRecordingForCurrentPage();
+    }
+
+    // Hết giờ trả lời -> dừng ghi âm rồi upload nền (submit vẫn đảm bảo upload qua ensureRecordingsUploadedForAnswers).
+    async function finishAnswerRecordingForCurrentPage() {
+        const key = getCurrentAnswerKey();
+        if (!key) return;
+        if (!(state.recordingActive && state.recordingActive.key === key)) return;
+        await stopActiveRecording('auto');
+        const recording = state.recordings[key];
+        if (recording && recording.blob && !recording.uploadedUrl) {
+            uploadRecording(key)
+                .then(() => renderRecordingUI(state.pages[state.currentPage - 1]))
+                .catch(() => { });
+        }
     }
 
     function cleanupRecordings() {
@@ -1003,9 +1029,14 @@
                 };
 
                 if (waitSeconds > 0) {
+                    // Sau audio cuối, khoảng đếm này chính là giờ trả lời -> tự ghi âm.
+                    if (!hasNextAudio) autoStartRecordingForCurrentPage();
                     startAutoAdvanceCountdown(page, waitSeconds, {
                         completionLabel: nextActionLabel,
-                        onComplete: finishSequence
+                        onComplete: async () => {
+                            if (!hasNextAudio) await finishAnswerRecordingForCurrentPage();
+                            await finishSequence();
+                        }
                     });
                     return;
                 }
@@ -1074,6 +1105,12 @@
 
             if (hasAudio && refs.autoHint) {
                 refs.autoHint.textContent = 'Đang phát audio... hệ thống sẽ chờ đúng theo mốc thời gian của từng audio.';
+            }
+
+            // Trang câu hỏi không có audio -> vào ngay giờ trả lời: tự ghi âm (giống buoi_hoc.js).
+            // Trang có audio sẽ tự ghi âm sau khi audio phát xong (trong playAudioSequence).
+            if (!hasAudio && page.answerKey) {
+                autoStartRecordingForCurrentPage();
             }
         }
 
@@ -1262,8 +1299,10 @@
             }
         });
 
+        // "Ghi lại" = xoá bản ghi hiện tại rồi bắt đầu ghi âm mới ngay (giống buoi_hoc.js).
         refs.recordClearBtn?.addEventListener('click', async () => {
             await clearRecordingForCurrentPage();
+            await startRecordingForCurrentPage();
         });
     }
 

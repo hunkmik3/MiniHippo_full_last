@@ -3174,7 +3174,7 @@ function renderPage(pageIndex) {
       case 'writing-sentences': container.innerHTML = renderWritingSentences(page); break;
       case 'writing-chat':      container.innerHTML = renderWritingChat(page); break;
       case 'speaking-q':        container.innerHTML = renderSpeakingQ(page); playSpeakingQAudio(page); break;
-      case 'speaking-image':    container.innerHTML = renderSpeakingImage(page); startSpeakingTimer(page); break;
+      case 'speaking-image':    container.innerHTML = renderSpeakingImage(page); playSpeakingImageAnswer(page); break;
       case 'writing-describe-image': container.innerHTML = renderWritingDescribeImage(page); break;
       case 'writing-followup':      container.innerHTML = renderWritingFollowup(page); break;
       case 'speaking-intro':    container.innerHTML = renderSpeakingIntro(page); playSpeakingIntroAudio(page); break;
@@ -4016,6 +4016,7 @@ function renderSpeakingQ(page) {
 
 function playSpeakingQAudio(page) {
   clearSpeakingTimer();
+  stopActiveSpeakingRecording();
   const d = page.data || {};
   const audioId = `sp-basic-audio-${page.idx}`;
   const audioStatusId = `sp-basic-audio-status-${page.idx}`;
@@ -4024,10 +4025,22 @@ function playSpeakingQAudio(page) {
   const hintEl = document.getElementById('speaking-status');
   const timerStatus = document.getElementById('speaking-timer-status');
 
-  const startTimer = () => {
+  const startTimer = async () => {
     if (statusLabel) statusLabel.textContent = 'Audio xong.';
     if (hintEl) hintEl.textContent = 'Đang đếm thời gian trả lời. Hệ thống sẽ tự chuyển sang câu tiếp theo.';
-    if (timerStatus) timerStatus.textContent = `Thời gian trả lời: ${page.responseSeconds} giây`;
+    // Tự bật ghi âm khi vào giờ trả lời (giống speaking-audio-q). Timer sẽ tự dừng ghi âm khi hết giờ.
+    const key = getSpeakingRecordingKey(page);
+    window.__retryQRecordingPage = page;
+    window.__retryQRecordingKey = key;
+    const ok = await startSpeakingRecording(key, { retryHandlerName: 'retryQuestionSpeakingRecording' });
+    if (ok) {
+      showSpeakingRecordingIndicator(key, {
+        containerIds: [audioStatusId, 'speaking-timer-status'],
+        text: `🔴 Đang ghi âm... ${page.responseSeconds}s`
+      });
+    } else if (timerStatus) {
+      timerStatus.textContent = `Thời gian trả lời: ${page.responseSeconds} giây — micro chưa sẵn sàng (xem cảnh báo phía trên)`;
+    }
     startSpeakingTimer(page);
   };
 
@@ -4038,6 +4051,26 @@ function playSpeakingQAudio(page) {
   playMediaOrSpeechUntilEnded(audio, d.prompt || '')
     .then(startTimer)
     .catch(() => { startTimer(); });
+}
+
+// Trang speaking-image không có audio câu hỏi -> vào giờ trả lời ngay: tự bật ghi âm rồi đếm giờ.
+function playSpeakingImageAnswer(page) {
+  clearSpeakingTimer();
+  const startWithRecording = async () => {
+    const key = getSpeakingRecordingKey(page);
+    window.__retryQRecordingPage = page;
+    window.__retryQRecordingKey = key;
+    const ok = await startSpeakingRecording(key, { retryHandlerName: 'retryQuestionSpeakingRecording' });
+    if (ok) {
+      showSpeakingRecordingIndicator(key, {
+        containerIds: ['speaking-status'],
+        text: `🔴 Đang ghi âm... ${page.responseSeconds}s`
+      });
+    }
+    // Timer sẽ tự dừng ghi âm khi hết giờ (xem startSpeakingTimer).
+    startSpeakingTimer(page);
+  };
+  startWithRecording();
 }
 
 function renderSpeakingImage(page) {
@@ -4144,7 +4177,7 @@ function renderSpeakingIntro(page) {
 
           ${renderSpeakingRecordingControls(recordingKey, {
             label: 'Ghi âm trang giới thiệu',
-            hint: `Trang intro hiện chờ ${prepSeconds} giây chuẩn bị sau audio rồi chuyển sang câu hỏi. Nút này dùng khi cần ghi thử hoặc ghi lại ngay trên trang đầu.`
+            hint: `Mic sẽ tự bật ghi âm trong ${prepSeconds} giây chuẩn bị trên trang này (sau khi audio phát xong), rồi tự chuyển sang câu hỏi. Bạn có thể bấm ghi/dừng/ghi lại thủ công nếu cần.`
           })}
         </div>
       </div>
@@ -4219,7 +4252,15 @@ function playSpeakingIntroAudio(page) {
       return;
     }
     ensureIntroPrepRing();
-    if (statusLabel) statusLabel.textContent = 'Audio xong. Hãy quan sát ảnh & chuẩn bị nội dung trả lời.';
+    if (statusLabel) statusLabel.textContent = 'Audio xong. Hệ thống đang ghi âm trang giới thiệu, hãy bắt đầu trả lời.';
+    // Theo yêu cầu: tự ghi âm NGAY trên trang giới thiệu trong lúc đếm giờ chuẩn bị.
+    // Ghi âm sẽ tự dừng trước khi chuyển sang trang câu hỏi (để recorder không bị xung đột).
+    const introKey = getSpeakingRecordingKey(page);
+    window.__retryIntroRecordingPage = page;
+    window.__retryIntroRecordingKey = introKey;
+    startSpeakingRecording(introKey, { retryHandlerName: 'retryIntroSpeakingRecording' }).then((ok) => {
+      if (ok) showSpeakingRecordingIndicator(introKey, { containerIds: ['audio-status-label', 'speaking-status'] });
+    });
     let remaining = prepSeconds;
     const ring = document.getElementById('intro-prep-ring');
     const seconds = document.getElementById('intro-prep-seconds');
@@ -4227,11 +4268,12 @@ function playSpeakingIntroAudio(page) {
     introPrepInterval = setInterval(() => {
       remaining -= 1;
       if (seconds) seconds.textContent = String(Math.max(0, remaining));
-      if (status) status.innerHTML = `Chuẩn bị câu trả lời. Tự chuyển sang câu hỏi sau <strong>${Math.max(0, remaining)}</strong> giây…`;
+      if (status) status.innerHTML = `<span class="text-danger">🔴 Đang ghi âm…</span> Tự chuyển sang câu hỏi sau <strong>${Math.max(0, remaining)}</strong> giây…`;
       if (remaining <= 5 && ring) ring.className = 'speaking-timer-ring warning';
       if (remaining <= 0) {
         clearIntroPrep();
         if (ring) ring.className = 'speaking-timer-ring expired';
+        stopActiveSpeakingRecording();
         saveCurrent();
         renderPage(currentPage + 1);
       }
