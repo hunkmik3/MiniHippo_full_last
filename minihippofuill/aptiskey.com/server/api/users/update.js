@@ -9,6 +9,7 @@ function normalizeLearningProgram(value) {
   const normalized = value.trim().toLowerCase();
   if (normalized === 'class' || normalized === 'classroom') return 'classroom';
   if (normalized === 'aptis') return 'aptis';
+  if (normalized === 'vstep') return 'vstep';
   return '';
 }
 
@@ -19,6 +20,7 @@ function normalizeCourse(value) {
   if (normalized === 'lớp học' || normalized === 'lop hoc') return 'Lớp học';
   if (normalized === 'lớp ôn thi' || normalized === 'lop on thi') return 'Lớp ôn thi';
   if (normalized === 'aptis') return 'Aptis';
+  if (normalized === 'vstep') return 'VSTEP';
   return trimmed;
 }
 
@@ -190,6 +192,8 @@ export default async function handler(req, res) {
         ? 'Lớp học'
         : normalizedProgram === 'aptis'
           ? 'Aptis'
+          : normalizedProgram === 'vstep'
+            ? 'VSTEP'
           : '';
 
   if (effectiveCourse === 'Lớp học' && !resolvedBand) {
@@ -255,6 +259,8 @@ export default async function handler(req, res) {
     payload.course = 'Aptis';
   } else if (normalizedProgram === 'classroom') {
     payload.course = 'Lớp học';
+  } else if (normalizedProgram === 'vstep') {
+    payload.course = 'VSTEP';
   }
   if (typeof band !== 'undefined' || typeof course !== 'undefined' || payload.course === 'Lớp học') {
     payload.band =
@@ -264,10 +270,10 @@ export default async function handler(req, res) {
   }
   if (typeof assignedClassId !== 'undefined') {
     payload.assigned_class_id =
-      payload.course === 'Lớp ôn thi' || payload.course === 'Aptis'
+      payload.course === 'Lớp ôn thi' || payload.course === 'Aptis' || payload.course === 'VSTEP'
         ? null
         : resolvedAssignedClassId || null;
-  } else if (payload.course === 'Lớp ôn thi' || payload.course === 'Aptis') {
+  } else if (payload.course === 'Lớp ôn thi' || payload.course === 'Aptis' || payload.course === 'VSTEP') {
     payload.assigned_class_id = null;
   }
   if (typeof startedOn !== 'undefined') {
@@ -296,7 +302,6 @@ export default async function handler(req, res) {
     });
   }
 }
-
 
 
 

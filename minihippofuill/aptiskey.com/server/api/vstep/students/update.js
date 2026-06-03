@@ -35,7 +35,10 @@ export default async function handler(req, res) {
     if (!existing) return res.status(404).json({ error: 'Không tìm thấy học viên VSTEP' });
 
     const payload = { updated_at: new Date().toISOString() };
-    const publicUserPayload = {};
+    const publicUserPayload = {
+      learning_program: 'vstep',
+      course: 'VSTEP'
+    };
 
     if (body.accountCode !== undefined || body.account_code !== undefined) {
       payload.account_code = cleanText(body.accountCode ?? body.account_code) || null;

@@ -222,6 +222,27 @@
             return typeof value === 'string' ? value.trim().toLowerCase() : '';
         }
 
+        function normalizeLearningProgram(value) {
+            const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+            if (normalized === 'class' || normalized === 'classroom') return 'classroom';
+            if (normalized === 'aptis') return 'aptis';
+            if (normalized === 'vstep') return 'vstep';
+            return '';
+        }
+
+        function resolveUserCourse(user) {
+            if (typeof window.resolveMiniHippoCourse === 'function') {
+                return window.resolveMiniHippoCourse(user);
+            }
+            const course = normalizeCourse(user && user.course);
+            if (course) return course;
+            const program = normalizeLearningProgram(user && (user.learningProgram || user.learning_program));
+            if (program === 'vstep') return 'vstep';
+            if (program === 'classroom') return 'lớp học';
+            if (program === 'aptis') return 'aptis';
+            return '';
+        }
+
         function normalizePath(pathname) {
             const raw = typeof pathname === 'string' ? pathname.trim().toLowerCase() : '';
             if (!raw || raw === '/') return '/';
@@ -285,7 +306,7 @@
             if (!user) return false;
             const role = String(user.role || '').toLowerCase();
             if (role === 'admin') return true;
-            const course = normalizeCourse(user.course);
+            const course = resolveUserCourse(user);
             if (mod === 'lop_hoc') return course === 'lớp học';
             if (mod === 'aptis') return course === 'aptis' || course === 'lớp ôn thi';
             if (mod === 'vstep') return course === 'vstep';
@@ -298,7 +319,7 @@
             if (stored && userCanAccessModule(user, stored)) return stored;
             if (!user) return 'aptis';
             if (String(user.role || '').toLowerCase() === 'admin') return 'aptis';
-            const course = normalizeCourse(user.course);
+            const course = resolveUserCourse(user);
             if (course === 'lớp học') return 'lop_hoc';
             if (course === 'vstep') return 'vstep';
             return 'aptis';

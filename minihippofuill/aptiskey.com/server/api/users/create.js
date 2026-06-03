@@ -16,6 +16,7 @@ function normalizeLearningProgram(value) {
   const normalized = value.trim().toLowerCase();
   if (normalized === 'class' || normalized === 'classroom') return 'classroom';
   if (normalized === 'aptis') return 'aptis';
+  if (normalized === 'vstep') return 'vstep';
   return '';
 }
 
@@ -26,6 +27,7 @@ function normalizeCourse(value) {
   if (normalized === 'lớp học' || normalized === 'lop hoc') return 'Lớp học';
   if (normalized === 'lớp ôn thi' || normalized === 'lop on thi') return 'Lớp ôn thi';
   if (normalized === 'aptis') return 'Aptis';
+  if (normalized === 'vstep') return 'VSTEP';
   return trimmed;
 }
 
@@ -220,7 +222,13 @@ export default async function handler(req, res) {
 
     const effectiveCourse =
       resolvedCourse ||
-      (resolvedLearningProgram === 'classroom' ? 'Lớp học' : '');
+      (resolvedLearningProgram === 'classroom'
+        ? 'Lớp học'
+        : resolvedLearningProgram === 'aptis'
+          ? 'Aptis'
+          : resolvedLearningProgram === 'vstep'
+            ? 'VSTEP'
+            : '');
 
     if (effectiveCourse === 'Lớp học' && !resolvedBand) {
       return res.status(400).json({ error: 'Học viên lớp học bắt buộc phải có band (B1 hoặc B2).' });
@@ -248,6 +256,8 @@ export default async function handler(req, res) {
       userPayload.course = 'Aptis';
     } else if (resolvedLearningProgram === 'classroom') {
       userPayload.course = effectiveCourse || 'Lớp học';
+    } else if (resolvedLearningProgram === 'vstep') {
+      userPayload.course = 'VSTEP';
     }
     if (typeof band !== 'undefined' || userPayload.course === 'Lớp học') {
       userPayload.band = userPayload.course === 'Lớp ôn thi' ? null : (resolvedBand || null);

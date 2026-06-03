@@ -316,6 +316,41 @@
         return null;
     }
 
+    function getOrderingCards(container) {
+        return Array.from(container?.querySelectorAll('.reading-order-card[data-correct-index]') || []);
+    }
+
+    function syncOrderingButtons(container) {
+        const cards = getOrderingCards(container);
+        cards.forEach((card, index) => {
+            card.dataset.orderIndex = String(index);
+            const up = card.querySelector('[data-order-action="up"]');
+            const down = card.querySelector('[data-order-action="down"]');
+            if (up) up.disabled = index === 0;
+            if (down) down.disabled = index === cards.length - 1;
+        });
+    }
+
+    function moveOrderingCard(containerId, index, delta) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        const cards = getOrderingCards(container);
+        const from = Number(index);
+        const to = from + Number(delta);
+        if (!Number.isInteger(from) || !Number.isInteger(to) || to < 0 || to >= cards.length) return;
+
+        const moving = cards[from];
+        const target = cards[to];
+        if (!moving || !target) return;
+        if (delta < 0) {
+            container.insertBefore(moving, target);
+        } else {
+            container.insertBefore(target, moving);
+        }
+        syncOrderingButtons(container);
+    }
+    window.moveReadingSetOrderingCard = moveOrderingCard;
+
     function renderOrderingQuestion(containerId, topicId, questionData) {
         const container = document.getElementById(containerId);
         const topicEl = document.getElementById(topicId);
@@ -354,6 +389,7 @@
 
         shuffledSentences.forEach((item, displayIndex) => {
             const sentence = typeof item === 'string' ? item : item.text;
+            const safeSentence = escapeHtml(sentence);
             const originalIndex = typeof item === 'string' ? sentences.indexOf(item) : item.originalIndex;
             const card = document.createElement('div');
             card.dataset.correctIndex = originalIndex;
@@ -366,15 +402,29 @@
                 card.innerHTML = `
                     <div class="card-body d-flex align-items-center">
                         <i class="bi bi-check-circle-fill text-success me-2" style="font-size: 1.2rem;"></i>
-                        <span>${sentence}</span>
+                        <span>${safeSentence}</span>
                     </div>
                 `;
             } else {
-                card.className = 'draggable-card';
+                card.className = 'reading-order-card';
+                const movableIndex = displayIndex - 1;
                 card.innerHTML = `
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-grip-vertical me-2 text-muted" style="font-size: 1.2rem;"></i>
-                        <span>${sentence}</span>
+                    <div class="reading-order-card-body">
+                        <span class="reading-order-text">${safeSentence}</span>
+                        <div class="reading-order-actions" aria-label="Đổi vị trí câu">
+                            <button type="button" class="btn btn-sm btn-outline-primary reading-order-move-btn"
+                                    data-order-action="up"
+                                    onclick="moveReadingSetOrderingCard('${containerId}', Number(this.closest('.reading-order-card').dataset.orderIndex), -1)"
+                                    ${movableIndex === 0 ? 'disabled' : ''} title="Chuyển lên">
+                                <i class="bi bi-arrow-up"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-primary reading-order-move-btn"
+                                    data-order-action="down"
+                                    onclick="moveReadingSetOrderingCard('${containerId}', Number(this.closest('.reading-order-card').dataset.orderIndex), 1)"
+                                    ${movableIndex === shuffledRest.length - 1 ? 'disabled' : ''} title="Chuyển xuống">
+                                <i class="bi bi-arrow-down"></i>
+                            </button>
+                        </div>
                     </div>
                 `;
             }
@@ -382,14 +432,7 @@
             container.appendChild(card);
         });
 
-        if (typeof Sortable !== 'undefined' && Sortable?.create) {
-            Sortable.create(container, {
-                animation: 150,
-                draggable: '.draggable-card'
-            });
-        } else {
-            console.warn('SortableJS is not loaded; Reading ordering question rendered without drag support.');
-        }
+        syncOrderingButtons(container);
 
         return true;
     }

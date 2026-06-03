@@ -60,6 +60,57 @@ html {
 .question-card h3, .question-card h4, .question-card h5 { line-height: 1.4; }
 .question-card .speaking-question-text { font-size: 1.18rem; line-height: 1.6; }
 .question-card .draggable-card { font-size: 1.04rem; line-height: 1.65; }
+.reading-order-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  margin-bottom: 0.75rem;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.05);
+  cursor: default !important;
+}
+.reading-order-card.draggable-item {
+  cursor: default !important;
+}
+.reading-order-card.draggable-item:hover,
+.reading-order-card.draggable-item:active {
+  transform: none !important;
+}
+.reading-order-card.draggable-item:active {
+  cursor: default !important;
+}
+.reading-order-card-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  padding: 1rem;
+}
+.reading-order-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 1.04rem;
+  line-height: 1.6;
+}
+.reading-order-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.35rem;
+}
+.reading-order-move-btn {
+  width: 2.35rem;
+  height: 2.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+@media (max-width: 576px) {
+  .reading-order-card-body {
+    align-items: flex-start;
+  }
+  .reading-order-actions {
+    flex-direction: column;
+  }
+}
 .question-card .gap-row,
 .question-card .sentence-fill { font-size: 1.06rem; }
 .question-card .writing-q-item label { font-size: 1.05rem; font-weight: 600; }
@@ -104,12 +155,34 @@ html {
   border-radius: 0.6rem;
 }
 
+.speaking-recording-panel {
+  border: 1px solid #dbe4f0;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+  padding: 0.9rem 1rem;
+}
+
+.speaking-recording-actions .btn {
+  min-width: 92px;
+  font-weight: 700;
+}
+
+.speaking-recording-panel audio {
+  max-height: 42px;
+}
+
 @media (max-width: 768px) {
   .question-card,
   .question-card .q-text,
   .question-card .lq-text,
   .question-card .option-item .option-text { font-size: 1rem; }
   .question-card .q-number-label { font-size: 1.25rem; }
+  .speaking-recording-actions {
+    width: 100%;
+  }
+  .speaking-recording-actions .btn {
+    flex: 1 1 120px;
+  }
 }
 
 /* ============================================
@@ -819,4 +892,3 @@ form {
   border-radius: 0.5rem;
   backdrop-filter: blur(10px);
 }
-

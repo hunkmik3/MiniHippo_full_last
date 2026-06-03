@@ -19,10 +19,16 @@ function resolveLearningProgram(user = {}) {
   if (directProgram === 'aptis') {
     return 'aptis';
   }
+  if (directProgram === 'vstep') {
+    return 'vstep';
+  }
 
   const normalizedCourse = normalize(user.course);
   if (CLASSROOM_COURSES.has(normalizedCourse)) {
     return 'classroom';
+  }
+  if (normalizedCourse === 'vstep') {
+    return 'vstep';
   }
 
   return 'aptis';
@@ -80,6 +86,8 @@ export default async function handler(req, res) {
         ? enrichedUsers.filter(user => user.learning_program === 'classroom')
         : group === 'aptis'
           ? enrichedUsers.filter(user => user.learning_program === 'aptis')
+          : group === 'vstep'
+            ? enrichedUsers.filter(user => user.learning_program === 'vstep')
           : enrichedUsers;
 
     return res.status(200).json({ users: filteredUsers });

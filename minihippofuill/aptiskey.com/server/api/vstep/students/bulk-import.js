@@ -61,6 +61,8 @@ async function createOrUpdateStudent(row, batchId) {
         account_code: payload.account_code,
         full_name: payload.full_name,
         phone_number: payload.phone_number,
+        learning_program: 'vstep',
+        course: 'VSTEP',
         band,
         status: payload.status,
         device_limit: deviceLimit,
