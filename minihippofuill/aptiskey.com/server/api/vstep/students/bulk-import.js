@@ -1,6 +1,6 @@
 import { parseJsonBody } from '../../_utils/parseBody.js';
 import { verifyAdminRequest } from '../../_utils/auth.js';
-import { callSupabaseAuth, insertInto, selectFrom, updateTable } from '../../_utils/supabase.js';
+import { callSupabaseAuth, deleteFrom, insertInto, selectFrom, updateTable } from '../../_utils/supabase.js';
 import { resolveDeviceLimit } from '../../_utils/device.js';
 import { computeVstepExpiresAtDate, vstepSchemaErrorResponse } from '../_utils.js';
 
@@ -163,7 +163,14 @@ async function createOrUpdateStudent(row, batchId) {
 
     return { action: 'created', student, temporaryPassword: password };
   } catch (error) {
+    // Dọn cả public.users + auth.users để tránh orphan gây 409 ở lần
+    // import sau (xem comment ở students/create.js).
     if (authUser?.id) {
+      try {
+        await deleteFrom('users', [{ column: 'id', value: authUser.id }]);
+      } catch (publicCleanupError) {
+        console.warn('Failed to rollback public.users row (bulk import):', publicCleanupError.message);
+      }
       try {
         await callSupabaseAuth(`admin/users/${authUser.id}`, { method: 'DELETE' }, { useAnonKey: false });
       } catch (cleanupError) {

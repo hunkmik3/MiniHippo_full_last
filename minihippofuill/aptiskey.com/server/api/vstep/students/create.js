@@ -1,6 +1,6 @@
 import { parseJsonBody } from '../../_utils/parseBody.js';
 import { verifyAdminRequest } from '../../_utils/auth.js';
-import { callSupabaseAuth, insertInto, selectFrom } from '../../_utils/supabase.js';
+import { callSupabaseAuth, deleteFrom, insertInto, selectFrom } from '../../_utils/supabase.js';
 import { resolveDeviceLimit } from '../../_utils/device.js';
 import { computeVstepExpiresAtDate, vstepSchemaErrorResponse } from '../_utils.js';
 
@@ -143,7 +143,16 @@ export default async function handler(req, res) {
       temporaryPassword: generated ? password : null
     });
   } catch (error) {
+    // Rollback DUAL: phải dọn cả public.users (nếu chèn được rồi mới fail
+    // ở bước vstep_students) lẫn auth.users. Không có FK cascade giữa
+    // public.users và auth.users nên rollback một bên sẽ để lại orphan
+    // — lần tạo sau cùng email/id sẽ kẹt 409 duplicate key.
     if (authUser?.id) {
+      try {
+        await deleteFrom('users', [{ column: 'id', value: authUser.id }]);
+      } catch (publicCleanupError) {
+        console.warn('Failed to rollback public.users row:', publicCleanupError.message);
+      }
       try {
         await callSupabaseAuth(`admin/users/${authUser.id}`, { method: 'DELETE' }, { useAnonKey: false });
       } catch (cleanupError) {
