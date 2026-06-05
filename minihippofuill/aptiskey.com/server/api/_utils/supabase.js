@@ -154,7 +154,18 @@ export async function callSupabaseAuth(path, options = {}, config = {}) {
     } catch {
       parsed = { error: text || 'Auth request failed' };
     }
-    const error = new Error(parsed.error || 'Auth request failed');
+    // Supabase Auth trả message ở nhiều field tuỳ endpoint:
+    //   - admin/users: { msg, code, error_code } cho 422 (vd "A user with this email...")
+    //   - oauth/token: { error, error_description }
+    //   - signup/login: { error }
+    // Lấy field đầu tiên có giá trị thay vì chỉ đọc `error` (nếu không sẽ
+    // rơi vào fallback "Auth request failed" che mất lỗi thật).
+    const detailMessage = parsed?.msg
+      || parsed?.error_description
+      || parsed?.error
+      || parsed?.message
+      || 'Auth request failed';
+    const error = new Error(detailMessage);
     error.status = response.status;
     error.details = parsed;
     throw error;
