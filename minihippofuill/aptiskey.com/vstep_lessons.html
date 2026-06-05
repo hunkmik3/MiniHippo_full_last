@@ -41,10 +41,9 @@
             </a>
           </li>
           <li class="nav-item d-none d-md-block">
-            <a href="vstep_lessons.html" class="nav-link">Học VSTEP</a>
-          </li>
-          <li class="nav-item d-none d-md-block">
-            <a href="vstep_full_test.html" class="nav-link">Thi thử full test</a>
+            <a href="vstep_home.html" class="nav-link">
+              <i class="bi bi-house-door me-1"></i> Trang VSTEP
+            </a>
           </li>
           <li class="nav-item d-none d-md-block">
             <a href="#" class="nav-link" onclick="window.open('https://www.facebook.com/trungtamminihippo', '_blank'); return false;">
@@ -70,27 +69,16 @@
           <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" role="navigation"
             aria-label="VSTEP navigation" data-accordion="false" id="navigation">
             <li class="nav-item">
-              <a href="vstep_bode.html" class="nav-link">
-                <i class="nav-icon bi bi-journal-check"></i>
-                <p>Ôn thi VSTEP</p>
+              <a href="vstep_lessons.html" class="nav-link active">
+                <i class="nav-icon bi bi-clipboard2-pulse"></i>
+                <p>Bài học được giao</p>
               </a>
             </li>
-            <li class="nav-item menu-open">
-              <a href="#" class="nav-link active">
-                <i class="nav-icon bi bi-calendar2-week"></i>
-                <p>
-                  Học tập VSTEP
-                  <i class="nav-arrow bi bi-chevron-right"></i>
-                </p>
+            <li class="nav-item">
+              <a href="vstep_home.html" class="nav-link">
+                <i class="nav-icon bi bi-house-door"></i>
+                <p>Trang VSTEP</p>
               </a>
-              <ul class="nav nav-treeview">
-                <li class="nav-item">
-                  <a href="vstep_lessons.html" class="nav-link active">
-                    <i class="nav-icon bi bi-clipboard2-pulse"></i>
-                    <p>Bài học được giao</p>
-                  </a>
-                </li>
-              </ul>
             </li>
             <li class="nav-item">
               <a href="#" class="nav-link"
@@ -126,11 +114,8 @@
                   <p class="text-secondary mb-0">Theo dõi lớp học, lịch học, bài được giao và deadline trong module VSTEP riêng.</p>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
-                  <a href="vstep_bode.html" class="btn btn-outline-secondary">
-                    <i class="bi bi-journal-check me-1"></i> Ôn thi
-                  </a>
-                  <a href="vstep_full_test.html" class="btn btn-outline-secondary">
-                    <i class="bi bi-stack me-1"></i> Full test
+                  <a href="vstep_home.html" class="btn btn-outline-secondary">
+                    <i class="bi bi-house-door me-1"></i> Trang VSTEP
                   </a>
                   <button type="button" class="btn btn-primary fw-semibold" id="reloadVstepListBtn">
                     <i class="bi bi-arrow-clockwise me-1"></i> Tải lại
@@ -223,7 +208,7 @@
       }
     });
   </script>
-  <script src="js/vstep_bode.js"></script>
+  <script src="js/vstep_lessons.js"></script>
   <script src="js/copy_paste_guard.js"></script>
 </body>
 
