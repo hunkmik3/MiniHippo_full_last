@@ -4,6 +4,17 @@
         practice: 'Ôn thi VSTEP',
         lesson_exam: 'Học tập VSTEP'
     };
+
+    // Page mode: set bởi <script>window.__VSTEP_ADMIN_MODE__ = '...'</script>
+    // ngay trước khi load file này. Quyết định trang gộp (legacy) hay 1 trong 2
+    // trang con (Ôn thi / Lớp Học). Hardcode flow filter + default panel.
+    const ADMIN_MODE = (typeof window !== 'undefined' && window.__VSTEP_ADMIN_MODE__) || 'legacy';
+    const MODE_CONFIG = {
+        legacy: { defaultPanel: 'students', forceFlow: null, allowFlowFilter: true },
+        onthi: { defaultPanel: 'content', forceFlow: 'practice', allowFlowFilter: false },
+        lophoc: { defaultPanel: 'students', forceFlow: 'lesson_exam', allowFlowFilter: false }
+    };
+    const PAGE = MODE_CONFIG[ADMIN_MODE] || MODE_CONFIG.legacy;
     const CONTENT_SKILL_LABELS = {
         full_test: 'Full 4 kỹ năng',
         listening: 'Listening',
@@ -27,8 +38,8 @@
     const refs = {};
     const state = {
         editingId: '',
-        currentPanel: 'students',
-        currentFlow: 'practice',
+        currentPanel: PAGE.defaultPanel,
+        currentFlow: PAGE.forceFlow || 'practice',
         sets: [],
         users: [],
         results: [],
@@ -968,6 +979,13 @@
             return;
         }
 
+        // Defense-in-depth: nếu trang Ôn thi / Lớp Học hardcode flow, ép
+        // payload.data.vstep_flow để tránh admin lỡ tạo nhầm flow ngược lại.
+        if (PAGE.forceFlow) {
+            payload.data = payload.data || {};
+            payload.data.vstep_flow = PAGE.forceFlow;
+        }
+
         refs.saveBtn.disabled = true;
         refs.saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Đang lưu...';
 
@@ -1603,7 +1621,9 @@
     }
 
     function renderResults() {
-        const flowFilter = getValue('vstepResultFlowFilter');
+        // Khi page mode hardcode flow (onthi / lophoc) — luôn ưu tiên forceFlow,
+        // bỏ qua UI filter để tránh admin vô tình thấy lẫn lộn flow khác.
+        const flowFilter = PAGE.forceFlow || getValue('vstepResultFlowFilter');
         const classFilter = getValue('vstepResultClassFilter');
         const users = userMap();
         const keyword = getValue('vstepResultSearch').toLowerCase();
@@ -1810,7 +1830,7 @@
 
     function exportResultsCSV() {
         const classId = getValue('vstepResultClassFilter');
-        const flowFilter = getValue('vstepResultFlowFilter');
+        const flowFilter = PAGE.forceFlow || getValue('vstepResultFlowFilter');
         const users = userMap();
         const classMap = {};
         state.classes.forEach(c => { classMap[c.id] = c; });
@@ -2003,7 +2023,15 @@
         await loadUsers();
         await Promise.all([loadSets(), loadResources(), loadClasses()]);
         await loadResults();
-        showPanel('students');
+
+        // Default panel theo mode (legacy='students', onthi='content', lophoc='students').
+        // Nếu panel mặc định không tồn tại trên DOM (trang con subset), fallback
+        // sang panel đầu tiên có trong DOM để admin không thấy trang trống.
+        const desired = PAGE.defaultPanel || 'students';
+        const fallbackOrder = ['students', 'resources', 'classes', 'content', 'results'];
+        const candidate = [desired, ...fallbackOrder].find(name => $(`vstep-${name}-panel`));
+        showPanel(candidate || desired);
+        if (candidate === 'content') showContentFlow(PAGE.forceFlow || state.currentFlow);
     }
 
     document.addEventListener('DOMContentLoaded', init);
