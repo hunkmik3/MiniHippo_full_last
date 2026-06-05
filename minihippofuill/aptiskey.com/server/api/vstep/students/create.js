@@ -1,6 +1,6 @@
 import { parseJsonBody } from '../../_utils/parseBody.js';
 import { verifyAdminRequest } from '../../_utils/auth.js';
-import { callSupabaseAuth, deleteFrom, insertInto, selectFrom } from '../../_utils/supabase.js';
+import { callSupabaseAuth, deleteFrom, insertInto, selectFrom, upsertInto } from '../../_utils/supabase.js';
 import { resolveDeviceLimit } from '../../_utils/device.js';
 import { computeVstepExpiresAtDate, vstepSchemaErrorResponse } from '../_utils.js';
 
@@ -118,7 +118,11 @@ export default async function handler(req, res) {
       band
     };
 
-    await insertInto('users', [publicUserPayload]);
+    // Supabase Auth có trigger handle_new_user tự tạo row public.users khi
+    // auth.users insert. Dùng upsert để merge thêm cột nghiệp vụ
+    // (account_code, course, band, started_on, expires_at...) thay vì INSERT
+    // (sẽ 409 vì id đã tồn tại).
+    await upsertInto('users', [publicUserPayload]);
 
     const [student] = await insertInto('vstep_students', [{
       user_id: authUser.id,

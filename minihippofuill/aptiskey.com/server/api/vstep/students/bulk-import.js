@@ -1,6 +1,6 @@
 import { parseJsonBody } from '../../_utils/parseBody.js';
 import { verifyAdminRequest } from '../../_utils/auth.js';
-import { callSupabaseAuth, deleteFrom, insertInto, selectFrom, updateTable } from '../../_utils/supabase.js';
+import { callSupabaseAuth, deleteFrom, insertInto, selectFrom, updateTable, upsertInto } from '../../_utils/supabase.js';
 import { resolveDeviceLimit } from '../../_utils/device.js';
 import { computeVstepExpiresAtDate, vstepSchemaErrorResponse } from '../_utils.js';
 
@@ -142,7 +142,9 @@ async function createOrUpdateStudent(row, batchId) {
       band
     };
 
-    await insertInto('users', [publicUserPayload]);
+    // Upsert vì Supabase Auth trigger handle_new_user đã tạo public.users
+    // ngay khi auth user insert — xem comment ở students/create.js.
+    await upsertInto('users', [publicUserPayload]);
 
     const [student] = await insertInto('vstep_students', [{
       user_id: authUser.id,
