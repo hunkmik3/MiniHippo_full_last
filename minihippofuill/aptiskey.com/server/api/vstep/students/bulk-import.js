@@ -2,7 +2,16 @@ import { parseJsonBody } from '../../_utils/parseBody.js';
 import { verifyAdminRequest } from '../../_utils/auth.js';
 import { callSupabaseAuth, insertInto, selectFrom, updateTable } from '../../_utils/supabase.js';
 import { resolveDeviceLimit } from '../../_utils/device.js';
-import { vstepSchemaErrorResponse } from '../_utils.js';
+import { computeVstepExpiresAtDate, vstepSchemaErrorResponse } from '../_utils.js';
+
+function todayLocalYmd() {
+  const d = new Date();
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, '0'),
+    String(d.getDate()).padStart(2, '0')
+  ].join('-');
+}
 
 function generatePassword(seed) {
   const base = String(seed || Math.random().toString(36).slice(2, 10))
@@ -30,7 +39,15 @@ async function createOrUpdateStudent(row, batchId) {
   const phone = clean(row.phone || row.phone_number || row.sdt);
   const band = normalizeBand(row.band || row.level || row.lop);
   const password = clean(row.password) || generatePassword(accountCode || email);
-  const expiresAt = clean(row.expiresAt || row.expires_at || row.expire_date) || null;
+
+  // Auto-compute expires_at = started_on + 6 tháng. Nếu CSV cung cấp started_on
+  // thì dùng, không thì lấy hôm nay (ngày import) làm started_on mặc định.
+  const startedOnRaw = clean(row.startedOn || row.started_on || row.start_date || row.ngay_khai_giang) || '';
+  const hasStartedOn = String(startedOnRaw || '').trim() !== '';
+  const startedOn = hasStartedOn ? String(startedOnRaw).slice(0, 10) : todayLocalYmd();
+
+  const explicitExpiresRaw = clean(row.expiresAt || row.expires_at || row.expire_date) || '';
+  const expiresAt = explicitExpiresRaw || computeVstepExpiresAtDate(startedOn);
 
   // Cờ "dòng CSV CÓ cung cấp cột này hay không" — để khi RE-IMPORT thiếu cột thì
   // GIỮ giá trị cũ thay vì ghi đè/xoá (band, expires_at, device_limit, practice_access).
@@ -117,6 +134,7 @@ async function createOrUpdateStudent(row, batchId) {
       full_name: fullName || null,
       phone_number: phone || null,
       device_limit: deviceLimit,
+      started_on: startedOn,
       expires_at: expiresAt,
       notes: clean(row.notes) || null,
       learning_program: 'vstep',
@@ -137,6 +155,7 @@ async function createOrUpdateStudent(row, batchId) {
       practice_access: practiceAccess,
       status: publicUserPayload.status,
       device_limit: deviceLimit,
+      started_on: startedOn,
       expires_at: expiresAt,
       notes: publicUserPayload.notes,
       last_import_batch: batchId

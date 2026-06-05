@@ -4,6 +4,7 @@ import assignClass from '../../../server/api/vstep/classes/assign.js';
 import createClass from '../../../server/api/vstep/classes/create.js';
 import listClasses from '../../../server/api/vstep/classes/list.js';
 import myClasses from '../../../server/api/vstep/classes/my.js';
+import updateClass from '../../../server/api/vstep/classes/update.js';
 import createContent from '../../../server/api/vstep/contents/create.js';
 import removeContent from '../../../server/api/vstep/contents/delete.js';
 import getContent from '../../../server/api/vstep/contents/get.js';
@@ -29,7 +30,8 @@ const handlers = {
     assign: assignClass,
     create: createClass,
     list: listClasses,
-    my: myClasses
+    my: myClasses,
+    update: updateClass
   },
   contents: {
     create: createContent,

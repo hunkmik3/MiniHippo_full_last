@@ -96,6 +96,111 @@
         return Number.isFinite(value) && value >= 0 ? value : fallback;
     }
 
+    // ===== VSTEP schedule helpers (client-side mirror of server/_utils.js) =====
+    // Dùng cho preview sessions + auto-expires; server vẫn là single source of truth.
+    const VSTEP_SCHEDULE_DAYS = { '246': [1, 3, 5], '357': [2, 4, 6] };
+    const VSTEP_DAY_NAMES = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+    const VSTEP_BAND_SESSION_LIMITS = { B1: 18, B2: 24 };
+
+    function parseLocalDateLike(value) {
+        if (!value) return null;
+        const str = String(value);
+        const m = str.match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?/);
+        if (!m) return null;
+        return new Date(
+            Number(m[1]),
+            Number(m[2]) - 1,
+            Number(m[3]),
+            Number(m[4] || 0),
+            Number(m[5] || 0),
+            0,
+            0
+        );
+    }
+
+    function vstepDefaultSessions(band) {
+        return VSTEP_BAND_SESSION_LIMITS[String(band || '').toUpperCase()] || 18;
+    }
+
+    function calculateVstepSessionDates(scheduleType, firstDate, numSessions) {
+        const days = VSTEP_SCHEDULE_DAYS[scheduleType] || VSTEP_SCHEDULE_DAYS['246'];
+        const start = parseLocalDateLike(firstDate);
+        if (!start) return [];
+        // Đẩy về 00:00 và snap sang ngày học hợp lệ đầu tiên >= ngày khai giảng.
+        const cur = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+        let safety = 14;
+        while (!days.includes(cur.getDay()) && safety-- > 0) {
+            cur.setDate(cur.getDate() + 1);
+        }
+        const out = [];
+        for (let i = 0; i < numSessions; i += 1) {
+            out.push(new Date(cur));
+            // Tăng ngày cho tới ngày học tiếp theo trong lịch.
+            let step = 7;
+            do {
+                cur.setDate(cur.getDate() + 1);
+                step -= 1;
+            } while (!days.includes(cur.getDay()) && step > 0);
+        }
+        return out;
+    }
+
+    function calculateVstepDeadline(sessionDates, idx, startTime) {
+        const [hh, mm] = String(startTime || '18:00').split(':').map(Number);
+        const next = sessionDates[idx + 1];
+        if (next) {
+            const d = new Date(next);
+            d.setHours(hh || 18, mm || 0, 0, 0);
+            return d;
+        }
+        // Buổi cuối: deadline = +2 ngày sau ngày học, cùng giờ học.
+        const last = new Date(sessionDates[idx]);
+        last.setDate(last.getDate() + 2);
+        last.setHours(hh || 18, mm || 0, 0, 0);
+        return last;
+    }
+
+    function buildVstepSessionsClient({ scheduleType, firstDate, startTime, numSessions }) {
+        const dates = calculateVstepSessionDates(scheduleType, firstDate, numSessions);
+        if (!dates.length) return [];
+        const [hh, mm] = String(startTime || '18:00').split(':').map(Number);
+        return dates.map((d, idx) => {
+            const start = new Date(d);
+            start.setHours(hh || 18, mm || 0, 0, 0);
+            const deadline = calculateVstepDeadline(dates, idx, startTime);
+            return {
+                number: idx + 1,
+                date: start.toISOString(),
+                deadline: deadline.toISOString(),
+                day_name: VSTEP_DAY_NAMES[start.getDay()] || ''
+            };
+        });
+    }
+
+    function addMonthsLocal(value, months) {
+        const d = parseLocalDateLike(value);
+        if (!d) return null;
+        const target = new Date(d.getFullYear(), d.getMonth() + months, d.getDate(), d.getHours(), d.getMinutes());
+        return target;
+    }
+
+    function formatYmd(date) {
+        if (!date || !Number.isFinite(date.getTime())) return '';
+        return [
+            date.getFullYear(),
+            String(date.getMonth() + 1).padStart(2, '0'),
+            String(date.getDate()).padStart(2, '0')
+        ].join('-');
+    }
+
+    function formatLocalDateTime(date) {
+        if (!date || !Number.isFinite(date.getTime())) return '';
+        const ymd = formatYmd(date);
+        const hh = String(date.getHours()).padStart(2, '0');
+        const mm = String(date.getMinutes()).padStart(2, '0');
+        return `${ymd} ${hh}:${mm}`;
+    }
+
     function getContentSkill() {
         const value = getValue('vstep-practice-skill');
         return Object.prototype.hasOwnProperty.call(CONTENT_SKILL_LABELS, value) ? value : 'full_test';
@@ -264,6 +369,10 @@
                         <label class="form-label small fw-semibold">Đáp án đúng</label>
                         <input type="text" class="form-control form-control-sm text-uppercase vstep-question-answer" maxlength="1" value="${escapeHtml(question.answer || 'A')}" placeholder="A">
                     </div>
+                    <div class="vstep-question-builder-prompt">
+                        <label class="form-label small fw-semibold">Giải thích (hiện sau khi học viên nộp bài)</label>
+                        <textarea class="form-control form-control-sm vstep-question-explanation" rows="2" placeholder="Vì sao đáp án đúng là...">${escapeHtml(question.explanation || '')}</textarea>
+                    </div>
                 </div>
             </div>
         `;
@@ -316,11 +425,13 @@
             if (validate && !options.some(option => option.label === answer)) {
                 throw new Error(`${contextLabel}: câu ${index + 1} có đáp án "${answer}" nhưng ô đáp án ${answer} đang trống.`);
             }
+            const explanation = row.querySelector('.vstep-question-explanation')?.value.trim() || '';
             return {
                 id: `${contextLabel.toLowerCase().replace(/[^\w]+/g, '-')}-${index + 1}`,
                 prompt,
                 options,
-                answer
+                answer,
+                explanation
             };
         });
     }
@@ -1043,6 +1154,7 @@
                     practiceAccess: isChecked('vstep-student-practice-access'),
                     password: getValue('vstep-student-password') || undefined,
                     deviceLimit: getNumber('vstep-student-device-limit', 2),
+                    startedOn: getValue('vstep-student-started') || undefined,
                     expiresAt: getValue('vstep-student-expires') || undefined,
                     notes,
                     course: 'VSTEP',
@@ -1052,6 +1164,8 @@
             refs.studentForm.reset();
             setValue('vstep-student-device-limit', 2);
             setValue('vstep-student-band', 'B1');
+            setValue('vstep-student-started', '');
+            setValue('vstep-student-expires', '');
             const practiceAccess = $('vstep-student-practice-access');
             if (practiceAccess) practiceAccess.checked = true;
             const temp = result.temporaryPassword ? ` Mật khẩu tạm: ${result.temporaryPassword}` : '';
@@ -1107,6 +1221,10 @@
             expiresat: 'expiresAt',
             expires_at: 'expiresAt',
             expire_date: 'expiresAt',
+            startedon: 'startedOn',
+            started_on: 'startedOn',
+            start_date: 'startedOn',
+            ngay_khai_giang: 'startedOn',
             practiceaccess: 'practiceAccess',
             practice_access: 'practiceAccess',
             password: 'password',
@@ -1116,7 +1234,7 @@
         const hasHeader = first.some(cell => headerAliases[cell]);
         const headers = hasHeader
             ? first.map(cell => headerAliases[cell] || cell)
-            : ['accountCode', 'fullName', 'email', 'phone', 'band', 'expiresAt', 'practiceAccess', 'password', 'notes'];
+            : ['accountCode', 'fullName', 'email', 'phone', 'band', 'startedOn', 'expiresAt', 'practiceAccess', 'password', 'notes'];
         const dataRows = hasHeader ? rows.slice(1) : rows;
 
         return dataRows.map(row => headers.reduce((acc, key, index) => {
@@ -1327,9 +1445,22 @@
             state.memberships = result.memberships || [];
             renderClasses();
             renderAssignmentOptions();
+            renderResultClassFilterOptions();
         } catch (error) {
             refs.classesList.innerHTML = `<div class="text-danger small">${escapeHtml(error.message)}</div>`;
         }
+    }
+
+    function renderResultClassFilterOptions() {
+        const select = refs.resultClassFilter;
+        if (!select) return;
+        const current = select.value;
+        const options = ['<option value="">Tất cả lớp</option>']
+            .concat(state.classes.map(item =>
+                `<option value="${escapeHtml(item.id)}">${escapeHtml(item.title || item.id)}</option>`
+            ));
+        select.innerHTML = options.join('');
+        if (current) select.value = current;
     }
 
     function renderClasses() {
@@ -1369,13 +1500,16 @@
         }
         refs.saveClassBtn.disabled = true;
         try {
+            const numSessionsRaw = getValue('vstep-class-num-sessions');
             const body = {
                 title,
                 band: getValue('vstep-class-band') || 'B1',
                 teacherName: getValue('vstep-class-teacher'),
                 startsAt: dateTimeValue('vstep-class-starts'),
-                endsAt: dateTimeValue('vstep-class-ends'),
-                schedule: parseJsonField('vstep-class-schedule', []),
+                endsAt: dateTimeValue('vstep-class-ends') || undefined,
+                scheduleType: getValue('vstep-class-schedule-type') || '246',
+                startTime: getValue('vstep-class-start-time') || '18:00',
+                numSessions: numSessionsRaw ? Number(numSessionsRaw) : undefined,
                 holidays: parseJsonField('vstep-class-holidays', []),
                 studentIds: selectedValues('vstep-class-students')
             };
@@ -1462,12 +1596,20 @@
         return result.metadata?.vstep_flow || 'practice';
     }
 
+    function studentClassIdFor(userId) {
+        const map = userMap();
+        const user = map[userId];
+        return user?.assigned_class_id || user?.class_id || '';
+    }
+
     function renderResults() {
         const flowFilter = getValue('vstepResultFlowFilter');
+        const classFilter = getValue('vstepResultClassFilter');
         const users = userMap();
         const keyword = getValue('vstepResultSearch').toLowerCase();
         const results = state.results.filter(result => {
             if (flowFilter && resultFlow(result) !== flowFilter) return false;
+            if (classFilter && studentClassIdFor(result.user_id) !== classFilter) return false;
             if (!keyword) return true;
             const user = users[result.user_id] || {};
             const md = result.metadata || {};
@@ -1634,10 +1776,153 @@
         refs.createAssignmentBtn = $('createVstepAssignmentBtn');
         refs.resultsBody = $('vstepResultsTableBody');
         refs.resultDetail = $('vstepResultDetail');
+        refs.resultClassFilter = $('vstepResultClassFilter');
+        refs.exportResultsBtn = $('exportVstepResultsBtn');
+        refs.classSessionsPreview = $('vstep-class-sessions-preview');
         refs.overviewStudents = $('vstepOverviewStudents');
         refs.overviewPractice = $('vstepOverviewPractice');
         refs.overviewLessons = $('vstepOverviewLessons');
         refs.overviewResults = $('vstepOverviewResults');
+    }
+
+    function csvEscape(value) {
+        const str = value == null ? '' : String(value);
+        return /[",\r\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+    }
+
+    function bandLevelLabel(score, max) {
+        // Mức độ VSTEP gợi ý (sơ bộ — dùng để hiển thị nhanh trong export).
+        const ratio = Number(max) > 0 ? Number(score) / Number(max) : 0;
+        if (ratio >= 0.85) return 'B2+ (Tốt)';
+        if (ratio >= 0.7) return 'B2 (Khá)';
+        if (ratio >= 0.55) return 'B1 (Đạt)';
+        if (ratio > 0) return 'Dưới B1';
+        return '';
+    }
+
+    function findAssignmentSessionLabel(result) {
+        // Buổi BTVN: lưu trong metadata.vstep_session_number nếu là lesson_exam.
+        const md = result.metadata || {};
+        if (md.vstep_session_number) return `Buổi ${md.vstep_session_number}`;
+        if (md.vstep_flow === 'lesson_exam' && md.vstep_set_title) return md.vstep_set_title;
+        return '';
+    }
+
+    function exportResultsCSV() {
+        const classId = getValue('vstepResultClassFilter');
+        const flowFilter = getValue('vstepResultFlowFilter');
+        const users = userMap();
+        const classMap = {};
+        state.classes.forEach(c => { classMap[c.id] = c; });
+
+        const rows = state.results.filter(r => {
+            if (flowFilter && resultFlow(r) !== flowFilter) return false;
+            if (classId && studentClassIdFor(r.user_id) !== classId) return false;
+            return true;
+        });
+        if (!rows.length) {
+            alert('Không có kết quả phù hợp để xuất.');
+            return;
+        }
+
+        const headers = [
+            'Thời gian nộp',
+            'Mã học viên',
+            'Email',
+            'Họ tên',
+            'Số điện thoại',
+            'Ngày khai giảng',
+            'Ngày kết thúc',
+            'Band',
+            'Số điểm / Mức độ',
+            'BTVN buổi'
+        ];
+        const lines = [headers.map(csvEscape).join(',')];
+        rows.forEach(r => {
+            const u = users[r.user_id] || {};
+            const cls = classMap[u.assigned_class_id || u.class_id || ''] || {};
+            const submitted = r.submitted_at ? new Date(r.submitted_at).toLocaleString('vi-VN') : '';
+            const score = `${Number(r.total_score || 0)}/${Number(r.max_score || 0)} - ${bandLevelLabel(r.total_score, r.max_score)}`;
+            lines.push([
+                submitted,
+                u.account_code || '',
+                u.email || '',
+                u.full_name || '',
+                u.phone_number || '',
+                u.started_on || (cls.starts_at ? cls.starts_at.slice(0, 10) : ''),
+                u.expires_at || (cls.ends_at ? cls.ends_at.slice(0, 10) : ''),
+                u.band || '',
+                score,
+                findAssignmentSessionLabel(r)
+            ].map(csvEscape).join(','));
+        });
+
+        // BOM ﻿ để Excel mở tiếng Việt không bị lỗi font.
+        const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const className = (classMap[classId] || {}).title || 'tat-ca-lop';
+        const stamp = new Date().toISOString().slice(0, 10);
+        a.download = `vstep-ket-qua-${className.replace(/\s+/g, '_')}-${stamp}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function previewClassSessions() {
+        const target = refs.classSessionsPreview;
+        if (!target) return;
+        const startsAt = getValue('vstep-class-starts');
+        if (!startsAt) {
+            target.innerHTML = '<div class="text-secondary">Nhập ngày khai giảng để xem 18/24 buổi và deadline tự tính.</div>';
+            return;
+        }
+        const scheduleType = getValue('vstep-class-schedule-type') || '246';
+        const startTime = getValue('vstep-class-start-time') || '18:00';
+        const band = getValue('vstep-class-band') || 'B1';
+        const numRaw = Number(getValue('vstep-class-num-sessions'));
+        const numSessions = Number.isFinite(numRaw) && numRaw > 0 ? numRaw : vstepDefaultSessions(band);
+
+        const sessions = buildVstepSessionsClient({ scheduleType, firstDate: startsAt, startTime, numSessions });
+        if (!sessions.length) {
+            target.innerHTML = '<div class="text-danger">Không thể tính lịch — kiểm tra lại ngày khai giảng.</div>';
+            return;
+        }
+        // Auto-fill ngày kết thúc (+6 tháng) nếu admin chưa nhập.
+        if (!getValue('vstep-class-ends')) {
+            const end = addMonthsLocal(startsAt, 6);
+            if (end) {
+                const ymd = formatYmd(end);
+                const hh = String(end.getHours()).padStart(2, '0');
+                const mm = String(end.getMinutes()).padStart(2, '0');
+                setValue('vstep-class-ends', `${ymd}T${hh}:${mm}`);
+            }
+        }
+        target.innerHTML = `
+            <div class="mb-1 small text-secondary">${sessions.length} buổi · lịch ${scheduleType} · giờ học ${escapeHtml(startTime)}</div>
+            <table class="table table-sm mb-0 small">
+                <thead><tr><th>#</th><th>Ngày học</th><th>Deadline</th></tr></thead>
+                <tbody>
+                    ${sessions.map(s => `
+                        <tr>
+                            <td>${s.number}</td>
+                            <td>${escapeHtml(formatLocalDateTime(new Date(s.date)))} (${escapeHtml(s.day_name)})</td>
+                            <td>${escapeHtml(formatLocalDateTime(new Date(s.deadline)))}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+
+    function autoFillStudentExpires() {
+        if (getValue('vstep-student-expires')) return;
+        const startedOn = getValue('vstep-student-started');
+        if (!startedOn) return;
+        const expires = addMonthsLocal(startedOn, 6);
+        if (expires) setValue('vstep-student-expires', formatYmd(expires));
     }
 
     async function init() {
@@ -1674,9 +1959,21 @@
         $('refreshVstepClassesBtn')?.addEventListener('click', loadClasses);
         $('refreshVstepResultsBtn')?.addEventListener('click', loadResults);
         $('vstepResultFlowFilter')?.addEventListener('change', renderResults);
+        $('vstepResultClassFilter')?.addEventListener('change', renderResults);
+        $('exportVstepResultsBtn')?.addEventListener('click', exportResultsCSV);
         $('vstepSetSearch')?.addEventListener('input', renderSetList);
         $('vstepStudentSearch')?.addEventListener('input', renderUsers);
         $('vstepResultSearch')?.addEventListener('input', renderResults);
+
+        // Class form: preview sessions khi đổi schedule_type/start_time/num_sessions/starts_at/band.
+        ['vstep-class-starts', 'vstep-class-schedule-type', 'vstep-class-start-time',
+         'vstep-class-num-sessions', 'vstep-class-band'].forEach(id => {
+            $(id)?.addEventListener('change', previewClassSessions);
+        });
+        $('vstep-class-preview-btn')?.addEventListener('click', previewClassSessions);
+
+        // Student form: auto-fill expires khi nhập started_on (chỉ khi expires đang trống).
+        $('vstep-student-started')?.addEventListener('change', autoFillStudentExpires);
         $('previewVstepJsonBtn')?.addEventListener('click', () => {
             try {
                 previewJson();

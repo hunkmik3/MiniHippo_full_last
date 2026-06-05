@@ -148,17 +148,21 @@
                   </div>
                   <div class="row g-3">
                     <div class="col-md-6">
-                      <label class="form-label" for="vstep-student-expires">Hết hạn</label>
-                      <input type="date" class="form-control" id="vstep-student-expires">
+                      <label class="form-label" for="vstep-student-started">Ngày khai giảng</label>
+                      <input type="date" class="form-control" id="vstep-student-started">
+                      <div class="vstep-help mt-1">Mặc định = hôm nay. Truy cập tự động hết sau 6 tháng.</div>
                     </div>
-                    <div class="col-md-6 d-flex align-items-end">
-                      <div class="form-check vstep-check-row">
-                        <input class="form-check-input" type="checkbox" id="vstep-student-practice-access" checked>
-                        <label class="form-check-label fw-semibold" for="vstep-student-practice-access">
-                          Cấp quyền Ôn thi
-                        </label>
-                      </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="vstep-student-expires">Hết hạn (auto)</label>
+                      <input type="date" class="form-control" id="vstep-student-expires" placeholder="Tự tính = ngày khai giảng + 6 tháng">
+                      <div class="vstep-help mt-1">Để trống để hệ thống tự tính, hoặc nhập để override.</div>
                     </div>
+                  </div>
+                  <div class="form-check vstep-check-row">
+                    <input class="form-check-input" type="checkbox" id="vstep-student-practice-access" checked>
+                    <label class="form-check-label fw-semibold" for="vstep-student-practice-access">
+                      Cấp quyền Ôn thi
+                    </label>
                   </div>
                   <div>
                     <label class="form-label fw-semibold" for="vstep-student-password">Mật khẩu</label>
@@ -180,8 +184,8 @@
                     <i class="bi bi-file-earmark-spreadsheet"></i>
                     <span>Import học viên từ Excel</span>
                   </div>
-                  <div class="vstep-help mb-2">Dán dữ liệu copy từ Excel. Hàng đầu có thể là: accountCode, fullName, email, phone, band, expiresAt, practiceAccess, password.</div>
-                  <textarea class="form-control" id="vstepImportText" rows="5" placeholder="VSTEP001&#9;Nguyễn Văn A&#9;student@example.com&#9;090...&#9;B1&#9;2026-12-31&#9;true"></textarea>
+                  <div class="vstep-help mb-2">Dán dữ liệu copy từ Excel. Cột hỗ trợ: accountCode, fullName, email, phone, band, startedOn, expiresAt (tự tính nếu trống), practiceAccess, password.</div>
+                  <textarea class="form-control" id="vstepImportText" rows="5" placeholder="VSTEP001&#9;Nguyễn Văn A&#9;student@example.com&#9;090...&#9;B1&#9;2026-06-05&#9;&#9;true"></textarea>
                   <div id="vstepImportAlert" class="alert alert-info small mt-3 mb-0">Chưa import dữ liệu.</div>
                   <button type="button" class="btn btn-outline-primary mt-3" id="importVstepStudentsBtn">
                     <i class="bi bi-upload me-1"></i> Import học viên
@@ -341,21 +345,49 @@
                   </div>
                   <div class="row g-3">
                     <div class="col-md-6">
-                      <label class="form-label" for="vstep-class-starts">Ngày bắt đầu</label>
+                      <label class="form-label" for="vstep-class-starts">Ngày khai giảng</label>
                       <input type="datetime-local" class="form-control" id="vstep-class-starts">
+                      <div class="vstep-help mt-1">Phải rơi vào lịch 246 hoặc 357 đã chọn.</div>
                     </div>
                     <div class="col-md-6">
-                      <label class="form-label" for="vstep-class-ends">Ngày kết thúc</label>
+                      <label class="form-label" for="vstep-class-ends">Ngày kết thúc (auto)</label>
                       <input type="datetime-local" class="form-control" id="vstep-class-ends">
+                      <div class="vstep-help mt-1">Tự tính = ngày khai giảng + 6 tháng. Để trống để tự tính.</div>
+                    </div>
+                  </div>
+                  <div class="row g-3">
+                    <div class="col-md-4">
+                      <label class="form-label" for="vstep-class-schedule-type">Lịch học</label>
+                      <select class="form-select" id="vstep-class-schedule-type">
+                        <option value="246">246 (Thứ 2/4/6)</option>
+                        <option value="357">357 (Thứ 3/5/7)</option>
+                      </select>
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label" for="vstep-class-start-time">Giờ học</label>
+                      <input type="time" class="form-control" id="vstep-class-start-time" value="18:00">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label" for="vstep-class-num-sessions">Số buổi</label>
+                      <input type="number" min="1" max="60" class="form-control" id="vstep-class-num-sessions" placeholder="B1=18, B2=24">
+                      <div class="vstep-help mt-1">Để trống để dùng mặc định theo band.</div>
                     </div>
                   </div>
                   <div>
-                    <label class="form-label" for="vstep-class-schedule">Lịch học JSON</label>
-                    <textarea class="form-control" id="vstep-class-schedule" rows="3" placeholder='[{"weekday":2,"time":"19:30-21:00"}]'></textarea>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                      <label class="form-label mb-0">Lịch buổi & deadline (preview)</label>
+                      <button type="button" class="btn btn-sm btn-outline-secondary" id="vstep-class-preview-btn">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Tính lại
+                      </button>
+                    </div>
+                    <div id="vstep-class-sessions-preview" class="border rounded p-2 small bg-light" style="max-height:220px;overflow:auto;">
+                      <div class="text-secondary">Nhập ngày khai giảng để xem 18/24 buổi và deadline tự tính.</div>
+                    </div>
+                    <div class="vstep-help mt-1">Deadline = giờ bắt đầu buổi kế tiếp. Buổi cuối deadline = +2 ngày so với ngày học.</div>
                   </div>
                   <div>
-                    <label class="form-label" for="vstep-class-holidays">Ngày nghỉ JSON</label>
-                    <textarea class="form-control" id="vstep-class-holidays" rows="2" placeholder='["2026-09-02"]'></textarea>
+                    <label class="form-label" for="vstep-class-holidays">Ngày nghỉ (JSON, optional)</label>
+                    <textarea class="form-control" id="vstep-class-holidays" rows="1" placeholder='["2026-09-02"]'></textarea>
                   </div>
                   <div>
                     <label class="form-label" for="vstep-class-students">Học viên trong lớp</label>
@@ -626,6 +658,12 @@
                   <option value="practice">Ôn thi VSTEP</option>
                   <option value="lesson_exam">Học tập VSTEP</option>
                 </select>
+                <select class="form-select form-select-sm" id="vstepResultClassFilter">
+                  <option value="">Tất cả lớp</option>
+                </select>
+                <button type="button" class="btn btn-sm btn-outline-success" id="exportVstepResultsBtn" title="Xuất kết quả theo lớp ra Excel/CSV">
+                  <i class="bi bi-file-earmark-excel me-1"></i> Xuất Excel
+                </button>
                 <button type="button" class="btn btn-sm btn-outline-primary" id="refreshVstepResultsBtn">
                   <i class="bi bi-arrow-clockwise me-1"></i> Tải lại
                 </button>

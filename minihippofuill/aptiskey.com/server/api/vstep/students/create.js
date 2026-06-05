@@ -2,7 +2,16 @@ import { parseJsonBody } from '../../_utils/parseBody.js';
 import { verifyAdminRequest } from '../../_utils/auth.js';
 import { callSupabaseAuth, insertInto, selectFrom } from '../../_utils/supabase.js';
 import { resolveDeviceLimit } from '../../_utils/device.js';
-import { vstepSchemaErrorResponse } from '../_utils.js';
+import { computeVstepExpiresAtDate, vstepSchemaErrorResponse } from '../_utils.js';
+
+function todayLocalYmd() {
+  const d = new Date();
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, '0'),
+    String(d.getDate()).padStart(2, '0')
+  ].join('-');
+}
 
 function generatePassword() {
   const random = Math.random().toString(36).slice(-8);
@@ -82,6 +91,15 @@ export default async function handler(req, res) {
       { useAnonKey: false }
     );
 
+    // Auto-compute expires_at = started_on + 6 tháng. Admin có thể override
+    // bằng body.expiresAt; nếu admin không truyền started_on thì dùng hôm nay.
+    const startedOn = String(
+      body?.startedOn || body?.started_on || todayLocalYmd()
+    ).slice(0, 10);
+    const autoExpiresAt = computeVstepExpiresAtDate(startedOn);
+    const explicitExpiresAt = body?.expiresAt || body?.expires_at;
+    const expiresAt = explicitExpiresAt || autoExpiresAt;
+
     const publicUserPayload = {
       id: authUser.id,
       email,
@@ -92,7 +110,8 @@ export default async function handler(req, res) {
       full_name: body?.fullName || body?.full_name || null,
       phone_number: body?.phone || body?.phone_number || null,
       device_limit: Number(body?.deviceLimit || body?.device_limit) || resolveDeviceLimit(),
-      expires_at: body?.expiresAt || body?.expires_at || null,
+      started_on: startedOn,
+      expires_at: expiresAt,
       notes: body?.notes || null,
       learning_program: 'vstep',
       course: 'VSTEP',
@@ -112,7 +131,8 @@ export default async function handler(req, res) {
       practice_access: body?.practiceAccess === false || body?.practice_access === false ? false : true,
       status: body?.status || 'active',
       device_limit: publicUserPayload.device_limit,
-      expires_at: publicUserPayload.expires_at,
+      started_on: startedOn,
+      expires_at: expiresAt,
       notes: body?.notes || null
     }]);
 
