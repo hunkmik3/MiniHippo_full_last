@@ -95,6 +95,20 @@ export async function insertInto(table, payload) {
   });
 }
 
+// UPSERT: nếu row đã tồn tại theo PK/unique → merge (UPDATE), không thì INSERT.
+// Dùng khi có DB trigger tự pre-insert (vd Supabase Auth handle_new_user
+// tự tạo public.users khi auth.users insert) — chèn trực tiếp sẽ 409.
+export async function upsertInto(table, payload, options = {}) {
+  const onConflict = options.onConflict ? `?on_conflict=${encodeURIComponent(options.onConflict)}` : '';
+  return supabaseFetch(`/rest/v1/${table}${onConflict}`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    headers: {
+      Prefer: 'return=representation,resolution=merge-duplicates'
+    }
+  });
+}
+
 export async function updateTable(table, filters, payload) {
   const params = filters
     .map(({ column, operator = 'eq', value }) => `${column}=${operator}.${encodeURIComponent(value)}`)
