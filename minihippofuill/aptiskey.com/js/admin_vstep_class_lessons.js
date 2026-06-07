@@ -187,15 +187,135 @@
             if (existing && window.__VSTEP_API__?.fillForm) {
                 window.__VSTEP_API__.fillForm(existing);
             } else {
-                const titleInput = $('vstep-title');
-                if (titleInput && !titleInput.value) {
-                    titleInput.value = `${cls.title || 'Lớp'} - Buổi ${sessionNumber}`;
-                }
+                applyBlueprint(cls, sessionNumber);
             }
 
             // Hiển thị banner ngữ cảnh trong panel content.
             updateContextBanner(cls, sessionNumber, dueAt);
         }, 50);
+    }
+
+    // Pre-fill form theo blueprint cố định B1/B2 (từ vstep_session_blueprints.js).
+    // Mục đích: form lesson_exam KHÔNG dùng template full 4 kỹ năng như Ôn thi
+    // — phải khớp cấu trúc cụ thể của từng buổi (vd Buổi 1 = 2 bài Reading).
+    function applyBlueprint(cls, sessionNumber) {
+        const titleInput = $('vstep-title');
+        const blueprint = window.VSTEP_SESSION_BLUEPRINTS?.getBlueprint
+            ? window.VSTEP_SESSION_BLUEPRINTS.getBlueprint(cls.band, sessionNumber)
+            : null;
+
+        // Title: dùng blueprint nếu có, kèm tên lớp; fallback "Lớp X - Buổi N".
+        if (titleInput && !titleInput.value) {
+            titleInput.value = blueprint?.title
+                ? `${cls.title || 'Lớp'} - ${blueprint.title}`
+                : `${cls.title || 'Lớp'} - Buổi ${sessionNumber}`;
+        }
+
+        if (!blueprint) {
+            // Không có blueprint cho buổi này → hiện tất cả skill như cũ.
+            applySkillVisibility(['listening', 'reading', 'writing', 'speaking']);
+            return;
+        }
+
+        // Ẩn các skill không có trong blueprint, hiện các skill có dùng.
+        const activeSkills = ['listening', 'reading', 'writing', 'speaking']
+            .filter(s => blueprint[s]?.parts?.length);
+        applySkillVisibility(activeSkills);
+
+        // Pre-fill từng skill theo blueprint. Mỗi part = 1 input title + tự sinh
+        // placeholder câu hỏi (admin paste nội dung thật sau).
+        prefillReading(blueprint.reading);
+        prefillListening(blueprint.listening);
+        prefillWriting(blueprint.writing);
+        prefillSpeaking(blueprint.speaking);
+    }
+
+    function applySkillVisibility(activeSkills) {
+        const activeSet = new Set(activeSkills);
+        // Skill cards (Listening/Reading/Writing/Speaking) có data-vstep-skill.
+        document.querySelectorAll('.vstep-skill-card[data-vstep-skill]').forEach(card => {
+            const skill = card.dataset.vstepSkill;
+            const show = activeSet.has(skill);
+            card.classList.toggle('d-none', !show);
+            if (show) card.setAttribute('open', 'open');
+        });
+        // Duration rows tương ứng.
+        document.querySelectorAll('[data-vstep-duration-skill]').forEach(row => {
+            row.classList.toggle('d-none', !activeSet.has(row.dataset.vstepDurationSkill));
+        });
+    }
+
+    function setIfExists(id, value) {
+        const el = $(id);
+        if (el) el.value = value == null ? '' : String(value);
+    }
+
+    function prefillReading(spec) {
+        if (!spec?.parts?.length) return;
+        // Form Reading hiện cố định 4 parts (vstep-reading-1..4). Set title +
+        // số câu cho parts có trong blueprint; clear title parts còn lại.
+        for (let i = 0; i < 4; i += 1) {
+            const part = spec.parts[i];
+            const idx = i + 1;
+            if (part) {
+                setIfExists(`vstep-reading-${idx}-title`, part.title);
+                setIfExists(`vstep-reading-${idx}-questions-count`, part.questionCount || 10);
+            } else {
+                setIfExists(`vstep-reading-${idx}-title`, '');
+                // Ẩn part không dùng để admin không nhầm là phải nhập.
+                const partEditor = $(`vstep-reading-${idx}-questions`)?.closest('.vstep-part-editor');
+                if (partEditor) partEditor.classList.add('d-none');
+            }
+        }
+    }
+
+    function prefillListening(spec) {
+        if (!spec?.parts?.length) return;
+        for (let i = 0; i < 3; i += 1) {
+            const part = spec.parts[i];
+            const idx = i + 1;
+            if (part) {
+                setIfExists(`vstep-listening-${idx}-title`, part.title);
+                setIfExists(`vstep-listening-${idx}-questions-count`, part.questionCount || 8);
+            } else {
+                setIfExists(`vstep-listening-${idx}-title`, '');
+                const partEditor = $(`vstep-listening-${idx}-questions`)?.closest('.vstep-part-editor');
+                if (partEditor) partEditor.classList.add('d-none');
+            }
+        }
+    }
+
+    function prefillWriting(spec) {
+        if (!spec?.parts?.length) return;
+        for (let i = 0; i < 2; i += 1) {
+            const part = spec.parts[i];
+            const idx = i + 1;
+            if (part) {
+                setIfExists(`vstep-writing-${idx}-title`, part.title);
+                if (part.instructions) setIfExists(`vstep-writing-${idx}-instructions`, part.instructions);
+            } else {
+                setIfExists(`vstep-writing-${idx}-title`, '');
+                const partEditor = $(`vstep-writing-${idx}-prompt`)?.closest('.vstep-part-editor');
+                if (partEditor) partEditor.classList.add('d-none');
+            }
+        }
+    }
+
+    function prefillSpeaking(spec) {
+        if (!spec?.parts?.length) return;
+        for (let i = 0; i < 3; i += 1) {
+            const part = spec.parts[i];
+            const idx = i + 1;
+            if (part) {
+                setIfExists(`vstep-speaking-${idx}-title`, part.title);
+                if (Number.isFinite(part.prepSeconds)) setIfExists(`vstep-speaking-${idx}-prep`, part.prepSeconds);
+                if (Number.isFinite(part.answerSeconds)) setIfExists(`vstep-speaking-${idx}-answer`, part.answerSeconds);
+            } else {
+                setIfExists(`vstep-speaking-${idx}-title`, '');
+                const partEditor = $(`vstep-speaking-${idx}-prompt`)?.closest('.vstep-part-editor');
+                if (partEditor) partEditor.classList.add('d-none');
+            }
+        }
     }
 
     function updateContextBanner(cls, sessionNumber, dueAt) {
