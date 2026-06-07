@@ -66,6 +66,7 @@
     const refs = {};
     const state = {
         editingId: '',
+        editingClassId: '',
         currentPanel: PAGE.defaultPanel,
         currentFlow: PAGE.forceFlow || 'practice',
         sets: [],
@@ -1740,9 +1741,115 @@
                         <span><i class="bi bi-play-circle"></i> ${escapeHtml(start)}</span>
                         <span><i class="bi bi-flag"></i> ${escapeHtml(end)}</span>
                     </div>
+                    <div class="vstep-class-actions d-flex gap-2 mt-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary vstep-class-edit-btn" data-class-id="${escapeHtml(item.id)}">
+                            <i class="bi bi-pencil me-1"></i>Sửa
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger vstep-class-delete-btn" data-class-id="${escapeHtml(item.id)}">
+                            <i class="bi bi-trash me-1"></i>Xoá
+                        </button>
+                    </div>
                 </article>
             `;
         }).join('');
+
+        // Nút sửa/xoá phải stopPropagation để không trigger click card mở grid buổi.
+        refs.classesList.querySelectorAll('.vstep-class-edit-btn').forEach(btn => {
+            btn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                editClass(btn.dataset.classId);
+            });
+        });
+        refs.classesList.querySelectorAll('.vstep-class-delete-btn').forEach(btn => {
+            btn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                deleteClass(btn.dataset.classId);
+            });
+        });
+    }
+
+    function editClass(classId) {
+        const cls = state.classes.find(item => String(item.id) === String(classId));
+        if (!cls) return;
+        state.editingClassId = cls.id;
+
+        // Load lại field từ class vào form. Form trở thành "Cập nhật" thay vì "Tạo mới".
+        setValue('vstep-class-title', cls.title || '');
+        setValue('vstep-class-band', cls.band || 'B1');
+        setValue('vstep-class-teacher', cls.teacher_name || '');
+        // datetime-local format YYYY-MM-DDTHH:mm — slice ISO string đủ dùng.
+        const sliceIsoForInput = (iso) => {
+            if (!iso) return '';
+            const d = new Date(iso);
+            if (!Number.isFinite(d.getTime())) return '';
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mi = String(d.getMinutes()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+        };
+        setValue('vstep-class-starts', sliceIsoForInput(cls.starts_at));
+        setValue('vstep-class-ends', sliceIsoForInput(cls.ends_at));
+        setValue('vstep-class-schedule-type', cls.schedule_type || '246');
+        setValue('vstep-class-start-time', cls.start_time || '18:00');
+        setValue('vstep-class-num-sessions', cls.num_sessions ? String(cls.num_sessions) : '');
+        const holidays = Array.isArray(cls.holidays) ? cls.holidays : [];
+        setValue('vstep-class-holidays', JSON.stringify(holidays));
+        // Trigger reset listener của module checkboxes để re-render holiday tags.
+        $('vstep-class-holidays')?.dispatchEvent(new Event('change'));
+
+        // Đổi nút submit thành "Cập nhật" + hiện nút "Huỷ sửa".
+        if (refs.saveClassBtn) {
+            refs.saveClassBtn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> Cập nhật lớp';
+        }
+        let cancelBtn = $('cancelEditClassBtn');
+        if (!cancelBtn && refs.saveClassBtn) {
+            cancelBtn = document.createElement('button');
+            cancelBtn.id = 'cancelEditClassBtn';
+            cancelBtn.type = 'button';
+            cancelBtn.className = 'btn btn-outline-secondary ms-2';
+            cancelBtn.innerHTML = '<i class="bi bi-x-circle me-1"></i>Huỷ sửa';
+            cancelBtn.addEventListener('click', cancelEditClass);
+            refs.saveClassBtn.parentNode.insertBefore(cancelBtn, refs.saveClassBtn.nextSibling);
+        }
+        setClassAlert(`Đang sửa lớp "${cls.title || cls.id}". Đổi field rồi bấm "Cập nhật lớp".`, 'info');
+
+        // Scroll lên form lớp để admin thấy ngay.
+        $('vstepClassForm')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function cancelEditClass() {
+        state.editingClassId = '';
+        refs.classForm?.reset();
+        if (refs.saveClassBtn) {
+            refs.saveClassBtn.innerHTML = '<i class="bi bi-calendar-plus me-1"></i> Tạo lớp';
+        }
+        $('cancelEditClassBtn')?.remove();
+        setClassAlert('Đã huỷ sửa. Có thể tạo lớp mới hoặc chọn lớp khác để sửa.', 'info');
+    }
+
+    async function deleteClass(classId) {
+        const cls = state.classes.find(item => String(item.id) === String(classId));
+        if (!cls) return;
+        const confirmMsg = `Xoá lớp "${cls.title || cls.id}"?\n\n`
+            + `Sẽ dọn luôn:\n`
+            + `  • Toàn bộ học viên đang gán lớp này (HV không bị xoá, chỉ gỡ lớp)\n`
+            + `  • Toàn bộ bài đã giao cho lớp\n\n`
+            + `Hành động này KHÔNG thể hoàn tác.`;
+        if (!window.confirm(confirmMsg)) return;
+        try {
+            const result = await fetchJson(`/api/vstep/classes/delete?id=${encodeURIComponent(classId)}`, {
+                method: 'DELETE'
+            });
+            if (!result.success) throw new Error('Không thể xoá lớp VSTEP.');
+            if (state.editingClassId === classId) cancelEditClass();
+            setClassAlert(`Đã xoá lớp "${cls.title || cls.id}".`, 'success');
+            await loadClasses();
+            await loadUsers();
+        } catch (error) {
+            setClassAlert(error.message, 'danger');
+        }
     }
 
     async function createClass(event) {
@@ -1752,6 +1859,7 @@
             setClassAlert('Vui lòng nhập tên lớp.', 'warning');
             return;
         }
+        const isUpdate = Boolean(state.editingClassId);
         refs.saveClassBtn.disabled = true;
         try {
             const numSessionsRaw = getValue('vstep-class-num-sessions');
@@ -1767,22 +1875,35 @@
                 holidays: parseJsonField('vstep-class-holidays', []),
                 studentIds: selectedValues('vstep-class-students')
             };
-            const result = await fetchJson('/api/vstep/classes/create', {
-                method: 'POST',
+            if (isUpdate) body.id = state.editingClassId;
+            const url = isUpdate
+                ? `/api/vstep/classes/update?id=${encodeURIComponent(state.editingClassId)}`
+                : '/api/vstep/classes/create';
+            const result = await fetchJson(url, {
+                method: isUpdate ? 'PATCH' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
             });
-            if (!result.success) throw new Error('Không thể tạo lớp VSTEP.');
+            if (!result.success) throw new Error(isUpdate ? 'Không thể cập nhật lớp.' : 'Không thể tạo lớp VSTEP.');
+
+            // Reset state edit + form về chế độ "Tạo mới".
+            state.editingClassId = '';
             refs.classForm.reset();
-            setClassAlert('Đã tạo lớp VSTEP.', 'success');
+            if (refs.saveClassBtn) {
+                refs.saveClassBtn.innerHTML = '<i class="bi bi-calendar-plus me-1"></i> Tạo lớp';
+            }
+            $('cancelEditClassBtn')?.remove();
+            setClassAlert(isUpdate ? 'Đã cập nhật lớp VSTEP.' : 'Đã tạo lớp VSTEP.', 'success');
             await loadClasses();
             await loadUsers();
 
-            // Hook event cho module admin_vstep_class_lessons.js: chuyển sang
-            // grid "Tạo bài học cho lớp X" với 18/24 buổi của lớp vừa tạo.
-            window.dispatchEvent(new CustomEvent('vstep:class-created', {
-                detail: { class: result.class }
-            }));
+            // Hook event cho module admin_vstep_class_lessons.js — chỉ trigger
+            // khi TẠO MỚI (update lớp không cần mở lại grid buổi từ đầu).
+            if (!isUpdate) {
+                window.dispatchEvent(new CustomEvent('vstep:class-created', {
+                    detail: { class: result.class }
+                }));
+            }
         } catch (error) {
             setClassAlert(error.message, 'danger');
         } finally {
