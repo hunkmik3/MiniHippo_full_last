@@ -42,3 +42,7 @@ ALTER TABLE public.vstep_students
 
 CREATE INDEX IF NOT EXISTS idx_vstep_students_started_on
   ON public.vstep_students(started_on);
+
+-- Per-class buổi học: lưu class_id + session_number bên trong vstep_contents.data
+-- jsonb (vstep_class_id, vstep_session_number, vstep_session_due_at). Không cần
+-- DB column riêng — query qua jsonb operators khi filter theo lớp.

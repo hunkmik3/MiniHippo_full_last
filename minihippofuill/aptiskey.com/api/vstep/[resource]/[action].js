@@ -14,6 +14,7 @@ import createResource from '../../../server/api/vstep/resources/create.js';
 import listResources from '../../../server/api/vstep/resources/list.js';
 import removeResult from '../../../server/api/vstep/results/delete.js';
 import listResults from '../../../server/api/vstep/results/list.js';
+import listMyResults from '../../../server/api/vstep/results/my-list.js';
 import submitResult from '../../../server/api/vstep/results/submit.js';
 import updateResult from '../../../server/api/vstep/results/update.js';
 import createStudent from '../../../server/api/vstep/students/create.js';
@@ -47,6 +48,8 @@ const handlers = {
   results: {
     delete: removeResult,
     list: listResults,
+    'my-list': listMyResults,
+    my_list: listMyResults,
     submit: submitResult,
     update: updateResult
   },

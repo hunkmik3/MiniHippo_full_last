@@ -231,6 +231,7 @@
             vstep_flow: data.vstep_flow || 'practice',
             vstep_content_kind: data.vstep_content_kind || 'mock_test',
             vstep_practice_skill: data.vstep_practice_skill || 'full_test',
+            onthi: data.onthi && typeof data.onthi === 'object' ? data.onthi : {},
             durations: {
                 listening: Number(data.durations?.listening) || 45,
                 reading: Number(data.durations?.reading) || 60,
@@ -1577,8 +1578,14 @@
                 vstep_set_title: state.set?.title || '',
                 vstep_practice_skill: requestedSkill || 'full_test',
                 vstep_practice_mode: requestedMode || 'full_test',
+                vstep_onthi: state.data.onthi || {},
                 vstep_initial_part: singlePartPractice ? state.currentPartIndex + 1 : null,
                 assignment_id: assignmentId || state.set?.assignment?.id || null,
+                assignment_submitted_overdue: Boolean(state.overdueAcknowledged),
+                vstep_session_number: state.set?.session_number
+                    || state.set?.assignment?.session_number
+                    || state.data?.vstep_session_number
+                    || null,
                 submitted_at: new Date().toISOString(),
                 proctor_photo: state.proctorPhoto || null,
                 answers: state.answers,
@@ -1696,6 +1703,34 @@
         }, true);
     }
 
+    // Modal cảnh báo "Đã trễ deadline" — chỉ hiện 1 lần trước precheck nếu
+    // assignment.due_at đã qua. Học viên phải click "Tôi đã nắm rõ" mới được vào.
+    async function gateOverdueDeadline() {
+        const assignment = state.set?.assignment || null;
+        if (!assignment?.due_at) return; // không có deadline → bỏ qua
+        const dueMs = new Date(assignment.due_at).getTime();
+        if (!Number.isFinite(dueMs) || dueMs >= Date.now()) return; // còn hạn → bỏ qua
+
+        state.overdueAcknowledged = true;
+        const modal = document.getElementById('vstepOverdueModal');
+        const confirmBtn = document.getElementById('vstepOverdueConfirmBtn');
+        const meta = document.getElementById('vstepOverdueMeta');
+        if (!modal || !confirmBtn) return;
+        if (meta) {
+            const dueText = new Date(dueMs).toLocaleString('vi-VN');
+            meta.textContent = `Hạn nộp: ${dueText}`;
+        }
+        modal.classList.add('show');
+        return new Promise(resolve => {
+            const handler = () => {
+                modal.classList.remove('show');
+                confirmBtn.removeEventListener('click', handler);
+                resolve();
+            };
+            confirmBtn.addEventListener('click', handler);
+        });
+    }
+
     async function init() {
         try {
             if (typeof requireAuth === 'function') {
@@ -1707,6 +1742,7 @@
             populateCandidateInfo();
             setupPrecheckAudio();
             showOnly(refs.precheck);
+            await gateOverdueDeadline();
         } catch (error) {
             refs.loading.innerHTML = `<div class="alert alert-danger">${escapeHtml(error.message)}</div>`;
             showOnly(refs.loading);

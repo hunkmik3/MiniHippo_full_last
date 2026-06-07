@@ -22,7 +22,7 @@
         writing: {
             label: 'Writing',
             icon: 'bi-pencil-square',
-            description: 'Luyện Writing VSTEP theo bộ đề placeholder, có lưu bài để giáo viên chấm thủ công.',
+            description: 'Luyện Writing VSTEP theo bộ đề, có lưu bài để giáo viên chấm thủ công.',
             setCta: 'Luyện Writing'
         },
         speaking: {
@@ -76,6 +76,18 @@
         const data = set?.data || {};
         const parts = data?.[skill]?.parts;
         return Array.isArray(parts) ? parts : [];
+    }
+
+    function getContentSkill(set) {
+        const data = set?.data || {};
+        const explicit = String(data.vstep_practice_skill || '').toLowerCase();
+        if (allowedSkills.includes(explicit) || explicit === 'full_test') return explicit;
+        const filledSkills = allowedSkills.filter(item => Array.isArray(data?.[item]?.parts) && data[item].parts.length);
+        return filledSkills.length === 1 ? filledSkills[0] : 'full_test';
+    }
+
+    function isCurrentSkillSet(set) {
+        return getContentSkill(set) === skill;
     }
 
     function countQuestions(parts) {
@@ -135,7 +147,7 @@
                             <i class="bi ${escapeHtml(meta.icon)}"></i>
                         </div>
                         <h3>${escapeHtml(set.title || 'VSTEP practice set')}</h3>
-                        <p>${escapeHtml(set.description || `${meta.label} practice placeholder`)}</p>
+                        <p>${escapeHtml(set.description || `Bài luyện ${meta.label} VSTEP theo bộ đề.`)}</p>
                         <div class="vstep-skill-library-card-meta">
                             <span><i class="bi bi-list-check"></i>${parts.length} part</span>
                             <span><i class="bi bi-question-circle"></i>${questionCount} câu/task</span>
@@ -164,7 +176,7 @@
     }
 
     function render(sets) {
-        const usableSets = sets.filter(set => getParts(set).length);
+        const usableSets = sets.filter(set => isCurrentSkillSet(set) && getParts(set).length);
         const totalParts = usableSets.reduce((sum, set) => sum + getParts(set).length, 0);
         const totalQuestions = usableSets.reduce((sum, set) => sum + countQuestions(getParts(set)), 0);
         refs.setCount.textContent = String(usableSets.length);
@@ -173,7 +185,7 @@
 
         if (!usableSets.length) {
             refs.grid.innerHTML = '';
-            setState(`Chưa có nội dung ${skillMeta[skill].label} VSTEP published. Admin có thể thêm bộ đề placeholder trước.`, 'warning');
+            setState(`Chưa có nội dung ${skillMeta[skill].label} VSTEP published. Admin có thể thêm bài học theo bộ đề trước.`, 'warning');
             return;
         }
 

@@ -22,7 +22,35 @@
         writing: 'Writing',
         speaking: 'Speaking'
     };
-    const SKILL_KEYS = ['listening', 'reading', 'writing', 'speaking'];
+    const SKILL_KEYS = ['reading', 'listening', 'writing', 'speaking'];
+    const DEFAULT_PRACTICE_SKILL = 'reading';
+    const DEFAULT_CONTENT_SKILL = ADMIN_MODE === 'onthi' ? DEFAULT_PRACTICE_SKILL : 'full_test';
+    const PRACTICE_SKILL_META = {
+        reading: {
+            label: 'Reading',
+            listHelp: 'Bài published sẽ hiện ở trang Reading theo bộ đề của học viên.',
+            subtitle: 'Upload nội dung đúng cấu trúc Reading mà học viên đang làm ở trang Học theo bộ đề.',
+            countLabel: 'câu'
+        },
+        listening: {
+            label: 'Listening',
+            listHelp: 'Bài published sẽ hiện ở trang Listening theo bộ đề của học viên.',
+            subtitle: 'Upload audio, transcript và câu hỏi đúng cấu trúc Listening theo bộ đề.',
+            countLabel: 'câu'
+        },
+        writing: {
+            label: 'Writing',
+            listHelp: 'Bài published sẽ hiện ở trang Writing theo bộ đề của học viên.',
+            subtitle: 'Upload 2 Writing tasks để học viên viết bài và nộp cho giáo viên chấm tay.',
+            countLabel: 'task Writing'
+        },
+        speaking: {
+            label: 'Speaking',
+            listHelp: 'Bài published sẽ hiện ở trang Speaking theo bộ đề của học viên.',
+            subtitle: 'Upload prompt, audio giới thiệu, timing và ảnh minh họa cho bài Speaking thu âm.',
+            countLabel: 'part Speaking'
+        }
+    };
     const LISTENING_QUESTION_COUNTS = [8, 12, 15];
     const READING_QUESTION_COUNTS = [10, 10, 10, 10];
     const SPEAKING_TIMING_DEFAULTS = [
@@ -45,7 +73,8 @@
         results: [],
         resources: [],
         classes: [],
-        memberships: []
+        memberships: [],
+        currentContentSkill: DEFAULT_CONTENT_SKILL
     };
 
     function $(id) {
@@ -105,6 +134,95 @@
     function getNumber(id, fallback) {
         const value = Number(getValue(id));
         return Number.isFinite(value) && value >= 0 ? value : fallback;
+    }
+
+    function toDateInputValue(value) {
+        if (!value) return '';
+        const raw = String(value).trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+        const date = new Date(raw);
+        return date && Number.isFinite(date.getTime()) ? formatYmd(date) : '';
+    }
+
+    function toDateTimeLocalValue(value) {
+        if (!value) return '';
+        const date = new Date(value);
+        if (!date || !Number.isFinite(date.getTime())) return '';
+        const ymd = formatYmd(date);
+        const hh = String(date.getHours()).padStart(2, '0');
+        const mm = String(date.getMinutes()).padStart(2, '0');
+        return `${ymd}T${hh}:${mm}`;
+    }
+
+    function addDaysLocal(date, days) {
+        const next = new Date(date);
+        next.setDate(next.getDate() + days);
+        return next;
+    }
+
+    function endOfLocalDay(date) {
+        const next = new Date(date);
+        next.setHours(23, 59, 0, 0);
+        return next;
+    }
+
+    function suggestOnthiTrack(contentSkill = getContentSkill()) {
+        if (contentSkill === 'writing' || contentSkill === 'speaking') return 'sw';
+        if (contentSkill === 'full_test') return 'full';
+        return 'lr';
+    }
+
+    function normalizeOnthiTrack(value, contentSkill) {
+        const allowed = ADMIN_MODE === 'onthi' ? ['lr', 'sw'] : ['lr', 'sw', 'full'];
+        const raw = String(value || '').toLowerCase();
+        if (allowed.includes(raw)) return raw;
+        const suggested = suggestOnthiTrack(contentSkill);
+        return allowed.includes(suggested) ? suggested : allowed[0];
+    }
+
+    function autoFillOnthiWindow(options = {}) {
+        const examDate = getValue('vstep-onthi-exam-date');
+        if (!examDate) return;
+        const date = new Date(`${examDate}T00:00:00`);
+        if (!Number.isFinite(date.getTime())) return;
+        const accessFrom = addDaysLocal(date, -21);
+        accessFrom.setHours(0, 0, 0, 0);
+        const accessUntil = endOfLocalDay(date);
+        setValue('vstep-onthi-access-from', toDateTimeLocalValue(accessFrom));
+        setValue('vstep-onthi-access-until', toDateTimeLocalValue(accessUntil));
+        if (options.forceDeadline || !getValue('vstep-onthi-deadline')) {
+            setValue('vstep-onthi-deadline', toDateTimeLocalValue(accessUntil));
+        }
+    }
+
+    function collectOnthiMeta(contentSkill) {
+        const order = Number(getValue('vstep-onthi-order'));
+        const notifyBeforeHours = getNumber('vstep-onthi-notify-hours', 24);
+        return {
+            enabled: true,
+            track: normalizeOnthiTrack(getValue('vstep-onthi-track'), contentSkill),
+            order: Number.isFinite(order) && order > 0 ? Math.round(order) : null,
+            examDate: getValue('vstep-onthi-exam-date') || null,
+            accessFrom: dateTimeValue('vstep-onthi-access-from') || null,
+            accessUntil: dateTimeValue('vstep-onthi-access-until') || null,
+            deadlineAt: dateTimeValue('vstep-onthi-deadline') || null,
+            notifyBeforeHours: Number.isFinite(notifyBeforeHours) && notifyBeforeHours > 0 ? Math.round(notifyBeforeHours) : 24,
+            required: isChecked('vstep-onthi-required')
+        };
+    }
+
+    function onthiMetaOfSet(set) {
+        const data = set?.data || {};
+        return data.onthi && typeof data.onthi === 'object' ? data.onthi : {};
+    }
+
+    function formatOnthiMeta(set) {
+        const meta = onthiMetaOfSet(set);
+        const chunks = [];
+        if (meta.track) chunks.push(String(meta.track).toUpperCase());
+        if (meta.order) chunks.push(`#${meta.order}`);
+        if (meta.deadlineAt) chunks.push(`DL ${formatLocalDateTime(new Date(meta.deadlineAt))}`);
+        return chunks.join(' · ');
     }
 
     // ===== VSTEP schedule helpers (client-side mirror of server/_utils.js) =====
@@ -213,21 +331,65 @@
     }
 
     function getContentSkill() {
-        const value = getValue('vstep-practice-skill');
-        return Object.prototype.hasOwnProperty.call(CONTENT_SKILL_LABELS, value) ? value : 'full_test';
+        const value = getValue('vstep-practice-skill') || state.currentContentSkill;
+        return Object.prototype.hasOwnProperty.call(CONTENT_SKILL_LABELS, value) ? value : DEFAULT_CONTENT_SKILL;
+    }
+
+    function isPracticeSkill(skill) {
+        return SKILL_KEYS.includes(skill);
+    }
+
+    function normalizePracticeSkill(skill) {
+        return isPracticeSkill(skill) ? skill : DEFAULT_PRACTICE_SKILL;
     }
 
     function shouldIncludeSkill(skill, contentSkill = getContentSkill()) {
         return contentSkill === 'full_test' || contentSkill === skill;
     }
 
+    function syncPracticeSkillUi() {
+        const contentSkill = getContentSkill();
+        const activeSkill = normalizePracticeSkill(contentSkill);
+        const meta = PRACTICE_SKILL_META[activeSkill];
+        document.querySelectorAll('[data-vstep-practice-skill]').forEach(button => {
+            button.classList.toggle('active', button.dataset.vstepPracticeSkill === activeSkill);
+            button.setAttribute('aria-pressed', button.dataset.vstepPracticeSkill === activeSkill ? 'true' : 'false');
+        });
+        if (ADMIN_MODE !== 'onthi' || !meta) return;
+        if (refs.setListTitle) refs.setListTitle.textContent = `${meta.label} - Học theo bộ đề`;
+        if (refs.setListHelp) refs.setListHelp.textContent = meta.listHelp;
+        if (refs.formSubtitle) refs.formSubtitle.textContent = meta.subtitle;
+        if (refs.formTitle && !state.editingId) refs.formTitle.textContent = `Tạo bài ${meta.label} theo bộ đề mới`;
+    }
+
     function updateSkillEditorVisibility() {
         const contentSkill = getContentSkill();
+        state.currentContentSkill = contentSkill;
         document.querySelectorAll('.vstep-skill-card[data-vstep-skill]').forEach(card => {
             const show = shouldIncludeSkill(card.dataset.vstepSkill, contentSkill);
             card.classList.toggle('is-hidden-by-skill', !show);
             if (show) card.setAttribute('open', 'open');
         });
+        document.querySelectorAll('[data-vstep-duration-skill]').forEach(row => {
+            const show = shouldIncludeSkill(row.dataset.vstepDurationSkill, contentSkill);
+            row.classList.toggle('d-none', !show);
+        });
+        syncPracticeSkillUi();
+    }
+
+    function setPracticeSkill(skill, options = {}) {
+        const normalized = normalizePracticeSkill(skill);
+        state.currentContentSkill = normalized;
+        setValue('vstep-practice-skill', normalized);
+        if (options.updateTrack !== false) {
+            setValue('vstep-onthi-track', normalizeOnthiTrack(null, normalized));
+        }
+        updateSkillEditorVisibility();
+        if (options.resetForm) {
+            resetForm();
+            return;
+        }
+        renderSetList();
     }
 
     function authHeaders(extra = {}) {
@@ -776,6 +938,7 @@
             vstep_practice_skill: contentSkill,
             vstep_content_kind: getValue('vstep-content-kind') || 'mock_test',
             status: getValue('vstep-status') || 'draft',
+            onthi: flow === 'practice' ? collectOnthiMeta(contentSkill) : null,
             durations,
             listening: { parts: listeningParts },
             reading: { parts: readingParts },
@@ -885,6 +1048,12 @@
         });
     }
 
+    function practiceSetCountable(set) {
+        if (flowOfSet(set) !== 'practice') return false;
+        if (ADMIN_MODE !== 'onthi') return true;
+        return isPracticeSkill(contentSkillOfSet(set));
+    }
+
     function summarizeSet(set) {
         const data = set?.data || {};
         const sum = parts => (parts || []).reduce((total, part) => total + (part.questions || []).length, 0);
@@ -896,6 +1065,20 @@
         };
     }
 
+    function renderSetCounts(summary, contentSkill) {
+        if (contentSkill === 'full_test') {
+            return `
+                <span>Listening ${summary.listening}</span>
+                <span>Reading ${summary.reading}</span>
+                <span>Writing ${summary.writing}</span>
+                <span>Speaking ${summary.speaking}</span>
+            `;
+        }
+        const meta = PRACTICE_SKILL_META[contentSkill];
+        const value = summary[contentSkill] || 0;
+        return `<span>${escapeHtml(meta?.label || CONTENT_SKILL_LABELS[contentSkill] || 'VSTEP')} ${escapeHtml(String(value))} ${escapeHtml(meta?.countLabel || '')}</span>`;
+    }
+
     function updateSetStats(sets) {
         const published = sets.filter(set => (set.data?.status || 'draft') === 'published').length;
         if (refs.statTotal) refs.statTotal.textContent = String(sets.length);
@@ -904,7 +1087,7 @@
     }
 
     function updateOverview() {
-        const practiceCount = state.sets.filter(set => flowOfSet(set) === 'practice').length;
+        const practiceCount = state.sets.filter(practiceSetCountable).length;
         const lessonCount = state.sets.filter(set => flowOfSet(set) === 'lesson_exam').length;
         if (refs.overviewStudents) refs.overviewStudents.textContent = String(state.users.length);
         if (refs.overviewPractice) refs.overviewPractice.textContent = String(practiceCount);
@@ -913,10 +1096,13 @@
     }
 
     function renderSetList() {
+        syncPracticeSkillUi();
         const sets = filteredSets();
         updateSetStats(sets);
         if (!sets.length) {
-            refs.setList.innerHTML = `<div class="text-secondary small">Chưa có nội dung VSTEP cho nhóm ${escapeHtml(FLOW_LABELS[state.currentFlow])}.</div>`;
+            const meta = PRACTICE_SKILL_META[normalizePracticeSkill(getContentSkill())];
+            const name = ADMIN_MODE === 'onthi' && meta ? `${meta.label} theo bộ đề` : FLOW_LABELS[state.currentFlow];
+            refs.setList.innerHTML = `<div class="text-secondary small">Chưa có nội dung VSTEP cho ${escapeHtml(name)}.</div>`;
             return;
         }
 
@@ -925,7 +1111,9 @@
             const active = set.id === state.editingId ? ' active' : '';
             const date = set.created_at ? new Date(set.created_at).toLocaleDateString('vi-VN') : '';
             const summary = summarizeSet(set);
+            const setSkill = contentSkillOfSet(set);
             const statusClass = status === 'published' ? 'vstep-status-published' : 'vstep-status-draft';
+            const onthiText = formatOnthiMeta(set);
             return `
                 <button type="button" class="vstep-set-item${active}" data-id="${escapeHtml(set.id)}">
                     <div class="vstep-set-item-top">
@@ -933,15 +1121,13 @@
                         <span class="vstep-status-pill ${statusClass}">${escapeHtml(status)}</span>
                     </div>
                     <div class="vstep-set-meta">
-                        <span><i class="bi bi-bullseye"></i> ${escapeHtml(CONTENT_SKILL_LABELS[contentSkillOfSet(set)] || 'VSTEP')}</span>
+                        <span><i class="bi bi-bullseye"></i> ${escapeHtml(CONTENT_SKILL_LABELS[setSkill] || 'VSTEP')}</span>
                         <span><i class="bi bi-clock"></i> ${escapeHtml(String(set.duration_minutes || 177))} phút</span>
                         <span><i class="bi bi-calendar3"></i> ${escapeHtml(date || '-')}</span>
                     </div>
+                    ${onthiText ? `<div class="vstep-set-meta vstep-set-meta-schedule"><span><i class="bi bi-calendar2-check"></i> ${escapeHtml(onthiText)}</span></div>` : ''}
                     <div class="vstep-set-counts">
-                        <span>Listening ${summary.listening}</span>
-                        <span>Reading ${summary.reading}</span>
-                        <span>Writing ${summary.writing}</span>
-                        <span>Speaking ${summary.speaking}</span>
+                        ${renderSetCounts(summary, setSkill)}
                     </div>
                 </button>
             `;
@@ -986,6 +1172,14 @@
             payload.data.vstep_flow = PAGE.forceFlow;
         }
 
+        // Hook cho module "tạo bài học theo buổi" (admin_vstep_class_lessons.js):
+        // cho phép inject thêm metadata (vstep_class_id, vstep_session_number...)
+        // vào payload.data trước khi POST. Hook trả về Promise để module bên ngoài
+        // có thể đồng bộ state nếu cần.
+        if (typeof window.__VSTEP_PAYLOAD_HOOK__ === 'function') {
+            try { await window.__VSTEP_PAYLOAD_HOOK__(payload); } catch (e) { console.warn(e); }
+        }
+
         refs.saveBtn.disabled = true;
         refs.saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Đang lưu...';
 
@@ -999,8 +1193,17 @@
 
             state.editingId = result.set?.id || result.content?.id || state.editingId;
             state.currentFlow = payload.data.vstep_flow || state.currentFlow;
+            state.currentContentSkill = payload.data.vstep_practice_skill || state.currentContentSkill;
             setValue('vstep-flow', state.currentFlow);
+            setValue('vstep-practice-skill', state.currentContentSkill);
             await loadSets();
+
+            // Hook event cho module ngoài (admin_vstep_class_lessons.js) biết
+            // content vừa save để refresh grid + navigate về danh sách buổi.
+            window.dispatchEvent(new CustomEvent('vstep:content-saved', {
+                detail: { content: result.set || result.content, payload, isUpdate }
+            }));
+
             alert('Đã lưu nội dung VSTEP.');
         } catch (error) {
             alert(error.message);
@@ -1014,9 +1217,21 @@
         state.editingId = '';
         refs.form.reset();
         initEditors();
+        const contentSkill = ADMIN_MODE === 'onthi'
+            ? normalizePracticeSkill(state.currentContentSkill)
+            : (state.currentContentSkill || DEFAULT_CONTENT_SKILL);
+        state.currentContentSkill = contentSkill;
         setValue('vstep-flow', state.currentFlow);
-        setValue('vstep-practice-skill', state.currentFlow === 'practice' ? 'listening' : 'full_test');
+        setValue('vstep-practice-skill', contentSkill);
         setValue('vstep-content-kind', state.currentFlow === 'lesson_exam' ? 'assigned_exam' : 'mock_test');
+        setValue('vstep-onthi-track', normalizeOnthiTrack(null, contentSkill));
+        setValue('vstep-onthi-order', '');
+        setValue('vstep-onthi-exam-date', '');
+        setValue('vstep-onthi-access-from', '');
+        setValue('vstep-onthi-access-until', '');
+        setValue('vstep-onthi-deadline', '');
+        setValue('vstep-onthi-notify-hours', 24);
+        setChecked('vstep-onthi-required', true);
         setValue('vstep-duration-listening', 45);
         setValue('vstep-duration-reading', 60);
         setValue('vstep-duration-writing', 60);
@@ -1024,7 +1239,9 @@
         setValue('vstep-speaking-ready-seconds', 60);
         setValue('vstep-speaking-ready-message', 'Bạn đeo tai nghe để làm bài thi nói. Bài làm sẽ được thu âm trực tiếp.');
         updateSkillEditorVisibility();
-        refs.formTitle.textContent = `Tạo ${FLOW_LABELS[state.currentFlow]} VSTEP mới`;
+        if (ADMIN_MODE !== 'onthi') {
+            refs.formTitle.textContent = `Tạo ${FLOW_LABELS[state.currentFlow]} VSTEP mới`;
+        }
         refs.preview.textContent = '{}';
         renderSetList();
     }
@@ -1037,12 +1254,24 @@
         refs.form.reset();
         initEditors();
         refs.formTitle.textContent = `Đang sửa: ${set.title || 'VSTEP content'}`;
+        const inferredSkill = inferContentSkillFromData(data);
+        const contentSkill = ADMIN_MODE === 'onthi' ? normalizePracticeSkill(inferredSkill) : inferredSkill;
+        state.currentContentSkill = contentSkill;
         setValue('vstep-title', set.title || '');
         setValue('vstep-description', set.description || '');
         setValue('vstep-flow', data.vstep_flow || state.currentFlow);
-        setValue('vstep-practice-skill', inferContentSkillFromData(data));
+        setValue('vstep-practice-skill', contentSkill);
         setValue('vstep-content-kind', data.vstep_content_kind || 'mock_test');
         setValue('vstep-status', data.status || 'draft');
+        const onthi = data.onthi && typeof data.onthi === 'object' ? data.onthi : {};
+        setValue('vstep-onthi-track', normalizeOnthiTrack(onthi.track, contentSkill));
+        setValue('vstep-onthi-order', onthi.order || '');
+        setValue('vstep-onthi-exam-date', toDateInputValue(onthi.examDate));
+        setValue('vstep-onthi-access-from', toDateTimeLocalValue(onthi.accessFrom));
+        setValue('vstep-onthi-access-until', toDateTimeLocalValue(onthi.accessUntil));
+        setValue('vstep-onthi-deadline', toDateTimeLocalValue(onthi.deadlineAt));
+        setValue('vstep-onthi-notify-hours', onthi.notifyBeforeHours || 24);
+        setChecked('vstep-onthi-required', onthi.required !== false);
         setValue('vstep-duration-listening', data.durations?.listening || 45);
         setValue('vstep-duration-reading', data.durations?.reading || 60);
         setValue('vstep-duration-writing', data.durations?.writing || 60);
@@ -1115,11 +1344,18 @@
             updateOverview();
             renderUsers();
         } catch (error) {
-            refs.usersBody.innerHTML = `<tr><td colspan="7" class="text-danger text-center py-3">${escapeHtml(error.message)}</td></tr>`;
+            if (refs.usersBody) {
+                refs.usersBody.innerHTML = `<tr><td colspan="7" class="text-danger text-center py-3">${escapeHtml(error.message)}</td></tr>`;
+            } else {
+                console.warn('Không thể tải danh sách học viên VSTEP:', error.message);
+            }
         }
     }
 
     function renderUsers() {
+        renderClassStudentOptions();
+        renderAssignmentOptions();
+        if (!refs.usersBody) return;
         const keyword = getValue('vstepStudentSearch').toLowerCase();
         const users = state.users.filter(user => {
             if (!keyword) return true;
@@ -1492,7 +1728,7 @@
             const start = item.starts_at ? new Date(item.starts_at).toLocaleString('vi-VN') : '-';
             const end = item.ends_at ? new Date(item.ends_at).toLocaleString('vi-VN') : '-';
             return `
-                <article class="vstep-class-card">
+                <article class="vstep-class-card" data-vstep-class-id="${escapeHtml(item.id)}" role="button" tabindex="0" title="Click để xem 18/24 buổi học của lớp">
                     <div class="d-flex justify-content-between gap-2">
                         <div>
                             <div class="fw-bold">${escapeHtml(item.title || 'VSTEP class')}</div>
@@ -1541,6 +1777,12 @@
             setClassAlert('Đã tạo lớp VSTEP.', 'success');
             await loadClasses();
             await loadUsers();
+
+            // Hook event cho module admin_vstep_class_lessons.js: chuyển sang
+            // grid "Tạo bài học cho lớp X" với 18/24 buổi của lớp vừa tạo.
+            window.dispatchEvent(new CustomEvent('vstep:class-created', {
+                detail: { class: result.class }
+            }));
         } catch (error) {
             setClassAlert(error.message, 'danger');
         } finally {
@@ -1746,8 +1988,14 @@
         document.querySelectorAll('.vstep-admin-tab').forEach(button => button.classList.remove('active'));
         document.querySelector(`[data-vstep-flow="${state.currentFlow}"]`)?.classList.add('active');
         setValue('vstep-flow', state.currentFlow);
-        if (refs.setListTitle) refs.setListTitle.textContent = `${FLOW_LABELS[state.currentFlow]} VSTEP`;
-        if (refs.formSubtitle) {
+        if (ADMIN_MODE === 'onthi') {
+            state.currentContentSkill = normalizePracticeSkill(state.currentContentSkill);
+            setValue('vstep-practice-skill', state.currentContentSkill);
+            syncPracticeSkillUi();
+        } else if (refs.setListTitle) {
+            refs.setListTitle.textContent = `${FLOW_LABELS[state.currentFlow]} VSTEP`;
+        }
+        if (refs.formSubtitle && ADMIN_MODE !== 'onthi') {
             refs.formSubtitle.textContent = state.currentFlow === 'practice'
                 ? 'Tạo bộ đề ôn thi VSTEP để học viên tự luyện theo mẫu phân khu Aptis.'
                 : 'Tạo nội dung học tập VSTEP để giao cho lớp/học viên theo mẫu module lớp học.';
@@ -1763,6 +2011,8 @@
         refs.practiceSkill = $('vstep-practice-skill');
         refs.setList = $('vstepSetList');
         refs.setListTitle = $('vstepSetListTitle');
+        refs.setListHelp = $('vstepSetListHelp');
+        refs.practiceSkillSwitcher = $('vstepPracticeSkillSwitcher');
         refs.preview = $('vstepJsonPreview');
         refs.saveBtn = $('saveVstepSetBtn');
         refs.listeningEditors = $('vstep-listening-editors');
@@ -1984,6 +2234,9 @@
         $('vstepSetSearch')?.addEventListener('input', renderSetList);
         $('vstepStudentSearch')?.addEventListener('input', renderUsers);
         $('vstepResultSearch')?.addEventListener('input', renderResults);
+        document.querySelectorAll('[data-vstep-practice-skill]').forEach(button => {
+            button.addEventListener('click', () => setPracticeSkill(button.dataset.vstepPracticeSkill, { resetForm: true }));
+        });
 
         // Class form: preview sessions khi đổi schedule_type/start_time/num_sessions/starts_at/band.
         ['vstep-class-starts', 'vstep-class-schedule-type', 'vstep-class-start-time',
@@ -2009,16 +2262,14 @@
         refs.assignmentForm?.addEventListener('submit', createAssignment);
         $('vstep-flow')?.addEventListener('change', () => {
             state.currentFlow = getValue('vstep-flow') || 'practice';
-            if (state.currentFlow === 'practice' && getContentSkill() === 'full_test') {
-                setValue('vstep-practice-skill', 'listening');
-            }
             updateSkillEditorVisibility();
             renderSetList();
         });
         refs.practiceSkill?.addEventListener('change', () => {
-            updateSkillEditorVisibility();
-            renderSetList();
+            setPracticeSkill(getValue('vstep-practice-skill'));
         });
+        $('vstep-onthi-exam-date')?.addEventListener('change', () => autoFillOnthiWindow());
+        $('vstep-onthi-autofill-window')?.addEventListener('click', () => autoFillOnthiWindow({ forceDeadline: true }));
 
         await loadUsers();
         await Promise.all([loadSets(), loadResources(), loadClasses()]);
@@ -2033,6 +2284,11 @@
         showPanel(candidate || desired);
         if (candidate === 'content') showContentFlow(PAGE.forceFlow || state.currentFlow);
     }
+
+    // Expose tối thiểu cho module ngoài (admin_vstep_class_lessons.js) đọc
+    // state.sets / state.classes và gọi fillForm khi chuyển sang editor.
+    window.__VSTEP_STATE__ = state;
+    window.__VSTEP_API__ = { fillForm, resetForm, showContentFlow };
 
     document.addEventListener('DOMContentLoaded', init);
 })();

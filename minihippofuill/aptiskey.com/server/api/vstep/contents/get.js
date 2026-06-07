@@ -1,6 +1,6 @@
 import { selectFrom } from '../../_utils/supabase.js';
 import { verifyUserRequest } from '../../_utils/auth.js';
-import { contentToLegacySet, vstepSchemaErrorResponse } from '../_utils.js';
+import { contentToLegacySet, practiceAccessWindowStatus, vstepSchemaErrorResponse } from '../_utils.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -44,6 +44,12 @@ export default async function handler(req, res) {
       }
       if (content.flow === 'practice' && vstepStudent && vstepStudent.practice_access === false) {
         return res.status(403).json({ error: 'Tài khoản chưa được cấp quyền vào khu vực Ôn thi VSTEP' });
+      }
+      if (content.flow === 'practice') {
+        const windowStatus = practiceAccessWindowStatus(content);
+        if (!windowStatus.allowed) {
+          return res.status(403).json({ error: windowStatus.reason || 'Đề ôn thi chưa nằm trong thời gian truy cập' });
+        }
       }
       if (content.flow === 'lesson_exam') {
         const assignmentId = req.query.assignment || req.query.assignmentId || '';

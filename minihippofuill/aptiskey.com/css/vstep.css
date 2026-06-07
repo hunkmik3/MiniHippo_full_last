@@ -209,6 +209,49 @@ body.vstep-body {
   padding: 18px 28px 32px;
 }
 
+.vstep-admin-skill-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.vstep-admin-skill-option {
+  border: 1px solid var(--vstep-admin-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--vstep-admin-ink);
+  padding: 13px 14px;
+  text-align: left;
+  display: grid;
+  gap: 5px;
+  min-height: 82px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.vstep-admin-skill-option span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+}
+
+.vstep-admin-skill-option i {
+  color: var(--vstep-admin-accent);
+}
+
+.vstep-admin-skill-option small {
+  color: var(--vstep-admin-muted);
+  line-height: 1.35;
+}
+
+.vstep-admin-skill-option:hover,
+.vstep-admin-skill-option.active {
+  border-color: var(--vstep-admin-accent);
+  background: #eff6ff;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.12);
+}
+
 .vstep-admin-tabs {
   display: grid;
   gap: 8px;
@@ -409,6 +452,19 @@ body.vstep-body {
   color: var(--vstep-admin-muted);
   font-size: 0.8rem;
   margin-top: 9px;
+}
+
+.vstep-set-meta-schedule {
+  color: #1d4ed8;
+}
+
+.vstep-check-line {
+  border: 1px solid var(--vstep-admin-line);
+  border-radius: 8px;
+  background: var(--vstep-admin-soft);
+  min-height: 38px;
+  padding: 9px 12px 9px 36px;
+  width: 100%;
 }
 
 .vstep-set-counts span {
@@ -935,6 +991,61 @@ body.vstep-body {
   border-radius: 6px;
 }
 
+/* Session card cho landing Học tập VSTEP (grid 18/24 buổi B1/B2). */
+.vstep-session-card {
+  background: #fff;
+  border: 1px solid #e3ebf6;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 6px 18px rgba(31, 95, 200, 0.06);
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+.vstep-session-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(31, 95, 200, 0.14);
+}
+.vstep-session-card-done { border-color: #6ad6a3; background: #f1faf5; }
+.vstep-session-card-late-done { border-color: #f0c14b; background: #fdf7e6; }
+.vstep-session-card-overdue { border-color: #f0a4a4; background: #fdf3f3; }
+.vstep-session-card-urgent { border-color: #ffd28a; background: #fff7eb; }
+.vstep-session-card-pending { opacity: 0.65; }
+
+.vstep-session-card .vstep-session-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+.vstep-session-card .vstep-session-num {
+  font-weight: 700;
+  color: #1f3a68;
+  font-size: 1.05rem;
+}
+.vstep-session-card .vstep-session-day { font-size: 0.82rem; }
+
+.vstep-session-status {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.vstep-session-status-done { background: #d8f3e3; color: #1a7a4a; }
+.vstep-session-status-late-done { background: #fbe6b3; color: #8a6700; }
+.vstep-session-status-overdue { background: #f9d3d3; color: #a83232; }
+.vstep-session-status-urgent { background: #ffe2bd; color: #a06400; }
+.vstep-session-status-open { background: #e0ecff; color: #1f5fc8; }
+.vstep-session-status-pending { background: #ecf0f5; color: #5a6b8a; }
+
+.vstep-session-body h3 { color: #1f3a68; }
+.vstep-session-meta { line-height: 1.5; }
+
+.vstep-session-foot { margin-top: auto; }
+
 .vstep-practice-options,
 .vstep-skill-library {
   min-height: auto;
@@ -954,6 +1065,71 @@ body.vstep-body {
 
 .vstep-practice-hero {
   border-top: 4px solid #2563eb;
+}
+
+.vstep-onthi-dashboard {
+  background: #fff;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 8px;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+  padding: 20px;
+}
+
+.vstep-onthi-dashboard-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.vstep-onthi-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.vstep-onthi-metrics div {
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 12px 14px;
+}
+
+.vstep-onthi-metrics strong {
+  display: block;
+  color: #1e293b;
+  font-size: 1.35rem;
+  line-height: 1.1;
+}
+
+.vstep-onthi-metrics span {
+  color: #64748b;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.vstep-onthi-result-shell {
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 8px;
+}
+
+.vstep-onthi-result-shell .table {
+  min-width: 760px;
+}
+
+.vstep-dashboard-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #075985;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 3px 10px;
+  white-space: nowrap;
 }
 
 .vstep-skill-options-grid {
@@ -2184,6 +2360,10 @@ body.vstep-body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .vstep-admin-skill-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .vstep-admin-grid,
   .vstep-results-layout {
     grid-template-columns: 1fr;
@@ -2227,6 +2407,7 @@ body.vstep-body {
   }
 
   .vstep-admin-layout,
+  .vstep-admin-skill-board,
   .vstep-module-home-grid,
   .vstep-class-summary-grid,
   .vstep-learning-grid,
@@ -2234,10 +2415,14 @@ body.vstep-body {
   .vstep-practice-strip,
   .vstep-skill-metrics,
   .vstep-info-columns,
-  .vstep-reading-layout,
-  .vstep-speaking-player {
-    grid-template-columns: 1fr;
-  }
+	  .vstep-reading-layout,
+	  .vstep-speaking-player {
+	    grid-template-columns: 1fr;
+	  }
+
+	  .vstep-onthi-metrics {
+	    grid-template-columns: 1fr;
+	  }
 
   .vstep-question-builder-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2343,12 +2528,13 @@ body.vstep-body {
     text-align: center;
   }
 
-  .vstep-bode-hero,
-  .vstep-home-hero,
-  .vstep-practice-hero,
-  .vstep-skill-hero {
-    align-items: stretch;
-    flex-direction: column;
+	  .vstep-bode-hero,
+	  .vstep-home-hero,
+	  .vstep-practice-hero,
+	  .vstep-onthi-dashboard-head,
+	  .vstep-skill-hero {
+	    align-items: stretch;
+	    flex-direction: column;
   }
 }
 

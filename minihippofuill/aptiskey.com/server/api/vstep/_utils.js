@@ -76,6 +76,38 @@ export function contentToLegacySet(content) {
   };
 }
 
+export function getPracticeOnthiMeta(content) {
+  const data = content?.data && typeof content.data === 'object' ? content.data : {};
+  return data.onthi && typeof data.onthi === 'object' ? data.onthi : {};
+}
+
+function parseTime(value) {
+  if (!value) return null;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : null;
+}
+
+export function practiceAccessWindowStatus(content, nowMs = Date.now()) {
+  const flow = content?.flow || content?.data?.vstep_flow || 'practice';
+  if (flow !== 'practice') return { allowed: true };
+  const meta = getPracticeOnthiMeta(content);
+  const accessFrom = parseTime(meta.accessFrom);
+  const accessUntil = parseTime(meta.accessUntil || meta.deadlineAt);
+  if (accessFrom && nowMs < accessFrom) {
+    return {
+      allowed: false,
+      reason: `Đề ôn thi này sẽ mở từ ${new Date(accessFrom).toLocaleString('vi-VN')}.`
+    };
+  }
+  if (accessUntil && nowMs > accessUntil) {
+    return {
+      allowed: false,
+      reason: `Đề ôn thi này đã đóng truy cập từ ${new Date(accessUntil).toLocaleString('vi-VN')}.`
+    };
+  }
+  return { allowed: true };
+}
+
 // ===========================================================
 // Helpers cho lịch học VSTEP (246 / 357), số buổi cố định theo
 // band (B1=18 / B2=24), auto-compute sessions[] + deadline.
