@@ -67,6 +67,7 @@
     const state = {
         editingId: '',
         editingClassId: '',
+        activeResultId: '',
         currentPanel: PAGE.defaultPanel,
         currentFlow: PAGE.forceFlow || 'practice',
         sets: [],
@@ -533,10 +534,28 @@
         });
     }
 
-    function questionRowHtml(question = {}, index = 0) {
+    function questionRowHtml(question = {}, index = 0, includeAudio = false) {
         const labels = ['A', 'B', 'C', 'D'];
+        // Listening questions cần audioUrl riêng cho từng câu — học viên click
+        // nút Play của câu nào sẽ nghe audio câu đó (1 lần, lock sau khi xong).
+        const audioField = includeAudio ? `
+                    <div class="vstep-question-builder-prompt">
+                        <label class="form-label small fw-semibold">
+                            <i class="bi bi-headphones me-1 text-primary"></i>Audio riêng cho câu này
+                        </label>
+                        <div class="d-flex gap-2 align-items-center">
+                            <input type="text" class="form-control form-control-sm vstep-question-audio-url"
+                                value="${escapeHtml(question.audioUrl || '')}"
+                                placeholder="audio/vstep/listening/... hoặc dán URL">
+                            <input type="file" class="form-control form-control-sm vstep-question-audio-file"
+                                accept="audio/mp3,audio/mpeg,audio/webm,audio/ogg,audio/mp4,.mp3,.webm,.ogg,.m4a"
+                                style="max-width:200px;">
+                        </div>
+                        <div class="vstep-help mt-1 vstep-question-audio-status"></div>
+                    </div>
+        ` : '';
         return `
-            <div class="vstep-question-builder-row">
+            <div class="vstep-question-builder-row" data-include-audio="${includeAudio ? '1' : '0'}">
                 <div class="vstep-question-builder-head">
                     <strong>Câu ${index + 1}</strong>
                     <button type="button" class="btn btn-sm btn-outline-danger vstep-remove-question-row" aria-label="Xóa câu hỏi">
@@ -548,6 +567,7 @@
                         <label class="form-label small fw-semibold">Câu hỏi</label>
                         <input type="text" class="form-control form-control-sm vstep-question-prompt" value="${escapeHtml(question.prompt || '')}" placeholder="Nhập câu hỏi">
                     </div>
+                    ${audioField}
                     ${labels.map(label => `
                         <div>
                             <label class="form-label small fw-semibold">Đáp án ${label}</label>
@@ -581,12 +601,55 @@
                 refreshQuestionRowIndexes(container);
             });
         });
+        // Upload audio per câu cho Listening. Đọc file, base64, POST upload-audio
+        // → set URL trả về vào input vstep-question-audio-url của câu đó.
+        container.querySelectorAll('.vstep-question-audio-file').forEach(input => {
+            input.addEventListener('change', () => uploadQuestionAudio(input));
+        });
+    }
+
+    async function uploadQuestionAudio(input) {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        const row = input.closest('.vstep-question-builder-row');
+        const urlInput = row?.querySelector('.vstep-question-audio-url');
+        const status = row?.querySelector('.vstep-question-audio-status');
+        if (status) status.textContent = 'Đang upload audio...';
+        try {
+            const base64 = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const result = String(reader.result || '');
+                    resolve(result.includes(',') ? result.split(',')[1] : result);
+                };
+                reader.onerror = () => reject(new Error('Không thể đọc file audio.'));
+                reader.readAsDataURL(file);
+            });
+            const filePath = `audio/vstep/listening/questions/${Date.now()}_${sanitizeFileName(file.name)}`;
+            const result = await fetchJson('/api/upload-audio', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    filePath,
+                    content: base64,
+                    message: `Upload VSTEP listening question audio ${filePath}`
+                })
+            });
+            if (urlInput) urlInput.value = result.rawUrl || filePath;
+            if (status) status.textContent = '✓ Audio đã upload.';
+        } catch (error) {
+            if (status) status.textContent = 'Lỗi: ' + error.message;
+        } finally {
+            input.value = '';
+        }
     }
 
     function renderQuestionRows(targetId, questions = []) {
         const container = $(targetId);
         if (!container) return;
-        container.innerHTML = questions.map((question, index) => questionRowHtml(question, index)).join('');
+        // Auto-detect: target chứa "listening" → render audio field per câu.
+        const includeAudio = /listening/i.test(targetId);
+        container.innerHTML = questions.map((question, index) => questionRowHtml(question, index, includeAudio)).join('');
         bindQuestionRows(container);
     }
 
@@ -615,7 +678,10 @@
                 throw new Error(`${contextLabel}: câu ${index + 1} có đáp án "${answer}" nhưng ô đáp án ${answer} đang trống.`);
             }
             const explanation = row.querySelector('.vstep-question-explanation')?.value.trim() || '';
+            // audioUrl chỉ tồn tại cho Listening (row có data-include-audio=1).
+            const audioUrl = row.querySelector('.vstep-question-audio-url')?.value.trim() || '';
             return {
+                audioUrl,
                 id: `${contextLabel.toLowerCase().replace(/[^\w]+/g, '-')}-${index + 1}`,
                 prompt,
                 options,
@@ -2003,6 +2069,7 @@
         // bỏ qua UI filter để tránh admin vô tình thấy lẫn lộn flow khác.
         const flowFilter = PAGE.forceFlow || getValue('vstepResultFlowFilter');
         const classFilter = getValue('vstepResultClassFilter');
+        const detailButtonLabel = ADMIN_MODE === 'lophoc' ? 'Chấm bài' : 'Chi tiết';
         const users = userMap();
         const keyword = getValue('vstepResultSearch').toLowerCase();
         const results = state.results.filter(result => {
@@ -2029,8 +2096,8 @@
             const user = users[result.user_id] || {};
             const md = result.metadata || {};
             const manual = [
-                md.writing_answers?.length ? 'Writing' : '',
-                md.speaking_answers && Object.keys(md.speaking_answers).length ? 'Speaking' : ''
+                hasWritingDetail(md) ? 'Writing' : '',
+                hasSpeakingDetail(md) ? 'Speaking' : ''
             ].filter(Boolean).join(', ') || 'Không có';
             const manualScore = result.manual_score == null
                 ? manual
@@ -2044,7 +2111,7 @@
                     <td><span class="vstep-status-pill vstep-status-published">${escapeHtml(FLOW_LABELS[resultFlow(result)] || resultFlow(result))}</span></td>
                     <td class="fw-semibold">${escapeHtml(score)}</td>
                     <td>${escapeHtml(manualScore)}</td>
-                    <td><button type="button" class="btn btn-sm btn-outline-secondary" data-result-id="${escapeHtml(result.id)}"><i class="bi bi-search me-1"></i>Chi tiết</button></td>
+                    <td><button type="button" class="btn btn-sm btn-outline-secondary" data-result-id="${escapeHtml(result.id)}"><i class="bi bi-search me-1"></i>${escapeHtml(detailButtonLabel)}</button></td>
                 </tr>
             `;
         }).join('');
@@ -2054,25 +2121,394 @@
         });
     }
 
+    function formatResultDateTime(value) {
+        const date = value ? new Date(value) : null;
+        return date && Number.isFinite(date.getTime()) ? date.toLocaleString('vi-VN') : '-';
+    }
+
+    function formatResultDuration(seconds) {
+        const total = Number(seconds);
+        if (!Number.isFinite(total) || total <= 0) return '-';
+        const mins = Math.floor(total / 60);
+        const secs = Math.round(total % 60);
+        return `${mins}p ${String(secs).padStart(2, '0')}s`;
+    }
+
+    function resultContentKindLabel(value) {
+        const kind = String(value || '').toLowerCase();
+        if (kind === 'assigned_exam') return 'Bài học được giao';
+        if (kind === 'mock_test') return 'Bộ đề ôn thi';
+        return value || '-';
+    }
+
+    function normalizeMediaUrl(url) {
+        const value = String(url || '').trim();
+        if (!value || value.toLowerCase().startsWith('javascript:')) return '';
+        return value;
+    }
+
+    function toSpeakingEntries(raw) {
+        if (Array.isArray(raw)) return raw;
+        if (!raw || typeof raw !== 'object') return [];
+        return Object.entries(raw).map(([key, value]) => ({
+            key,
+            ...(value && typeof value === 'object' ? value : { answer: value })
+        }));
+    }
+
+    function collectWritingAnswersFromMetadata(metadata = {}) {
+        if (Array.isArray(metadata.writing_answers)) {
+            return metadata.writing_answers.map((item, index) => ({
+                partLabel: `Writing Part ${Number(item?.part) || index + 1}`,
+                title: item?.title || '',
+                prompt: item?.prompt || '',
+                answer: item?.answer || '',
+                wordCount: Number(item?.word_count || 0)
+            }));
+        }
+
+        const output = [];
+        const userAnswers = metadata.user_answers;
+        if (!userAnswers || typeof userAnswers !== 'object') return output;
+
+        Object.keys(userAnswers).forEach((partKey) => {
+            const items = Array.isArray(userAnswers[partKey]) ? userAnswers[partKey] : [];
+            items.forEach((item, index) => {
+                output.push({
+                    partLabel: String(partKey).replace(/^part/i, 'Part '),
+                    title: item?.key || `Câu ${index + 1}`,
+                    prompt: item?.prompt || '',
+                    answer: item?.answer || '',
+                    wordCount: Number(item?.word_count || 0)
+                });
+            });
+        });
+
+        return output;
+    }
+
+    function collectSpeakingEntriesFromMetadata(metadata = {}) {
+        const primary = toSpeakingEntries(metadata?.speaking_answers);
+        if (primary.length) return primary;
+        return toSpeakingEntries(metadata?.answers?.speaking);
+    }
+
+    function hasWritingDetail(metadata = {}) {
+        return collectWritingAnswersFromMetadata(metadata).length > 0;
+    }
+
+    function hasSpeakingDetail(metadata = {}) {
+        return collectSpeakingEntriesFromMetadata(metadata).length > 0;
+    }
+
+    function openBootstrapModal(element) {
+        if (!element) return;
+        const bootstrapApi = window.bootstrap || globalThis.bootstrap;
+        if (bootstrapApi?.Modal) {
+            bootstrapApi.Modal.getOrCreateInstance(element).show();
+            return;
+        }
+        element.style.display = 'block';
+        element.classList.add('show');
+        element.removeAttribute('aria-hidden');
+        document.body.classList.add('modal-open');
+    }
+
+    function buildResultMetaCards(result, user) {
+        const md = result.metadata || {};
+        const cards = [
+            ['Học viên', user.full_name || user.account_code || user.email || '-'],
+            ['Mã học viên', user.account_code || '-'],
+            ['Band', user.band || '-'],
+            ['Ngày nộp', formatResultDateTime(result.submitted_at)],
+            ['Nội dung', result.content_title || md.vstep_set_title || '-'],
+            ['Loại bài', resultContentKindLabel(result.content_kind || md.vstep_content_kind)],
+            ['Khu vực', FLOW_LABELS[resultFlow(result)] || resultFlow(result)],
+            ['Thời gian làm', formatResultDuration(result.duration_seconds)]
+        ];
+        if (md.assignment_due_at) {
+            cards.push(['Deadline', formatResultDateTime(md.assignment_due_at)]);
+        }
+        return cards.map(([label, value]) => `
+            <div class="vstep-result-card">
+                <span class="vstep-result-card-label">${escapeHtml(label)}</span>
+                <strong>${escapeHtml(String(value || '-'))}</strong>
+            </div>
+        `).join('');
+    }
+
+    function resultClassTitle(result, user) {
+        const classId = result.metadata?.vstep_class_id || studentClassIdFor(result.user_id) || user.assigned_class_id || user.class_id || '';
+        const match = state.classes.find(item => String(item.id) === String(classId));
+        return match?.title || result.metadata?.class_title || '-';
+    }
+
+    function buildResultModalMeta(result, user) {
+        const md = result.metadata || {};
+        const chips = [
+            ['Học viên', user.full_name || user.account_code || user.email || '-'],
+            ['Mã HV', user.account_code || '-'],
+            ['Lớp', resultClassTitle(result, user)],
+            ['Band', user.band || '-'],
+            ['Nộp lúc', formatResultDateTime(result.submitted_at)],
+            ['Nội dung', result.content_title || md.vstep_set_title || '-'],
+            ['Buổi', md.vstep_session_number ? `Buổi ${md.vstep_session_number}` : '-'],
+            ['Thời gian làm', formatResultDuration(result.duration_seconds)]
+        ];
+        return chips.map(([label, value]) => `
+            <div class="submission-detail-chip">
+                <span class="label">${escapeHtml(label)}</span>
+                <span>${escapeHtml(String(value || '-'))}</span>
+            </div>
+        `).join('');
+    }
+
+    function buildResultModalScoreSection(result) {
+        const partScores = result.part_scores && typeof result.part_scores === 'object' ? result.part_scores : {};
+        const rowsHtml = Object.keys(partScores).length
+            ? Object.keys(partScores).map((key) => {
+                const item = partScores[key] || {};
+                const scoreText = item.pendingManualGrade === true
+                    ? 'Chờ chấm tay'
+                    : `${Number(item.score || 0)}/${Number(item.total || 0)}`;
+                return `
+                    <tr>
+                        <td>${escapeHtml(CONTENT_SKILL_LABELS[key] || key)}</td>
+                        <td>${escapeHtml(scoreText)}</td>
+                    </tr>
+                `;
+            }).join('')
+            : '<tr><td colspan="2" class="text-muted">Chưa có điểm theo kỹ năng.</td></tr>';
+        return `
+            <div class="submission-detail-section-title"><i class="bi bi-clipboard-check"></i>Kết quả bài nộp</div>
+            <div class="submission-detail-card">
+                <div class="prompt">Tổng điểm hiện tại</div>
+                <div class="answer">
+                    Điểm tự động: ${escapeHtml(`${Number(result.total_score || 0)}/${Number(result.max_score || 0)}`)}
+                    ${result.manual_score == null ? '' : `<br>Điểm chấm tay: ${escapeHtml(String(Number(result.manual_score || 0)))}`}
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th>Kỹ năng</th>
+                            <th>Điểm</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    function buildResultModalWritingSection(metadata) {
+        const answers = collectWritingAnswersFromMetadata(metadata);
+        if (!answers.length) return '';
+        const cards = answers.map((item, index) => `
+            <div class="submission-detail-card">
+                <div class="prompt">${escapeHtml(item.partLabel || `Writing Part ${index + 1}`)}${item.title ? ` - ${escapeHtml(item.title)}` : ''}</div>
+                ${item.prompt ? `<div class="text-muted mb-2" style="font-size:0.82rem;">${escapeHtml(item.prompt)}</div>` : ''}
+                <div class="answer">${escapeHtml(item.answer || '(Học viên chưa nhập bài)')}</div>
+                <div class="text-muted mt-2" style="font-size:0.78rem;">Số từ: ${escapeHtml(String(item.wordCount || 0))}</div>
+            </div>
+        `).join('');
+        return `
+            <div class="submission-detail-section-title"><i class="bi bi-pencil-square"></i>Writing</div>
+            ${cards}
+        `;
+    }
+
+    function buildResultModalSpeakingSection(metadata) {
+        const entries = collectSpeakingEntriesFromMetadata(metadata);
+        if (!entries.length) return '';
+        const cards = entries.map((item, index) => {
+            const recordingUrl = normalizeMediaUrl(item?.recording_url || item?.recordingUrl || item?.audio_url || item?.audioUrl);
+            const transcript = String(item?.answer || item?.transcript || '').trim();
+            const prompt = String(item?.prompt || '').trim();
+            return `
+                <div class="submission-detail-card">
+                    <div class="prompt">Speaking ${escapeHtml(String(item.key || index + 1))}</div>
+                    ${prompt ? `<div class="text-muted mb-2" style="font-size:0.82rem;">${escapeHtml(prompt)}</div>` : ''}
+                    <div class="answer">${escapeHtml(transcript || '(Không có transcript hoặc ghi chú văn bản)')}</div>
+                    ${recordingUrl ? `
+                        <div class="mt-2">
+                            <audio controls preload="none" style="width:100%;">
+                                <source src="${escapeHtml(recordingUrl)}">
+                            </audio>
+                        </div>
+                    ` : '<div class="text-muted mt-2" style="font-size:0.78rem;">Không có file ghi âm.</div>'}
+                </div>
+            `;
+        }).join('');
+        return `
+            <div class="submission-detail-section-title"><i class="bi bi-mic"></i>Speaking</div>
+            ${cards}
+        `;
+    }
+
+    function buildResultModalPhotoSection(metadata) {
+        const proctorPhoto = metadata?.proctor_photo || '';
+        if (!proctorPhoto) return '';
+        return `
+            <div class="submission-detail-section-title"><i class="bi bi-camera"></i>Ảnh giám thị</div>
+            <div class="submission-detail-card">
+                <img src="${escapeHtml(proctorPhoto)}" alt="Ảnh giám thị" style="max-width:320px;width:100%;border-radius:8px;border:1px solid #cbd5e1;display:block;">
+            </div>
+        `;
+    }
+
+    function buildResultModalSections(result) {
+        const metadata = result.metadata || {};
+        const sections = [
+            buildResultModalScoreSection(result),
+            buildResultModalWritingSection(metadata),
+            buildResultModalSpeakingSection(metadata),
+            buildResultModalPhotoSection(metadata)
+        ].filter(Boolean);
+        return sections.join('<hr class="my-3">');
+    }
+
+    function buildResultGradeForm(result) {
+        return `
+            <div class="mb-2">
+                <label class="form-label small">Điểm chấm tay</label>
+                <input type="number" step="0.1" min="0" class="form-control form-control-sm" id="vstep-manual-score" value="${escapeHtml(result.manual_score ?? '')}">
+            </div>
+            <div class="mt-2">
+                <label class="form-label small">Nhận xét giáo viên</label>
+                <textarea class="form-control form-control-sm" id="vstep-manual-feedback" rows="5" placeholder="Nhập nhận xét cho bài nộp này...">${escapeHtml(result.manual_feedback || '')}</textarea>
+            </div>
+            <div class="alert alert-light border small mt-3 mb-0">
+                Điểm và nhận xét sẽ lưu trực tiếp vào kết quả VSTEP để giáo viên theo dõi lại sau.
+            </div>
+            <div class="small mt-2 text-muted" id="vstepGradeStatus"></div>
+        `;
+    }
+
+    function buildResultScoreSection(result) {
+        const partScores = result.part_scores && typeof result.part_scores === 'object' ? result.part_scores : {};
+        const keys = ['listening', 'reading', 'writing', 'speaking'].filter(key => partScores[key]);
+        const rows = keys.length
+            ? keys.map(key => {
+                const item = partScores[key] || {};
+                const pending = item.pendingManualGrade === true;
+                const scoreText = pending
+                    ? 'Chờ chấm tay'
+                    : `${Number(item.score || 0)}/${Number(item.total || 0)}`;
+                return `
+                    <div class="vstep-result-score-row">
+                        <span>${escapeHtml(CONTENT_SKILL_LABELS[key] || key)}</span>
+                        <strong>${escapeHtml(scoreText)}</strong>
+                    </div>
+                `;
+            }).join('')
+            : '<div class="text-muted small">Chưa có điểm theo từng kỹ năng.</div>';
+        return `
+            <section class="vstep-result-section">
+                <div class="vstep-result-section-title"><i class="bi bi-bar-chart-line"></i><span>Điểm theo kỹ năng</span></div>
+                <div class="vstep-result-score-total">
+                    <span>Tổng điểm tự động</span>
+                    <strong>${escapeHtml(`${Number(result.total_score || 0)}/${Number(result.max_score || 0)}`)}</strong>
+                </div>
+                ${result.manual_score == null ? '' : `
+                    <div class="vstep-result-score-total is-manual">
+                        <span>Điểm chấm tay</span>
+                        <strong>${escapeHtml(String(Number(result.manual_score || 0)))}</strong>
+                    </div>
+                `}
+                <div class="vstep-result-score-list">${rows}</div>
+            </section>
+        `;
+    }
+
+    function buildWritingAnswerSection(metadata) {
+        const answers = Array.isArray(metadata?.writing_answers) ? metadata.writing_answers : [];
+        if (!answers.length) return '';
+        const cards = answers.map((item, index) => `
+            <article class="vstep-result-answer-card">
+                <div class="vstep-result-answer-head">
+                    <strong>Writing Part ${index + 1}</strong>
+                    <span>${escapeHtml(String(item.word_count || 0))} từ</span>
+                </div>
+                ${item.title ? `<div class="vstep-result-answer-subtitle">${escapeHtml(item.title)}</div>` : ''}
+                ${item.prompt ? `<div class="vstep-result-answer-prompt">${escapeHtml(item.prompt)}</div>` : ''}
+                <div class="vstep-result-answer-body">${escapeHtml(item.answer || '(Học viên chưa nhập bài)')}</div>
+            </article>
+        `).join('');
+        return `
+            <section class="vstep-result-section">
+                <div class="vstep-result-section-title"><i class="bi bi-pencil-square"></i><span>Bài làm Writing</span></div>
+                ${cards}
+            </section>
+        `;
+    }
+
+    function buildSpeakingAnswerSection(metadata) {
+        const entries = toSpeakingEntries(metadata?.speaking_answers);
+        if (!entries.length) return '';
+        const cards = entries.map((item, index) => {
+            const recordingUrl = normalizeMediaUrl(item?.recording_url || item?.recordingUrl || item?.audio_url || item?.audioUrl);
+            const transcript = String(item?.answer || item?.transcript || '').trim();
+            const prompt = String(item?.prompt || '').trim();
+            return `
+                <article class="vstep-result-answer-card">
+                    <div class="vstep-result-answer-head">
+                        <strong>Speaking ${escapeHtml(String(item.key || index + 1))}</strong>
+                        <span>${recordingUrl ? 'Có file ghi âm' : 'Chưa có file'}</span>
+                    </div>
+                    ${prompt ? `<div class="vstep-result-answer-prompt">${escapeHtml(prompt)}</div>` : ''}
+                    ${transcript ? `<div class="vstep-result-answer-body">${escapeHtml(transcript)}</div>` : '<div class="vstep-result-answer-empty">Không có transcript hoặc ghi chú văn bản.</div>'}
+                    ${recordingUrl ? `
+                        <div class="mt-2">
+                            <audio controls preload="none" class="w-100">
+                                <source src="${escapeHtml(recordingUrl)}">
+                            </audio>
+                        </div>
+                    ` : ''}
+                </article>
+            `;
+        }).join('');
+        return `
+            <section class="vstep-result-section">
+                <div class="vstep-result-section-title"><i class="bi bi-mic"></i><span>File nộp Speaking</span></div>
+                ${cards}
+            </section>
+        `;
+    }
+
     function showResultDetail(id) {
         const result = state.results.find(item => String(item.id) === String(id));
         if (!result) return;
+        state.activeResultId = String(id);
+        const user = userMap()[result.user_id] || {};
+        const metadata = result.metadata || {};
+
+        if (ADMIN_MODE === 'lophoc' && refs.resultModal && refs.resultModalMeta && refs.resultModalContent && refs.resultModalGrading) {
+            if (refs.resultModalTitle) {
+                refs.resultModalTitle.textContent = `Chi tiết bài nộp - ${user.full_name || user.account_code || result.user_id || ''}`;
+            }
+            refs.resultModalMeta.innerHTML = buildResultModalMeta(result, user);
+            refs.resultModalContent.innerHTML = buildResultModalSections(result) || '<div class="text-muted">Bài nộp này chưa có dữ liệu chi tiết Writing/Speaking.</div>';
+            refs.resultModalGrading.innerHTML = buildResultGradeForm(result);
+            refs.resultModalSaveBtn?.replaceWith(refs.resultModalSaveBtn.cloneNode(true));
+            refs.resultModalSaveBtn = $('saveVstepGradeBtnModal');
+            refs.resultModalSaveBtn?.addEventListener('click', () => saveManualGrade(result.id));
+            if (window.bootstrap) {
+                window.bootstrap.Modal.getOrCreateInstance(refs.resultModal).show();
+            }
+            return;
+        }
 
         // Ảnh giám thị (chụp lúc nhận đề) lưu trong metadata.proctor_photo (data URL).
-        const proctorPhoto = result.metadata?.proctor_photo || '';
+        const proctorPhoto = metadata?.proctor_photo || '';
         const photoHtml = proctorPhoto
             ? `
-            <div class="vstep-grade-box mb-3">
-                <label class="form-label text-white">Ảnh giám thị (lúc nhận đề)</label>
+            <section class="vstep-result-section">
+                <div class="vstep-result-section-title"><i class="bi bi-camera"></i><span>Ảnh giám thị</span></div>
                 <div><img src="${escapeHtml(proctorPhoto)}" alt="Ảnh giám thị" style="max-width:320px;width:100%;border-radius:8px;border:1px solid #94c7f0;display:block;"></div>
-            </div>`
+            </section>`
             : '';
-
-        // Bỏ chuỗi base64 ảnh khỏi JSON dump cho gọn (đã hiển thị ảnh ở trên).
-        const resultForDump = { ...result };
-        if (resultForDump.metadata?.proctor_photo) {
-            resultForDump.metadata = { ...resultForDump.metadata, proctor_photo: '[ảnh giám thị - xem ở trên]' };
-        }
 
         refs.resultDetail.innerHTML = `
             <div class="vstep-grade-box mb-3">
@@ -2085,8 +2521,14 @@
                 </button>
                 <div class="small mt-2" id="vstepGradeStatus"></div>
             </div>
+            <section class="vstep-result-section">
+                <div class="vstep-result-section-title"><i class="bi bi-file-earmark-text"></i><span>Tổng quan bài nộp</span></div>
+                <div class="vstep-result-card-grid">${buildResultMetaCards(result, user)}</div>
+            </section>
+            ${buildResultScoreSection(result)}
+            ${buildWritingAnswerSection(metadata)}
+            ${buildSpeakingAnswerSection(metadata)}
             ${photoHtml}
-            <pre class="mb-0">${escapeHtml(JSON.stringify(resultForDump, null, 2))}</pre>
         `;
         $('saveVstepGradeBtn')?.addEventListener('click', () => saveManualGrade(result.id));
     }
@@ -2103,8 +2545,10 @@
                     manualFeedback: getValue('vstep-manual-feedback')
                 })
             });
-            if (status) status.textContent = 'Đã lưu điểm và nhận xét.';
             await loadResults();
+            showResultDetail(id);
+            const nextStatus = $('vstepGradeStatus');
+            if (nextStatus) nextStatus.textContent = 'Đã lưu điểm và nhận xét.';
         } catch (error) {
             if (status) status.textContent = error.message;
         }
@@ -2182,6 +2626,12 @@
         refs.createAssignmentBtn = $('createVstepAssignmentBtn');
         refs.resultsBody = $('vstepResultsTableBody');
         refs.resultDetail = $('vstepResultDetail');
+        refs.resultModal = $('vstepResultDetailModal');
+        refs.resultModalTitle = $('vstepResultModalTitle');
+        refs.resultModalMeta = $('vstepResultModalMeta');
+        refs.resultModalContent = $('vstepResultModalContent');
+        refs.resultModalGrading = $('vstepResultModalGrading');
+        refs.resultModalSaveBtn = $('saveVstepGradeBtnModal');
         refs.resultClassFilter = $('vstepResultClassFilter');
         refs.exportResultsBtn = $('exportVstepResultsBtn');
         refs.classSessionsPreview = $('vstep-class-sessions-preview');

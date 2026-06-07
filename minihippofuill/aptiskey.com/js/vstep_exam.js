@@ -630,9 +630,16 @@
                     <span class="vstep-option-copy"><strong>${escapeHtml(option.label)}.</strong> ${escapeHtml(option.text)}</span>
                 </label>
             `).join('');
+            // Listening per-question audio: mỗi câu có nút Play riêng, HV bấm
+            // để nghe (1 lần, lock sau khi nghe xong). audioUrl optional —
+            // nếu rỗng thì không render audio bar cho câu đó.
+            const audioBar = (skill === 'listening' && question.audioUrl)
+                ? renderAudioBar(question.audioUrl, `listening-q-${partIndex}-${questionIndex}`)
+                : '';
             return `
                 <div class="vstep-question${skill === 'listening' ? ' vstep-listening-question' : ''}" data-question-id="${escapeHtml(id)}" data-question-number="${questionNumber}">
                     <div class="vstep-question-title">${escapeHtml(titlePrefix)} ${escapeHtml(question.prompt)}</div>
+                    ${audioBar}
                     ${options}
                 </div>
             `;
@@ -656,6 +663,16 @@
         const title = safeText(part.title, `Part ${partIndex + 1}`);
         const range = getQuestionRange('listening', part, partIndex);
         const directions = getListeningDirections(part, partIndex);
+        // Nếu part có audio chung (legacy) hoặc tất cả câu chưa có audio riêng,
+        // dùng part-level audio. Còn không thì mỗi câu có audio riêng.
+        const questions = part.questions || [];
+        const hasPerQuestionAudio = questions.some(q => q.audioUrl);
+        const partAudioBar = (!hasPerQuestionAudio && part.audioUrl)
+            ? renderAudioBar(part.audioUrl, `listening-${partIndex}`)
+            : '';
+        const audioNote = hasPerQuestionAudio
+            ? 'Mỗi câu có audio riêng. Bấm Play để nghe — mỗi câu chỉ được nghe 1 lần, không thể tua hoặc nghe lại.'
+            : 'Nhấn Play một lần để nghe. Audio sẽ tự chạy đến hết; không thể tạm dừng, tua hoặc nghe lại.';
         refs.content.innerHTML = `
             <div class="vstep-listening-layout">
                 <section class="vstep-listening-paper">
@@ -664,8 +681,8 @@
                         ${range ? `<span>${escapeHtml(range)}</span>` : ''}
                     </div>
                     <div class="vstep-listening-instructions">${nl2br(directions)}</div>
-                    ${renderAudioBar(part.audioUrl, `listening-${partIndex}`)}
-                    <p class="vstep-listening-audio-note">Nhấn Play một lần để nghe. Audio sẽ tự chạy đến hết; không thể tạm dừng, tua hoặc nghe lại.</p>
+                    ${partAudioBar}
+                    <p class="vstep-listening-audio-note">${escapeHtml(audioNote)}</p>
                     <div class="vstep-listening-questions">
                         ${renderMcqQuestions('listening', part, partIndex)}
                     </div>
