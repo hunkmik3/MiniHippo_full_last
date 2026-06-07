@@ -185,14 +185,56 @@
         setTimeout(() => {
             const existing = findContent(cls.id, sessionNumber);
             if (existing && window.__VSTEP_API__?.fillForm) {
+                // Load data đã save vào form (admin sửa bài cũ).
                 window.__VSTEP_API__.fillForm(existing);
+                // Sau khi fillForm render lại đủ 4 kỹ năng, vẫn phải apply
+                // visibility theo blueprint để ẩn skill không có trong buổi đó
+                // — tránh form hiện Listening/Speaking dù buổi 1 chỉ có Reading.
+                applyBlueprintVisibility(cls, sessionNumber);
             } else {
+                // Tạo bài mới: apply cả visibility + prefill title/count.
                 applyBlueprint(cls, sessionNumber);
             }
 
             // Hiển thị banner ngữ cảnh trong panel content.
             updateContextBanner(cls, sessionNumber, dueAt);
         }, 50);
+    }
+
+    // Chỉ ẩn/hiện skill section theo blueprint, không động vào data đã có.
+    // Dùng khi load bài cũ qua fillForm (admin sửa) — ngược lại applyBlueprint
+    // làm cả visibility + prefill title/count cho bài mới chưa có data.
+    function applyBlueprintVisibility(cls, sessionNumber) {
+        const blueprint = window.VSTEP_SESSION_BLUEPRINTS?.getBlueprint
+            ? window.VSTEP_SESSION_BLUEPRINTS.getBlueprint(cls.band, sessionNumber)
+            : null;
+        if (!blueprint) {
+            applySkillVisibility(['listening', 'reading', 'writing', 'speaking']);
+            return;
+        }
+        const activeSkills = ['listening', 'reading', 'writing', 'speaking']
+            .filter(s => blueprint[s]?.parts?.length);
+        applySkillVisibility(activeSkills);
+
+        // Trong skill còn lại, ẩn các part vượt quá số part trong blueprint.
+        // VD blueprint Reading có 2 parts → ẩn part editor 3, 4.
+        hideExtraParts('reading', blueprint.reading?.parts?.length || 0, 4);
+        hideExtraParts('listening', blueprint.listening?.parts?.length || 0, 3);
+        hideExtraParts('writing', blueprint.writing?.parts?.length || 0, 2);
+        hideExtraParts('speaking', blueprint.speaking?.parts?.length || 0, 3);
+    }
+
+    function hideExtraParts(skill, keepCount, maxParts) {
+        // Editor cho từng part nằm trong .vstep-part-editor thứ N. fillForm
+        // render hết 3/4 parts mặc dù blueprint chỉ cần 1-2 → ẩn các part
+        // vượt quá keepCount.
+        const container = $(`vstep-${skill}-editors`);
+        if (!container) return;
+        const partEditors = container.querySelectorAll('.vstep-part-editor');
+        partEditors.forEach((editor, idx) => {
+            // idx là 0-based, blueprint keepCount là 1-based count.
+            editor.classList.toggle('d-none', idx >= keepCount);
+        });
     }
 
     // Pre-fill form theo blueprint cố định B1/B2 (từ vstep_session_blueprints.js).
@@ -221,6 +263,13 @@
         const activeSkills = ['listening', 'reading', 'writing', 'speaking']
             .filter(s => blueprint[s]?.parts?.length);
         applySkillVisibility(activeSkills);
+
+        // Ẩn các part vượt quá số part trong blueprint (initEditors render
+        // mặc định 3 Listening / 4 Reading / 2 Writing / 3 Speaking parts).
+        hideExtraParts('reading', blueprint.reading?.parts?.length || 0, 4);
+        hideExtraParts('listening', blueprint.listening?.parts?.length || 0, 3);
+        hideExtraParts('writing', blueprint.writing?.parts?.length || 0, 2);
+        hideExtraParts('speaking', blueprint.speaking?.parts?.length || 0, 3);
 
         // Pre-fill từng skill theo blueprint. Mỗi part = 1 input title + tự sinh
         // placeholder câu hỏi (admin paste nội dung thật sau).
