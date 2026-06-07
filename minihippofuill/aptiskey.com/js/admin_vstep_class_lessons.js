@@ -228,6 +228,11 @@
         prefillListening(blueprint.listening);
         prefillWriting(blueprint.writing);
         prefillSpeaking(blueprint.speaking);
+
+        // Default published cho buổi học của lớp (admin tạo bài là để HV làm
+        // ngay sau khi save). Nếu admin muốn để draft thì đổi tay trước khi
+        // lưu. Tránh trạng thái HV thấy "Sắp mở" mặc dù admin đã tạo bài.
+        setIfExists('vstep-status', 'published');
     }
 
     function applySkillVisibility(activeSkills) {
