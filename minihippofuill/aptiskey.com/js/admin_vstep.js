@@ -403,13 +403,28 @@
         return headers;
     }
 
-    async function fetchJson(url, options = {}) {
+    async function fetchJson(url, options = {}, _retry = false) {
         const response = await fetch(url, {
             ...options,
             headers: authHeaders(options.headers || {})
         });
         const result = await response.json().catch(() => ({}));
         if (!response.ok) {
+            // Token expired (401/403 với message liên quan token) → tự
+            // refresh 1 lần rồi retry. Tránh loop vô hạn bằng cờ _retry.
+            // js/auth.js expose window.refreshAuthToken — nếu refresh OK,
+            // localStorage.auth_token đã được cập nhật, fetch lại sẽ pass.
+            const errMsg = String(result.error || '').toLowerCase();
+            const isTokenError = (response.status === 401 || response.status === 403)
+                && (errMsg.includes('token') || errMsg.includes('unauthor') || errMsg.includes('expired') || errMsg.includes('missing authorization'));
+            if (isTokenError && !_retry && typeof window.refreshAuthToken === 'function') {
+                try {
+                    const newToken = await window.refreshAuthToken();
+                    if (newToken) return fetchJson(url, options, true);
+                } catch {
+                    // fall-through để throw error gốc
+                }
+            }
             throw new Error(result.error || result.details || 'Không thể xử lý yêu cầu.');
         }
         return result;
