@@ -43,17 +43,43 @@ export default async function handler(req, res) {
       })))
       : [];
 
-    const payloads = students.map(student => ({
-      content_id: contentId,
-      class_id: classId,
-      student_id: student?.id || null,
-      user_id: student?.user_id || null,
-      assigned_by: adminCheck.user.id,
-      available_from: body?.availableFrom || body?.available_from || null,
-      due_at: body?.dueAt || body?.due_at || null,
-      status: body?.status || 'active',
-      notes: body?.notes || null
-    }));
+    // Dedup: nếu đã có assignment cho (content_id, class_id, student_id) active
+    // rồi thì SKIP — admin click save bài 2 lần / autoAssignContent chạy lại
+    // không tạo duplicate. Vẫn cho phép update due_at qua endpoint update riêng.
+    const existing = await selectFrom('vstep_assignments', {
+      filters: [
+        { column: 'content_id', value: contentId },
+        { column: 'class_id', value: classId, operator: classId ? 'eq' : 'is' }
+      ]
+    });
+    const existingByStudent = new Set(
+      (Array.isArray(existing) ? existing : [])
+        .filter(a => a.status !== 'archived')
+        .map(a => a.student_id || '__noStudent__')
+    );
+
+    const payloads = students
+      .filter(student => !existingByStudent.has(student?.id || '__noStudent__'))
+      .map(student => ({
+        content_id: contentId,
+        class_id: classId,
+        student_id: student?.id || null,
+        user_id: student?.user_id || null,
+        assigned_by: adminCheck.user.id,
+        available_from: body?.availableFrom || body?.available_from || null,
+        due_at: body?.dueAt || body?.due_at || null,
+        status: body?.status || 'active',
+        notes: body?.notes || null
+      }));
+
+    if (!payloads.length) {
+      // Đã có assignment cho tất cả HV — trả về existing thay vì error.
+      return res.status(200).json({
+        success: true,
+        assignments: Array.isArray(existing) ? existing : [],
+        message: 'Tất cả HV đã có assignment cho bài này, không tạo thêm.'
+      });
+    }
 
     const records = await insertInto('vstep_assignments', payloads);
     return res.status(200).json({

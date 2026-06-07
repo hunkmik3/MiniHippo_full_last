@@ -44,13 +44,37 @@ export default async function handler(req, res) {
           return res.status(403).json({ error: 'Tài khoản chưa được cấp quyền vào khu vực Ôn thi VSTEP' });
         }
         if (flow === 'lesson_exam') {
-          assignments = await selectFrom('vstep_assignments', {
+          // Học viên có assignment qua 2 cách:
+          //   (a) user-level: vstep_assignments.user_id = HV (admin giao cá nhân)
+          //   (b) class-level: vstep_assignments.class_id = lớp của HV (admin
+          //       auto giao khi save bài cho lớp — không gắn user_id riêng)
+          // Phải lấy CẢ HAI rồi dedup theo id, không thì class-level bị miss
+          // → HV thấy mọi buổi đều "Chưa mở" mặc dù admin đã tạo bài.
+          const userAssignments = await selectFrom('vstep_assignments', {
             filters: [
               { column: 'user_id', value: authResult.user.id },
               { column: 'status', value: 'active' }
             ],
             order: { column: 'due_at', asc: true }
           });
+          const classId = vstepStudent?.class_id || authResult.user.assignedClassId;
+          const classAssignments = classId
+            ? await selectFrom('vstep_assignments', {
+                filters: [
+                  { column: 'class_id', value: classId },
+                  { column: 'status', value: 'active' }
+                ],
+                order: { column: 'due_at', asc: true }
+              })
+            : [];
+          // Dedup theo id (1 assignment có thể có cả user_id + class_id).
+          const seen = new Set();
+          assignments = [...(userAssignments || []), ...(classAssignments || [])]
+            .filter(a => {
+              if (!a?.id || seen.has(a.id)) return false;
+              seen.add(a.id);
+              return true;
+            });
         }
       }
     } else {
