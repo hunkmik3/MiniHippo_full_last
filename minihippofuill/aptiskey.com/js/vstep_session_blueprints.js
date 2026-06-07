@@ -41,13 +41,13 @@
         },
         3: {
             title: 'Buổi 3 - Reading 4 + Listening 1-3',
-            summary: 'Reading 4 (10 câu) + Listening 1-3 (16 câu)',
+            summary: 'Reading 4 (10 câu) + Listening 1-3 (16 câu, mỗi câu 1 audio riêng)',
             reading: { parts: [R('Practice Reading 4', 10)] },
             listening: { parts: [L('Practice Listening 1-3', 16)] }
         },
         4: {
             title: 'Buổi 4 - Reading 5 + Listening 4-5',
-            summary: 'Reading 5 (10 câu) + Listening 4-5 (12 câu)',
+            summary: 'Reading 5 (10 câu) + Listening 4-5 (12 câu, mỗi câu 1 audio riêng)',
             reading: { parts: [R('Practice Reading 5', 10)] },
             listening: { parts: [L('Practice Listening 4-5', 12)] }
         },
@@ -171,7 +171,7 @@
     const B2 = {
         1: {
             title: 'B2 Buổi 1 - Listening 1-3 + 4-5',
-            summary: 'Listening 1-3 + Listening 4-5',
+            summary: 'Listening 1-3 (16 câu) + Listening 4-5 (12 câu), mỗi câu 1 audio riêng',
             listening: { parts: [L('Practice Listening 1-3', 16), L('Practice Listening 4-5', 12)] }
         },
         2: {
