@@ -238,15 +238,44 @@
                 writing: Number(data.durations?.writing) || 60,
                 speaking: Number(data.durations?.speaking) || 12
             },
-            listening: { parts: Array.isArray(data.listening?.parts) ? data.listening.parts.slice(0, 3) : [] },
-            reading: { parts: Array.isArray(data.reading?.parts) ? data.reading.parts.slice(0, 4) : [] },
-            writing: { parts: Array.isArray(data.writing?.parts) ? data.writing.parts.slice(0, 2) : [] },
+            listening: { parts: filterMeaningfulParts(data.listening?.parts, 'listening', 3) },
+            reading: { parts: filterMeaningfulParts(data.reading?.parts, 'reading', 4) },
+            writing: { parts: filterMeaningfulParts(data.writing?.parts, 'writing', 2) },
             speaking: {
                 readySeconds: Number(data.speaking?.readySeconds) || 60,
                 readyMessage: data.speaking?.readyMessage || 'Bạn đeo tai nghe để làm bài thi nói. Bài làm sẽ được thu âm trực tiếp.',
-                parts: Array.isArray(data.speaking?.parts) ? data.speaking.parts.slice(0, 3) : []
+                parts: filterMeaningfulParts(data.speaking?.parts, 'speaking', 3)
             }
         };
+    }
+
+    // Bài học VSTEP Lớp Học có thể chỉ có 1-2 kỹ năng (theo blueprint buổi).
+    // Form admin render đủ 3 Listening + 4 Reading + 2 Writing + 3 Speaking
+    // editors → khi save có thể lưu cả parts không có content (questions rỗng,
+    // prompt trống). Filter ở đây để HV không thấy section trống ở exam page.
+    function filterMeaningfulParts(parts, skill, maxSlice) {
+        if (!Array.isArray(parts) || !parts.length) return [];
+        return parts.slice(0, maxSlice).filter(part => {
+            if (!part || typeof part !== 'object') return false;
+            if (skill === 'listening') {
+                return Boolean(part.audioUrl)
+                    || (Array.isArray(part.questions) && part.questions.length > 0);
+            }
+            if (skill === 'reading') {
+                return Boolean(part.passage && String(part.passage).trim()
+                    && !String(part.passage).startsWith('Reading Part') /* placeholder */)
+                    || (Array.isArray(part.questions) && part.questions.length > 0);
+            }
+            if (skill === 'writing') {
+                const prompt = String(part.prompt || '').trim();
+                return prompt.length > 0 && !prompt.startsWith('Writing Part');
+            }
+            if (skill === 'speaking') {
+                const prompt = String(part.prompt || '').trim();
+                return prompt.length > 0 && !prompt.startsWith('Speaking Part');
+            }
+            return true;
+        });
     }
 
     function restoreAttempt() {
@@ -313,10 +342,15 @@
         }
 
         state.data = normalizeData(state.set);
-        const requiredSkills = focusedSkillPractice ? [getCurrentSkill()] : skills;
-        const missingSkill = requiredSkills.find(skill => !getParts(skill).length);
-        if (missingSkill) {
-            throw new Error(`Đề VSTEP thiếu dữ liệu ${missingSkill}. Vui lòng báo admin kiểm tra.`);
+        // Bài Lớp Học có thể chỉ có 1-2 kỹ năng (vd Buổi 1 chỉ Reading). Yêu cầu
+        // PHẢI có ÍT NHẤT 1 kỹ năng có data — không bắt buộc đủ cả 4.
+        const skillsWithData = skills.filter(s => getParts(s).length > 0);
+        if (!skillsWithData.length) {
+            throw new Error('Bài VSTEP chưa có nội dung. Vui lòng báo admin kiểm tra.');
+        }
+        // Nếu kỹ năng hiện tại không có data, chuyển sang kỹ năng đầu tiên có data.
+        if (!getParts(getCurrentSkill()).length) {
+            state.currentSkillIndex = skills.indexOf(skillsWithData[0]);
         }
         clampCurrentPosition();
         restoreAttempt();
@@ -382,8 +416,8 @@
             openSubmitModal();
             refs.submitStatus.textContent = 'Hết giờ làm bài. Hệ thống đang tự động nộp bài...';
             submitExam();
-        } else if (state.currentSkillIndex < skills.length - 1) {
-            moveToSkill(state.currentSkillIndex + 1);
+        } else if (findNextSkillWithData(state.currentSkillIndex + 1) !== -1) {
+            moveToSkill(findNextSkillWithData(state.currentSkillIndex + 1));
         } else {
             state.autoSubmitting = true;
             openSubmitModal();
@@ -468,9 +502,11 @@
     }
 
     function renderTabs() {
+        // Chỉ build tab cho skill có parts thật. Bài Lớp Học có thể chỉ có
+        // Reading (vd Buổi 1) → KHÔNG render tab Listening/Writing/Speaking trống.
         const visibleIndexes = focusedSkillPractice
             ? [state.currentSkillIndex]
-            : skills.map((_, index) => index);
+            : skills.map((_, index) => index).filter(idx => getParts(skills[idx]).length > 0);
         refs.tabs.classList.toggle('vstep-tab-strip-single-skill', visibleIndexes.length === 1);
         refs.tabs.innerHTML = visibleIndexes.map(skillIndex => {
             const skill = skills[skillIndex];
@@ -1302,13 +1338,22 @@
         showModal(refs.skillConfirmModal);
     }
 
+    // Tìm skill kế tiếp có parts thật (skip skill rỗng trong bài Lớp Học).
+    function findNextSkillWithData(fromIndex) {
+        for (let i = fromIndex; i < skills.length; i += 1) {
+            if (getParts(skills[i]).length > 0) return i;
+        }
+        return -1;
+    }
+
     function requestNextSkill() {
         if (focusedSkillPractice) {
             openSubmitModal();
             return;
         }
-        const nextSkillIndex = state.currentSkillIndex + 1;
-        if (!skills[nextSkillIndex]) {
+        const nextSkillIndex = findNextSkillWithData(state.currentSkillIndex + 1);
+        if (nextSkillIndex === -1) {
+            // Không còn skill nào có data → nộp bài.
             openSubmitModal();
             return;
         }
@@ -1662,7 +1707,7 @@
         });
         document.getElementById('confirmNextSkillBtn').addEventListener('click', () => {
             const target = state.pendingSkillMove || {
-                skillIndex: state.currentSkillIndex + 1,
+                skillIndex: findNextSkillWithData(state.currentSkillIndex + 1),
                 partIndex: 0
             };
             state.pendingSkillMove = null;
