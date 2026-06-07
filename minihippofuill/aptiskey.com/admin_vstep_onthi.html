@@ -55,11 +55,11 @@
         <div>
           <div class="vstep-admin-eyebrow">Admin Workspace / VSTEP / Ôn thi</div>
           <h1>Quản lý Ôn thi VSTEP</h1>
-          <p>Bộ đề 4 kỹ năng Listening / Reading / Writing / Speaking để học viên tự luyện.</p>
+          <p>Upload và quản lý bài học theo bộ đề cho 4 kỹ năng Reading / Listening / Writing / Speaking.</p>
         </div>
         <div class="vstep-admin-header-actions">
           <button type="button" class="btn btn-primary" id="newVstepSetBtn">
-            <i class="bi bi-plus-circle me-1"></i> Tạo bộ đề
+            <i class="bi bi-plus-circle me-1"></i> Tạo bài học
           </button>
         </div>
       </header>
@@ -69,7 +69,7 @@
           <span class="vstep-metric-icon vstep-metric-practice"><i class="bi bi-journal-check"></i></span>
           <div>
             <strong id="vstepOverviewPractice">0</strong>
-            <small>Bộ ôn thi</small>
+            <small>Bài theo bộ đề</small>
           </div>
         </div>
         <div class="vstep-admin-metric">
@@ -163,12 +163,31 @@
         </section>
 
         <section class="vstep-admin-section active" id="vstep-content-panel">
+          <div class="vstep-admin-skill-board" id="vstepPracticeSkillSwitcher" aria-label="Chọn kỹ năng học theo bộ đề">
+            <button type="button" class="vstep-admin-skill-option active" data-vstep-practice-skill="reading">
+              <span><i class="bi bi-book"></i> Reading</span>
+              <small>4 parts, passage và câu hỏi</small>
+            </button>
+            <button type="button" class="vstep-admin-skill-option" data-vstep-practice-skill="listening">
+              <span><i class="bi bi-headphones"></i> Listening</span>
+              <small>3 parts, audio và câu hỏi</small>
+            </button>
+            <button type="button" class="vstep-admin-skill-option" data-vstep-practice-skill="writing">
+              <span><i class="bi bi-pencil-square"></i> Writing</span>
+              <small>2 tasks, bài viết chấm tay</small>
+            </button>
+            <button type="button" class="vstep-admin-skill-option" data-vstep-practice-skill="speaking">
+              <span><i class="bi bi-mic"></i> Speaking</span>
+              <small>3 parts, thu âm và nộp bài</small>
+            </button>
+          </div>
+
           <div class="vstep-admin-layout">
             <aside class="vstep-panel vstep-content-index">
               <div class="vstep-panel-header vstep-panel-header-row">
                 <div>
-                  <strong id="vstepSetListTitle">Danh sách bộ đề Ôn thi</strong>
-                  <div class="vstep-help" id="vstepSetListHelp">Đề published sẽ hiện ở trang Ôn thi VSTEP của học viên.</div>
+                  <strong id="vstepSetListTitle">Reading - Học theo bộ đề</strong>
+                  <div class="vstep-help" id="vstepSetListHelp">Bài published sẽ hiện ở trang Reading theo bộ đề của học viên.</div>
                 </div>
                 <button type="button" class="btn btn-sm btn-outline-primary" id="refreshVstepSetsBtn" aria-label="Tải lại bộ đề">
                   <i class="bi bi-arrow-clockwise"></i>
@@ -194,8 +213,8 @@
               <div class="vstep-panel-header">
                 <div class="vstep-content-toolbar">
                   <div>
-                    <strong id="vstepFormTitle">Tạo bộ đề Ôn thi VSTEP mới</strong>
-                    <div class="vstep-help" id="vstepFormSubtitle">Cấu trúc đề thi VSTEP: Listening, Reading, Writing, Speaking.</div>
+                    <strong id="vstepFormTitle">Tạo bài Reading theo bộ đề mới</strong>
+                    <div class="vstep-help" id="vstepFormSubtitle">Upload nội dung đúng cấu trúc Reading mà học viên đang làm ở trang Học theo bộ đề.</div>
                   </div>
                   <div class="vstep-admin-actions">
                     <button type="button" class="btn btn-outline-secondary btn-sm" id="resetVstepFormBtn">
@@ -230,11 +249,10 @@
                       <!-- vstep-flow ẩn — hardcode 'practice' bởi mode='onthi'. -->
                       <input type="hidden" id="vstep-flow" value="practice">
                       <div class="col-md-4 col-xl-2">
-                        <label class="form-label fw-semibold" for="vstep-practice-skill">Kỹ năng bộ đề</label>
+                        <label class="form-label fw-semibold" for="vstep-practice-skill">Kỹ năng đang quản lý</label>
                         <select class="form-select" id="vstep-practice-skill">
-                          <option value="full_test">Full 4 kỹ năng</option>
-                          <option value="listening">Listening set</option>
                           <option value="reading">Reading set</option>
+                          <option value="listening">Listening set</option>
                           <option value="writing">Writing set</option>
                           <option value="speaking">Speaking set</option>
                         </select>
@@ -253,23 +271,78 @@
 
                   <div class="vstep-form-section">
                     <div class="vstep-form-section-title">
+                      <i class="bi bi-calendar2-check"></i>
+                      <span>Lịch thi & deadline ôn thi</span>
+                    </div>
+                    <div class="row g-3">
+                      <div class="col-md-6 col-xl-2">
+                        <label class="form-label" for="vstep-onthi-track">Nhóm đề</label>
+                        <select class="form-select" id="vstep-onthi-track">
+                          <option value="lr">L&R</option>
+                          <option value="sw">S&W</option>
+                        </select>
+                      </div>
+                      <div class="col-md-6 col-xl-2">
+                        <label class="form-label" for="vstep-onthi-order">Thứ tự</label>
+                        <input type="number" min="1" class="form-control" id="vstep-onthi-order" placeholder="VD: 1">
+                      </div>
+                      <div class="col-md-6 col-xl-2">
+                        <label class="form-label" for="vstep-onthi-exam-date">Ngày thi</label>
+                        <input type="date" class="form-control" id="vstep-onthi-exam-date">
+                      </div>
+                      <div class="col-md-6 col-xl-3">
+                        <label class="form-label" for="vstep-onthi-access-from">Mở từ</label>
+                        <input type="datetime-local" class="form-control" id="vstep-onthi-access-from">
+                      </div>
+                      <div class="col-md-6 col-xl-3">
+                        <label class="form-label" for="vstep-onthi-deadline">Deadline</label>
+                        <input type="datetime-local" class="form-control" id="vstep-onthi-deadline">
+                      </div>
+                      <div class="col-md-6 col-xl-3">
+                        <label class="form-label" for="vstep-onthi-access-until">Đóng truy cập</label>
+                        <input type="datetime-local" class="form-control" id="vstep-onthi-access-until">
+                      </div>
+                      <div class="col-md-6 col-xl-3">
+                        <label class="form-label" for="vstep-onthi-notify-hours">Nhắc trước deadline</label>
+                        <div class="input-group">
+                          <input type="number" min="1" class="form-control" id="vstep-onthi-notify-hours" value="24">
+                          <span class="input-group-text">giờ</span>
+                        </div>
+                      </div>
+                      <div class="col-md-6 col-xl-3 d-flex align-items-end">
+                        <div class="form-check vstep-check-line">
+                          <input class="form-check-input" type="checkbox" id="vstep-onthi-required" checked>
+                          <label class="form-check-label" for="vstep-onthi-required">Bắt buộc hoàn thành</label>
+                        </div>
+                      </div>
+                      <div class="col-md-6 col-xl-3 d-flex align-items-end">
+                        <button type="button" class="btn btn-outline-primary w-100" id="vstep-onthi-autofill-window">
+                          <i class="bi bi-magic me-1"></i> Tự tính 3 tuần
+                        </button>
+                      </div>
+                    </div>
+                    <div class="vstep-help mt-2">Nếu nhập ngày thi, hệ thống có thể tự mở trước 21 ngày và đóng cuối ngày thi. Học viên sẽ thấy cảnh báo trước deadline theo số giờ cấu hình.</div>
+                  </div>
+
+                  <div class="vstep-form-section">
+                    <div class="vstep-form-section-title">
                       <i class="bi bi-stopwatch"></i>
                       <span>Thời lượng</span>
                     </div>
                     <div class="row g-3">
-                      <div class="col-6 col-lg-3">
+                      <div class="col-6 col-lg-3" data-vstep-duration-skill="listening">
                         <label class="form-label" for="vstep-duration-listening">Listening phút</label>
                         <input type="number" min="1" class="form-control" id="vstep-duration-listening" value="45">
                       </div>
-                      <div class="col-6 col-lg-3">
+                      <div class="col-6 col-lg-3" data-vstep-duration-skill="reading">
                         <label class="form-label" for="vstep-duration-reading">Reading phút</label>
                         <input type="number" min="1" class="form-control" id="vstep-duration-reading" value="60">
                       </div>
-                      <div class="col-6 col-lg-3">
+                      <div class="col-6 col-lg-3" data-vstep-duration-skill="writing">
                         <label class="form-label" for="vstep-duration-writing">Writing phút</label>
                         <input type="number" min="1" class="form-control" id="vstep-duration-writing" value="60">
                       </div>
-                      <div class="col-6 col-lg-3">
+                      <div class="col-6 col-lg-3" data-vstep-duration-skill="speaking">
                         <label class="form-label" for="vstep-duration-speaking">Speaking phút</label>
                         <input type="number" min="1" class="form-control" id="vstep-duration-speaking" value="12">
                       </div>

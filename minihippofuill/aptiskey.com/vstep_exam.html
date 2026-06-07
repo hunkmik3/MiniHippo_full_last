@@ -107,6 +107,20 @@
     </footer>
   </section>
 
+  <div id="vstepOverdueModal" class="vstep-modal-backdrop-lite">
+    <div class="vstep-modal-card" style="max-width:520px;">
+      <div class="text-warning fs-1 mb-2"><i class="bi bi-exclamation-triangle-fill"></i></div>
+      <h2 class="h5 mb-3">Bạn đã trễ deadline</h2>
+      <p class="text-secondary mb-2">Tình trạng buổi học này được ghi nhận: <strong class="text-danger">CHƯA LÀM</strong>.</p>
+      <p class="text-secondary mb-3">Bạn có thể làm để luyện tập thêm, nhưng kết quả sau khi hoàn thành <strong>sẽ không được ghi nhận đúng hạn</strong> trong báo cáo lớp.</p>
+      <div class="text-secondary small mb-3" id="vstepOverdueMeta"></div>
+      <div class="d-flex justify-content-center gap-2">
+        <button type="button" class="vstep-red-button" id="vstepOverdueConfirmBtn">Tôi đã nắm rõ thông tin</button>
+        <a class="btn btn-light border" href="/vstep_lessons.html">Quay lại</a>
+      </div>
+    </div>
+  </div>
+
   <div id="skillConfirmModal" class="vstep-modal-backdrop-lite">
     <div class="vstep-modal-card">
       <h2 class="h5 mb-3" id="skillConfirmTitle">Bạn muốn chuyển kỹ năng tiếp theo?</h2>
