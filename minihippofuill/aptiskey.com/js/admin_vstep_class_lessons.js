@@ -227,14 +227,85 @@
     function hideExtraParts(skill, keepCount, maxParts) {
         // Editor cho từng part nằm trong .vstep-part-editor thứ N. fillForm
         // render hết 3/4 parts mặc dù blueprint chỉ cần 1-2 → ẩn các part
-        // vượt quá keepCount.
+        // vượt quá keepCount BAN ĐẦU, nhưng cho admin nút "+ Hiện thêm part"
+        // để mở khi muốn override blueprint (tăng số part vd Reading 3).
         const container = $(`vstep-${skill}-editors`);
         if (!container) return;
         const partEditors = container.querySelectorAll('.vstep-part-editor');
         partEditors.forEach((editor, idx) => {
-            // idx là 0-based, blueprint keepCount là 1-based count.
-            editor.classList.toggle('d-none', idx >= keepCount);
+            const isHidden = idx >= keepCount;
+            editor.classList.toggle('d-none', isHidden);
+            // Đảm bảo part hiện có nút "Ẩn part này" cho admin xoá nếu không dùng.
+            if (!isHidden) addPartHideButton(editor, skill, idx);
         });
+
+        // Thêm/cập nhật nút "+ Hiện thêm part" ở cuối container.
+        let addBtn = container.querySelector('.vstep-add-extra-part');
+        const hiddenCount = Math.max(0, maxParts - keepCount);
+        if (hiddenCount > 0) {
+            if (!addBtn) {
+                addBtn = document.createElement('button');
+                addBtn.type = 'button';
+                addBtn.className = 'btn btn-sm btn-outline-primary vstep-add-extra-part mt-2';
+                container.appendChild(addBtn);
+            }
+            addBtn.innerHTML = `<i class="bi bi-plus-circle me-1"></i>Hiện thêm part (${hiddenCount} còn ẩn)`;
+            addBtn.onclick = () => showNextHiddenPart(skill, container);
+            addBtn.style.display = '';
+        } else if (addBtn) {
+            addBtn.style.display = 'none';
+        }
+    }
+
+    function showNextHiddenPart(skill, container) {
+        const editors = container.querySelectorAll('.vstep-part-editor');
+        let openedIdx = -1;
+        for (let i = 0; i < editors.length; i += 1) {
+            if (editors[i].classList.contains('d-none')) {
+                editors[i].classList.remove('d-none');
+                addPartHideButton(editors[i], skill, i);
+                openedIdx = i;
+                break;
+            }
+        }
+        // Cập nhật label/visibility nút "+ Hiện thêm part" sau khi mở 1 part.
+        const stillHidden = Array.from(editors).filter(e => e.classList.contains('d-none')).length;
+        const addBtn = container.querySelector('.vstep-add-extra-part');
+        if (addBtn) {
+            if (stillHidden > 0) {
+                addBtn.innerHTML = `<i class="bi bi-plus-circle me-1"></i>Hiện thêm part (${stillHidden} còn ẩn)`;
+            } else {
+                addBtn.style.display = 'none';
+            }
+        }
+        if (openedIdx >= 0) editors[openedIdx].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function addPartHideButton(editor, skill, partIdx) {
+        // Chỉ thêm 1 lần — kiểm tra đã có chưa.
+        if (editor.querySelector('.vstep-hide-part-btn')) return;
+        const heading = editor.querySelector('.vstep-editor-heading');
+        if (!heading) return;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-sm btn-outline-secondary vstep-hide-part-btn ms-auto';
+        btn.innerHTML = '<i class="bi bi-eye-slash me-1"></i>Ẩn part này';
+        btn.title = 'Ẩn part khỏi bài học này — phần này sẽ không hiện cho học viên.';
+        btn.onclick = () => {
+            editor.classList.add('d-none');
+            // Refresh label nút thêm part.
+            const container = $(`vstep-${skill}-editors`);
+            const stillHidden = container
+                ? Array.from(container.querySelectorAll('.vstep-part-editor'))
+                    .filter(e => e.classList.contains('d-none')).length
+                : 0;
+            const addBtn = container?.querySelector('.vstep-add-extra-part');
+            if (addBtn) {
+                addBtn.innerHTML = `<i class="bi bi-plus-circle me-1"></i>Hiện thêm part (${stillHidden} còn ẩn)`;
+                addBtn.style.display = '';
+            }
+        };
+        heading.appendChild(btn);
     }
 
     // Pre-fill form theo blueprint cố định B1/B2 (từ vstep_session_blueprints.js).
