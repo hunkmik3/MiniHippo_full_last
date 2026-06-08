@@ -2041,16 +2041,36 @@
         return true;
     }
 
+    // Fill dropdown lớp cho filter Results panel (trang onthi).
+    // Giữ giá trị admin đang chọn để không reset filter sau khi reload.
+    function populateResultClassDropdown() {
+        const select = refs.resultClassFilter;
+        if (!select) return;
+        const current = select.value;
+        const options = ['<option value="">Tất cả lớp</option>']
+            .concat((state.classes || []).map(cls =>
+                `<option value="${escapeHtml(cls.id)}">${escapeHtml(cls.title || cls.id)}</option>`
+            ));
+        select.innerHTML = options.join('');
+        if (current) select.value = current;
+    }
+
     async function loadResults() {
-        refs.resultsBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Đang tải kết quả...</td></tr>';
+        const initialColspan = refs.resultsTableShell ? 14 : 7;
+        refs.resultsBody.innerHTML = `<tr><td colspan="${initialColspan}" class="text-center text-muted py-3">Đang tải kết quả...</td></tr>`;
         try {
             if (!state.users.length) await loadUsers();
+            // Trang Ôn thi cần list class để populate filter — load nếu chưa có.
+            if (ADMIN_MODE === 'onthi' && refs.resultClassFilter && !state.classes?.length) {
+                try { await loadClasses(); } catch { /* fallback: dropdown trống */ }
+            }
             const result = await fetchJson('/api/vstep/results/list?limit=200');
             state.results = (result.results || []).filter(isVstepResult);
             updateOverview();
+            populateResultClassDropdown();
             renderResults();
         } catch (error) {
-            refs.resultsBody.innerHTML = `<tr><td colspan="7" class="text-danger text-center py-3">${escapeHtml(error.message)}</td></tr>`;
+            refs.resultsBody.innerHTML = `<tr><td colspan="${initialColspan}" class="text-danger text-center py-3">${escapeHtml(error.message)}</td></tr>`;
         }
     }
 
@@ -2064,61 +2084,168 @@
         return user?.assigned_class_id || user?.class_id || '';
     }
 
-    function renderResults() {
-        // Khi page mode hardcode flow (onthi / lophoc) — luôn ưu tiên forceFlow,
-        // bỏ qua UI filter để tránh admin vô tình thấy lẫn lộn flow khác.
+    // Filter chung: áp dụng forceFlow + class + band + type + keyword.
+    // Dùng cho cả renderResults 7-cột (legacy/lophoc) và 12-cột (onthi).
+    function filterResultsForRender() {
         const flowFilter = PAGE.forceFlow || getValue('vstepResultFlowFilter');
         const classFilter = getValue('vstepResultClassFilter');
-        const detailButtonLabel = ADMIN_MODE === 'lophoc' ? 'Chấm bài' : 'Chi tiết';
-        const users = userMap();
+        const bandFilter = String(getValue('vstepResultBandFilter') || '').toUpperCase();
+        const typeFilter = String(getValue('vstepResultTypeFilter') || '').toLowerCase();
         const keyword = getValue('vstepResultSearch').toLowerCase();
-        const results = state.results.filter(result => {
+        const users = userMap();
+        return state.results.filter(result => {
             if (flowFilter && resultFlow(result) !== flowFilter) return false;
             if (classFilter && studentClassIdFor(result.user_id) !== classFilter) return false;
-            if (!keyword) return true;
             const user = users[result.user_id] || {};
             const md = result.metadata || {};
+            if (bandFilter && String(user.band || '').toUpperCase() !== bandFilter) return false;
+            if (typeFilter === 'writing' && !hasWritingDetail(md)) return false;
+            if (typeFilter === 'speaking' && !hasSpeakingDetail(md)) return false;
+            if (typeFilter === 'pending') {
+                const needsManual = hasWritingDetail(md) || hasSpeakingDetail(md);
+                if (!needsManual || result.manual_score != null) return false;
+            }
+            if (!keyword) return true;
             return [
-                user.full_name,
-                user.account_code,
-                user.email,
-                result.content_title,
-                md.vstep_set_title,
+                user.full_name, user.account_code, user.email,
+                user.phone_number, result.content_title, md.vstep_set_title,
                 result.user_id
             ].join(' ').toLowerCase().includes(keyword);
         });
+    }
+
+    // Render row Type badges (Writing / Speaking / VSTEP) cho cột Loại bài.
+    function renderResultTypeBadges(result) {
+        const md = result.metadata || {};
+        const badges = [];
+        if (hasWritingDetail(md)) badges.push('<span class="vstep-badge-type vstep-badge-writing">Writing</span>');
+        if (hasSpeakingDetail(md)) badges.push('<span class="vstep-badge-type vstep-badge-speaking">Speaking</span>');
+        if (!badges.length) badges.push('<span class="vstep-badge-type vstep-badge-vstep">VSTEP</span>');
+        return badges.join('');
+    }
+
+    function bandBadgeHtml(band) {
+        const b = String(band || '').toUpperCase();
+        if (b === 'B1' || b === 'B2') {
+            return `<span class="vstep-badge-band vstep-badge-band-${b.toLowerCase()}">${b}</span>`;
+        }
+        return '<span class="text-muted small">-</span>';
+    }
+
+    function shortDate(value) {
+        if (!value) return '-';
+        const d = new Date(value);
+        if (!Number.isFinite(d.getTime())) return '-';
+        return d.toLocaleDateString('vi-VN');
+    }
+
+    function updateResultsSummary(filteredResults) {
+        if (!refs.resultsCountTotal) return; // không có DOM (legacy / lophoc page) → skip
+        const users = userMap();
+        const studentIds = new Set();
+        let graded = 0;
+        let pending = 0;
+        filteredResults.forEach(r => {
+            studentIds.add(r.user_id);
+            const md = r.metadata || {};
+            const needsManual = hasWritingDetail(md) || hasSpeakingDetail(md);
+            if (r.manual_score != null) graded += 1;
+            else if (needsManual) pending += 1;
+        });
+        refs.resultsCountTotal.textContent = String(filteredResults.length);
+        refs.resultsCountStudents.textContent = String(studentIds.size);
+        refs.resultsCountGraded.textContent = String(graded);
+        refs.resultsCountPending.textContent = String(pending);
+    }
+
+    function renderResults() {
+        const results = filterResultsForRender();
+        const useRichTable = ADMIN_MODE === 'onthi' && refs.resultsTableShell;
+
+        if (!refs.resultsBody) return;
+
+        // Empty state — chỉ kích hoạt cho onthi (có element #vstepResultsEmpty).
+        if (refs.resultsEmpty) {
+            refs.resultsEmpty.style.display = results.length ? 'none' : 'block';
+        }
+        if (refs.resultsTableShell) {
+            refs.resultsTableShell.style.display = results.length ? '' : 'none';
+        }
+
         if (!results.length) {
-            refs.resultsBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Chưa có kết quả VSTEP phù hợp.</td></tr>';
+            const colspan = useRichTable ? 14 : 7;
+            refs.resultsBody.innerHTML = `<tr><td colspan="${colspan}" class="text-center text-muted py-3">Chưa có kết quả VSTEP phù hợp.</td></tr>`;
+            updateResultsSummary(results);
             return;
         }
 
-        refs.resultsBody.innerHTML = results.map(result => {
-            const user = users[result.user_id] || {};
-            const md = result.metadata || {};
-            const manual = [
-                hasWritingDetail(md) ? 'Writing' : '',
-                hasSpeakingDetail(md) ? 'Speaking' : ''
-            ].filter(Boolean).join(', ') || 'Không có';
-            const manualScore = result.manual_score == null
-                ? manual
-                : `${Number(result.manual_score || 0)} điểm`;
-            const score = `${Number(result.total_score || 0)}/${Number(result.max_score || 0)}`;
-            return `
-                <tr>
-                    <td>${escapeHtml(result.submitted_at ? new Date(result.submitted_at).toLocaleString('vi-VN') : '-')}</td>
-                    <td>${escapeHtml(user.full_name || user.account_code || result.user_id || '-')}</td>
-                    <td>${escapeHtml(result.content_title || md.vstep_set_title || '-')}</td>
-                    <td><span class="vstep-status-pill vstep-status-published">${escapeHtml(FLOW_LABELS[resultFlow(result)] || resultFlow(result))}</span></td>
-                    <td class="fw-semibold">${escapeHtml(score)}</td>
-                    <td>${escapeHtml(manualScore)}</td>
-                    <td><button type="button" class="btn btn-sm btn-outline-secondary" data-result-id="${escapeHtml(result.id)}"><i class="bi bi-search me-1"></i>${escapeHtml(detailButtonLabel)}</button></td>
-                </tr>
-            `;
-        }).join('');
+        const users = userMap();
+        const detailButtonLabel = ADMIN_MODE === 'lophoc' ? 'Chấm bài' : 'Chi tiết';
+
+        if (useRichTable) {
+            // BẢNG 12 CỘT cho Ôn thi VSTEP — mô phỏng layout Lớp Học Aptis.
+            refs.resultsBody.innerHTML = results.map((result, index) => {
+                const user = users[result.user_id] || {};
+                const md = result.metadata || {};
+                const score = `${Number(result.total_score || 0)}/${Number(result.max_score || 0)}`;
+                const manual = result.manual_score == null
+                    ? '<span class="text-muted small">—</span>'
+                    : `<strong class="text-success">${escapeHtml(String(Number(result.manual_score || 0)))}</strong>`;
+                return `
+                    <tr>
+                        <td class="text-muted">${index + 1}</td>
+                        <td><span class="small">${escapeHtml(result.submitted_at ? new Date(result.submitted_at).toLocaleString('vi-VN') : '-')}</span></td>
+                        <td><code class="small">${escapeHtml(user.account_code || '-')}</code></td>
+                        <td class="small">${escapeHtml(user.email || '-')}</td>
+                        <td class="fw-semibold">${escapeHtml(user.full_name || '-')}</td>
+                        <td class="small">${escapeHtml(user.phone_number || '-')}</td>
+                        <td class="small">${escapeHtml(shortDate(user.started_on))}</td>
+                        <td class="small">${escapeHtml(shortDate(user.expires_at))}</td>
+                        <td>${bandBadgeHtml(user.band)}</td>
+                        <td>${renderResultTypeBadges(result)}</td>
+                        <td class="small">${escapeHtml(result.content_title || md.vstep_set_title || '-')}</td>
+                        <td class="fw-semibold">${escapeHtml(score)}</td>
+                        <td>${manual}</td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-result-id="${escapeHtml(result.id)}">
+                                <i class="bi bi-eye me-1"></i>${escapeHtml(detailButtonLabel)}
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        } else {
+            // BẢNG 7 CỘT — giữ nguyên cho legacy admin_vstep.html và Lớp Học VSTEP.
+            refs.resultsBody.innerHTML = results.map(result => {
+                const user = users[result.user_id] || {};
+                const md = result.metadata || {};
+                const manual = [
+                    hasWritingDetail(md) ? 'Writing' : '',
+                    hasSpeakingDetail(md) ? 'Speaking' : ''
+                ].filter(Boolean).join(', ') || 'Không có';
+                const manualScore = result.manual_score == null
+                    ? manual
+                    : `${Number(result.manual_score || 0)} điểm`;
+                const score = `${Number(result.total_score || 0)}/${Number(result.max_score || 0)}`;
+                return `
+                    <tr>
+                        <td>${escapeHtml(result.submitted_at ? new Date(result.submitted_at).toLocaleString('vi-VN') : '-')}</td>
+                        <td>${escapeHtml(user.full_name || user.account_code || result.user_id || '-')}</td>
+                        <td>${escapeHtml(result.content_title || md.vstep_set_title || '-')}</td>
+                        <td><span class="vstep-status-pill vstep-status-published">${escapeHtml(FLOW_LABELS[resultFlow(result)] || resultFlow(result))}</span></td>
+                        <td class="fw-semibold">${escapeHtml(score)}</td>
+                        <td>${escapeHtml(manualScore)}</td>
+                        <td><button type="button" class="btn btn-sm btn-outline-secondary" data-result-id="${escapeHtml(result.id)}"><i class="bi bi-search me-1"></i>${escapeHtml(detailButtonLabel)}</button></td>
+                    </tr>
+                `;
+            }).join('');
+        }
 
         refs.resultsBody.querySelectorAll('[data-result-id]').forEach(button => {
             button.addEventListener('click', () => showResultDetail(button.dataset.resultId));
         });
+
+        updateResultsSummary(results);
     }
 
     function formatResultDateTime(value) {
@@ -2423,13 +2550,13 @@
     }
 
     function buildWritingAnswerSection(metadata) {
-        const answers = Array.isArray(metadata?.writing_answers) ? metadata.writing_answers : [];
+        const answers = collectWritingAnswersFromMetadata(metadata);
         if (!answers.length) return '';
         const cards = answers.map((item, index) => `
             <article class="vstep-result-answer-card">
                 <div class="vstep-result-answer-head">
-                    <strong>Writing Part ${index + 1}</strong>
-                    <span>${escapeHtml(String(item.word_count || 0))} từ</span>
+                    <strong>${escapeHtml(item.partLabel || `Writing Part ${index + 1}`)}</strong>
+                    <span>${escapeHtml(String(item.wordCount || 0))} từ</span>
                 </div>
                 ${item.title ? `<div class="vstep-result-answer-subtitle">${escapeHtml(item.title)}</div>` : ''}
                 ${item.prompt ? `<div class="vstep-result-answer-prompt">${escapeHtml(item.prompt)}</div>` : ''}
@@ -2445,7 +2572,7 @@
     }
 
     function buildSpeakingAnswerSection(metadata) {
-        const entries = toSpeakingEntries(metadata?.speaking_answers);
+        const entries = collectSpeakingEntriesFromMetadata(metadata);
         if (!entries.length) return '';
         const cards = entries.map((item, index) => {
             const recordingUrl = normalizeMediaUrl(item?.recording_url || item?.recordingUrl || item?.audio_url || item?.audioUrl);
@@ -2484,7 +2611,9 @@
         const user = userMap()[result.user_id] || {};
         const metadata = result.metadata || {};
 
-        if (ADMIN_MODE === 'lophoc' && refs.resultModal && refs.resultModalMeta && refs.resultModalContent && refs.resultModalGrading) {
+        // Dùng modal cho mọi mode có markup modal (cả onthi + lophoc) — fallback
+        // về aside chỉ khi không có modal (admin_vstep.html legacy không có).
+        if (refs.resultModal && refs.resultModalMeta && refs.resultModalContent && refs.resultModalGrading) {
             if (refs.resultModalTitle) {
                 refs.resultModalTitle.textContent = `Chi tiết bài nộp - ${user.full_name || user.account_code || result.user_id || ''}`;
             }
@@ -2494,9 +2623,7 @@
             refs.resultModalSaveBtn?.replaceWith(refs.resultModalSaveBtn.cloneNode(true));
             refs.resultModalSaveBtn = $('saveVstepGradeBtnModal');
             refs.resultModalSaveBtn?.addEventListener('click', () => saveManualGrade(result.id));
-            if (window.bootstrap) {
-                window.bootstrap.Modal.getOrCreateInstance(refs.resultModal).show();
-            }
+            openBootstrapModal(refs.resultModal);
             return;
         }
 
@@ -2633,6 +2760,14 @@
         refs.resultModalGrading = $('vstepResultModalGrading');
         refs.resultModalSaveBtn = $('saveVstepGradeBtnModal');
         refs.resultClassFilter = $('vstepResultClassFilter');
+        refs.resultBandFilter = $('vstepResultBandFilter');
+        refs.resultTypeFilter = $('vstepResultTypeFilter');
+        refs.resultsTableShell = $('vstepResultsTableShell');
+        refs.resultsEmpty = $('vstepResultsEmpty');
+        refs.resultsCountTotal = $('vstepResultsCountTotal');
+        refs.resultsCountStudents = $('vstepResultsCountStudents');
+        refs.resultsCountGraded = $('vstepResultsCountGraded');
+        refs.resultsCountPending = $('vstepResultsCountPending');
         refs.exportResultsBtn = $('exportVstepResultsBtn');
         refs.classSessionsPreview = $('vstep-class-sessions-preview');
         refs.overviewStudents = $('vstepOverviewStudents');
@@ -2665,17 +2800,13 @@
     }
 
     function exportResultsCSV() {
-        const classId = getValue('vstepResultClassFilter');
-        const flowFilter = PAGE.forceFlow || getValue('vstepResultFlowFilter');
+        // Dùng filter chung filterResultsForRender() để xuất đúng bộ data
+        // admin đang xem (class + band + type + search + flow đều áp dụng).
+        const rows = filterResultsForRender();
         const users = userMap();
         const classMap = {};
         state.classes.forEach(c => { classMap[c.id] = c; });
-
-        const rows = state.results.filter(r => {
-            if (flowFilter && resultFlow(r) !== flowFilter) return false;
-            if (classId && studentClassIdFor(r.user_id) !== classId) return false;
-            return true;
-        });
+        const classId = getValue('vstepResultClassFilter');
         if (!rows.length) {
             alert('Không có kết quả phù hợp để xuất.');
             return;
@@ -2816,6 +2947,8 @@
         $('refreshVstepResultsBtn')?.addEventListener('click', loadResults);
         $('vstepResultFlowFilter')?.addEventListener('change', renderResults);
         $('vstepResultClassFilter')?.addEventListener('change', renderResults);
+        $('vstepResultBandFilter')?.addEventListener('change', renderResults);
+        $('vstepResultTypeFilter')?.addEventListener('change', renderResults);
         $('exportVstepResultsBtn')?.addEventListener('click', exportResultsCSV);
         $('vstepSetSearch')?.addEventListener('input', renderSetList);
         $('vstepStudentSearch')?.addEventListener('input', renderUsers);
