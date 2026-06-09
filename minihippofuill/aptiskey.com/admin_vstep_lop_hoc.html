@@ -219,12 +219,37 @@
                 <div class="vstep-form-section bg-white">
                   <div class="vstep-form-section-title mb-2">
                     <i class="bi bi-file-earmark-spreadsheet"></i>
-                    <span>Import học viên từ Excel</span>
+                    <span>Import học viên từ Excel / CSV</span>
                   </div>
-                  <div class="vstep-help mb-2">Cột hỗ trợ: accountCode, fullName, email, phone, band, startedOn, expiresAt (tự tính nếu trống), practiceAccess, password.</div>
-                  <textarea class="form-control" id="vstepImportText" rows="5" placeholder="VSTEP001&#9;Nguyễn Văn A&#9;student@example.com&#9;090...&#9;B1&#9;2026-06-05&#9;&#9;true"></textarea>
-                  <div id="vstepImportAlert" class="alert alert-info small mt-3 mb-0">Chưa import dữ liệu.</div>
-                  <button type="button" class="btn btn-outline-primary mt-3" id="importVstepStudentsBtn">
+                  <div class="vstep-help mb-2">
+                    Cột hỗ trợ: <code>accountCode, fullName, email, phone, band, startedOn, expiresAt (tự tính nếu trống), practiceAccess, password</code>.
+                    Định dạng <strong>.xlsx / .xls / .csv / .tsv / .txt</strong> (dòng đầu là header hoặc dữ liệu).
+                  </div>
+
+                  <!-- Upload file: ưu tiên hơn paste textarea. Sau khi đọc file
+                       thành công, textarea sẽ tự fill TSV/CSV để admin xem preview. -->
+                  <div class="d-flex flex-wrap gap-2 mb-2 align-items-center">
+                    <input type="file" class="form-control form-control-sm" id="vstepImportFile"
+                      accept=".xlsx,.xls,.csv,.tsv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,text/tab-separated-values,text/plain"
+                      style="max-width:340px;">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="vstepDownloadTemplateBtn"
+                      title="Tải file mẫu CSV với header chuẩn">
+                      <i class="bi bi-download me-1"></i> Tải file mẫu
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-light text-secondary border" id="vstepClearImportBtn">
+                      <i class="bi bi-x-circle me-1"></i> Xoá nội dung
+                    </button>
+                  </div>
+
+                  <details class="mb-2">
+                    <summary class="small text-secondary" style="cursor:pointer;">
+                      <i class="bi bi-clipboard me-1"></i>Hoặc paste dữ liệu trực tiếp (Tab / Comma separated)
+                    </summary>
+                    <textarea class="form-control mt-2" id="vstepImportText" rows="5" placeholder="VSTEP001&#9;Nguyễn Văn A&#9;student@example.com&#9;090...&#9;B1&#9;2026-06-05&#9;&#9;true"></textarea>
+                  </details>
+
+                  <div id="vstepImportAlert" class="alert alert-info small mt-2 mb-0">Chọn file Excel/CSV hoặc paste dữ liệu để bắt đầu.</div>
+                  <button type="button" class="btn btn-primary mt-3" id="importVstepStudentsBtn">
                     <i class="bi bi-upload me-1"></i> Import học viên
                   </button>
                 </div>
@@ -750,31 +775,25 @@
               </div>
             </div>
             <div class="vstep-panel-body">
-              <div class="vstep-results-layout">
-                <div class="table-responsive vstep-table-shell">
-                  <table class="table table-hover align-middle mb-0">
-                    <thead>
-                      <tr>
-                        <th>Thời gian</th>
-                        <th>Học viên</th>
-                        <th>Nội dung</th>
-                        <th>Nhóm</th>
-                        <th>Điểm tự động</th>
-                        <th>Chấm tay</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody id="vstepResultsTableBody">
-                      <tr>
-                        <td colspan="7" class="text-center text-muted py-3">Đang tải kết quả...</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <aside class="vstep-result-detail">
-                  <div class="fw-bold mb-2">Chi tiết bài nộp</div>
-                  <div id="vstepResultDetail" class="vstep-result-detail-content">Chọn một kết quả để xem metadata, câu trả lời Writing và file Speaking.</div>
-                </aside>
+              <div class="table-responsive vstep-table-shell">
+                <table class="table table-hover align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Thời gian</th>
+                      <th>Học viên</th>
+                      <th>Nội dung</th>
+                      <th>Nhóm</th>
+                      <th>Điểm tự động</th>
+                      <th>Chấm tay</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="vstepResultsTableBody">
+                    <tr>
+                      <td colspan="7" class="text-center text-muted py-3">Đang tải kết quả...</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -783,7 +802,43 @@
     </div>
   </div>
 
+  <div class="modal fade" id="vstepResultDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="vstepResultModalTitle">Chi tiết bài nộp</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-12 col-lg-7">
+              <div class="border rounded p-3 h-100 bg-white">
+                <div id="vstepResultModalMeta" class="submission-detail-meta"></div>
+                <div id="vstepResultModalContent"></div>
+              </div>
+            </div>
+            <div class="col-12 col-lg-5">
+              <div class="border rounded p-3 h-100 bg-white">
+                <h6 class="mb-3">Chấm điểm admin</h6>
+                <div id="vstepResultModalGrading"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Đóng</button>
+          <button type="button" class="btn btn-primary btn-sm" id="saveVstepGradeBtnModal">
+            <i class="bi bi-save me-1"></i>Lưu chấm điểm
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- SheetJS để parse .xlsx/.xls khi admin upload file Excel.
+       Load defer để không block render. CSV/TSV không cần thư viện này. -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
   <script src="js/auth.js"></script>
   <script>window.__VSTEP_ADMIN_MODE__ = 'lophoc';</script>
   <script src="js/vstep_session_blueprints.js"></script>

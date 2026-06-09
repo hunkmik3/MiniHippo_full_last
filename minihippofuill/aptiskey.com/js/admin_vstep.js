@@ -1582,6 +1582,74 @@
         }, {})).filter(item => item.accountCode || item.email);
     }
 
+    // Đọc file upload (xlsx/xls/csv/tsv/txt) → TSV string → fill vào textarea
+    // để admin xem preview + dùng parseStudentImportRows() như paste tay.
+    async function handleImportFileChange(input) {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        const name = String(file.name || '').toLowerCase();
+        const ext = name.split('.').pop();
+        try {
+            let text = '';
+            if (ext === 'xlsx' || ext === 'xls') {
+                // Yêu cầu thư viện SheetJS (XLSX) đã load qua CDN.
+                if (typeof window.XLSX === 'undefined') {
+                    throw new Error('Thư viện đọc Excel (SheetJS) chưa load. Vui lòng F5 trang và thử lại.');
+                }
+                const buffer = await file.arrayBuffer();
+                const workbook = window.XLSX.read(buffer, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                if (!firstSheetName) throw new Error('File Excel rỗng — không có sheet nào.');
+                const sheet = workbook.Sheets[firstSheetName];
+                // FS='\t' → TSV để parseStudentImportRows tự detect delimiter.
+                text = window.XLSX.utils.sheet_to_csv(sheet, { FS: '\t', blankrows: false });
+            } else if (ext === 'csv' || ext === 'tsv' || ext === 'txt') {
+                text = await file.text();
+            } else {
+                throw new Error(`Định dạng .${ext} không hỗ trợ. Dùng .xlsx, .xls, .csv, .tsv hoặc .txt.`);
+            }
+            setValue('vstepImportText', text);
+            // Tự đếm số dòng hợp lệ để feedback admin trước khi bấm Import.
+            const preview = parseStudentImportRows(text);
+            setImportAlert(
+                `Đã nạp file "${file.name}" — phát hiện ${preview.length} dòng học viên. Bấm "Import học viên" để tiếp tục.`,
+                preview.length ? 'success' : 'warning'
+            );
+        } catch (error) {
+            setImportAlert('Lỗi đọc file: ' + error.message, 'danger');
+        } finally {
+            // Reset input để admin có thể chọn lại cùng file nếu cần.
+            input.value = '';
+        }
+    }
+
+    function downloadImportTemplateCSV() {
+        const headers = [
+            'accountCode', 'fullName', 'email', 'phone', 'band',
+            'startedOn', 'expiresAt', 'practiceAccess', 'password'
+        ];
+        const sample = [
+            'VSTEP001', 'Nguyễn Văn A', 'student001@vstep.example', '0901234567', 'B1',
+            '2026-06-09', '', 'true', ''
+        ];
+        // BOM để Excel mở UTF-8 không vỡ tiếng Việt + dùng tab delimiter (TSV).
+        const content = '﻿' + headers.join('\t') + '\n' + sample.join('\t') + '\n';
+        const blob = new Blob([content], { type: 'text/tab-separated-values;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'vstep-import-template.tsv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function clearImportInput() {
+        setValue('vstepImportText', '');
+        setImportAlert('Đã xoá nội dung. Chọn file Excel/CSV mới hoặc paste lại dữ liệu.', 'info');
+    }
+
     async function importStudents() {
         const students = parseStudentImportRows(getValue('vstepImportText'));
         if (!students.length) {
@@ -2976,6 +3044,9 @@
         refs.saveBtn?.addEventListener('click', saveSet);
         refs.studentForm?.addEventListener('submit', createStudent);
         refs.importBtn?.addEventListener('click', importStudents);
+        $('vstepImportFile')?.addEventListener('change', (event) => handleImportFileChange(event.target));
+        $('vstepDownloadTemplateBtn')?.addEventListener('click', downloadImportTemplateCSV);
+        $('vstepClearImportBtn')?.addEventListener('click', clearImportInput);
         refs.resourceForm?.addEventListener('submit', createResource);
         refs.classForm?.addEventListener('submit', createClass);
         refs.assignmentForm?.addEventListener('submit', createAssignment);
