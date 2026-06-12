@@ -1,5 +1,8 @@
 export {
   buildR2PublicUrl,
+  createR2PutUploadUrl,
+  deleteR2Objects,
+  getR2ObjectBuffer,
   getContentTypeForPath,
   isR2Configured,
   normalizeR2Key,

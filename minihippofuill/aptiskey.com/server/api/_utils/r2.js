@@ -1,4 +1,5 @@
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectsCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const REPO_PREFIX = 'minihippofuill/aptiskey.com/';
 
@@ -125,6 +126,20 @@ function toBody(content, encoding) {
   return Buffer.from(String(content || ''), encoding || 'utf8');
 }
 
+async function streamToBuffer(body) {
+  if (!body) return Buffer.alloc(0);
+  if (Buffer.isBuffer(body)) return body;
+  if (typeof body.transformToByteArray === 'function') {
+    return Buffer.from(await body.transformToByteArray());
+  }
+
+  const chunks = [];
+  for await (const chunk of body) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
 export async function putR2Object(
   filePath,
   { content, contentType, encoding = 'utf8' } = {}
@@ -152,4 +167,71 @@ export async function putR2Object(
     sizeBytes: body.byteLength,
     contentType: resolvedContentType
   };
+}
+
+export async function createR2PutUploadUrl(
+  filePath,
+  { contentType, expiresIn = 900 } = {}
+) {
+  if (!isR2Configured()) {
+    throw new Error('Missing R2 environment variables');
+  }
+
+  const key = normalizeR2Key(filePath);
+  const resolvedContentType = contentType || getContentTypeForPath(key);
+  const command = new PutObjectCommand({
+    Bucket: cleanEnv(process.env.R2_BUCKET),
+    Key: key,
+    ContentType: resolvedContentType
+  });
+
+  const uploadUrl = await getSignedUrl(getClient(), command, { expiresIn });
+
+  return {
+    key,
+    uploadUrl,
+    publicUrl: buildR2PublicUrl(key),
+    contentType: resolvedContentType,
+    expiresIn
+  };
+}
+
+export async function getR2ObjectBuffer(filePath) {
+  if (!isR2Configured()) {
+    throw new Error('Missing R2 environment variables');
+  }
+
+  const key = normalizeR2Key(filePath);
+  const result = await getClient().send(
+    new GetObjectCommand({
+      Bucket: cleanEnv(process.env.R2_BUCKET),
+      Key: key
+    })
+  );
+
+  return streamToBuffer(result.Body);
+}
+
+export async function deleteR2Objects(filePaths = []) {
+  if (!isR2Configured()) {
+    throw new Error('Missing R2 environment variables');
+  }
+
+  const objects = filePaths
+    .map((filePath) => ({ Key: normalizeR2Key(filePath) }))
+    .filter((item) => item.Key);
+
+  if (!objects.length) return { deleted: 0 };
+
+  await getClient().send(
+    new DeleteObjectsCommand({
+      Bucket: cleanEnv(process.env.R2_BUCKET),
+      Delete: {
+        Objects: objects,
+        Quiet: true
+      }
+    })
+  );
+
+  return { deleted: objects.length };
 }

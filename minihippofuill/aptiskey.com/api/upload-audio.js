@@ -1,9 +1,18 @@
 import parseBody from './_utils/parseBody.js';
 import { buildGithubHeaders, putGithubContent } from './_utils/supabase.js';
-import { isR2Configured, normalizeR2Key, putR2Object } from './_utils/r2.js';
+import {
+  createR2PutUploadUrl,
+  deleteR2Objects,
+  getR2ObjectBuffer,
+  isR2Configured,
+  normalizeR2Key,
+  putR2Object
+} from './_utils/r2.js';
 import { verifyAdminRequest, verifyUserRequest } from './_utils/auth.js';
 
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024; // 50MB
+const MAX_CHUNK_UPLOAD_BYTES = 3 * 1024 * 1024; // Keep JSON payload below Vercel's 4.5MB cap.
+const MAX_CHUNK_COUNT = 100;
 const SITE_PREFIX = 'minihippofuill/aptiskey.com/';
 const ALLOWED_MEDIA_PREFIXES = [
   `${SITE_PREFIX}audio/`,
@@ -68,6 +77,36 @@ function encodePath(path) {
 function inferContentType(path, fallback) {
   const ext = normalizePath(path).split('.').pop()?.toLowerCase();
   return MIME_BY_EXT[ext] || fallback || 'application/octet-stream';
+}
+
+function sanitizeUploadId(value) {
+  const text = String(value || '').trim();
+  if (!/^[A-Za-z0-9._-]{8,100}$/.test(text)) {
+    throw new Error('uploadId không hợp lệ');
+  }
+  return text;
+}
+
+function parseChunkIndex(value) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : -1;
+}
+
+function parseChunkCount(value) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 && parsed <= MAX_CHUNK_COUNT ? parsed : -1;
+}
+
+function tempChunkPath(uploadId, chunkIndex) {
+  return `tmp/vstep_upload_chunks/${uploadId}/${String(chunkIndex).padStart(5, '0')}.part`;
+}
+
+async function verifyUploadRequest(req, normalizedInputPath) {
+  if (isSpeakingSubmissionPath(normalizedInputPath)) {
+    return verifyUserRequest(req, { requireDevice: true });
+  }
+
+  return verifyAdminRequest(req);
 }
 
 function parseGithubMediaUrl(value) {
@@ -202,6 +241,239 @@ async function handleGithubMedia(req, res) {
   }
 }
 
+async function handleCreateR2Upload(req, res, body) {
+  const { filePath, contentType, mimeType, sizeBytes } = body || {};
+
+  if (!filePath || typeof filePath !== 'string') {
+    return res.status(400).json({ error: 'filePath phải là chuỗi không rỗng' });
+  }
+
+  const parsedSize = Number(sizeBytes);
+  if (!Number.isFinite(parsedSize) || parsedSize <= 0) {
+    return res.status(400).json({ error: 'sizeBytes không hợp lệ' });
+  }
+
+  if (parsedSize > MAX_UPLOAD_BYTES) {
+    return res
+      .status(400)
+      .json({ error: `File upload vượt giới hạn cho phép (${MAX_UPLOAD_BYTES / (1024 * 1024)}MB).` });
+  }
+
+  const normalizedInputPath = normalizePath(filePath);
+  const authCheck = await verifyUploadRequest(req, normalizedInputPath);
+  if (!authCheck.success) {
+    return res
+      .status(authCheck.status)
+      .json({ error: authCheck.error || 'Unauthorized' });
+  }
+
+  if (!isR2Configured()) {
+    return res.status(501).json({
+      error: 'R2 chưa được cấu hình, không thể upload trực tiếp file lớn.',
+      code: 'r2_not_configured'
+    });
+  }
+
+  let r2Key;
+  try {
+    r2Key = normalizeR2Key(normalizedInputPath);
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'filePath không hợp lệ' });
+  }
+
+  try {
+    const signed = await createR2PutUploadUrl(r2Key, {
+      contentType: contentType || mimeType || inferContentType(r2Key)
+    });
+
+    return res.status(200).json({
+      success: true,
+      uploadUrl: signed.uploadUrl,
+      rawUrl: signed.publicUrl,
+      publicUrl: signed.publicUrl,
+      fileUrl: signed.publicUrl,
+      filePath: signed.key,
+      storage: 'r2',
+      contentType: signed.contentType,
+      expiresIn: signed.expiresIn
+    });
+  } catch (error) {
+    console.error('Create R2 upload URL error:', error);
+    return res.status(error.status || 500).json({
+      error: 'Không thể tạo link upload R2.',
+      details: error.message || null
+    });
+  }
+}
+
+async function handleUploadR2Chunk(req, res, body) {
+  const { filePath, uploadId, chunkIndex, chunkCount, content, sizeBytes } = body || {};
+
+  if (!filePath || typeof filePath !== 'string') {
+    return res.status(400).json({ error: 'filePath phải là chuỗi không rỗng' });
+  }
+
+  if (typeof content !== 'string' || !content) {
+    return res.status(400).json({ error: 'content chunk phải là chuỗi base64 không rỗng' });
+  }
+
+  const parsedSize = Number(sizeBytes);
+  if (!Number.isFinite(parsedSize) || parsedSize <= 0 || parsedSize > MAX_UPLOAD_BYTES) {
+    return res
+      .status(400)
+      .json({ error: `File upload vượt giới hạn cho phép (${MAX_UPLOAD_BYTES / (1024 * 1024)}MB).` });
+  }
+
+  let safeUploadId;
+  try {
+    safeUploadId = sanitizeUploadId(uploadId);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const index = parseChunkIndex(chunkIndex);
+  const count = parseChunkCount(chunkCount);
+  if (index < 0 || count < 1 || index >= count) {
+    return res.status(400).json({ error: 'Thông tin chunk không hợp lệ' });
+  }
+
+  const approxBytes = Math.floor((content.length * 3) / 4);
+  if (approxBytes <= 0 || approxBytes > MAX_CHUNK_UPLOAD_BYTES) {
+    return res
+      .status(400)
+      .json({ error: `Chunk upload vượt giới hạn cho phép (${MAX_CHUNK_UPLOAD_BYTES / (1024 * 1024)}MB).` });
+  }
+
+  const normalizedInputPath = normalizePath(filePath);
+  const authCheck = await verifyUploadRequest(req, normalizedInputPath);
+  if (!authCheck.success) {
+    return res
+      .status(authCheck.status)
+      .json({ error: authCheck.error || 'Unauthorized' });
+  }
+
+  if (!isR2Configured()) {
+    return res.status(501).json({
+      error: 'R2 chưa được cấu hình, không thể upload trực tiếp file lớn.',
+      code: 'r2_not_configured'
+    });
+  }
+
+  try {
+    await putR2Object(tempChunkPath(safeUploadId, index), {
+      content,
+      contentType: 'application/octet-stream',
+      encoding: 'base64'
+    });
+
+    return res.status(200).json({
+      success: true,
+      uploadId: safeUploadId,
+      chunkIndex: index,
+      chunkCount: count
+    });
+  } catch (error) {
+    console.error('Upload R2 chunk error:', error);
+    return res.status(error.status || 500).json({
+      error: 'Không thể upload chunk lên R2.',
+      details: error.message || null
+    });
+  }
+}
+
+async function handleCompleteR2ChunkUpload(req, res, body) {
+  const { filePath, uploadId, chunkCount, contentType, mimeType, sizeBytes } = body || {};
+
+  if (!filePath || typeof filePath !== 'string') {
+    return res.status(400).json({ error: 'filePath phải là chuỗi không rỗng' });
+  }
+
+  const parsedSize = Number(sizeBytes);
+  if (!Number.isFinite(parsedSize) || parsedSize <= 0 || parsedSize > MAX_UPLOAD_BYTES) {
+    return res
+      .status(400)
+      .json({ error: `File upload vượt giới hạn cho phép (${MAX_UPLOAD_BYTES / (1024 * 1024)}MB).` });
+  }
+
+  let safeUploadId;
+  try {
+    safeUploadId = sanitizeUploadId(uploadId);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const count = parseChunkCount(chunkCount);
+  if (count < 1) {
+    return res.status(400).json({ error: 'chunkCount không hợp lệ' });
+  }
+
+  const normalizedInputPath = normalizePath(filePath);
+  const authCheck = await verifyUploadRequest(req, normalizedInputPath);
+  if (!authCheck.success) {
+    return res
+      .status(authCheck.status)
+      .json({ error: authCheck.error || 'Unauthorized' });
+  }
+
+  if (!isR2Configured()) {
+    return res.status(501).json({
+      error: 'R2 chưa được cấu hình, không thể upload trực tiếp file lớn.',
+      code: 'r2_not_configured'
+    });
+  }
+
+  let r2Key;
+  try {
+    r2Key = normalizeR2Key(normalizedInputPath);
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'filePath không hợp lệ' });
+  }
+
+  const chunkPaths = Array.from({ length: count }, (_, index) => tempChunkPath(safeUploadId, index));
+
+  try {
+    const buffers = [];
+    let totalBytes = 0;
+    for (const chunkPath of chunkPaths) {
+      const chunk = await getR2ObjectBuffer(chunkPath);
+      totalBytes += chunk.byteLength;
+      if (totalBytes > MAX_UPLOAD_BYTES) {
+        throw new Error(`File upload vượt giới hạn cho phép (${MAX_UPLOAD_BYTES / (1024 * 1024)}MB).`);
+      }
+      buffers.push(chunk);
+    }
+
+    if (totalBytes !== parsedSize) {
+      throw new Error('Dung lượng file sau khi ghép chunk không khớp.');
+    }
+
+    const uploaded = await putR2Object(r2Key, {
+      content: Buffer.concat(buffers, totalBytes),
+      contentType: contentType || mimeType || inferContentType(r2Key)
+    });
+
+    deleteR2Objects(chunkPaths).catch((cleanupError) => {
+      console.warn('Cleanup R2 chunks failed:', cleanupError);
+    });
+
+    return res.status(200).json({
+      success: true,
+      rawUrl: uploaded.publicUrl,
+      fileUrl: uploaded.publicUrl,
+      filePath: uploaded.key,
+      storage: 'r2',
+      sizeBytes: uploaded.sizeBytes,
+      contentType: uploaded.contentType
+    });
+  } catch (error) {
+    console.error('Complete R2 chunk upload error:', error);
+    return res.status(error.status || 500).json({
+      error: 'Không thể ghép file upload.',
+      details: error.message || null
+    });
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method === 'GET' || req.method === 'HEAD') {
     return handleGithubMedia(req, res);
@@ -218,6 +490,18 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('Parse body error:', error);
     return res.status(400).json({ error: error.message || 'Invalid JSON payload' });
+  }
+
+  if (body?.action === 'create-r2-upload' || body?.action === 'r2-presign') {
+    return handleCreateR2Upload(req, res, body);
+  }
+
+  if (body?.action === 'upload-r2-chunk') {
+    return handleUploadR2Chunk(req, res, body);
+  }
+
+  if (body?.action === 'complete-r2-chunk-upload') {
+    return handleCompleteR2ChunkUpload(req, res, body);
   }
 
   const { filePath, content, message } = body || {};
@@ -237,22 +521,11 @@ export default async function handler(req, res) {
   }
 
   const normalizedInputPath = normalizePath(filePath);
-  const speakingSubmissionUpload = isSpeakingSubmissionPath(normalizedInputPath);
-
-  if (speakingSubmissionUpload) {
-    const userCheck = await verifyUserRequest(req, { requireDevice: true });
-    if (!userCheck.success) {
-      return res
-        .status(userCheck.status)
-        .json({ error: userCheck.error || 'Unauthorized' });
-    }
-  } else {
-    const adminCheck = await verifyAdminRequest(req);
-    if (!adminCheck.success) {
-      return res
-        .status(adminCheck.status)
-        .json({ error: adminCheck.error || 'Unauthorized' });
-    }
+  const authCheck = await verifyUploadRequest(req, normalizedInputPath);
+  if (!authCheck.success) {
+    return res
+      .status(authCheck.status)
+      .json({ error: authCheck.error || 'Unauthorized' });
   }
 
   const approxBytes = Math.floor((content.length * 3) / 4);
