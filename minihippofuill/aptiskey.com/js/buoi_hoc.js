@@ -3752,12 +3752,17 @@ function renderWritingShort(page) {
     let counterClass = 'word-counter';
     if (wc >= minWords && wc <= maxWords) counterClass += ' in-range';
     else if (wc > maxWords) counterClass += ' over-limit';
+    // maxlength HTML attribute dùng ký tự, không phải từ. Trước đây hard-code
+    // 200 ký tự → bài có maxWords=100 dễ bị cắt giữa chừng nếu admin viết
+    // dài (mỗi từ ~6-8 ký tự, 100 từ ≈ 600-800 ký tự). Tính động: hệ số
+    // 12 ký tự/từ + 50 buffer = đủ cho mọi ngôn ngữ + Unicode.
+    const safeCharLimit = Math.max(200, maxWords * 12 + 50);
     return `
       <div class="writing-q-item">
         <label>${esc(prompt)}</label>
         <input type="text" class="form-control writing-input" name="${key}" value="${esc(saved)}"
                data-min="${minWords}" data-max="${maxWords}"
-               placeholder="Viết ${minWords}-${maxWords} từ..." maxlength="200"
+               placeholder="Viết ${minWords}-${maxWords} từ..." maxlength="${safeCharLimit}"
                oninput="limitWords(this, ${maxWords}); updateWordCount(this); userAnswers['${key}']=this.value;">
         <div class="${counterClass}" id="wc-${key}">Số từ: ${wc} / ${maxWords}</div>
       </div>`;
