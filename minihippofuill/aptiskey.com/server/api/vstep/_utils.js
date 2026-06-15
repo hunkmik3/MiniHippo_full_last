@@ -60,6 +60,8 @@ export function contentToLegacySet(content) {
   data.vstep_flow = content.flow || data.vstep_flow || 'practice';
   data.vstep_content_kind = content.content_kind || data.vstep_content_kind || 'mock_test';
   data.status = content.status || data.status || 'draft';
+  if (content.band) data.vstep_band = content.band;
+  if (content.session_number) data.vstep_session_number = content.session_number;
   return {
     id: content.id,
     type: 'vstep',
@@ -72,6 +74,8 @@ export function contentToLegacySet(content) {
     flow: content.flow,
     content_kind: content.content_kind,
     status: content.status,
+    band: content.band || null,
+    session_number: content.session_number || null,
     assignment: content.assignment || null
   };
 }
@@ -265,6 +269,16 @@ export function legacyPayloadToContentPayload(body = {}, adminUser = null) {
   data.vstep_content_kind = contentKind;
   data.status = status;
 
+  // Shared blueprint pool: nội dung lesson_exam chỉ phụ thuộc band + session.
+  // Mỗi lớp B1 dùng chung 18 content theo session_number, B2 dùng chung 24.
+  // KHÔNG còn gắn vstep_class_id vào data — đã đổi từ per-class sang shared.
+  const bandRaw = String(body.band || data.vstep_band || '').toUpperCase();
+  const band = (bandRaw === 'B1' || bandRaw === 'B2') ? bandRaw : null;
+  const sessionRaw = Number(body.session_number ?? body.sessionNumber ?? data.vstep_session_number);
+  const sessionNumber = Number.isFinite(sessionRaw) && sessionRaw > 0 ? Math.floor(sessionRaw) : null;
+  if (band) data.vstep_band = band;
+  if (sessionNumber) data.vstep_session_number = sessionNumber;
+
   return {
     flow,
     content_kind: contentKind,
@@ -273,6 +287,75 @@ export function legacyPayloadToContentPayload(body = {}, adminUser = null) {
     status,
     duration_minutes: Number(body.duration_minutes) || 177,
     data,
+    band,
+    session_number: sessionNumber,
     created_by: adminUser?.id || null
   };
+}
+
+// Auto bind 18/24 content (theo band) vào lớp dưới dạng vstep_assignments.
+// Idempotent — skip nếu lớp đã có assignment cho session_number đó.
+// Gọi từ classes/create.js sau khi tạo lớp + (tùy chọn) classes/sync-assignments.js
+// để admin re-sync sau khi cập nhật content blueprint.
+export async function syncClassAssignmentsByBand(classRecord, adminId, deps) {
+  const { selectFrom, insertInto } = deps;
+  if (!classRecord?.id || !classRecord.band) {
+    return { created: 0, skipped: 0, missing: [], reason: 'missing class id or band' };
+  }
+  const sessions = Array.isArray(classRecord.sessions) ? classRecord.sessions : [];
+  if (!sessions.length) {
+    return { created: 0, skipped: 0, missing: [], reason: 'class chưa có sessions[]' };
+  }
+
+  // Pool content lesson_exam của band này. Mỗi session_number = 1 content.
+  const contents = await selectFrom('vstep_contents', {
+    filters: [
+      { column: 'flow', value: 'lesson_exam' },
+      { column: 'band', value: classRecord.band }
+    ]
+  });
+  const contentBySession = new Map();
+  (Array.isArray(contents) ? contents : []).forEach(c => {
+    if (c.session_number) contentBySession.set(Number(c.session_number), c);
+  });
+
+  // Skip session đã có assignment để idempotent.
+  const existing = await selectFrom('vstep_assignments', {
+    filters: [{ column: 'class_id', value: classRecord.id }]
+  });
+  const existingSessions = new Set(
+    (Array.isArray(existing) ? existing : [])
+      .map(a => Number(a.session_number))
+      .filter(n => Number.isFinite(n))
+  );
+
+  let created = 0;
+  let skipped = 0;
+  const missing = [];
+  for (const session of sessions) {
+    const num = Number(session.number);
+    if (!Number.isFinite(num) || num <= 0) continue;
+    if (existingSessions.has(num)) { skipped += 1; continue; }
+    const content = contentBySession.get(num);
+    if (!content) { missing.push(num); continue; }
+    try {
+      await insertInto('vstep_assignments', [{
+        content_id: content.id,
+        class_id: classRecord.id,
+        user_id: null,
+        student_id: null,
+        session_number: num,
+        available_from: session.date || null,
+        due_at: session.deadline || null,
+        status: 'active',
+        notes: `Auto-bind buổi ${num} (${classRecord.band})`,
+        created_by: adminId || null
+      }]);
+      created += 1;
+    } catch (error) {
+      console.warn(`Auto-bind buổi ${num} thất bại:`, error.message);
+    }
+  }
+
+  return { created, skipped, missing };
 }

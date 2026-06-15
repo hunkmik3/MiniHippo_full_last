@@ -43,9 +43,42 @@ ALTER TABLE public.vstep_students
 CREATE INDEX IF NOT EXISTS idx_vstep_students_started_on
   ON public.vstep_students(started_on);
 
--- Per-class buổi học: lưu class_id + session_number bên trong vstep_contents.data
--- jsonb (vstep_class_id, vstep_session_number, vstep_session_due_at). Không cần
--- DB column riêng — query qua jsonb operators khi filter theo lớp.
+-- ===========================================================
+-- vstep_contents: SHARED BLUEPRINT model (đã chuyển từ per-class sang shared).
+-- Content lesson_exam phân biệt qua band (B1/B2) + session_number (1..18/24).
+-- Mỗi lớp B1 dùng chung 18 content, mỗi lớp B2 dùng chung 24 content.
+-- ===========================================================
+ALTER TABLE public.vstep_contents
+  ADD COLUMN IF NOT EXISTS band text,
+  ADD COLUMN IF NOT EXISTS session_number integer;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint c
+    WHERE conname = 'vstep_contents_band_check'
+      AND conrelid = 'public.vstep_contents'::regclass
+  ) THEN
+    ALTER TABLE public.vstep_contents
+      ADD CONSTRAINT vstep_contents_band_check
+      CHECK (band IS NULL OR band IN ('B1', 'B2'));
+  END IF;
+END $$;
+
+-- 1 buổi = 1 content per band (unique). Pool shared cho mọi lớp cùng band.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_vstep_contents_band_session_unique
+  ON public.vstep_contents(band, session_number)
+  WHERE band IS NOT NULL AND session_number IS NOT NULL AND flow = 'lesson_exam';
+
+CREATE INDEX IF NOT EXISTS idx_vstep_contents_band_session
+  ON public.vstep_contents(band, session_number, flow);
+
+-- vstep_assignments.session_number: lưu sẵn để filter nhanh không cần đọc content.
+ALTER TABLE public.vstep_assignments
+  ADD COLUMN IF NOT EXISTS session_number integer;
+
+CREATE INDEX IF NOT EXISTS idx_vstep_assignments_class_session
+  ON public.vstep_assignments(class_id, session_number);
 
 -- ===========================================================
 -- vstep_students.learning_program: phân biệt 2 sub-module VSTEP.
