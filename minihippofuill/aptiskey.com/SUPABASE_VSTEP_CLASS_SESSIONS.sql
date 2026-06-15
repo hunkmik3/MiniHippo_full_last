@@ -46,3 +46,34 @@ CREATE INDEX IF NOT EXISTS idx_vstep_students_started_on
 -- Per-class buổi học: lưu class_id + session_number bên trong vstep_contents.data
 -- jsonb (vstep_class_id, vstep_session_number, vstep_session_due_at). Không cần
 -- DB column riêng — query qua jsonb operators khi filter theo lớp.
+
+-- ===========================================================
+-- vstep_students.learning_program: phân biệt 2 sub-module VSTEP.
+--   'vstep_lophoc' → HV lớp học theo buổi, gắn class, lịch 246/357
+--   'vstep_onthi'  → HV ôn thi tự luyện bộ đề
+-- Mỗi HV chỉ thuộc 1 module (yêu cầu user: 1 tài khoản = 1 module).
+-- Default 'vstep_lophoc' cho HV cũ — admin có thể đổi qua UI nếu cần.
+-- ===========================================================
+ALTER TABLE public.vstep_students
+  ADD COLUMN IF NOT EXISTS learning_program text DEFAULT 'vstep_lophoc';
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint c
+    WHERE conname = 'vstep_students_learning_program_check'
+      AND conrelid = 'public.vstep_students'::regclass
+  ) THEN
+    ALTER TABLE public.vstep_students
+      ADD CONSTRAINT vstep_students_learning_program_check
+      CHECK (learning_program IN ('vstep_lophoc', 'vstep_onthi'));
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_vstep_students_learning_program
+  ON public.vstep_students(learning_program);
+
+-- Đồng bộ row hiện có (đổi NULL → 'vstep_lophoc' default).
+UPDATE public.vstep_students
+  SET learning_program = 'vstep_lophoc'
+  WHERE learning_program IS NULL;

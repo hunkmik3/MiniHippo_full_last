@@ -9,10 +9,14 @@
     // ngay trước khi load file này. Quyết định trang gộp (legacy) hay 1 trong 2
     // trang con (Ôn thi / Lớp Học). Hardcode flow filter + default panel.
     const ADMIN_MODE = (typeof window !== 'undefined' && window.__VSTEP_ADMIN_MODE__) || 'legacy';
+    // learningProgram tag: phân biệt 3 module dùng chung bảng users + vstep_students.
+    //   onthi   → 'vstep_onthi'   (HV chỉ truy cập Ôn thi bộ đề)
+    //   lophoc  → 'vstep_lophoc'  (HV theo lớp + buổi, có deadline)
+    //   legacy  → null           (admin tổng — không filter list)
     const MODE_CONFIG = {
-        legacy: { defaultPanel: 'students', forceFlow: null, allowFlowFilter: true },
-        onthi: { defaultPanel: 'content', forceFlow: 'practice', allowFlowFilter: false },
-        lophoc: { defaultPanel: 'students', forceFlow: 'lesson_exam', allowFlowFilter: false }
+        legacy: { defaultPanel: 'students', forceFlow: null, allowFlowFilter: true, learningProgram: null },
+        onthi: { defaultPanel: 'content', forceFlow: 'practice', allowFlowFilter: false, learningProgram: 'vstep_onthi' },
+        lophoc: { defaultPanel: 'students', forceFlow: 'lesson_exam', allowFlowFilter: false, learningProgram: 'vstep_lophoc' }
     };
     const PAGE = MODE_CONFIG[ADMIN_MODE] || MODE_CONFIG.legacy;
     const CONTENT_SKILL_LABELS = {
@@ -62,6 +66,10 @@
         { min: 120, max: 220, instruction: 'You should spend about 20 minutes on this task.' },
         { min: 250, max: 350, instruction: 'You should spend about 40 minutes on this task.' }
     ];
+    const MAX_MEDIA_UPLOAD_BYTES = 50 * 1024 * 1024;
+    const LEGACY_JSON_UPLOAD_LIMIT_BYTES = 3 * 1024 * 1024;
+    const R2_CHUNK_UPLOAD_BYTES = 2 * 1024 * 1024;
+    const ENABLE_DIRECT_R2_UPLOAD = Boolean(window.__VSTEP_DIRECT_R2_UPLOAD__);
 
     const refs = {};
     const state = {
@@ -440,6 +448,199 @@
             .toLowerCase() || 'audio';
     }
 
+    function formatFileSize(bytes) {
+        const value = Number(bytes) || 0;
+        if (value >= 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+        if (value >= 1024) return `${Math.round(value / 1024)} KB`;
+        return `${value} B`;
+    }
+
+    function readFileAsBase64(file, errorMessage = 'Không thể đọc file.') {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const result = String(reader.result || '');
+                resolve(result.includes(',') ? result.split(',')[1] : result);
+            };
+            reader.onerror = () => reject(new Error(errorMessage));
+            reader.readAsDataURL(file);
+        });
+    }
+
+    async function requestR2UploadTicket(file, filePath) {
+        const response = await fetch('/api/upload-audio', {
+            method: 'POST',
+            headers: authHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({
+                action: 'create-r2-upload',
+                filePath,
+                contentType: file.type || '',
+                sizeBytes: file.size
+            })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            const error = new Error(result.error || result.details || 'Không thể tạo link upload R2.');
+            error.status = response.status;
+            error.code = result.code || '';
+            error.stage = 'r2-ticket';
+            throw error;
+        }
+        return result;
+    }
+
+    async function uploadFileToR2(file, filePath) {
+        const ticket = await requestR2UploadTicket(file, filePath);
+        if (!ticket.uploadUrl) {
+            throw new Error('API không trả về link upload R2.');
+        }
+
+        const headers = {};
+        if (ticket.contentType) headers['Content-Type'] = ticket.contentType;
+        let response;
+        try {
+            response = await fetch(ticket.uploadUrl, {
+                method: 'PUT',
+                headers,
+                body: file
+            });
+        } catch (error) {
+            error.stage = 'r2-put';
+            throw error;
+        }
+        if (!response.ok) {
+            const error = new Error(`Không upload được lên R2 (${response.status}).`);
+            error.status = response.status;
+            error.stage = 'r2-put';
+            throw error;
+        }
+
+        return {
+            ...ticket,
+            rawUrl: ticket.rawUrl || ticket.publicUrl || filePath,
+            filePath: ticket.filePath || filePath
+        };
+    }
+
+    function canFallbackToLegacyUpload(error) {
+        if (!error?.status) return true;
+        return error.status === 404 || error.status === 501 || error.status === 503 || error.code === 'r2_not_configured';
+    }
+
+    function canAttemptChunkedUpload(error) {
+        if (!error) return true;
+        if (error.stage === 'r2-put') return true;
+        if (error.stage === 'r2-ticket') {
+            return error.status >= 500 && error.status !== 501 && error.code !== 'r2_not_configured';
+        }
+        return ![400, 401, 403].includes(Number(error.status));
+    }
+
+    function createUploadId() {
+        const random = new Uint32Array(3);
+        if (window.crypto?.getRandomValues) {
+            window.crypto.getRandomValues(random);
+        } else {
+            random[0] = Math.floor(Math.random() * 0xffffffff);
+            random[1] = Math.floor(Math.random() * 0xffffffff);
+            random[2] = Math.floor(Math.random() * 0xffffffff);
+        }
+        return `vstep-${Date.now()}-${Array.from(random).map((value) => value.toString(36)).join('-')}`;
+    }
+
+    async function uploadFileViaJson(file, filePath, message) {
+        const base64 = await readFileAsBase64(file);
+        return fetchJson('/api/upload-audio', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                filePath,
+                content: base64,
+                message
+            })
+        });
+    }
+
+    async function uploadFileViaChunkedR2(file, filePath) {
+        const uploadId = createUploadId();
+        const chunkCount = Math.ceil(file.size / R2_CHUNK_UPLOAD_BYTES);
+
+        for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex += 1) {
+            const start = chunkIndex * R2_CHUNK_UPLOAD_BYTES;
+            const end = Math.min(file.size, start + R2_CHUNK_UPLOAD_BYTES);
+            const chunk = file.slice(start, end);
+            const base64 = await readFileAsBase64(chunk, 'Không thể đọc chunk file.');
+            await fetchJson('/api/upload-audio', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'upload-r2-chunk',
+                    uploadId,
+                    filePath,
+                    chunkIndex,
+                    chunkCount,
+                    content: base64,
+                    contentType: file.type || '',
+                    sizeBytes: file.size
+                })
+            });
+        }
+
+        return fetchJson('/api/upload-audio', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'complete-r2-chunk-upload',
+                uploadId,
+                filePath,
+                chunkCount,
+                contentType: file.type || '',
+                sizeBytes: file.size
+            })
+        });
+    }
+
+    async function uploadMediaFile(file, filePath, message) {
+        if (file.size > MAX_MEDIA_UPLOAD_BYTES) {
+            throw new Error(`File ${formatFileSize(file.size)} vượt giới hạn ${formatFileSize(MAX_MEDIA_UPLOAD_BYTES)}.`);
+        }
+
+        let directUploadError = null;
+        if (ENABLE_DIRECT_R2_UPLOAD) {
+            try {
+                return await uploadFileToR2(file, filePath);
+            } catch (error) {
+                directUploadError = error;
+                const authOrValidationError = error.stage === 'r2-ticket' && [400, 401, 403].includes(Number(error.status));
+                if (authOrValidationError) {
+                    throw error;
+                }
+            }
+        }
+
+        if (file.size > LEGACY_JSON_UPLOAD_LIMIT_BYTES) {
+            if (canAttemptChunkedUpload(directUploadError)) {
+                try {
+                    return await uploadFileViaChunkedR2(file, filePath);
+                } catch (chunkError) {
+                    throw new Error(`Không upload được file lớn qua R2 chunked. ${chunkError.message || ''}`.trim());
+                }
+            }
+
+            const reason = directUploadError?.message ? ` Lý do R2: ${directUploadError.message}` : '';
+            throw new Error(
+                `File ${formatFileSize(file.size)} quá lớn để upload qua Vercel Function. ` +
+                `Hãy kiểm tra cấu hình R2/CORS hoặc nén file xuống dưới ${formatFileSize(LEGACY_JSON_UPLOAD_LIMIT_BYTES)}.${reason}`
+            );
+        }
+
+        if (!canFallbackToLegacyUpload(directUploadError)) {
+            throw directUploadError;
+        }
+
+        return uploadFileViaJson(file, filePath, message);
+    }
+
     function parseOption(raw, index) {
         const fallbackLabel = String.fromCharCode(65 + index);
         const text = String(raw || '').trim();
@@ -616,25 +817,12 @@
         const status = row?.querySelector('.vstep-question-audio-status');
         if (status) status.textContent = 'Đang upload audio...';
         try {
-            const base64 = await new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => {
-                    const result = String(reader.result || '');
-                    resolve(result.includes(',') ? result.split(',')[1] : result);
-                };
-                reader.onerror = () => reject(new Error('Không thể đọc file audio.'));
-                reader.readAsDataURL(file);
-            });
             const filePath = `audio/vstep/listening/questions/${Date.now()}_${sanitizeFileName(file.name)}`;
-            const result = await fetchJson('/api/upload-audio', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    filePath,
-                    content: base64,
-                    message: `Upload VSTEP listening question audio ${filePath}`
-                })
-            });
+            const result = await uploadMediaFile(
+                file,
+                filePath,
+                `Upload VSTEP listening question audio ${filePath}`
+            );
             if (urlInput) urlInput.value = result.rawUrl || filePath;
             if (status) status.textContent = '✓ Audio đã upload.';
         } catch (error) {
@@ -1066,26 +1254,12 @@
         if (status) status.textContent = 'Đang upload file...';
 
         try {
-            const base64 = await new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => {
-                    const result = String(reader.result || '');
-                    resolve(result.includes(',') ? result.split(',')[1] : result);
-                };
-                reader.onerror = () => reject(new Error('Không thể đọc file.'));
-                reader.readAsDataURL(file);
-            });
-
             const filePath = `${dir}/${Date.now()}_${sanitizeFileName(file.name)}`;
-            const result = await fetchJson('/api/upload-audio', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    filePath,
-                    content: base64,
-                    message: `Upload VSTEP media ${filePath}`
-                })
-            });
+            const result = await uploadMediaFile(
+                file,
+                filePath,
+                `Upload VSTEP media ${filePath}`
+            );
 
             setValue(targetId, result.rawUrl || filePath);
             if (status) status.textContent = 'Đã upload file.';
@@ -1421,7 +1595,12 @@
 
     async function loadUsers() {
         try {
-            const result = await fetchJson('/api/vstep/students/list');
+            // Filter HV theo learning_program của trang: admin Ôn thi chỉ
+            // thấy HV Ôn thi, admin Lớp Học chỉ thấy HV Lớp Học. Legacy: tất cả.
+            const listUrl = PAGE.learningProgram
+                ? `/api/vstep/students/list?learning_program=${encodeURIComponent(PAGE.learningProgram)}`
+                : '/api/vstep/students/list';
+            const result = await fetchJson(listUrl);
             state.users = result.students || [];
             updateOverview();
             renderUsers();
@@ -1494,7 +1673,9 @@
                     expiresAt: getValue('vstep-student-expires') || undefined,
                     notes,
                     course: 'VSTEP',
-                    learningProgram: 'vstep'
+                    // Gắn theo trang admin đang đứng: 'vstep_onthi' / 'vstep_lophoc'.
+                    // Legacy admin (PAGE.learningProgram null) → mặc định lophoc.
+                    learningProgram: PAGE.learningProgram || 'vstep_lophoc'
                 })
             });
             refs.studentForm.reset();
@@ -1662,7 +1843,12 @@
             const result = await fetchJson('/api/vstep/students/bulk-import', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ students })
+                body: JSON.stringify({
+                    students,
+                    // Default learning_program cho cả batch; mỗi row CSV có
+                    // thể override bằng cột learningProgram nếu cần.
+                    learningProgram: PAGE.learningProgram || 'vstep_lophoc'
+                })
             });
             const failed = Number(result.failed || 0);
             setImportAlert(`Import xong: tạo mới ${result.created || 0}, cập nhật ${result.updated || 0}, lỗi ${failed}.`, failed ? 'warning' : 'success');
@@ -1687,25 +1873,12 @@
     }
 
     async function uploadResourceFile(file, type) {
-        const base64 = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-                const result = String(reader.result || '');
-                resolve(result.includes(',') ? result.split(',')[1] : result);
-            };
-            reader.onerror = () => reject(new Error('Không thể đọc file tài nguyên.'));
-            reader.readAsDataURL(file);
-        });
         const filePath = `${resourceDir(type)}/${Date.now()}_${sanitizeFileName(file.name)}`;
-        const result = await fetchJson('/api/upload-audio', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                filePath,
-                content: base64,
-                message: `Upload VSTEP resource ${filePath}`
-            })
-        });
+        const result = await uploadMediaFile(
+            file,
+            filePath,
+            `Upload VSTEP resource ${filePath}`
+        );
         return {
             filePath,
             rawUrl: result.rawUrl || filePath,

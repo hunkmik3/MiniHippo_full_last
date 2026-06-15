@@ -100,6 +100,14 @@ export default async function handler(req, res) {
     const explicitExpiresAt = body?.expiresAt || body?.expires_at;
     const expiresAt = explicitExpiresAt || autoExpiresAt;
 
+    // learning_program phân biệt 2 sub-module VSTEP:
+    //   'vstep_lophoc'  → HV lớp học theo buổi, gắn class, có lịch 246/357
+    //   'vstep_onthi'   → HV ôn thi tự luyện, truy cập Ôn thi bộ đề tự do
+    // Admin truyền qua body.learningProgram. Backward compat: nếu thiếu hoặc
+    // = 'vstep' cũ → mặc định 'vstep_lophoc' (đa số HV cũ là lớp học).
+    const rawProgram = String(body?.learningProgram || body?.learning_program || '').trim().toLowerCase();
+    const learningProgram = (rawProgram === 'vstep_onthi') ? 'vstep_onthi' : 'vstep_lophoc';
+
     const publicUserPayload = {
       id: authUser.id,
       email,
@@ -113,7 +121,7 @@ export default async function handler(req, res) {
       started_on: startedOn,
       expires_at: expiresAt,
       notes: body?.notes || null,
-      learning_program: 'vstep',
+      learning_program: learningProgram,
       course: 'VSTEP',
       band
     };
@@ -132,6 +140,7 @@ export default async function handler(req, res) {
       full_name: body?.fullName || body?.full_name || null,
       phone_number: body?.phone || body?.phone_number || null,
       band,
+      learning_program: learningProgram,
       practice_access: body?.practiceAccess === false || body?.practice_access === false ? false : true,
       status: body?.status || 'active',
       device_limit: publicUserPayload.device_limit,
