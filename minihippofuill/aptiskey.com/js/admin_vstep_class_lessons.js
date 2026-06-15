@@ -191,14 +191,336 @@
             const existing = findContent(band, sessionNumber);
             if (existing && window.__VSTEP_API__?.fillForm) {
                 window.__VSTEP_API__.fillForm(existing);
+                // Suy enabled skills + partCount từ content thực tế đã lưu.
+                currentEnabledSkills = deriveEnabledSkillsFromContent(existing);
+                applySkillVisibility();
+                ALL_SKILLS.forEach(applyPartVisibility);
+                renderSkillToolbar();
             } else {
-                const titleInput = $('vstep-title');
-                if (titleInput && !titleInput.value) {
-                    titleInput.value = `${band} - Buổi ${sessionNumber}`;
+                // Buổi chưa có content → reset form rồi pre-fill blueprint mặc định.
+                // Admin vẫn tự do thêm part/câu/đáp án/skill khác sau đó (giống ôn thi).
+                if (window.__VSTEP_API__?.resetForm) {
+                    window.__VSTEP_API__.resetForm();
                 }
+                prefillFromBlueprint(band, sessionNumber);
             }
             updateContextBanner(band, sessionNumber);
         }, 50);
+    }
+
+    // ===== Pre-fill content editor theo blueprint =====
+    // Blueprint là default suggestion (vd Buổi 1 = Reading 1+2). Sau khi pre-fill,
+    // admin tự do edit/thêm/xoá part, thêm câu, đổi đáp án, thêm kỹ năng khác.
+    // KHÔNG khoá UI — chỉ điền giá trị mặc định + ẩn skill không dùng (có toolbar
+    // để bật/tắt skill như checkbox).
+    const SKILL_META = {
+        reading:   { icon: 'bi-book',            label: 'Reading'   },
+        listening: { icon: 'bi-headphones',      label: 'Listening' },
+        writing:   { icon: 'bi-pencil-square',   label: 'Writing'   },
+        speaking:  { icon: 'bi-mic',             label: 'Speaking'  }
+    };
+    const ALL_SKILLS = ['reading', 'listening', 'writing', 'speaking'];
+    // DOM render cứng: 3 listening, 4 reading, 2 writing, 3 speaking (admin_vstep.js initEditors).
+    const MAX_PARTS = { listening: 3, reading: 4, writing: 2, speaking: 3 };
+
+    // Set kỹ năng đang bật cho buổi hiện tại (mutable, refresh mỗi lần mở buổi).
+    let currentEnabledSkills = new Set();
+    // Số part đang dùng cho mỗi skill (1-based count). Vd reading=2 → hiện Part 1,2 ẩn Part 3,4.
+    let currentPartCounts = { listening: 0, reading: 0, writing: 0, speaking: 0 };
+
+    function prefillFromBlueprint(band, sessionNumber) {
+        const bp = window.VSTEP_SESSION_BLUEPRINTS?.getBlueprint(band, sessionNumber);
+        if (!bp) {
+            const titleInput = $('vstep-title');
+            if (titleInput && !titleInput.value) {
+                titleInput.value = `${band} - Buổi ${sessionNumber}`;
+            }
+            // Không có blueprint → bật full 4 kỹ năng (giống ôn thi).
+            currentEnabledSkills = new Set(ALL_SKILLS);
+            applySkillVisibility();
+            renderSkillToolbar();
+            return;
+        }
+
+        // 1. Title gợi ý theo blueprint.
+        const titleInput = $('vstep-title');
+        if (titleInput) titleInput.value = bp.title || `${band} - Buổi ${sessionNumber}`;
+
+        // 2. Tập kỹ năng mặc định + số part mặc định theo blueprint.
+        const skillsInBp = ALL_SKILLS.filter(s => bp[s]?.parts?.length);
+        currentEnabledSkills = new Set(skillsInBp);
+        ALL_SKILLS.forEach(s => {
+            const bpCount = bp[s]?.parts?.length || 0;
+            currentPartCounts[s] = Math.min(bpCount, MAX_PARTS[s]);
+        });
+
+        // 3. Set contentSkill = full_test để collectPayload chạy hết các skill có dữ liệu.
+        //    (Skill không bật sẽ KHÔNG có questions → vstep_exam.js skip empty parts).
+        const skillBtn = document.querySelector('[data-vstep-practice-skill="full_test"]');
+        if (skillBtn) skillBtn.click();
+
+        // setPracticeSkill có thể re-init editors → đợi 80ms rồi mới fill từng part.
+        setTimeout(() => {
+            fillPartsByBlueprint(bp);
+            applySkillVisibility();
+            ALL_SKILLS.forEach(applyPartVisibility);
+            renderSkillToolbar();
+        }, 80);
+    }
+
+    function fillPartsByBlueprint(bp) {
+        // Reading parts (DOM render 4 part — fill tối đa 4).
+        (bp.reading?.parts || []).slice(0, 4).forEach((part, i) => {
+            const idx = i + 1;
+            const titleEl = $(`vstep-reading-${idx}-title`);
+            if (titleEl) titleEl.value = part.title || `Part ${idx}`;
+            triggerPlaceholderQuestions(`vstep-reading-${idx}-questions`, part.questionCount);
+        });
+
+        // Listening parts (DOM render 3 part — fill tối đa 3).
+        (bp.listening?.parts || []).slice(0, 3).forEach((part, i) => {
+            const idx = i + 1;
+            const titleEl = $(`vstep-listening-${idx}-title`);
+            if (titleEl) titleEl.value = part.title || `Part ${idx}`;
+            triggerPlaceholderQuestions(`vstep-listening-${idx}-questions`, part.questionCount);
+        });
+
+        // Writing tasks (DOM render 2 part).
+        (bp.writing?.parts || []).slice(0, 2).forEach((part, i) => {
+            const idx = i + 1;
+            const titleEl = $(`vstep-writing-${idx}-title`);
+            if (titleEl) titleEl.value = part.title || `Part ${idx}`;
+            const instrEl = $(`vstep-writing-${idx}-instructions`);
+            if (instrEl && part.instructions) instrEl.value = part.instructions;
+        });
+
+        // Speaking parts (DOM render 3 part).
+        (bp.speaking?.parts || []).slice(0, 3).forEach((part, i) => {
+            const idx = i + 1;
+            const titleEl = $(`vstep-speaking-${idx}-title`);
+            if (titleEl) titleEl.value = part.title || `Part ${idx}`;
+            if (Number.isFinite(part.prepSeconds)) {
+                const prepEl = $(`vstep-speaking-${idx}-prep`);
+                if (prepEl) prepEl.value = String(part.prepSeconds);
+            }
+            if (Number.isFinite(part.answerSeconds)) {
+                const ansEl = $(`vstep-speaking-${idx}-answer`);
+                if (ansEl) ansEl.value = String(part.answerSeconds);
+            }
+        });
+    }
+
+    // Trigger nút "Tạo placeholder câu hỏi" với count tùy chỉnh theo blueprint.
+    // admin_vstep.js: button.dataset.count = ID của input số câu (KHÔNG phải số).
+    // Set value của input số câu trước, rồi click button → handler đọc value đúng.
+    function triggerPlaceholderQuestions(targetId, count) {
+        if (!targetId || !count || count <= 0) return;
+        const btn = document.querySelector(`.vstep-generate-question-lines[data-target="${targetId}"]`);
+        if (!btn) return;
+        const countInputId = btn.dataset.count;
+        const countInput = document.getElementById(countInputId);
+        if (countInput) countInput.value = String(count);
+        // Skip confirm dialog: form vừa reset, không có rows nào → confirm() không trigger.
+        btn.click();
+    }
+
+    // ===== Visibility + add/remove cho TỪNG PART trong 1 skill =====
+    function applyPartVisibility(skill) {
+        const container = document.getElementById(`vstep-${skill}-editors`);
+        if (!container) return;
+        const parts = Array.from(container.querySelectorAll(':scope > .vstep-part-editor'));
+        parts.forEach((part, i) => {
+            part.classList.toggle('d-none', i >= currentPartCounts[skill]);
+        });
+        injectPartControls(skill);
+    }
+
+    function clearPartData(skill, partIndex) {
+        // partIndex 1-based — khớp id vstep-{skill}-{partIndex}-{field}.
+        const container = document.getElementById(`vstep-${skill}-editors`);
+        if (!container) return;
+        const partEl = container.querySelectorAll(':scope > .vstep-part-editor')[partIndex - 1];
+        if (!partEl) return;
+        partEl.querySelectorAll('input, textarea').forEach(el => {
+            if (el.type === 'checkbox' || el.type === 'radio') { el.checked = false; return; }
+            if (el.type === 'file') { try { el.value = ''; } catch (_) {} return; }
+            el.value = '';
+        });
+        partEl.querySelectorAll('.vstep-question-builder').forEach(b => { b.innerHTML = ''; });
+    }
+
+    function injectPartControls(skill) {
+        const container = document.getElementById(`vstep-${skill}-editors`);
+        if (!container) return;
+        container.querySelector(':scope > .vstep-part-controls')?.remove();
+
+        const max = MAX_PARTS[skill];
+        const count = currentPartCounts[skill];
+
+        const wrap = document.createElement('div');
+        wrap.className = 'vstep-part-controls d-flex flex-wrap align-items-center gap-2 mt-2 p-2 border rounded bg-light';
+        wrap.innerHTML = `
+            <span class="small text-muted me-auto">
+                <i class="bi ${SKILL_META[skill].icon} me-1"></i>
+                ${SKILL_META[skill].label}: đang dùng <strong>${count}/${max}</strong> part
+            </span>
+            ${count > 0 ? `
+                <button type="button" class="btn btn-sm btn-outline-warning vstep-remove-last-part-btn" data-skill="${skill}">
+                    <i class="bi bi-dash-circle me-1"></i>Bỏ Part ${count}
+                </button>
+            ` : ''}
+            ${count < max ? `
+                <button type="button" class="btn btn-sm btn-outline-primary vstep-add-part-btn" data-skill="${skill}">
+                    <i class="bi bi-plus-circle me-1"></i>Thêm Part ${count + 1}
+                </button>
+            ` : '<span class="badge bg-secondary">Đã dùng tối đa</span>'}
+        `;
+        container.appendChild(wrap);
+
+        wrap.querySelector('.vstep-add-part-btn')?.addEventListener('click', () => {
+            if (currentPartCounts[skill] < MAX_PARTS[skill]) {
+                currentPartCounts[skill] += 1;
+                // Nếu skill chưa bật → tự bật.
+                if (!currentEnabledSkills.has(skill)) {
+                    currentEnabledSkills.add(skill);
+                    applySkillVisibility();
+                    renderSkillToolbar();
+                }
+                applyPartVisibility(skill);
+            }
+        });
+        wrap.querySelector('.vstep-remove-last-part-btn')?.addEventListener('click', () => {
+            const idx = currentPartCounts[skill];
+            if (idx <= 0) return;
+            if (!window.confirm(`Bỏ Part ${idx} của ${SKILL_META[skill].label}? Dữ liệu Part ${idx} sẽ mất.`)) return;
+            clearPartData(skill, idx);
+            currentPartCounts[skill] -= 1;
+            // Nếu hết part → coi như tắt skill luôn.
+            if (currentPartCounts[skill] === 0) {
+                currentEnabledSkills.delete(skill);
+                applySkillVisibility();
+                renderSkillToolbar();
+            }
+            applyPartVisibility(skill);
+        });
+    }
+
+    // ===== Toolbar bật/tắt kỹ năng =====
+    function applySkillVisibility() {
+        ALL_SKILLS.forEach(skill => {
+            const card = document.querySelector(`details.vstep-skill-card[data-vstep-skill="${skill}"]`);
+            if (!card) return;
+            const enabled = currentEnabledSkills.has(skill);
+            card.classList.toggle('d-none', !enabled);
+            if (enabled) {
+                card.setAttribute('open', '');
+            }
+        });
+    }
+
+    function clearSkillData(skill) {
+        const card = document.querySelector(`details.vstep-skill-card[data-vstep-skill="${skill}"]`);
+        if (!card) return;
+        // Clear input/textarea trong card. Skip ready-seconds/message (global Speaking).
+        card.querySelectorAll('input, textarea').forEach(el => {
+            if (el.id === 'vstep-speaking-ready-seconds' || el.id === 'vstep-speaking-ready-message') return;
+            if (el.type === 'checkbox' || el.type === 'radio') { el.checked = false; return; }
+            if (el.type === 'file') { try { el.value = ''; } catch (_) {} return; }
+            el.value = '';
+        });
+        // Xoá question rows đã render.
+        card.querySelectorAll('.vstep-question-builder').forEach(b => { b.innerHTML = ''; });
+        // Reset count + ẩn toàn bộ part editor + redraw toolbar nhỏ.
+        currentPartCounts[skill] = 0;
+        applyPartVisibility(skill);
+    }
+
+    function renderSkillToolbar() {
+        const stack = document.querySelector('.vstep-skill-stack');
+        if (!stack) return;
+        let toolbar = $('vstep-skills-toolbar');
+        if (!toolbar) {
+            toolbar = document.createElement('div');
+            toolbar.id = 'vstep-skills-toolbar';
+            toolbar.className = 'd-flex flex-wrap align-items-center gap-2 mb-3 p-2 border rounded bg-light';
+            stack.parentNode.insertBefore(toolbar, stack);
+        }
+        const enabled = ALL_SKILLS.filter(s => currentEnabledSkills.has(s));
+        const missing = ALL_SKILLS.filter(s => !currentEnabledSkills.has(s));
+
+        const enabledHtml = enabled.length
+            ? enabled.map(s => `
+                <span class="badge bg-primary d-inline-flex align-items-center gap-1 py-2 px-2">
+                    <i class="bi ${SKILL_META[s].icon}"></i>
+                    <span>${SKILL_META[s].label}</span>
+                    <button type="button" class="btn-close btn-close-white vstep-remove-skill-btn ms-1"
+                        data-skill="${s}" aria-label="Bỏ kỹ năng" title="Bỏ kỹ năng ${SKILL_META[s].label}"
+                        style="font-size:.55em;"></button>
+                </span>
+            `).join('')
+            : '<span class="text-danger small">Chưa bật kỹ năng nào — bấm nút bên phải để thêm.</span>';
+
+        const missingHtml = missing.length
+            ? `<span class="small text-muted ms-2 me-1">|  Thêm:</span>` +
+              missing.map(s => `
+                <button type="button" class="btn btn-sm btn-outline-success vstep-add-skill-btn" data-skill="${s}">
+                    <i class="bi bi-plus-circle me-1"></i><i class="bi ${SKILL_META[s].icon} me-1"></i>${SKILL_META[s].label}
+                </button>
+            `).join('')
+            : '<span class="small text-success ms-2"><i class="bi bi-check2-circle me-1"></i>Đã bật đủ 4 kỹ năng</span>';
+
+        toolbar.innerHTML = `
+            <span class="small text-muted me-1"><i class="bi bi-layers me-1"></i>Kỹ năng trong buổi:</span>
+            ${enabledHtml}
+            ${missingHtml}
+        `;
+
+        toolbar.querySelectorAll('.vstep-add-skill-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const s = btn.dataset.skill;
+                if (!s) return;
+                currentEnabledSkills.add(s);
+                // Khi bật skill mới → mặc định hiện 1 part đầu để admin nhập.
+                if (currentPartCounts[s] === 0) currentPartCounts[s] = 1;
+                applySkillVisibility();
+                applyPartVisibility(s);
+                renderSkillToolbar();
+            });
+        });
+        toolbar.querySelectorAll('.vstep-remove-skill-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const s = btn.dataset.skill;
+                if (!s) return;
+                if (!window.confirm(`Bỏ kỹ năng ${SKILL_META[s].label} khỏi buổi này? Dữ liệu đã nhập sẽ bị xoá.`)) return;
+                currentEnabledSkills.delete(s);
+                clearSkillData(s);
+                applySkillVisibility();
+                renderSkillToolbar();
+            });
+        });
+    }
+
+    // ===== Khi load content có sẵn (existing) → suy enabled skills + partCount từ data =====
+    function deriveEnabledSkillsFromContent(content) {
+        const data = content?.data || {};
+        const enabled = new Set();
+        ALL_SKILLS.forEach(skill => {
+            const parts = data?.[skill]?.parts || [];
+            // Đếm part thực sự có dữ liệu (questions/prompt/passage/audioUrl).
+            let lastMeaningful = 0;
+            parts.forEach((p, i) => {
+                const has = (p?.questions?.length || p?.prompt || p?.passage || p?.audioUrl);
+                if (has) lastMeaningful = i + 1;
+            });
+            currentPartCounts[skill] = Math.min(lastMeaningful, MAX_PARTS[skill]);
+            if (lastMeaningful > 0) enabled.add(skill);
+        });
+        // Fallback: nếu không suy được gì → bật full 4 skill với số part max.
+        if (!enabled.size) {
+            ALL_SKILLS.forEach(s => { currentPartCounts[s] = MAX_PARTS[s]; });
+            return new Set(ALL_SKILLS);
+        }
+        return enabled;
     }
 
     function updateContextBanner(band, sessionNumber) {
@@ -225,6 +547,20 @@
             banner.classList.add('d-none');
             banner.innerHTML = '';
         }
+        // Reset toolbar + un-hide skill cards + un-hide part editors về mặc định khi rời context buổi.
+        const toolbar = $('vstep-skills-toolbar');
+        if (toolbar) toolbar.remove();
+        ALL_SKILLS.forEach(skill => {
+            const card = document.querySelector(`details.vstep-skill-card[data-vstep-skill="${skill}"]`);
+            if (card) card.classList.remove('d-none');
+            const container = document.getElementById(`vstep-${skill}-editors`);
+            if (container) {
+                container.querySelector(':scope > .vstep-part-controls')?.remove();
+                container.querySelectorAll(':scope > .vstep-part-editor').forEach(p => p.classList.remove('d-none'));
+            }
+        });
+        currentEnabledSkills = new Set();
+        currentPartCounts = { listening: 0, reading: 0, writing: 0, speaking: 0 };
     }
 
     // ===== Payload hook: gắn band + session_number vào content trước khi save =====

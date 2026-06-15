@@ -819,6 +819,224 @@ body.vstep-body {
   padding: 12px;
 }
 
+.submission-detail-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.submission-detail-chip {
+  border: 1px solid #dbe3f0;
+  border-radius: 0.6rem;
+  background: #f8fafc;
+  padding: 0.6rem 0.75rem;
+}
+
+.submission-detail-chip .label {
+  display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--vstep-admin-muted);
+  font-weight: 700;
+  margin-bottom: 0.2rem;
+}
+
+.submission-detail-card {
+  border: 1px solid #dbe3f0;
+  border-radius: 0.75rem;
+  background: #fff;
+  padding: 0.85rem;
+  margin-bottom: 0.75rem;
+}
+
+.submission-detail-card .prompt {
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--vstep-admin-ink);
+}
+
+.submission-detail-card .answer {
+  white-space: pre-wrap;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 0.6rem 0.7rem;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: #334155;
+}
+
+.submission-detail-card .corrected {
+  white-space: pre-wrap;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  margin-top: 0.55rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.submission-detail-section-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin: 0.4rem 0 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--vstep-admin-ink);
+}
+
+.vstep-result-section {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.vstep-result-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: #f8fafc;
+  font-weight: 800;
+}
+
+.vstep-result-section-title i {
+  color: #86efac;
+}
+
+.vstep-result-card-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.vstep-result-card {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.55);
+  padding: 10px;
+}
+
+.vstep-result-card-label {
+  display: block;
+  color: #93c5fd;
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.vstep-result-card strong {
+  color: #f8fafc;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.vstep-result-score-total,
+.vstep-result-score-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.vstep-result-score-total {
+  margin-bottom: 8px;
+  border: 1px solid rgba(134, 239, 172, 0.18);
+}
+
+.vstep-result-score-total.is-manual {
+  border-color: rgba(251, 191, 36, 0.24);
+}
+
+.vstep-result-score-list {
+  display: grid;
+  gap: 8px;
+}
+
+.vstep-result-score-row {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.vstep-result-score-total span,
+.vstep-result-score-row span {
+  color: #cbd5e1;
+  font-size: 0.82rem;
+}
+
+.vstep-result-score-total strong,
+.vstep-result-score-row strong {
+  color: #f8fafc;
+  font-size: 0.88rem;
+}
+
+.vstep-result-answer-card {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.55);
+  padding: 10px;
+}
+
+.vstep-result-answer-card + .vstep-result-answer-card {
+  margin-top: 10px;
+}
+
+.vstep-result-answer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.vstep-result-answer-head strong {
+  color: #f8fafc;
+  font-size: 0.88rem;
+}
+
+.vstep-result-answer-head span,
+.vstep-result-answer-subtitle {
+  color: #93c5fd;
+  font-size: 0.76rem;
+}
+
+.vstep-result-answer-prompt {
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  margin-bottom: 8px;
+  white-space: pre-wrap;
+}
+
+.vstep-result-answer-body,
+.vstep-result-answer-empty {
+  border-radius: 8px;
+  padding: 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.82rem;
+}
+
+.vstep-result-answer-body {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f8fafc;
+}
+
+.vstep-result-answer-empty {
+  background: rgba(255, 255, 255, 0.04);
+  color: #94a3b8;
+}
+
 .vstep-module-home {
   min-height: 100vh;
   background: #eef4fb;

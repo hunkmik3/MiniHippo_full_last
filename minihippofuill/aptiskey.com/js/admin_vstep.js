@@ -1370,22 +1370,41 @@
             const setSkill = contentSkillOfSet(set);
             const statusClass = status === 'published' ? 'vstep-status-published' : 'vstep-status-draft';
             const onthiText = formatOnthiMeta(set);
+            // Hiện band+session nếu có (shared blueprint) hoặc cảnh báo content cũ
+            // gắn vstep_class_id (per-class — đã obsolete).
+            const setBand = set.band || set?.data?.vstep_band;
+            const setSession = set.session_number || set?.data?.vstep_session_number;
+            const legacyClassId = set?.data?.vstep_class_id;
+            const taxonomyHtml = setBand && setSession
+                ? `<span class="badge bg-info text-dark me-1">${escapeHtml(setBand)} - Buổi ${escapeHtml(String(setSession))}</span>`
+                : legacyClassId
+                    ? `<span class="badge bg-warning text-dark me-1" title="Content cũ gắn 1 lớp — không hiện trong grid shared. Xoá để dọn.">Per-class (legacy)</span>`
+                    : '';
             return `
-                <button type="button" class="vstep-set-item${active}" data-id="${escapeHtml(set.id)}">
-                    <div class="vstep-set-item-top">
-                        <div class="fw-bold">${escapeHtml(set.title || 'VSTEP content')}</div>
-                        <span class="vstep-status-pill ${statusClass}">${escapeHtml(status)}</span>
-                    </div>
-                    <div class="vstep-set-meta">
-                        <span><i class="bi bi-bullseye"></i> ${escapeHtml(CONTENT_SKILL_LABELS[setSkill] || 'VSTEP')}</span>
-                        <span><i class="bi bi-clock"></i> ${escapeHtml(String(set.duration_minutes || 177))} phút</span>
-                        <span><i class="bi bi-calendar3"></i> ${escapeHtml(date || '-')}</span>
-                    </div>
-                    ${onthiText ? `<div class="vstep-set-meta vstep-set-meta-schedule"><span><i class="bi bi-calendar2-check"></i> ${escapeHtml(onthiText)}</span></div>` : ''}
-                    <div class="vstep-set-counts">
-                        ${renderSetCounts(summary, setSkill)}
-                    </div>
-                </button>
+                <div class="vstep-set-item-wrap" style="position:relative;">
+                    <button type="button" class="vstep-set-item${active}" data-id="${escapeHtml(set.id)}" style="padding-right:48px;">
+                        <div class="vstep-set-item-top">
+                            <div class="fw-bold">${escapeHtml(set.title || 'VSTEP content')}</div>
+                            <span class="vstep-status-pill ${statusClass}">${escapeHtml(status)}</span>
+                        </div>
+                        <div class="vstep-set-meta">
+                            <span><i class="bi bi-bullseye"></i> ${escapeHtml(CONTENT_SKILL_LABELS[setSkill] || 'VSTEP')}</span>
+                            <span><i class="bi bi-clock"></i> ${escapeHtml(String(set.duration_minutes || 177))} phút</span>
+                            <span><i class="bi bi-calendar3"></i> ${escapeHtml(date || '-')}</span>
+                        </div>
+                        ${taxonomyHtml ? `<div class="mt-1">${taxonomyHtml}</div>` : ''}
+                        ${onthiText ? `<div class="vstep-set-meta vstep-set-meta-schedule"><span><i class="bi bi-calendar2-check"></i> ${escapeHtml(onthiText)}</span></div>` : ''}
+                        <div class="vstep-set-counts">
+                            ${renderSetCounts(summary, setSkill)}
+                        </div>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger vstep-set-delete-btn"
+                        data-delete-id="${escapeHtml(set.id)}" data-delete-title="${escapeHtml(set.title || 'VSTEP content')}"
+                        title="Xoá nội dung VSTEP này"
+                        style="position:absolute;top:8px;right:8px;padding:2px 8px;">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
             `;
         }).join('');
 
@@ -1395,6 +1414,31 @@
                 if (set) fillForm(set);
             });
         });
+        refs.setList.querySelectorAll('.vstep-set-delete-btn').forEach(btn => {
+            btn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                deleteContentSet(btn.dataset.deleteId, btn.dataset.deleteTitle);
+            });
+        });
+    }
+
+    async function deleteContentSet(id, title) {
+        if (!id) return;
+        const msg = `Xoá nội dung "${title || id}"?\n\n`
+            + `Sẽ dọn luôn các assignment đang trỏ đến content này (HV mất quyền truy cập).\n`
+            + `Hành động này KHÔNG thể hoàn tác.`;
+        if (!window.confirm(msg)) return;
+        try {
+            await fetchJson(`/api/vstep/contents/delete?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+            // Nếu đang edit content vừa xoá → reset form.
+            if (state.editingId === id) {
+                state.editingId = '';
+                resetForm();
+            }
+            await loadSets();
+        } catch (error) {
+            alert('Không thể xoá: ' + error.message);
+        }
     }
 
     async function loadSets() {

@@ -16,6 +16,12 @@ export default async function handler(req, res) {
   if (!id) return res.status(400).json({ error: 'Thiếu tham số id' });
 
   try {
+    // Dọn assignments trỏ tới content trước (FK có thể không cascade).
+    try {
+      await deleteFrom('vstep_assignments', [{ column: 'content_id', value: id }]);
+    } catch (cleanupError) {
+      console.warn('Failed to cleanup vstep_assignments before delete content:', cleanupError.message);
+    }
     await deleteFrom('vstep_contents', [{ column: 'id', value: id }]);
     return res.status(200).json({ success: true });
   } catch (error) {
