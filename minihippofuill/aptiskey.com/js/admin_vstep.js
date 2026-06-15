@@ -9,10 +9,14 @@
     // ngay trước khi load file này. Quyết định trang gộp (legacy) hay 1 trong 2
     // trang con (Ôn thi / Lớp Học). Hardcode flow filter + default panel.
     const ADMIN_MODE = (typeof window !== 'undefined' && window.__VSTEP_ADMIN_MODE__) || 'legacy';
+    // learningProgram tag: phân biệt 3 module dùng chung bảng users + vstep_students.
+    //   onthi   → 'vstep_onthi'   (HV chỉ truy cập Ôn thi bộ đề)
+    //   lophoc  → 'vstep_lophoc'  (HV theo lớp + buổi, có deadline)
+    //   legacy  → null           (admin tổng — không filter list)
     const MODE_CONFIG = {
-        legacy: { defaultPanel: 'students', forceFlow: null, allowFlowFilter: true },
-        onthi: { defaultPanel: 'content', forceFlow: 'practice', allowFlowFilter: false },
-        lophoc: { defaultPanel: 'students', forceFlow: 'lesson_exam', allowFlowFilter: false }
+        legacy: { defaultPanel: 'students', forceFlow: null, allowFlowFilter: true, learningProgram: null },
+        onthi: { defaultPanel: 'content', forceFlow: 'practice', allowFlowFilter: false, learningProgram: 'vstep_onthi' },
+        lophoc: { defaultPanel: 'students', forceFlow: 'lesson_exam', allowFlowFilter: false, learningProgram: 'vstep_lophoc' }
     };
     const PAGE = MODE_CONFIG[ADMIN_MODE] || MODE_CONFIG.legacy;
     const CONTENT_SKILL_LABELS = {
@@ -1591,7 +1595,12 @@
 
     async function loadUsers() {
         try {
-            const result = await fetchJson('/api/vstep/students/list');
+            // Filter HV theo learning_program của trang: admin Ôn thi chỉ
+            // thấy HV Ôn thi, admin Lớp Học chỉ thấy HV Lớp Học. Legacy: tất cả.
+            const listUrl = PAGE.learningProgram
+                ? `/api/vstep/students/list?learning_program=${encodeURIComponent(PAGE.learningProgram)}`
+                : '/api/vstep/students/list';
+            const result = await fetchJson(listUrl);
             state.users = result.students || [];
             updateOverview();
             renderUsers();
@@ -1664,7 +1673,9 @@
                     expiresAt: getValue('vstep-student-expires') || undefined,
                     notes,
                     course: 'VSTEP',
-                    learningProgram: 'vstep'
+                    // Gắn theo trang admin đang đứng: 'vstep_onthi' / 'vstep_lophoc'.
+                    // Legacy admin (PAGE.learningProgram null) → mặc định lophoc.
+                    learningProgram: PAGE.learningProgram || 'vstep_lophoc'
                 })
             });
             refs.studentForm.reset();
@@ -1832,7 +1843,12 @@
             const result = await fetchJson('/api/vstep/students/bulk-import', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ students })
+                body: JSON.stringify({
+                    students,
+                    // Default learning_program cho cả batch; mỗi row CSV có
+                    // thể override bằng cột learningProgram nếu cần.
+                    learningProgram: PAGE.learningProgram || 'vstep_lophoc'
+                })
             });
             const failed = Number(result.failed || 0);
             setImportAlert(`Import xong: tạo mới ${result.created || 0}, cập nhật ${result.updated || 0}, lỗi ${failed}.`, failed ? 'warning' : 'success');

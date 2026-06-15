@@ -29,7 +29,7 @@ function clean(value) {
   return typeof value === 'string' ? value.trim() : value;
 }
 
-async function createOrUpdateStudent(row, batchId) {
+async function createOrUpdateStudent(row, batchId, defaultLearningProgram = 'vstep_lophoc') {
   const accountCode = clean(row.accountCode || row.account_code || row.ma || row.code);
   let email = clean(row.email);
   if (!email && accountCode) email = `${String(accountCode).toLowerCase()}@vstep.minihippo.local`;
@@ -62,6 +62,13 @@ async function createOrUpdateStudent(row, batchId) {
         || String(row.practiceAccess ?? row.practice_access).toLowerCase() === 'false')
     : true;
 
+  // learning_program ưu tiên: row.learningProgram > defaultLearningProgram.
+  // Chấp nhận giá trị 'vstep_onthi' hoặc fallback 'vstep_lophoc'.
+  const rowProgramRaw = String(row.learningProgram || row.learning_program || '').trim().toLowerCase();
+  const learningProgram = (rowProgramRaw === 'vstep_onthi' || rowProgramRaw === 'vstep_lophoc')
+    ? rowProgramRaw
+    : (defaultLearningProgram === 'vstep_onthi' ? 'vstep_onthi' : 'vstep_lophoc');
+
   const existingByEmail = await selectFrom('vstep_students', {
     filters: [{ column: 'email', value: email }],
     single: true
@@ -74,11 +81,18 @@ async function createOrUpdateStudent(row, batchId) {
     const resolvedDeviceLimit = hasDeviceLimit ? deviceLimit : (existingByEmail.device_limit ?? resolveDeviceLimit());
     const resolvedPracticeAccess = hasPracticeAccess ? practiceAccess : (existingByEmail.practice_access ?? true);
 
+    // Khi RE-IMPORT: nếu admin chỉ định learning_program khác → MOVE HV sang
+    // module mới. Nếu không chỉ định (default) → GIỮ NGUYÊN module cũ.
+    const resolvedProgram = rowProgramRaw
+      ? learningProgram
+      : (existingByEmail.learning_program || learningProgram);
+
     const payload = {
       account_code: accountCode || existingByEmail.account_code || null,
       full_name: fullName || existingByEmail.full_name || null,
       phone_number: phone || existingByEmail.phone_number || null,
       band: resolvedBand,
+      learning_program: resolvedProgram,
       practice_access: resolvedPracticeAccess,
       status: clean(row.status) || existingByEmail.status || 'active',
       device_limit: resolvedDeviceLimit,
@@ -93,7 +107,7 @@ async function createOrUpdateStudent(row, batchId) {
         account_code: payload.account_code,
         full_name: payload.full_name,
         phone_number: payload.phone_number,
-        learning_program: 'vstep',
+        learning_program: resolvedProgram,
         course: 'VSTEP',
         band: resolvedBand,
         status: payload.status,
@@ -137,7 +151,7 @@ async function createOrUpdateStudent(row, batchId) {
       started_on: startedOn,
       expires_at: expiresAt,
       notes: clean(row.notes) || null,
-      learning_program: 'vstep',
+      learning_program: learningProgram,
       course: 'VSTEP',
       band
     };
@@ -154,6 +168,7 @@ async function createOrUpdateStudent(row, batchId) {
       full_name: fullName || null,
       phone_number: phone || null,
       band,
+      learning_program: learningProgram,
       practice_access: practiceAccess,
       status: publicUserPayload.status,
       device_limit: deviceLimit,
@@ -199,11 +214,16 @@ export default async function handler(req, res) {
     if (!rows.length) return res.status(400).json({ error: 'Danh sách import đang trống' });
     if (rows.length > 500) return res.status(400).json({ error: 'Mỗi lần chỉ import tối đa 500 học viên' });
 
+    // Admin chỉ định module mặc định (vstep_lophoc / vstep_onthi) qua body.
+    // Mỗi row CSV vẫn override được bằng cột learningProgram nếu cần.
+    const bodyProgram = String(body?.learningProgram || body?.learning_program || '').trim().toLowerCase();
+    const defaultProgram = bodyProgram === 'vstep_onthi' ? 'vstep_onthi' : 'vstep_lophoc';
+
     const batchId = `vstep-import-${Date.now()}`;
     const results = [];
     for (let index = 0; index < rows.length; index += 1) {
       try {
-        const result = await createOrUpdateStudent(rows[index], batchId);
+        const result = await createOrUpdateStudent(rows[index], batchId, defaultProgram);
         results.push({ row: index + 1, ok: true, ...result });
       } catch (error) {
         results.push({ row: index + 1, ok: false, error: error?.details?.message || error.message });

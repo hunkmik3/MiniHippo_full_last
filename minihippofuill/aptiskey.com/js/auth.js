@@ -6,7 +6,10 @@ const DEVICE_HEADER_SAFE_NAME_KEY = 'mh_device_header_name';
 const AUTH_SELECTED_MODULE_STORAGE_KEY = 'mh_selected_module';
 const AUTH_MODULE_LANDINGS = {
     aptis: '/home.html',
-    vstep: '/vstep_bode.html',
+    // VSTEP cũ — fallback chung; thực tế dùng vstep_onthi / vstep_lophoc landings.
+    vstep: '/vstep_home.html',
+    vstep_onthi: '/vstep_bode.html',
+    vstep_lophoc: '/vstep_lessons.html',
     lop_hoc: '/lop_hoc.html'
 };
 const AUTH_VALID_MODULES = new Set(Object.keys(AUTH_MODULE_LANDINGS));
@@ -30,7 +33,25 @@ const VSTEP_ONLY_PATHS = new Set([
     '/vstep_full_test',
     '/vstep_skill',
     '/vstep_lessons',
-    '/vstep_exam'
+    '/vstep_exam',
+    '/vstep_history'
+]);
+// Sub-module VSTEP: từ 2026-06, HV được chia 2 nhóm (vstep_onthi / vstep_lophoc)
+// theo users.learning_program. Mỗi nhóm chỉ vào route của mình + route chung.
+const VSTEP_LOPHOC_ONLY_PATHS = new Set([
+    '/vstep_lessons'
+]);
+const VSTEP_ONTHI_ONLY_PATHS = new Set([
+    '/vstep_bode',
+    '/vstep_full_test',
+    '/vstep_skill'
+]);
+// Path chung cả 2 sub-module (entry hub + exam page + history).
+const VSTEP_SHARED_PATHS = new Set([
+    '/vstep',
+    '/vstep_home',
+    '/vstep_exam',
+    '/vstep_history'
 ]);
 
 function generateDeviceId() {
@@ -125,9 +146,25 @@ function moduleForUser(user) {
     if (isAdminUser(user) && stored) return stored;
 
     const course = resolveUserCourse(user);
-    if (course === 'vstep') return 'vstep';
+    if (course === 'vstep') {
+        // VSTEP có 2 sub-module → trả về landing tương ứng.
+        return resolveVstepSubProgram(user) === 'vstep_onthi' ? 'vstep_onthi' : 'vstep_lophoc';
+    }
     if (course === 'lớp học') return 'lop_hoc';
     return 'aptis';
+}
+
+// Phân biệt HV VSTEP thuộc sub-module nào dựa vào users.learning_program.
+// 'vstep_onthi' → chỉ truy cập Ôn thi bộ đề (vstep_bode/vstep_skill/...)
+// 'vstep_lophoc' (mặc định) → chỉ truy cập Học tập VSTEP (vstep_lessons)
+// HV cũ có learning_program='vstep'/null → mặc định 'vstep_lophoc' để
+// không cắt quyền đột ngột; admin có thể đổi qua bulk-import.
+function resolveVstepSubProgram(user) {
+    const raw = String(
+        (user && (user.learningProgram || user.learning_program)) || ''
+    ).trim().toLowerCase();
+    if (raw === 'vstep_onthi') return 'vstep_onthi';
+    return 'vstep_lophoc';
 }
 
 function resolveUserCourse(user) {
@@ -181,15 +218,26 @@ function enforceCourseRoute(user) {
 
     // VSTEP là module riêng. Admin được bypass ở trên, học viên cần course VSTEP.
     if (isVstepOnlyPath) {
-        if (course === 'vstep') {
-            return true;
+        if (course !== 'vstep') {
+            if (course === 'lớp học') window.location.replace('/lop_hoc.html');
+            else window.location.replace('/home.html');
+            return false;
         }
-        if (course === 'lớp học') {
-            window.location.replace('/lop_hoc.html');
-        } else {
-            window.location.replace('/home.html');
+        // HV VSTEP: phân biệt sub-module để không cho cross-access.
+        //   vstep_onthi  KHÔNG vào được /vstep_lessons (lớp học)
+        //   vstep_lophoc KHÔNG vào được /vstep_bode, /vstep_skill, /vstep_full_test (ôn thi)
+        //   Route chung (VSTEP_SHARED_PATHS) — cả 2 đều vào được.
+        const subProgram = resolveVstepSubProgram(user);
+        if (VSTEP_SHARED_PATHS.has(path)) return true;
+        if (subProgram === 'vstep_onthi' && VSTEP_LOPHOC_ONLY_PATHS.has(path)) {
+            window.location.replace('/vstep_bode.html');
+            return false;
         }
-        return false;
+        if (subProgram === 'vstep_lophoc' && VSTEP_ONTHI_ONLY_PATHS.has(path)) {
+            window.location.replace('/vstep_lessons.html');
+            return false;
+        }
+        return true;
     }
 
     if (course === 'lớp học') {
