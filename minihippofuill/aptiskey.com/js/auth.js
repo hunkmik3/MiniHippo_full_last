@@ -409,6 +409,10 @@ function clearAuth() {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_refresh_token');
     localStorage.removeItem('auth_user');
+    // Dừng timer auto-refresh nếu đang chạy.
+    if (typeof stopTokenRefreshTimer === 'function') {
+        try { stopTokenRefreshTimer(); } catch (_) {}
+    }
 }
 
 // Check authentication on page load and redirect if not authenticated
@@ -486,8 +490,72 @@ async function submitPracticeResult(payload = {}) {
     }
 }
 
+// ===== Proactive token refresh =====
+// Supabase JWT default sống 60 phút. Nếu HV làm bài exam mà không gọi API nào
+// trong 60 phút → token âm thầm hết hạn → đến lúc nộp bài/upload audio mới fail.
+// Timer này tự gọi /api/auth/refresh mỗi 50 phút để token luôn fresh.
+// Refresh token Supabase mặc định sống ~30 ngày nên không có vấn đề gì.
+let TOKEN_REFRESH_TIMER_ID = null;
+const TOKEN_REFRESH_INTERVAL_MS = 50 * 60 * 1000; // 50 phút
+
+function startTokenRefreshTimer() {
+    if (TOKEN_REFRESH_TIMER_ID) return; // Đã chạy rồi.
+    TOKEN_REFRESH_TIMER_ID = setInterval(async () => {
+        if (!getAuthToken() || !localStorage.getItem('auth_refresh_token')) {
+            stopTokenRefreshTimer();
+            return;
+        }
+        try {
+            const newToken = await refreshAuthToken();
+            if (!newToken) {
+                // Refresh fail (refresh token cũng hết hạn) → dừng timer.
+                // Route guard / 401 retry sẽ redirect login khi cần.
+                stopTokenRefreshTimer();
+            }
+        } catch (err) {
+            console.warn('Proactive token refresh failed:', err);
+        }
+    }, TOKEN_REFRESH_INTERVAL_MS);
+}
+
+function stopTokenRefreshTimer() {
+    if (TOKEN_REFRESH_TIMER_ID) {
+        clearInterval(TOKEN_REFRESH_TIMER_ID);
+        TOKEN_REFRESH_TIMER_ID = null;
+    }
+}
+
+// Khi tab quay lại foreground sau khi sleep lâu (browser có thể tạm dừng
+// setInterval khi tab background) → refresh ngay để chắc token còn fresh
+// trước khi HV thao tác tiếp.
+if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', async () => {
+        if (document.visibilityState === 'visible'
+            && getAuthToken()
+            && localStorage.getItem('auth_refresh_token')) {
+            try { await refreshAuthToken(); } catch (_) {}
+        }
+    });
+    // Tab khác đăng xuất → dừng timer ở tab này luôn.
+    window.addEventListener('storage', (e) => {
+        if (e.key === 'auth_token' && !e.newValue) {
+            stopTokenRefreshTimer();
+        } else if (e.key === 'auth_token' && e.newValue && !TOKEN_REFRESH_TIMER_ID) {
+            startTokenRefreshTimer();
+        }
+    });
+    // Tự khởi động timer nếu page load thấy đã có token (HV reload trang).
+    document.addEventListener('DOMContentLoaded', () => {
+        if (getAuthToken() && localStorage.getItem('auth_refresh_token')) {
+            startTokenRefreshTimer();
+        }
+    });
+}
+
 // Make functions globally accessible
 window.checkAuth = checkAuth;
+window.startTokenRefreshTimer = startTokenRefreshTimer;
+window.stopTokenRefreshTimer = stopTokenRefreshTimer;
 window.getCurrentUser = getCurrentUser;
 window.getAuthToken = getAuthToken;
 window.refreshAuthToken = refreshAuthToken;

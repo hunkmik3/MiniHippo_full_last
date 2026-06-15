@@ -394,6 +394,11 @@
                     if (result.user) {
                         localStorage.setItem('auth_user', JSON.stringify(result.user));
                     }
+                    // Khởi động timer auto-refresh token để HV không bị out khi
+                    // làm bài lâu hơn 1 tiếng (Supabase JWT default 60 phút).
+                    if (typeof window.startTokenRefreshTimer === 'function') {
+                        try { window.startTokenRefreshTimer(); } catch (_) {}
+                    }
                 }
 
                 // Validate frontend (server đã validate, đây là double-check + user-friendly fallback).
