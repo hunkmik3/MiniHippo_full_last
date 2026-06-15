@@ -8,6 +8,7 @@ import {
   defaultNumSessionsForBand,
   normalizeScheduleType,
   normalizeVstepBand,
+  syncClassAssignmentsByBand,
   vstepSchemaErrorResponse
 } from '../_utils.js';
 
@@ -122,7 +123,24 @@ export default async function handler(req, res) {
       }));
     }
 
-    return res.status(200).json({ success: true, class: record });
+    // SHARED BLUEPRINT: lớp B1/B2 vừa tạo sẽ tự bind 18/24 content cùng band
+    // qua vstep_assignments. Admin có thể tạo content trước hoặc sau —
+    // sau khi soạn xong, gọi /api/vstep/classes/sync-assignments?id=... để
+    // bind các session_number chưa có content.
+    let syncSummary = null;
+    if (record?.band && Array.isArray(sessions) && sessions.length) {
+      try {
+        syncSummary = await syncClassAssignmentsByBand(
+          { id: record.id, band: record.band, sessions },
+          adminCheck.user.id,
+          { selectFrom, insertInto }
+        );
+      } catch (syncError) {
+        console.warn('Auto-bind class assignments failed:', syncError.message);
+      }
+    }
+
+    return res.status(200).json({ success: true, class: record, syncSummary });
   } catch (error) {
     const schema = vstepSchemaErrorResponse(error);
     if (schema) return res.status(schema.status).json(schema.body);

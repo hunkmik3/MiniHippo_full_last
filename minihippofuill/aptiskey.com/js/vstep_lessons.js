@@ -89,16 +89,18 @@
 
     function sessionStatus(set, dueRemaining) {
         // Match result theo content_id hoặc session_number (theo class) hoặc assignment_id.
-        const sessionNumber = set?.data?.vstep_session_number;
-        const classId = set?.data?.vstep_class_id;
+        // Shared blueprint: match result theo assignment_id (chính xác nhất),
+        // content_id, hoặc band+session_number (HV nộp bài giống bài → đếm).
+        const sessionNumber = set?.session_number || set?.data?.vstep_session_number;
+        const setBand = set?.band || set?.data?.vstep_band;
         const submittedResult = state.myResults.find(r => {
             const md = r?.metadata || {};
             if (r.assignment_id && r.assignment_id === set?.assignment?.id) return true;
             if (r.content_id && r.content_id === set?.id) return true;
             const mdSession = Number(md.vstep_session_number);
-            const mdClass = md.vstep_class_id;
+            const mdBand = String(md.vstep_band || '').toUpperCase();
             if (Number.isFinite(mdSession) && sessionNumber && mdSession === Number(sessionNumber)
-                && (!mdClass || !classId || String(mdClass) === String(classId))) return true;
+                && (!mdBand || !setBand || mdBand === String(setBand).toUpperCase())) return true;
             return false;
         });
         if (submittedResult) {
@@ -121,14 +123,16 @@
         const klass = state.classRecord;
         if (!klass) return [];
         const sessions = Array.isArray(klass.sessions) ? klass.sessions : [];
-        // Per-class binding: content.data.vstep_class_id + vstep_session_number.
-        // Chỉ lấy content thuộc đúng lớp của HV (tránh thấy buổi của lớp khác).
+        // SHARED BLUEPRINT binding: content match theo band (lớp) + session_number.
+        // Mọi lớp B1 dùng chung 18 content, mọi lớp B2 dùng chung 24 content.
+        // Ưu tiên column DB (set.band/session_number), fallback data jsonb.
+        const klassBand = String(klass.band || '').toUpperCase();
         const setsBySession = new Map();
         (state.sets || []).forEach(set => {
             const data = set.data || {};
-            const classId = data.vstep_class_id || set.assignment?.class_id;
-            if (classId && String(classId) !== String(klass.id)) return;
-            const num = Number(data.vstep_session_number || set.assignment?.session_number);
+            const setBand = String(set.band || data.vstep_band || '').toUpperCase();
+            if (klassBand && setBand && setBand !== klassBand) return;
+            const num = Number(set.session_number || data.vstep_session_number || set.assignment?.session_number);
             if (Number.isFinite(num) && num > 0) setsBySession.set(num, set);
         });
 

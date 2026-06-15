@@ -5,6 +5,7 @@ import createClass from '../../../server/api/vstep/classes/create.js';
 import deleteClass from '../../../server/api/vstep/classes/delete.js';
 import listClasses from '../../../server/api/vstep/classes/list.js';
 import myClasses from '../../../server/api/vstep/classes/my.js';
+import syncClassAssignments from '../../../server/api/vstep/classes/sync-assignments.js';
 import updateClass from '../../../server/api/vstep/classes/update.js';
 import createContent from '../../../server/api/vstep/contents/create.js';
 import removeContent from '../../../server/api/vstep/contents/delete.js';
@@ -34,6 +35,8 @@ const handlers = {
     delete: deleteClass,
     list: listClasses,
     my: myClasses,
+    'sync-assignments': syncClassAssignments,
+    sync_assignments: syncClassAssignments,
     update: updateClass
   },
   contents: {

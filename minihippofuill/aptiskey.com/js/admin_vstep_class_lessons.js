@@ -1,30 +1,26 @@
 /**
- * VSTEP Lớp Học — module quản lý bài học theo từng buổi của 1 lớp.
+ * VSTEP Lớp Học — SHARED BLUEPRINT model.
  *
- * Flow:
- *   1. Admin tạo lớp ở form #vstepClassForm → admin_vstep.js dispatch
- *      window event 'vstep:class-created' với { class }.
- *   2. Module này nhận event → mở panel #vstep-class-sessions-panel với grid
- *      18 (B1) hoặc 24 (B2) ô buổi học (đọc từ class.sessions[]).
- *   3. Click 1 ô → set hidden inputs (vstep-content-class-id, session-number,
- *      due-at) + showContentFlow('lesson_exam'). admin_vstep.js đã có hook
- *      `window.__VSTEP_PAYLOAD_HOOK__` đọc 3 hidden input đó để gắn vào
- *      payload.data trước khi POST /api/vstep/contents/create.
- *   4. Sau khi save content (admin_vstep.js dispatch 'vstep:content-saved')
- *      → module quay lại grid + refresh trạng thái "đã có bài / chưa có".
+ * Workflow (giống module Lớp Học Aptis):
+ *   1. Admin soạn 18 content B1 + 24 content B2 ở panel "Bài học theo buổi"
+ *      (1 lần, KHÔNG gắn lớp). Content phân biệt qua band + session_number.
+ *   2. Tạo lớp B1/B2 → backend auto bind 18/24 content cùng band qua
+ *      vstep_assignments (idempotent, dùng /api/vstep/classes/sync-assignments
+ *      để re-bind sau khi soạn content mới).
+ *   3. Mọi lớp B1 dùng chung 18 content, mọi lớp B2 dùng chung 24 content.
  *
- * Không động state/refs nội bộ của admin_vstep.js — chỉ giao tiếp qua
- * window event + hidden input + payload hook.
+ * Module này:
+ *   - Bỏ flow "click lớp → grid riêng → soạn content per-class" (đã obsolete).
+ *   - Render grid 18 B1 + 24 B2 ở panel vstep-class-sessions-panel (1 lần).
+ *   - Click ô buổi → mở content editor với band+session hidden inputs.
+ *   - Payload hook set band + session_number cho content (không class_id).
+ *   - Filter HV nâng cao trong form tạo lớp (band, chưa-có-lớp, search).
+ *
+ * Giao tiếp với admin_vstep.js qua window event + hidden input + payload hook.
  */
 (function () {
     if (typeof window === 'undefined') return;
     if (window.__VSTEP_ADMIN_MODE__ !== 'lophoc') return;
-
-    const state = {
-        activeClass: null,        // class object hiện đang xem grid buổi
-        activeSession: null,      // session_number đang edit (1..N)
-        contentsByKey: new Map()  // 'classId|sessionNumber' -> content
-    };
 
     const $ = (id) => document.getElementById(id);
 
@@ -37,96 +33,115 @@
             .replace(/'/g, '&#39;');
     }
 
-    function formatLocalDateTime(value) {
-        if (!value) return '';
-        const d = new Date(value);
-        if (!Number.isFinite(d.getTime())) return '';
-        const dd = String(d.getDate()).padStart(2, '0');
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const hh = String(d.getHours()).padStart(2, '0');
-        const min = String(d.getMinutes()).padStart(2, '0');
-        return `${dd}/${mm} ${hh}:${min}`;
-    }
-
     function bandSessionCount(band) {
         return String(band || '').toUpperCase() === 'B2' ? 24 : 18;
     }
 
-    // ===== Map content theo class + session =====
+    function formatVnDate(value) {
+        if (!value) return '';
+        const d = new Date(`${value}T00:00:00`);
+        if (!Number.isFinite(d.getTime())) return value;
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+        return `${dayNames[d.getDay()]} ${dd}/${mm}/${d.getFullYear()}`;
+    }
+
+    // ===== Index content theo band+session (shared, không phụ thuộc lớp) =====
+    const state = {
+        activeBand: 'B1',
+        activeSession: null,
+        contentsByKey: new Map() // 'B1|7' -> content
+    };
+
     function rebuildContentIndex() {
         state.contentsByKey.clear();
         const sets = window.__VSTEP_STATE__?.sets || [];
         sets.forEach(set => {
-            const data = set?.data || {};
-            const classId = data.vstep_class_id;
-            const sessionNumber = Number(data.vstep_session_number);
-            if (classId && sessionNumber > 0) {
-                state.contentsByKey.set(`${classId}|${sessionNumber}`, set);
+            const flow = set?.data?.vstep_flow || set?.flow;
+            if (flow !== 'lesson_exam') return;
+            // Ưu tiên column DB (set.band/session_number) — fallback data jsonb (content cũ).
+            const band = set.band || set?.data?.vstep_band;
+            const sessionNumber = Number(set.session_number || set?.data?.vstep_session_number);
+            if (band && sessionNumber > 0) {
+                state.contentsByKey.set(`${band}|${sessionNumber}`, set);
             }
         });
     }
 
-    function findContent(classId, sessionNumber) {
-        return state.contentsByKey.get(`${classId}|${sessionNumber}`) || null;
+    function findContent(band, sessionNumber) {
+        return state.contentsByKey.get(`${band}|${sessionNumber}`) || null;
     }
 
-    // ===== Render grid sessions =====
+    // ===== Render grid bài học theo buổi =====
     function renderGrid() {
         const panel = $('vstep-class-sessions-panel');
-        if (!panel || !state.activeClass) return;
-
-        const cls = state.activeClass;
-        const sessions = Array.isArray(cls.sessions) && cls.sessions.length
-            ? cls.sessions
-            : Array.from({ length: bandSessionCount(cls.band) }).map((_, i) => ({
-                number: i + 1,
-                date: null,
-                deadline: null,
-                day_name: ''
-            }));
+        if (!panel) return;
 
         const titleEl = $('vstep-class-sessions-title');
-        if (titleEl) titleEl.textContent = `Bài học cho lớp: ${cls.title || cls.id}`;
-
+        if (titleEl) titleEl.textContent = 'Bài học theo buổi (Shared blueprint)';
         const subtitleEl = $('vstep-class-sessions-subtitle');
         if (subtitleEl) {
-            subtitleEl.textContent = `${cls.band || '?'} · ${sessions.length} buổi · lịch ${cls.schedule_type || '—'} · giờ ${cls.start_time || '—'}`;
+            subtitleEl.textContent = 'Soạn 1 lần — dùng chung mọi lớp cùng band. Mọi lớp B1 sẽ tự bind 18 buổi này, mọi lớp B2 sẽ tự bind 24 buổi.';
         }
 
         const gridEl = $('vstep-class-sessions-grid');
         if (!gridEl) return;
-        gridEl.innerHTML = sessions.map(session => {
-            const existing = findContent(cls.id, session.number);
+
+        // 2 tab band → admin chọn band đang xem (B1 hoặc B2).
+        const band = state.activeBand;
+        const total = bandSessionCount(band);
+
+        const tabsHtml = `
+            <div class="d-flex gap-2 mb-3">
+                ${['B1', 'B2'].map(b => `
+                    <button type="button" class="btn btn-sm ${b === band ? 'btn-primary' : 'btn-outline-primary'} vstep-band-tab" data-band="${b}">
+                        Band ${b} (${bandSessionCount(b)} buổi)
+                    </button>
+                `).join('')}
+            </div>
+        `;
+
+        const cardsHtml = Array.from({ length: total }).map((_, i) => {
+            const sessionNumber = i + 1;
+            const existing = findContent(band, sessionNumber);
             const status = existing ? 'Đã có bài' : 'Chưa có bài';
             const statusClass = existing ? 'vstep-status-published' : 'vstep-status-draft';
-            const dateText = session.date ? formatLocalDateTime(session.date) : '—';
-            const deadlineText = session.deadline ? formatLocalDateTime(session.deadline) : '—';
-            const dayName = session.day_name || '';
             const action = existing
                 ? '<i class="bi bi-pencil-square me-1"></i>Sửa bài'
-                : '<i class="bi bi-plus-circle me-1"></i>Tạo bài học';
+                : '<i class="bi bi-plus-circle me-1"></i>Tạo bài';
             return `
-                <button type="button" class="vstep-session-card" data-session-number="${session.number}">
+                <button type="button" class="vstep-session-card" data-band="${band}" data-session="${sessionNumber}">
                     <div class="vstep-session-head">
-                        <strong>Buổi ${session.number}</strong>
-                        <span class="vstep-status-pill ${statusClass}">${status}</span>
+                        <strong>${escapeHtml(band)} - Buổi ${sessionNumber}</strong>
+                        <span class="vstep-status-pill ${statusClass}">${escapeHtml(status)}</span>
                     </div>
                     <div class="vstep-session-meta">
-                        <span><i class="bi bi-calendar-event"></i> ${escapeHtml(dayName)} ${escapeHtml(dateText)}</span>
-                        <span><i class="bi bi-flag"></i> DL ${escapeHtml(deadlineText)}</span>
-                        ${existing ? `<span class="text-secondary"><i class="bi bi-file-text"></i> ${escapeHtml(existing.title || '')}</span>` : ''}
+                        ${existing
+                            ? `<span class="text-secondary small"><i class="bi bi-file-text"></i> ${escapeHtml(existing.title || '')}</span>`
+                            : '<span class="text-muted small">Click để soạn</span>'
+                        }
                     </div>
                     <div class="vstep-session-action">${action}</div>
                 </button>
             `;
         }).join('');
 
-        gridEl.querySelectorAll('[data-session-number]').forEach(btn => {
-            btn.addEventListener('click', () => openSessionEditor(Number(btn.dataset.sessionNumber)));
+        gridEl.innerHTML = tabsHtml + `<div class="vstep-session-grid">${cardsHtml}</div>`;
+
+        gridEl.querySelectorAll('.vstep-band-tab').forEach(btn => {
+            btn.addEventListener('click', () => {
+                state.activeBand = btn.dataset.band;
+                renderGrid();
+            });
+        });
+        gridEl.querySelectorAll('[data-session]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                openSessionEditor(btn.dataset.band, Number(btn.dataset.session));
+            });
         });
     }
 
-    // ===== Mở 1 panel (ẩn các panel khác) =====
     function showPanel(panelId) {
         document.querySelectorAll('.vstep-admin-section').forEach(section => {
             section.classList.toggle('active', section.id === panelId);
@@ -134,331 +149,70 @@
         document.querySelectorAll('.vstep-admin-tab').forEach(btn => btn.classList.remove('active'));
     }
 
-    function openClassLessons(cls) {
-        if (!cls) return;
-        state.activeClass = cls;
+    function openSessionGrid(band) {
+        state.activeBand = band || 'B1';
         rebuildContentIndex();
         renderGrid();
         showPanel('vstep-class-sessions-panel');
     }
 
-    function backToClasses() {
-        state.activeClass = null;
-        state.activeSession = null;
-        clearSessionHiddenInputs();
-        const tab = document.querySelector('[data-vstep-panel="classes"]');
-        if (tab) tab.click();
-    }
-
-    // ===== Mở content editor cho 1 buổi =====
-    function setSessionHiddenInputs(classId, sessionNumber, dueAt) {
+    // ===== Mở content editor cho 1 buổi (band+session) =====
+    function setSessionHiddenInputs(band, sessionNumber) {
         const setIfExists = (id, value) => {
             const el = $(id);
             if (el) el.value = value == null ? '' : String(value);
         };
-        setIfExists('vstep-content-class-id', classId || '');
+        setIfExists('vstep-content-band', band || '');
         setIfExists('vstep-content-session-number', sessionNumber || '');
-        setIfExists('vstep-content-due-at', dueAt || '');
+        // Giữ class-id input để backward compat — luôn để trống (shared, không gắn lớp).
+        setIfExists('vstep-content-class-id', '');
+        setIfExists('vstep-content-due-at', '');
     }
 
     function clearSessionHiddenInputs() {
-        setSessionHiddenInputs('', '', '');
+        setSessionHiddenInputs('', '');
     }
 
-    function openSessionEditor(sessionNumber) {
-        const cls = state.activeClass;
-        if (!cls) return;
+    function openSessionEditor(band, sessionNumber) {
+        if (!band || !sessionNumber) return;
+        state.activeBand = band;
         state.activeSession = sessionNumber;
+        setSessionHiddenInputs(band, sessionNumber);
 
-        const session = (cls.sessions || []).find(s => Number(s.number) === Number(sessionNumber));
-        const dueAt = session?.deadline || '';
-
-        setSessionHiddenInputs(cls.id, sessionNumber, dueAt);
-
-        // Trigger content panel: dùng nút data-vstep-flow=lesson_exam đã có sẵn
-        // trong sidebar của admin_vstep_lop_hoc.html — admin_vstep.js sẽ
-        // tự chuyển panel + reset editor về flow lesson_exam.
+        // Mở content panel qua sidebar button.
         const flowBtn = document.querySelector('[data-vstep-flow="lesson_exam"]');
         if (flowBtn) flowBtn.click();
 
-        // Sau khi reset form, prefill title gợi ý + load bài cũ nếu có.
         setTimeout(() => {
-            const existing = findContent(cls.id, sessionNumber);
+            const existing = findContent(band, sessionNumber);
             if (existing && window.__VSTEP_API__?.fillForm) {
-                // Load data đã save vào form (admin sửa bài cũ).
                 window.__VSTEP_API__.fillForm(existing);
-                // Sau khi fillForm render lại đủ 4 kỹ năng, vẫn phải apply
-                // visibility theo blueprint để ẩn skill không có trong buổi đó
-                // — tránh form hiện Listening/Speaking dù buổi 1 chỉ có Reading.
-                applyBlueprintVisibility(cls, sessionNumber);
             } else {
-                // Tạo bài mới: apply cả visibility + prefill title/count.
-                applyBlueprint(cls, sessionNumber);
+                const titleInput = $('vstep-title');
+                if (titleInput && !titleInput.value) {
+                    titleInput.value = `${band} - Buổi ${sessionNumber}`;
+                }
             }
-
-            // Hiển thị banner ngữ cảnh trong panel content.
-            updateContextBanner(cls, sessionNumber, dueAt);
+            updateContextBanner(band, sessionNumber);
         }, 50);
     }
 
-    // Chỉ ẩn/hiện skill section theo blueprint, không động vào data đã có.
-    // Dùng khi load bài cũ qua fillForm (admin sửa) — ngược lại applyBlueprint
-    // làm cả visibility + prefill title/count cho bài mới chưa có data.
-    function applyBlueprintVisibility(cls, sessionNumber) {
-        const blueprint = window.VSTEP_SESSION_BLUEPRINTS?.getBlueprint
-            ? window.VSTEP_SESSION_BLUEPRINTS.getBlueprint(cls.band, sessionNumber)
-            : null;
-        if (!blueprint) {
-            applySkillVisibility(['listening', 'reading', 'writing', 'speaking']);
-            return;
-        }
-        const activeSkills = ['listening', 'reading', 'writing', 'speaking']
-            .filter(s => blueprint[s]?.parts?.length);
-        applySkillVisibility(activeSkills);
-
-        // Trong skill còn lại, ẩn các part vượt quá số part trong blueprint.
-        // VD blueprint Reading có 2 parts → ẩn part editor 3, 4.
-        hideExtraParts('reading', blueprint.reading?.parts?.length || 0, 4);
-        hideExtraParts('listening', blueprint.listening?.parts?.length || 0, 3);
-        hideExtraParts('writing', blueprint.writing?.parts?.length || 0, 2);
-        hideExtraParts('speaking', blueprint.speaking?.parts?.length || 0, 3);
-    }
-
-    function hideExtraParts(skill, keepCount, maxParts) {
-        // Editor cho từng part nằm trong .vstep-part-editor thứ N. fillForm
-        // render hết 3/4 parts mặc dù blueprint chỉ cần 1-2 → ẩn các part
-        // vượt quá keepCount BAN ĐẦU, nhưng cho admin nút "+ Hiện thêm part"
-        // để mở khi muốn override blueprint (tăng số part vd Reading 3).
-        const container = $(`vstep-${skill}-editors`);
-        if (!container) return;
-        const partEditors = container.querySelectorAll('.vstep-part-editor');
-        partEditors.forEach((editor, idx) => {
-            const isHidden = idx >= keepCount;
-            editor.classList.toggle('d-none', isHidden);
-            // Đảm bảo part hiện có nút "Ẩn part này" cho admin xoá nếu không dùng.
-            if (!isHidden) addPartHideButton(editor, skill, idx);
-        });
-
-        // Thêm/cập nhật nút "+ Hiện thêm part" ở cuối container.
-        let addBtn = container.querySelector('.vstep-add-extra-part');
-        const hiddenCount = Math.max(0, maxParts - keepCount);
-        if (hiddenCount > 0) {
-            if (!addBtn) {
-                addBtn = document.createElement('button');
-                addBtn.type = 'button';
-                addBtn.className = 'btn btn-sm btn-outline-primary vstep-add-extra-part mt-2';
-                container.appendChild(addBtn);
-            }
-            addBtn.innerHTML = `<i class="bi bi-plus-circle me-1"></i>Hiện thêm part (${hiddenCount} còn ẩn)`;
-            addBtn.onclick = () => showNextHiddenPart(skill, container);
-            addBtn.style.display = '';
-        } else if (addBtn) {
-            addBtn.style.display = 'none';
-        }
-    }
-
-    function showNextHiddenPart(skill, container) {
-        const editors = container.querySelectorAll('.vstep-part-editor');
-        let openedIdx = -1;
-        for (let i = 0; i < editors.length; i += 1) {
-            if (editors[i].classList.contains('d-none')) {
-                editors[i].classList.remove('d-none');
-                addPartHideButton(editors[i], skill, i);
-                openedIdx = i;
-                break;
-            }
-        }
-        // Cập nhật label/visibility nút "+ Hiện thêm part" sau khi mở 1 part.
-        const stillHidden = Array.from(editors).filter(e => e.classList.contains('d-none')).length;
-        const addBtn = container.querySelector('.vstep-add-extra-part');
-        if (addBtn) {
-            if (stillHidden > 0) {
-                addBtn.innerHTML = `<i class="bi bi-plus-circle me-1"></i>Hiện thêm part (${stillHidden} còn ẩn)`;
-            } else {
-                addBtn.style.display = 'none';
-            }
-        }
-        if (openedIdx >= 0) editors[openedIdx].scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-
-    function addPartHideButton(editor, skill, partIdx) {
-        // Chỉ thêm 1 lần — kiểm tra đã có chưa.
-        if (editor.querySelector('.vstep-hide-part-btn')) return;
-        const heading = editor.querySelector('.vstep-editor-heading');
-        if (!heading) return;
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'btn btn-sm btn-outline-secondary vstep-hide-part-btn ms-auto';
-        btn.innerHTML = '<i class="bi bi-eye-slash me-1"></i>Ẩn part này';
-        btn.title = 'Ẩn part khỏi bài học này — phần này sẽ không hiện cho học viên.';
-        btn.onclick = () => {
-            editor.classList.add('d-none');
-            // Refresh label nút thêm part.
-            const container = $(`vstep-${skill}-editors`);
-            const stillHidden = container
-                ? Array.from(container.querySelectorAll('.vstep-part-editor'))
-                    .filter(e => e.classList.contains('d-none')).length
-                : 0;
-            const addBtn = container?.querySelector('.vstep-add-extra-part');
-            if (addBtn) {
-                addBtn.innerHTML = `<i class="bi bi-plus-circle me-1"></i>Hiện thêm part (${stillHidden} còn ẩn)`;
-                addBtn.style.display = '';
-            }
-        };
-        heading.appendChild(btn);
-    }
-
-    // Pre-fill form theo blueprint cố định B1/B2 (từ vstep_session_blueprints.js).
-    // Mục đích: form lesson_exam KHÔNG dùng template full 4 kỹ năng như Ôn thi
-    // — phải khớp cấu trúc cụ thể của từng buổi (vd Buổi 1 = 2 bài Reading).
-    function applyBlueprint(cls, sessionNumber) {
-        const titleInput = $('vstep-title');
-        const blueprint = window.VSTEP_SESSION_BLUEPRINTS?.getBlueprint
-            ? window.VSTEP_SESSION_BLUEPRINTS.getBlueprint(cls.band, sessionNumber)
-            : null;
-
-        // Title: dùng blueprint nếu có, kèm tên lớp; fallback "Lớp X - Buổi N".
-        if (titleInput && !titleInput.value) {
-            titleInput.value = blueprint?.title
-                ? `${cls.title || 'Lớp'} - ${blueprint.title}`
-                : `${cls.title || 'Lớp'} - Buổi ${sessionNumber}`;
-        }
-
-        if (!blueprint) {
-            // Không có blueprint cho buổi này → hiện tất cả skill như cũ.
-            applySkillVisibility(['listening', 'reading', 'writing', 'speaking']);
-            return;
-        }
-
-        // Ẩn các skill không có trong blueprint, hiện các skill có dùng.
-        const activeSkills = ['listening', 'reading', 'writing', 'speaking']
-            .filter(s => blueprint[s]?.parts?.length);
-        applySkillVisibility(activeSkills);
-
-        // Ẩn các part vượt quá số part trong blueprint (initEditors render
-        // mặc định 3 Listening / 4 Reading / 2 Writing / 3 Speaking parts).
-        hideExtraParts('reading', blueprint.reading?.parts?.length || 0, 4);
-        hideExtraParts('listening', blueprint.listening?.parts?.length || 0, 3);
-        hideExtraParts('writing', blueprint.writing?.parts?.length || 0, 2);
-        hideExtraParts('speaking', blueprint.speaking?.parts?.length || 0, 3);
-
-        // Pre-fill từng skill theo blueprint. Mỗi part = 1 input title + tự sinh
-        // placeholder câu hỏi (admin paste nội dung thật sau).
-        prefillReading(blueprint.reading);
-        prefillListening(blueprint.listening);
-        prefillWriting(blueprint.writing);
-        prefillSpeaking(blueprint.speaking);
-
-        // Default published cho buổi học của lớp (admin tạo bài là để HV làm
-        // ngay sau khi save). Nếu admin muốn để draft thì đổi tay trước khi
-        // lưu. Tránh trạng thái HV thấy "Sắp mở" mặc dù admin đã tạo bài.
-        setIfExists('vstep-status', 'published');
-    }
-
-    function applySkillVisibility(activeSkills) {
-        const activeSet = new Set(activeSkills);
-        // Skill cards (Listening/Reading/Writing/Speaking) có data-vstep-skill.
-        document.querySelectorAll('.vstep-skill-card[data-vstep-skill]').forEach(card => {
-            const skill = card.dataset.vstepSkill;
-            const show = activeSet.has(skill);
-            card.classList.toggle('d-none', !show);
-            if (show) card.setAttribute('open', 'open');
-        });
-        // Duration rows tương ứng.
-        document.querySelectorAll('[data-vstep-duration-skill]').forEach(row => {
-            row.classList.toggle('d-none', !activeSet.has(row.dataset.vstepDurationSkill));
-        });
-    }
-
-    function setIfExists(id, value) {
-        const el = $(id);
-        if (el) el.value = value == null ? '' : String(value);
-    }
-
-    function prefillReading(spec) {
-        if (!spec?.parts?.length) return;
-        // Form Reading hiện cố định 4 parts (vstep-reading-1..4). Set title +
-        // số câu cho parts có trong blueprint; clear title parts còn lại.
-        for (let i = 0; i < 4; i += 1) {
-            const part = spec.parts[i];
-            const idx = i + 1;
-            if (part) {
-                setIfExists(`vstep-reading-${idx}-title`, part.title);
-                setIfExists(`vstep-reading-${idx}-questions-count`, part.questionCount || 10);
-            } else {
-                setIfExists(`vstep-reading-${idx}-title`, '');
-                // Ẩn part không dùng để admin không nhầm là phải nhập.
-                const partEditor = $(`vstep-reading-${idx}-questions`)?.closest('.vstep-part-editor');
-                if (partEditor) partEditor.classList.add('d-none');
-            }
-        }
-    }
-
-    function prefillListening(spec) {
-        if (!spec?.parts?.length) return;
-        for (let i = 0; i < 3; i += 1) {
-            const part = spec.parts[i];
-            const idx = i + 1;
-            if (part) {
-                setIfExists(`vstep-listening-${idx}-title`, part.title);
-                setIfExists(`vstep-listening-${idx}-questions-count`, part.questionCount || 8);
-            } else {
-                setIfExists(`vstep-listening-${idx}-title`, '');
-                const partEditor = $(`vstep-listening-${idx}-questions`)?.closest('.vstep-part-editor');
-                if (partEditor) partEditor.classList.add('d-none');
-            }
-        }
-    }
-
-    function prefillWriting(spec) {
-        if (!spec?.parts?.length) return;
-        for (let i = 0; i < 2; i += 1) {
-            const part = spec.parts[i];
-            const idx = i + 1;
-            if (part) {
-                setIfExists(`vstep-writing-${idx}-title`, part.title);
-                if (part.instructions) setIfExists(`vstep-writing-${idx}-instructions`, part.instructions);
-            } else {
-                setIfExists(`vstep-writing-${idx}-title`, '');
-                const partEditor = $(`vstep-writing-${idx}-prompt`)?.closest('.vstep-part-editor');
-                if (partEditor) partEditor.classList.add('d-none');
-            }
-        }
-    }
-
-    function prefillSpeaking(spec) {
-        if (!spec?.parts?.length) return;
-        for (let i = 0; i < 3; i += 1) {
-            const part = spec.parts[i];
-            const idx = i + 1;
-            if (part) {
-                setIfExists(`vstep-speaking-${idx}-title`, part.title);
-                if (Number.isFinite(part.prepSeconds)) setIfExists(`vstep-speaking-${idx}-prep`, part.prepSeconds);
-                if (Number.isFinite(part.answerSeconds)) setIfExists(`vstep-speaking-${idx}-answer`, part.answerSeconds);
-            } else {
-                setIfExists(`vstep-speaking-${idx}-title`, '');
-                const partEditor = $(`vstep-speaking-${idx}-prompt`)?.closest('.vstep-part-editor');
-                if (partEditor) partEditor.classList.add('d-none');
-            }
-        }
-    }
-
-    function updateContextBanner(cls, sessionNumber, dueAt) {
+    function updateContextBanner(band, sessionNumber) {
         const banner = $('vstep-content-context-banner');
         if (!banner) return;
         banner.classList.remove('d-none');
         banner.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <strong>Đang soạn buổi ${sessionNumber} của lớp ${escapeHtml(cls.title || '')}</strong>
-                    <div class="small text-secondary">Deadline tự động: ${escapeHtml(formatLocalDateTime(dueAt) || '—')}</div>
+                    <strong>Đang soạn ${escapeHtml(band)} - Buổi ${escapeHtml(String(sessionNumber))}</strong>
+                    <div class="small text-secondary">Nội dung này dùng chung cho mọi lớp ${escapeHtml(band)}. Mọi lớp tạo sau sẽ tự bind buổi này.</div>
                 </div>
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="vstep-content-back-to-grid">
                     <i class="bi bi-arrow-left me-1"></i> Về danh sách buổi
                 </button>
             </div>
         `;
-        $('vstep-content-back-to-grid')?.addEventListener('click', () => openClassLessons(cls));
+        $('vstep-content-back-to-grid')?.addEventListener('click', () => openSessionGrid(band));
     }
 
     function hideContextBanner() {
@@ -469,115 +223,98 @@
         }
     }
 
-    // ===== Payload hook: gắn class_id + session_number vào data trước khi save =====
+    // ===== Payload hook: gắn band + session_number vào content trước khi save =====
     window.__VSTEP_PAYLOAD_HOOK__ = function (payload) {
-        const classId = $('vstep-content-class-id')?.value || '';
+        const band = $('vstep-content-band')?.value || '';
         const sessionNumber = Number($('vstep-content-session-number')?.value || 0);
-        const dueAt = $('vstep-content-due-at')?.value || '';
-        if (classId && sessionNumber > 0) {
+        if ((band === 'B1' || band === 'B2') && sessionNumber > 0) {
+            payload.band = band;
+            payload.session_number = sessionNumber;
             payload.data = payload.data || {};
-            payload.data.vstep_class_id = classId;
+            payload.data.vstep_band = band;
             payload.data.vstep_session_number = sessionNumber;
-            if (dueAt) payload.data.vstep_session_due_at = dueAt;
-            // Title hint: nếu admin chưa nhập riêng, dùng "Buổi N - <lớp>"
+            // Title gợi ý nếu admin chưa nhập.
             if (!payload.title || !payload.title.trim()) {
-                payload.title = `${state.activeClass?.title || 'Lớp'} - Buổi ${sessionNumber}`;
+                payload.title = `${band} - Buổi ${sessionNumber}`;
             }
         }
     };
 
-    // ===== Sau khi save: tự giao bài cho lớp + refresh grid =====
-    async function autoAssignContent(content, dueAt) {
-        try {
-            await fetch('/api/vstep/assignments/create', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${localStorage.getItem('auth_token') || ''}`
-                },
-                body: JSON.stringify({
-                    contentId: content.id,
-                    classId: state.activeClass.id,
-                    dueAt: dueAt || null,
-                    notes: `Buổi ${$('vstep-content-session-number')?.value || ''}`
-                })
-            });
-        } catch (e) {
-            console.warn('Auto-assign failed:', e);
-        }
+    // ===== Sau khi save: refresh grid + auto re-sync assignments cho mọi lớp =====
+    async function autoSyncAllClasses() {
+        const classes = window.__VSTEP_STATE__?.classes || [];
+        const token = localStorage.getItem('auth_token') || '';
+        await Promise.all(classes.map(async (cls) => {
+            try {
+                await fetch(`/api/vstep/classes/sync-assignments?id=${encodeURIComponent(cls.id)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+                });
+            } catch (e) {
+                console.warn(`Sync class ${cls.id} failed:`, e);
+            }
+        }));
     }
-
-    window.addEventListener('vstep:class-created', (e) => {
-        if (e.detail?.class) openClassLessons(e.detail.class);
-    });
 
     window.addEventListener('vstep:content-saved', async (e) => {
         const content = e.detail?.content;
-        const classId = e.detail?.payload?.data?.vstep_class_id;
-        if (!classId || !content) return;
-        // Lần đầu tạo (không phải update) → tạo assignment để lớp có bài.
-        if (!e.detail.isUpdate) {
-            const dueAt = e.detail?.payload?.data?.vstep_session_due_at || '';
-            await autoAssignContent(content, dueAt);
-        }
-        // Quay lại grid để admin thấy trạng thái "Đã có bài".
-        if (state.activeClass) {
-            clearSessionHiddenInputs();
-            hideContextBanner();
-            // Đợi loadSets() trong admin_vstep.js refresh state.sets xong.
-            setTimeout(() => openClassLessons(state.activeClass), 200);
-        }
+        const band = e.detail?.payload?.band || e.detail?.payload?.data?.vstep_band;
+        const sessionNumber = e.detail?.payload?.session_number || e.detail?.payload?.data?.vstep_session_number;
+        if (!band || !sessionNumber || !content) return;
+
+        // Sync TỰ ĐỘNG tất cả lớp cùng band — đẩy content mới vào assignment.
+        await autoSyncAllClasses();
+
+        // Refresh state.sets trong admin_vstep.js (đã có loadSets() — admin_vstep.js
+        // tự gọi sau saveSet success). Sau đó render grid lại.
+        clearSessionHiddenInputs();
+        hideContextBanner();
+        setTimeout(() => openSessionGrid(band), 250);
     });
 
-    // Cho phép admin click vào card lớp ở danh sách lớp để mở grid buổi.
+    // ===== Quick access: button "Bài học theo buổi" trong sidebar =====
+    // Khi admin click data-vstep-flow="lesson_exam" lần đầu (chưa có context buổi),
+    // chuyển hướng sang grid B1 thay vì mở blank content editor.
     document.addEventListener('click', (event) => {
-        const card = event.target.closest('[data-vstep-class-id]');
-        if (!card) return;
-        const id = card.dataset.vstepClassId;
-        const classes = window.__VSTEP_STATE__?.classes || [];
-        const cls = classes.find(c => String(c.id) === String(id));
-        if (cls) openClassLessons(cls);
+        const flowBtn = event.target.closest('[data-vstep-flow="lesson_exam"]');
+        if (!flowBtn) return;
+        // Nếu admin đang trong context 1 buổi (hidden input band có giá trị) → để admin_vstep.js xử lý.
+        const currentBand = $('vstep-content-band')?.value || '';
+        if (!currentBand) {
+            // Mặc định mở grid thay vì content editor trống.
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            openSessionGrid(state.activeBand);
+        }
+    }, true);
+
+    // ===== Hook event tạo lớp: hiển thị summary auto-bind =====
+    window.addEventListener('vstep:class-created', (e) => {
+        const summary = e.detail?.syncSummary;
+        if (!summary) return;
+        const alertEl = $('vstepClassAlert');
+        if (!alertEl) return;
+        const msg = `Đã tạo lớp + tự bind ${summary.created} buổi (skip ${summary.skipped} đã có, thiếu content cho ${summary.missing?.length || 0} buổi).`;
+        alertEl.className = 'alert alert-success small mb-0';
+        alertEl.textContent = msg;
     });
 
-    // Expose API tối thiểu để debug.
-    window.__VSTEP_LOP_HOC__ = { openClassLessons, backToClasses, state };
-
-    // =====================================================================
-    // Checkbox UI cho "Ngày nghỉ" và "Học viên trong lớp" trong form tạo lớp.
-    // Giữ <textarea id="vstep-class-holidays"> và <select id="vstep-class-students">
-    // ẩn (admin_vstep.js đọc 2 element này) — module sync giá trị từ checkbox.
-    // =====================================================================
-
-    function formatVnDate(value) {
-        const d = new Date(`${value}T00:00:00`);
-        if (!Number.isFinite(d.getTime())) return value;
-        const dd = String(d.getDate()).padStart(2, '0');
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
-        return `${dayNames[d.getDay()]} ${dd}/${mm}/${d.getFullYear()}`;
-    }
-
+    // ===== Holidays checkboxes — giữ nguyên =====
     function setupHolidayCheckboxes() {
         const textarea = $('vstep-class-holidays');
         const list = $('vstep-class-holidays-list');
         const addBtn = $('vstep-class-holiday-add-btn');
         const addInput = $('vstep-class-holiday-add-input');
         if (!textarea || !list || !addBtn || !addInput) return;
-
-        function read() {
-            try { return JSON.parse(textarea.value || '[]'); }
-            catch { return []; }
-        }
-
+        function read() { try { return JSON.parse(textarea.value || '[]'); } catch { return []; } }
         function write(arr) {
             const cleaned = Array.from(new Set(arr.filter(Boolean))).sort();
             textarea.value = JSON.stringify(cleaned);
             render(cleaned);
         }
-
         function render(arr) {
             if (!arr.length) {
-                list.innerHTML = '<div class="text-secondary small">Chưa có ngày nghỉ. Bỏ tick để xóa.</div>';
+                list.innerHTML = '<div class="text-secondary small">Chưa có ngày nghỉ.</div>';
                 return;
             }
             list.innerHTML = arr.map(date => `
@@ -593,7 +330,6 @@
                 });
             });
         }
-
         addBtn.addEventListener('click', () => {
             const val = (addInput.value || '').trim();
             if (!val) return;
@@ -602,48 +338,93 @@
             write(arr);
             addInput.value = '';
         });
-
-        // Form reset (sau createClass) → clear list về rỗng.
         const form = $('vstepClassForm');
-        if (form) {
-            form.addEventListener('reset', () => {
-                setTimeout(() => write([]), 0);
-            });
-        }
-
+        if (form) form.addEventListener('reset', () => setTimeout(() => write([]), 0));
         render(read());
     }
 
-    function setupStudentCheckboxes() {
+    // ===== Filter HV nâng cao — band + chưa-có-lớp + search =====
+    function setupStudentCheckboxesAdvanced() {
         const select = $('vstep-class-students');
         const list = $('vstep-class-students-list');
         const search = $('vstep-class-students-search');
         if (!select || !list) return;
 
+        // Inject thêm 2 filter (band + chỉ-chưa-có-lớp) nếu chưa có.
+        if (!$('vstep-class-students-band-filter')) {
+            const filterBar = document.createElement('div');
+            filterBar.className = 'd-flex gap-2 mb-2 flex-wrap align-items-center';
+            filterBar.innerHTML = `
+                <select class="form-select form-select-sm" id="vstep-class-students-band-filter" style="max-width:120px;">
+                    <option value="">Mọi band</option>
+                    <option value="B1">B1</option>
+                    <option value="B2">B2</option>
+                </select>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" id="vstep-class-students-unassigned-only">
+                    <label class="form-check-label small" for="vstep-class-students-unassigned-only">Chỉ HV chưa có lớp</label>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="vstep-class-students-select-all">
+                    <i class="bi bi-check-all me-1"></i>Chọn tất cả đang lọc
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="vstep-class-students-clear-all">
+                    <i class="bi bi-x-square me-1"></i>Bỏ chọn hết
+                </button>
+            `;
+            search?.parentNode?.insertBefore(filterBar, search.nextSibling);
+        }
+
+        function getStudentBand(opt) {
+            // option value = student.id. Lookup band từ state.users.
+            const users = window.__VSTEP_STATE__?.users || [];
+            const u = users.find(x => String(x.id) === String(opt.value));
+            return String(u?.band || '').toUpperCase();
+        }
+        function getStudentClassId(opt) {
+            const users = window.__VSTEP_STATE__?.users || [];
+            const u = users.find(x => String(x.id) === String(opt.value));
+            return u?.class_id || '';
+        }
+
         function render() {
             const keyword = ((search?.value) || '').toLowerCase().trim();
+            const bandFilter = ($('vstep-class-students-band-filter')?.value || '').toUpperCase();
+            const unassignedOnly = $('vstep-class-students-unassigned-only')?.checked;
             const opts = Array.from(select.options);
             if (!opts.length) {
-                list.innerHTML = '<div class="text-secondary small">Chưa có học viên. Tạo học viên ở tab "Học viên" trước.</div>';
+                list.innerHTML = '<div class="text-secondary small">Chưa có học viên. Tạo HV ở tab "Học viên" trước.</div>';
                 return;
             }
-            const filtered = keyword
-                ? opts.filter(o => (o.textContent || '').toLowerCase().includes(keyword))
-                : opts;
+            const filtered = opts.filter(o => {
+                if (keyword && !(o.textContent || '').toLowerCase().includes(keyword)) return false;
+                if (bandFilter && getStudentBand(o) !== bandFilter) return false;
+                if (unassignedOnly && getStudentClassId(o)) return false;
+                return true;
+            });
             if (!filtered.length) {
-                list.innerHTML = '<div class="text-secondary small">Không có học viên nào khớp tìm kiếm.</div>';
+                list.innerHTML = '<div class="text-secondary small">Không có học viên nào khớp bộ lọc.</div>';
                 return;
             }
-            list.innerHTML = filtered.map(o => {
-                const checked = o.selected ? 'checked' : '';
-                const cbId = `vstep-class-student-cb-${o.value}`;
-                return `
-                    <div class="form-check">
-                        <input class="form-check-input vstep-class-student-check" type="checkbox" value="${escapeHtml(o.value)}" id="${escapeHtml(cbId)}" ${checked}>
-                        <label class="form-check-label small" for="${escapeHtml(cbId)}">${escapeHtml(o.textContent || '')}</label>
-                    </div>
-                `;
-            }).join('');
+            list.innerHTML = `
+                <div class="small text-muted mb-2">${filtered.length} / ${opts.length} HV (lọc theo điều kiện)</div>
+                ${filtered.map(o => {
+                    const checked = o.selected ? 'checked' : '';
+                    const cbId = `vstep-class-student-cb-${o.value}`;
+                    const band = getStudentBand(o);
+                    const cid = getStudentClassId(o);
+                    const meta = [
+                        band ? `<span class="badge bg-secondary">${escapeHtml(band)}</span>` : '',
+                        cid ? '<span class="badge bg-warning text-dark">Đã có lớp</span>' : ''
+                    ].filter(Boolean).join(' ');
+                    return `
+                        <div class="form-check d-flex align-items-center gap-2">
+                            <input class="form-check-input vstep-class-student-check" type="checkbox" value="${escapeHtml(o.value)}" id="${escapeHtml(cbId)}" ${checked}>
+                            <label class="form-check-label small flex-grow-1" for="${escapeHtml(cbId)}">${escapeHtml(o.textContent || '')}</label>
+                            ${meta}
+                        </div>
+                    `;
+                }).join('')}
+            `;
             list.querySelectorAll('.vstep-class-student-check').forEach(cb => {
                 cb.addEventListener('change', () => {
                     const opt = Array.from(select.options).find(o => o.value === cb.value);
@@ -652,14 +433,24 @@
             });
         }
 
-        // admin_vstep.js gọi renderClassStudentOptions() set lại innerHTML
-        // của <select> mỗi khi loadUsers xong → MutationObserver re-render.
         const obs = new MutationObserver(render);
         obs.observe(select, { childList: true });
-
         search?.addEventListener('input', render);
+        $('vstep-class-students-band-filter')?.addEventListener('change', render);
+        $('vstep-class-students-unassigned-only')?.addEventListener('change', render);
 
-        // Form reset (sau createClass) → uncheck hết.
+        $('vstep-class-students-select-all')?.addEventListener('click', () => {
+            list.querySelectorAll('.vstep-class-student-check').forEach(cb => {
+                cb.checked = true;
+                const opt = Array.from(select.options).find(o => o.value === cb.value);
+                if (opt) opt.selected = true;
+            });
+        });
+        $('vstep-class-students-clear-all')?.addEventListener('click', () => {
+            Array.from(select.options).forEach(o => { o.selected = false; });
+            render();
+        });
+
         const form = $('vstepClassForm');
         if (form) {
             form.addEventListener('reset', () => {
@@ -673,29 +464,20 @@
         render();
     }
 
-    // updateOverview() trong admin_vstep.js ghi state.results.length (mọi flow)
-    // vào card "Bài đã nộp". Trang Lớp Học chỉ nên hiện count lesson_exam.
-    // Quan sát text card → overwrite với count đúng. Tương tự cho card "Học viên"
-    // và "Bài học/buổi" để chắc ăn (lesson_exam tính cả 2 mode lesson/assigned_exam).
     function fixOverviewCounts() {
         const resultsEl = $('vstepOverviewResults');
         if (!resultsEl) return;
-
         let updating = false;
         function recompute() {
             if (updating) return;
             const results = window.__VSTEP_STATE__?.results || [];
-            const lessonExamCount = results.filter(r => {
-                const flow = r?.metadata?.vstep_flow;
-                return flow === 'lesson_exam';
-            }).length;
+            const lessonExamCount = results.filter(r => r?.metadata?.vstep_flow === 'lesson_exam').length;
             const desired = String(lessonExamCount);
             if (resultsEl.textContent === desired) return;
             updating = true;
             resultsEl.textContent = desired;
             setTimeout(() => { updating = false; }, 0);
         }
-
         const obs = new MutationObserver(recompute);
         obs.observe(resultsEl, { childList: true, characterData: true, subtree: true });
         recompute();
@@ -703,7 +485,7 @@
 
     document.addEventListener('DOMContentLoaded', () => {
         setupHolidayCheckboxes();
-        setupStudentCheckboxes();
+        setupStudentCheckboxesAdvanced();
         fixOverviewCounts();
     });
 })();

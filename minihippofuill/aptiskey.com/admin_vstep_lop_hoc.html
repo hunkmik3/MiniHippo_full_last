@@ -641,8 +641,12 @@
                   <!-- Hidden inputs: gắn lớp + buổi khi soạn bài từ flow "Tạo bài cho lớp X".
                        admin_vstep_class_lessons.js set 3 input này, admin_vstep.js
                        đọc qua window.__VSTEP_PAYLOAD_HOOK__ và push vào data jsonb. -->
-                  <input type="hidden" id="vstep-content-class-id" value="">
+                  <!-- Hidden inputs cho shared blueprint: band + session_number.
+                       admin_vstep_class_lessons.js set khi admin click 1 buổi trong grid.
+                       class-id giữ lại cho backward compat (luôn để trống ở shared model). -->
+                  <input type="hidden" id="vstep-content-band" value="">
                   <input type="hidden" id="vstep-content-session-number" value="">
+                  <input type="hidden" id="vstep-content-class-id" value="">
                   <input type="hidden" id="vstep-content-due-at" value="">
                   <div class="vstep-form-section">
                     <div class="vstep-form-section-title">
