@@ -562,29 +562,19 @@
               </button>
             </div>
             <div class="vstep-panel-body">
-              <div id="vstep-class-sessions-grid" class="vstep-session-grid">
-                <div class="text-secondary small">Chưa chọn lớp.</div>
+              <!-- Container thường (KHÔNG có class vstep-session-grid) — JS sẽ
+                   inject tabs band + inner div .vstep-session-grid riêng để
+                   tránh outer grid stretch tabs theo cột 220px gây vỡ layout. -->
+              <div id="vstep-class-sessions-grid">
+                <div class="text-secondary small">Đang tải bài học theo buổi...</div>
               </div>
             </div>
           </div>
         </section>
 
-        <section class="vstep-admin-section" id="vstep-class-sessions-panel">
-          <div class="vstep-panel">
-            <div class="vstep-panel-header vstep-panel-header-row">
-              <div>
-                <strong id="vstep-class-sessions-title">Bài học theo buổi</strong>
-                <div class="vstep-help" id="vstep-class-sessions-subtitle">Chọn 1 buổi để tạo hoặc sửa bài học cho lớp đó.</div>
-              </div>
-              <button type="button" class="btn btn-sm btn-outline-secondary" data-vstep-panel="classes">
-                <i class="bi bi-arrow-left me-1"></i> Quay lại danh sách lớp
-              </button>
-            </div>
-            <div class="vstep-panel-body">
-              <div id="vstep-class-sessions-grid" class="vstep-session-grid"></div>
-            </div>
-          </div>
-        </section>
+        <!-- Panel "Bài học theo buổi" duplicate đã được gộp vào panel trên
+             (line 553-573). Phần này được xoá để tránh 2 element cùng id
+             gây render lệch + grid layout vỡ. -->
 
         <section class="vstep-admin-section" id="vstep-content-panel">
           <div class="vstep-admin-layout">

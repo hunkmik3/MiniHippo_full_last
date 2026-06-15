@@ -92,10 +92,14 @@
         const band = state.activeBand;
         const total = bandSessionCount(band);
 
+        // Tabs band: dùng inline-flex + inline-block để CHẮC CHẮN không bị
+        // outer grid (nếu inherit) stretch theo column 220px. Mỗi button
+        // có width: auto và bo gọn.
         const tabsHtml = `
-            <div class="d-flex gap-2 mb-3">
+            <div class="vstep-band-tabs" style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
                 ${['B1', 'B2'].map(b => `
-                    <button type="button" class="btn btn-sm ${b === band ? 'btn-primary' : 'btn-outline-primary'} vstep-band-tab" data-band="${b}">
+                    <button type="button" class="btn btn-sm ${b === band ? 'btn-primary' : 'btn-outline-primary'} vstep-band-tab"
+                        data-band="${b}" style="width:auto;">
                         Band ${b} (${bandSessionCount(b)} buổi)
                     </button>
                 `).join('')}
