@@ -1657,6 +1657,9 @@
         }
     }
 
+    // Set HV đang được tick để bulk delete (giữ qua re-render do search).
+    const selectedStudentIds = new Set();
+
     function renderUsers() {
         renderClassStudentOptions();
         renderAssignmentOptions();
@@ -1672,12 +1675,23 @@
                 user.phone_number
             ].join(' ').toLowerCase().includes(keyword);
         });
+        // Đồng bộ selected set: bỏ HV không còn trong list (vd vừa xoá).
+        const visibleIds = new Set(users.map(u => String(u.id)));
+        Array.from(selectedStudentIds).forEach(id => {
+            if (!visibleIds.has(String(id))) selectedStudentIds.delete(id);
+        });
+
         if (!users.length) {
-            refs.usersBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Chưa có học viên VSTEP.</td></tr>';
+            refs.usersBody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">Chưa có học viên VSTEP.</td></tr>';
+            updateBulkBar();
             return;
         }
-        refs.usersBody.innerHTML = users.map(user => `
-            <tr>
+        refs.usersBody.innerHTML = users.map(user => {
+            const id = escapeHtml(String(user.id));
+            const checked = selectedStudentIds.has(String(user.id)) ? 'checked' : '';
+            return `
+            <tr data-student-id="${id}">
+                <td><input type="checkbox" class="form-check-input vstep-student-check" value="${id}" ${checked}></td>
                 <td><span class="vstep-code-pill">${escapeHtml(user.account_code || user.username || '-')}</span></td>
                 <td class="fw-semibold">${escapeHtml(user.full_name || '-')}</td>
                 <td>${escapeHtml(user.band || '-')}</td>
@@ -1685,10 +1699,153 @@
                 <td>${escapeHtml(user.email || '-')}</td>
                 <td><span class="vstep-device-pill">${escapeHtml(String(user.device_count || 0))}/${escapeHtml(String(user.device_limit || 2))}</span></td>
                 <td>${escapeHtml(user.expires_at ? new Date(user.expires_at).toLocaleDateString('vi-VN') : '-')}</td>
+                <td class="text-end">
+                    <button type="button" class="btn btn-sm btn-outline-primary me-1 vstep-student-edit-btn" data-id="${id}" title="Sửa">
+                        <i class="bi bi-pencil-square"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger vstep-student-delete-btn" data-id="${id}" title="Xoá">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
             </tr>
-        `).join('');
+        `;
+        }).join('');
         renderClassStudentOptions();
         renderAssignmentOptions();
+
+        // Bind handlers cho checkbox + nút action.
+        refs.usersBody.querySelectorAll('.vstep-student-check').forEach(cb => {
+            cb.addEventListener('change', () => {
+                if (cb.checked) selectedStudentIds.add(cb.value);
+                else selectedStudentIds.delete(cb.value);
+                updateBulkBar();
+                syncSelectAllCheckbox(users);
+            });
+        });
+        refs.usersBody.querySelectorAll('.vstep-student-edit-btn').forEach(btn => {
+            btn.addEventListener('click', () => openEditStudentModal(btn.dataset.id));
+        });
+        refs.usersBody.querySelectorAll('.vstep-student-delete-btn').forEach(btn => {
+            btn.addEventListener('click', () => deleteStudents([btn.dataset.id]));
+        });
+
+        updateBulkBar();
+        syncSelectAllCheckbox(users);
+    }
+
+    function updateBulkBar() {
+        const bar = $('vstepStudentsBulkBar');
+        const countEl = $('vstepStudentsBulkCount');
+        if (!bar || !countEl) return;
+        const count = selectedStudentIds.size;
+        countEl.textContent = String(count);
+        bar.classList.toggle('d-none', count === 0);
+    }
+
+    function syncSelectAllCheckbox(visibleUsers) {
+        const selectAll = $('vstepStudentsSelectAll');
+        if (!selectAll) return;
+        const ids = visibleUsers.map(u => String(u.id));
+        if (!ids.length) {
+            selectAll.checked = false;
+            selectAll.indeterminate = false;
+            return;
+        }
+        const tickedCount = ids.filter(id => selectedStudentIds.has(id)).length;
+        selectAll.checked = tickedCount === ids.length;
+        selectAll.indeterminate = tickedCount > 0 && tickedCount < ids.length;
+    }
+
+    async function deleteStudents(ids) {
+        if (!Array.isArray(ids) || !ids.length) return;
+        const single = ids.length === 1;
+        const target = single
+            ? (() => {
+                const u = state.users.find(x => String(x.id) === String(ids[0]));
+                return u ? `"${u.full_name || u.account_code || u.email}"` : 'học viên này';
+            })()
+            : `${ids.length} học viên`;
+        const msg = `Xoá ${target} khỏi hệ thống?\n\n`
+            + `Sẽ xoá HẲN: profile, tài khoản đăng nhập, bài đã giao, kết quả, lớp đang tham gia.\n`
+            + `Hành động này KHÔNG thể hoàn tác.`;
+        if (!window.confirm(msg)) return;
+        try {
+            const result = await fetchJson('/api/vstep/students/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids })
+            });
+            const summary = `Đã xoá ${result.deleted || 0} HV` +
+                (result.notFound ? `, ${result.notFound} không tìm thấy` : '') +
+                (result.errors?.length ? `, ${result.errors.length} lỗi` : '') + '.';
+            setStudentAlert(summary, result.errors?.length ? 'warning' : 'success');
+            // Bỏ tick ngay với các ids đã xử lý.
+            ids.forEach(id => selectedStudentIds.delete(String(id)));
+            await loadUsers();
+        } catch (error) {
+            setStudentAlert('Không thể xoá: ' + error.message, 'danger');
+        }
+    }
+
+    function openEditStudentModal(studentId) {
+        const user = state.users.find(u => String(u.id) === String(studentId));
+        if (!user) return;
+        const modalEl = $('vstepEditStudentModal');
+        if (!modalEl) return alert('Thiếu modal edit trong DOM.');
+        setValue('vstepEditStudentId', user.id);
+        setValue('vstepEditStudentAccountCode', user.account_code || user.username || '');
+        setValue('vstepEditStudentFullName', user.full_name || '');
+        setValue('vstepEditStudentEmail', user.email || '');
+        setValue('vstepEditStudentPhone', user.phone_number || '');
+        setValue('vstepEditStudentBand', user.band || 'B1');
+        setValue('vstepEditStudentDeviceLimit', String(user.device_limit || 2));
+        setValue('vstepEditStudentExpiresAt', user.expires_at ? String(user.expires_at).slice(0, 10) : '');
+        const pa = $('vstepEditStudentPracticeAccess');
+        if (pa) pa.checked = user.practice_access !== false;
+        const alertEl = $('vstepEditStudentAlert');
+        if (alertEl) { alertEl.classList.add('d-none'); alertEl.textContent = ''; }
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+    }
+
+    async function saveEditStudent() {
+        const id = getValue('vstepEditStudentId');
+        if (!id) return;
+        const btn = $('vstepEditStudentSaveBtn');
+        const alertEl = $('vstepEditStudentAlert');
+        const showAlert = (msg, type = 'danger') => {
+            if (!alertEl) return;
+            alertEl.className = `alert alert-${type} mb-0 small`;
+            alertEl.textContent = msg;
+            alertEl.classList.remove('d-none');
+        };
+        if (btn) btn.disabled = true;
+        try {
+            await fetchJson('/api/vstep/students/update', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id,
+                    accountCode: getValue('vstepEditStudentAccountCode') || null,
+                    fullName: getValue('vstepEditStudentFullName') || null,
+                    phone: getValue('vstepEditStudentPhone') || null,
+                    band: getValue('vstepEditStudentBand') || 'B1',
+                    deviceLimit: getNumber('vstepEditStudentDeviceLimit', 2),
+                    expiresAt: getValue('vstepEditStudentExpiresAt') || null,
+                    practiceAccess: isChecked('vstepEditStudentPracticeAccess')
+                })
+            });
+            showAlert('Đã cập nhật.', 'success');
+            await loadUsers();
+            setTimeout(() => {
+                const modalEl = $('vstepEditStudentModal');
+                if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+            }, 600);
+        } catch (error) {
+            showAlert(error.message || 'Không thể lưu.');
+        } finally {
+            if (btn) btn.disabled = false;
+        }
     }
 
     async function createStudent(event) {
@@ -3238,6 +3395,28 @@
         $('vstepSetSearch')?.addEventListener('input', renderSetList);
         $('vstepStudentSearch')?.addEventListener('input', renderUsers);
         $('vstepResultSearch')?.addEventListener('input', renderResults);
+
+        // Bulk select + delete học viên VSTEP.
+        $('vstepStudentsSelectAll')?.addEventListener('change', (ev) => {
+            const keyword = getValue('vstepStudentSearch').toLowerCase();
+            const visible = state.users.filter(u => {
+                if (!keyword) return true;
+                return [u.account_code, u.username, u.full_name, u.email, u.phone_number]
+                    .join(' ').toLowerCase().includes(keyword);
+            });
+            if (ev.target.checked) visible.forEach(u => selectedStudentIds.add(String(u.id)));
+            else visible.forEach(u => selectedStudentIds.delete(String(u.id)));
+            renderUsers();
+        });
+        $('vstepStudentsBulkClear')?.addEventListener('click', () => {
+            selectedStudentIds.clear();
+            renderUsers();
+        });
+        $('vstepStudentsBulkDelete')?.addEventListener('click', () => {
+            if (!selectedStudentIds.size) return;
+            deleteStudents(Array.from(selectedStudentIds));
+        });
+        $('vstepEditStudentSaveBtn')?.addEventListener('click', saveEditStudent);
         document.querySelectorAll('[data-vstep-practice-skill]').forEach(button => {
             button.addEventListener('click', () => setPracticeSkill(button.dataset.vstepPracticeSkill, { resetForm: true }));
         });

@@ -23,6 +23,7 @@ import createStudent from '../../../server/api/vstep/students/create.js';
 import listStudents from '../../../server/api/vstep/students/list.js';
 import bulkImportStudents from '../../../server/api/vstep/students/bulk-import.js';
 import updateStudent from '../../../server/api/vstep/students/update.js';
+import deleteStudent from '../../../server/api/vstep/students/delete.js';
 
 const handlers = {
   assignments: {
@@ -62,6 +63,7 @@ const handlers = {
     'bulk-import': bulkImportStudents,
     bulk_import: bulkImportStudents,
     create: createStudent,
+    delete: deleteStudent,
     list: listStudents,
     update: updateStudent
   }
