@@ -82,9 +82,9 @@ async function createOrUpdateStudent(row, batchId, defaultLearningProgram = 'vst
   // GIỮ giá trị cũ thay vì ghi đè/xoá (band, expires_at, device_limit, practice_access).
   const hasBand = String(row.band ?? row.level ?? row.lop ?? '').trim() !== '';
   const hasExpires = String(row.expiresAt ?? row.expires_at ?? row.expire_date ?? '').trim() !== '';
-  const rawDeviceLimit = Number(row.deviceLimit ?? row.device_limit);
+  const rawDeviceLimit = Number(row.deviceLimit ?? row.device_limit ?? row.devicelimit);
   const hasDeviceLimit = Number.isFinite(rawDeviceLimit) && rawDeviceLimit > 0;
-  const hasPracticeAccess = row.practiceAccess !== undefined || row.practice_access !== undefined;
+  const hasPracticeAccess = row.practiceAccess !== undefined || row.practice_access !== undefined || row.practiceaccess !== undefined;
   const deviceLimit = hasDeviceLimit ? Math.round(rawDeviceLimit) : resolveDeviceLimit();
   const practiceAccess = hasPracticeAccess
     ? !(row.practiceAccess === false || row.practice_access === false
@@ -93,7 +93,10 @@ async function createOrUpdateStudent(row, batchId, defaultLearningProgram = 'vst
 
   // learning_program ưu tiên: row.learningProgram > defaultLearningProgram.
   // Chấp nhận giá trị 'vstep_onthi' hoặc fallback 'vstep_lophoc'.
-  const rowProgramRaw = String(row.learningProgram || row.learning_program || '').trim().toLowerCase();
+  // Accept cả lowercase variants (parser CSV có thể strip camelCase).
+  const rowProgramRaw = String(
+    row.learningProgram || row.learning_program || row.learningprogram || row.module || ''
+  ).trim().toLowerCase();
   const learningProgram = (rowProgramRaw === 'vstep_onthi' || rowProgramRaw === 'vstep_lophoc')
     ? rowProgramRaw
     : (defaultLearningProgram === 'vstep_onthi' ? 'vstep_onthi' : 'vstep_lophoc');
