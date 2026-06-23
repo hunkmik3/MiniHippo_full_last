@@ -98,41 +98,63 @@ async function createOrUpdateStudent(row, batchId, defaultLearningProgram = 'vst
     ? rowProgramRaw
     : (defaultLearningProgram === 'vstep_onthi' ? 'vstep_onthi' : 'vstep_lophoc');
 
+  // Match theo email TRƯỚC, fallback sang account_code (do account_code cũng có
+  // UNIQUE constraint — nếu admin đổi email nhưng giữ mã thì coi như cùng HV).
   const existingByEmail = await selectFrom('vstep_students', {
     filters: [{ column: 'email', value: email }],
     single: true
   });
+  let existingByAccountCode = null;
+  if (accountCode && !existingByEmail) {
+    existingByAccountCode = await selectFrom('vstep_students', {
+      filters: [{ column: 'account_code', value: accountCode }],
+      single: true
+    });
+  }
+  // Nếu cả email và account_code đều khớp nhưng trỏ về 2 row khác nhau → conflict thật.
+  if (existingByEmail && accountCode) {
+    const byCode = await selectFrom('vstep_students', {
+      filters: [{ column: 'account_code', value: accountCode }],
+      single: true
+    });
+    if (byCode && byCode.id !== existingByEmail.id) {
+      throw new Error(`Mã ${accountCode} đã dùng cho HV khác (${byCode.email}). Đổi mã hoặc xoá HV cũ.`);
+    }
+  }
+  const existingMatch = existingByEmail || existingByAccountCode;
 
-  if (existingByEmail?.id) {
-    // RE-IMPORT: chỉ ghi đè trường mà CSV thực sự cung cấp; còn lại giữ giá trị cũ.
-    const resolvedBand = hasBand ? band : (existingByEmail.band ?? null);
-    const resolvedExpires = hasExpires ? expiresAt : (existingByEmail.expires_at ?? null);
-    const resolvedDeviceLimit = hasDeviceLimit ? deviceLimit : (existingByEmail.device_limit ?? resolveDeviceLimit());
-    const resolvedPracticeAccess = hasPracticeAccess ? practiceAccess : (existingByEmail.practice_access ?? true);
+  if (existingMatch?.id) {
+    // ===== UPDATE branch (re-import: match by email hoặc by account_code) =====
+    // Khi match qua account_code mà email khác → đồng bộ email payload sang HV cũ
+    // (admin có thể đang đổi email cho HV đã tồn tại).
+    const resolvedBand = hasBand ? band : (existingMatch.band ?? null);
+    const resolvedExpires = hasExpires ? expiresAt : (existingMatch.expires_at ?? null);
+    const resolvedDeviceLimit = hasDeviceLimit ? deviceLimit : (existingMatch.device_limit ?? resolveDeviceLimit());
+    const resolvedPracticeAccess = hasPracticeAccess ? practiceAccess : (existingMatch.practice_access ?? true);
 
     // Khi RE-IMPORT: nếu admin chỉ định learning_program khác → MOVE HV sang
     // module mới. Nếu không chỉ định (default) → GIỮ NGUYÊN module cũ.
     const resolvedProgram = rowProgramRaw
       ? learningProgram
-      : (existingByEmail.learning_program || learningProgram);
+      : (existingMatch.learning_program || learningProgram);
 
     const payload = {
-      account_code: accountCode || existingByEmail.account_code || null,
-      full_name: fullName || existingByEmail.full_name || null,
-      phone_number: phone || existingByEmail.phone_number || null,
+      account_code: accountCode || existingMatch.account_code || null,
+      full_name: fullName || existingMatch.full_name || null,
+      phone_number: phone || existingMatch.phone_number || null,
       band: resolvedBand,
       learning_program: resolvedProgram,
       practice_access: resolvedPracticeAccess,
-      status: clean(row.status) || existingByEmail.status || 'active',
+      status: clean(row.status) || existingMatch.status || 'active',
       device_limit: resolvedDeviceLimit,
       expires_at: resolvedExpires,
-      notes: clean(row.notes) || existingByEmail.notes || null,
+      notes: clean(row.notes) || existingMatch.notes || null,
       last_import_batch: batchId,
       updated_at: new Date().toISOString()
     };
-    const updated = await updateTable('vstep_students', [{ column: 'id', value: existingByEmail.id }], payload);
-    if (existingByEmail.user_id) {
-      await updateTable('users', [{ column: 'id', value: existingByEmail.user_id }], {
+    const updated = await updateTable('vstep_students', [{ column: 'id', value: existingMatch.id }], payload);
+    if (existingMatch.user_id) {
+      await updateTable('users', [{ column: 'id', value: existingMatch.user_id }], {
         account_code: payload.account_code,
         full_name: payload.full_name,
         phone_number: payload.phone_number,
