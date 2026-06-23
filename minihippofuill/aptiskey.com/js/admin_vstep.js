@@ -1948,7 +1948,13 @@
             practiceaccess: 'practiceAccess',
             practice_access: 'practiceAccess',
             password: 'password',
-            notes: 'notes'
+            notes: 'notes',
+            learningprogram: 'learningProgram',
+            learning_program: 'learningProgram',
+            module: 'learningProgram',
+            devicelimit: 'deviceLimit',
+            device_limit: 'deviceLimit',
+            username: 'username'
         };
         const first = rows[0].map(cell => cell.toLowerCase().replace(/\s+/g, '_'));
         const hasHeader = first.some(cell => headerAliases[cell]);
