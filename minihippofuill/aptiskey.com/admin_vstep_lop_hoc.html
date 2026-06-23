@@ -271,10 +271,20 @@
                   <i class="bi bi-search"></i>
                   <input type="search" class="form-control" id="vstepStudentSearch" placeholder="Tìm theo mã, tên hoặc email">
                 </div>
+                <div id="vstepStudentsBulkBar" class="d-none alert alert-warning d-flex flex-wrap align-items-center gap-2 py-2 mb-2">
+                  <span class="me-auto small fw-semibold"><i class="bi bi-check2-square me-1"></i>Đã chọn <span id="vstepStudentsBulkCount">0</span> học viên</span>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" id="vstepStudentsBulkClear">
+                    <i class="bi bi-x-circle me-1"></i>Bỏ chọn
+                  </button>
+                  <button type="button" class="btn btn-sm btn-danger" id="vstepStudentsBulkDelete">
+                    <i class="bi bi-trash me-1"></i>Xoá đã chọn
+                  </button>
+                </div>
                 <div class="table-responsive vstep-table-shell">
                   <table class="table table-hover align-middle mb-0">
                     <thead>
                       <tr>
+                        <th style="width:36px;"><input type="checkbox" class="form-check-input" id="vstepStudentsSelectAll" title="Chọn tất cả"></th>
                         <th>Mã</th>
                         <th>Học viên</th>
                         <th>Level</th>
@@ -282,11 +292,12 @@
                         <th>Email</th>
                         <th>Thiết bị</th>
                         <th>Hết hạn</th>
+                        <th class="text-end" style="width:140px;">Hành động</th>
                       </tr>
                     </thead>
                     <tbody id="vstepUsersTableBody">
                       <tr>
-                        <td colspan="7" class="text-center text-muted py-3">Đang tải học viên...</td>
+                        <td colspan="9" class="text-center text-muted py-3">Đang tải học viên...</td>
                       </tr>
                     </tbody>
                   </table>
@@ -823,6 +834,71 @@
           <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Đóng</button>
           <button type="button" class="btn btn-primary btn-sm" id="saveVstepGradeBtnModal">
             <i class="bi bi-save me-1"></i>Lưu chấm điểm
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal sửa thông tin học viên VSTEP (dùng chung lop_hoc/onthi) -->
+  <div class="modal fade" id="vstepEditStudentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Sửa thông tin học viên VSTEP</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form id="vstepEditStudentForm" class="row g-3">
+            <input type="hidden" id="vstepEditStudentId">
+            <div class="col-md-4">
+              <label class="form-label">Mã học viên</label>
+              <input type="text" class="form-control" id="vstepEditStudentAccountCode">
+            </div>
+            <div class="col-md-8">
+              <label class="form-label">Họ tên</label>
+              <input type="text" class="form-control" id="vstepEditStudentFullName">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Email</label>
+              <input type="email" class="form-control" id="vstepEditStudentEmail" readonly>
+              <div class="form-text small">Email không thể đổi sau khi tạo (đã gắn với Supabase Auth).</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Số điện thoại</label>
+              <input type="text" class="form-control" id="vstepEditStudentPhone">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Band</label>
+              <select class="form-select" id="vstepEditStudentBand">
+                <option value="B1">B1</option>
+                <option value="B2">B2</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Số thiết bị</label>
+              <input type="number" min="1" max="10" class="form-control" id="vstepEditStudentDeviceLimit">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Ngày hết hạn</label>
+              <input type="date" class="form-control" id="vstepEditStudentExpiresAt">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label d-block">Truy cập ôn thi</label>
+              <div class="form-check form-switch mt-2">
+                <input class="form-check-input" type="checkbox" id="vstepEditStudentPracticeAccess">
+                <label class="form-check-label small" for="vstepEditStudentPracticeAccess">Bật</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <div id="vstepEditStudentAlert" class="alert d-none mb-0 small"></div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Huỷ</button>
+          <button type="button" class="btn btn-primary" id="vstepEditStudentSaveBtn">
+            <i class="bi bi-check-circle me-1"></i>Lưu thay đổi
           </button>
         </div>
       </div>
