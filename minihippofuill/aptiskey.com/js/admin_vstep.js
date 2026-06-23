@@ -1899,6 +1899,8 @@
     function setImportAlert(message, type = 'info') {
         if (!refs.importAlert) return;
         refs.importAlert.className = `alert alert-${type} small mt-3 mb-0`;
+        // Preserve line breaks (\n) cho mass-import error detail.
+        refs.importAlert.style.whiteSpace = 'pre-line';
         refs.importAlert.textContent = message;
     }
 
@@ -2052,7 +2054,16 @@
                 })
             });
             const failed = Number(result.failed || 0);
-            setImportAlert(`Import xong: tạo mới ${result.created || 0}, cập nhật ${result.updated || 0}, lỗi ${failed}.`, failed ? 'warning' : 'success');
+            let message = `Import xong: tạo mới ${result.created || 0}, cập nhật ${result.updated || 0}, lỗi ${failed}.`;
+            // Hiện chi tiết dòng nào fail + lý do (giúp admin debug ngay).
+            if (failed && Array.isArray(result.results)) {
+                const errs = result.results
+                    .filter(r => !r.ok)
+                    .map(r => `• Dòng ${r.row}: ${r.error || 'không rõ lỗi'}`)
+                    .join('\n');
+                if (errs) message += `\n\nChi tiết lỗi:\n${errs}`;
+            }
+            setImportAlert(message, failed ? 'warning' : 'success');
             await loadUsers();
         } catch (error) {
             setImportAlert(error.message, 'danger');
