@@ -29,6 +29,35 @@ function clean(value) {
   return typeof value === 'string' ? value.trim() : value;
 }
 
+// Trả về username chưa tồn tại trong public.users. Nếu base bị chiếm (orphan
+// từ test cũ hoặc module khác đã dùng) → thêm suffix tăng dần để insert không
+// đụng constraint UNIQUE. Account_code (mã hiển thị) vẫn giữ nguyên giá trị admin
+// nhập — chỉ username (chìa khoá nội bộ) bị suffix.
+async function resolveUniqueUsername(baseUsername) {
+  if (!baseUsername) return baseUsername;
+  const tryNames = [
+    baseUsername,
+    `${baseUsername}_vstep`,
+    `${baseUsername}_${Date.now().toString(36)}`,
+    `${baseUsername}_${Math.random().toString(36).slice(2, 8)}`
+  ];
+  for (const candidate of tryNames) {
+    try {
+      const exists = await selectFrom('users', {
+        filters: [{ column: 'username', value: candidate }],
+        single: true
+      });
+      if (!exists) return candidate;
+    } catch (_) {
+      // Nếu query lỗi (vd RLS) → cứ thử candidate này; nếu trùng thì sẽ catch ở
+      // upsert sau, không phải killer ở đây.
+      return candidate;
+    }
+  }
+  // Fallback siêu hiếm: random hex dài.
+  return `${baseUsername}_${Math.random().toString(36).slice(2)}`;
+}
+
 async function createOrUpdateStudent(row, batchId, defaultLearningProgram = 'vstep_lophoc') {
   const accountCode = clean(row.accountCode || row.account_code || row.ma || row.code);
   let email = clean(row.email);
@@ -121,7 +150,10 @@ async function createOrUpdateStudent(row, batchId, defaultLearningProgram = 'vst
 
   // TẠO MỚI: auth user -> users -> vstep_students. Nếu lỗi giữa chừng thì XOÁ auth user
   // vừa tạo (cascade dọn users) để không để lại tài khoản mồ côi gây kẹt lần import sau.
-  const username = clean(row.username || accountCode || email.split('@')[0]);
+  // Username PHẢI UNIQUE trên public.users — nếu trùng (do orphan cũ, module khác đã chiếm,
+  // hay case mismatch khiến diagnostic SQL không tìm thấy) → tự suffix để insert không kẹt.
+  const baseUsername = clean(row.username || accountCode || email.split('@')[0]);
+  const username = await resolveUniqueUsername(baseUsername);
   let authUser = null;
   try {
     authUser = await callSupabaseAuth(
