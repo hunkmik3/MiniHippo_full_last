@@ -13,6 +13,30 @@ function todayLocalYmd() {
   ].join('-');
 }
 
+// Trả về username chưa tồn tại trong public.users — tránh đụng UNIQUE constraint
+// khi base bị orphan hoặc module khác đã chiếm. Account_code (mã hiển thị) vẫn giữ.
+async function resolveUniqueUsernameForCreate(baseUsername) {
+  if (!baseUsername) return baseUsername;
+  const tryNames = [
+    baseUsername,
+    `${baseUsername}_vstep`,
+    `${baseUsername}_${Date.now().toString(36)}`,
+    `${baseUsername}_${Math.random().toString(36).slice(2, 8)}`
+  ];
+  for (const candidate of tryNames) {
+    try {
+      const exists = await selectFrom('users', {
+        filters: [{ column: 'username', value: candidate }],
+        single: true
+      });
+      if (!exists) return candidate;
+    } catch (_) {
+      return candidate;
+    }
+  }
+  return `${baseUsername}_${Math.random().toString(36).slice(2)}`;
+}
+
 function generatePassword() {
   const random = Math.random().toString(36).slice(-8);
   const fallback = Math.random().toString(36).slice(-10);
@@ -52,7 +76,9 @@ export default async function handler(req, res) {
 
     const password = String(body?.password || '').trim() || generatePassword();
     const generated = !String(body?.password || '').trim();
-    const username = String(body?.username || accountCode || email.split('@')[0]).trim();
+    // Username phải UNIQUE — tự suffix nếu base bị orphan/module khác chiếm.
+    const baseUsername = String(body?.username || accountCode || email.split('@')[0]).trim();
+    const username = await resolveUniqueUsernameForCreate(baseUsername);
 
     const bandResult = resolveBand(body?.band);
     if (!bandResult.ok) {
