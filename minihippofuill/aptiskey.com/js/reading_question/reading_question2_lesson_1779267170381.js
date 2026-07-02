@@ -2,17 +2,8 @@
 // ////////////// DANH SÁCH CÂU HỎI PART 2 & 3 ///////////////
 // ===============================================================================================================
 
-// READING EXTRA P2 - Topic: Đề dự phòng thêm: Tech Innovation Expo
-const question2Content_1 = [
-    'The tech expo was held on Sunday morning, showcasing cutting-edge innovations.',
-    'Over 75 participants attended, with Ms. Tran presenting a smart home device.',
-    'After the presentations, awards were given for the most creative prototype.',
-    'Activities included 3D printing demos, Al workshops, and virtual reality trials.',
-    'Attendees enjoyed networking over coffee and exploring interactive displays.',
-];
-
 // READING EXTRA P2-2 - Topic: Music festivals
-const question2Content_2 = [
+const question2Content_1 = [
     '0. Last Saturday, a live music show was held in town park',
     'The local government planned, funded and paid for everything',
     'Because it was free, more than 5,000 people attended',
@@ -22,7 +13,7 @@ const question2Content_2 = [
 ];
 
 // READING EXTRA P2-3 - Topic: Family sports day
-const question2Content_3 = [
+const question2Content_2 = [
     '0. Last week, the weather was great. The town organized a ten-mile race.',
     'It took place on Sunday morning in the park, there was a race for adults.',
     'Sixty people took part, and among them, Ms. Kamus kept the fastest pace and won the race.',
@@ -32,7 +23,7 @@ const question2Content_3 = [
 ];
 
 // READING EXTRA P2-4 - Topic: Means of transportation
-const question2Content_4 = [
+const question2Content_3 = [
     'In the past, transportation was primarily accessible to the wealthy.',
     'Later, air travel became popular among business professionals.',
     'Eventually, buses and trains were introduced as affordable alternatives.',
@@ -41,7 +32,7 @@ const question2Content_4 = [
 ];
 
 // READING EXTRA P2-5 - Topic: A new coffee shop (2)
-const question2Content_5 = [
+const question2Content_4 = [
     'I arrived at the shop early in the morning, but it was crowded with people.',
     'A waiter assisted me in finding a table and handed me the menu.',
     'The menu was not as good as expected and quite pricey, so I decided to order a sandwich.',
@@ -50,7 +41,7 @@ const question2Content_5 = [
 ];
 
 // READING EXTRA P2-6 - Topic: Making films
-const question2Content_6 = [
+const question2Content_5 = [
     '0. In 1895, the Grand Place cafe in France showed the first commercial film.',
     'Old movies were very different from today\'s movies.',
     'That\'s because the movies were only in black and white, and sometimes without sound.',
@@ -60,7 +51,7 @@ const question2Content_6 = [
 ];
 
 // READING EXTRA P2-8 - Topic: The famous singer (2)
-const question2Content_7 = [
+const question2Content_6 = [
     'He is a famous singer.',
     'Before becoming famous, he studied music at school when he was 15.',
     'His unique way of dressing and performing made him stand out from others.',
@@ -69,7 +60,7 @@ const question2Content_7 = [
 ];
 
 // READING EXTRA P2-9 - Topic: The famous singer (3)
-const question2Content_8 = [
+const question2Content_7 = [
     'Jaden Nobelton is only 18 years old and he is a famous singer',
     'Before becoming famous at his age, he studied art and music in high school.',
     'During his studies, he studied creativity and singing on stage.',
@@ -79,7 +70,7 @@ const question2Content_8 = [
 ];
 
 // READING EXTRA P2-10 - Topic: Writing about a place (2)
-const question2Content_9 = [
+const question2Content_8 = [
     'Before writing, it is important to research the place thoroughly.',
     'To prepare well, you should learn about the people and the history of the area.',
     'Sometimes you may not be able to visit the place, but you can still find similar information from other sources.',
@@ -88,7 +79,7 @@ const question2Content_9 = [
 ];
 
 // READING EXTRA P2-11 - Topic: My visit to a new coffee shop
-const question2Content_10 = [
+const question2Content_9 = [
     'It was my first time visiting a new local coffee shop.',
     'At first, I didn’t think it would be good, but I decided to give it a try.',
     'I looked at the menu and saw many different kinds of food and drinks.',
@@ -97,7 +88,7 @@ const question2Content_10 = [
 ];
 
 // READING EXTRA P2-12 - Topic: History to travel
-const question2Content_11 = [
+const question2Content_10 = [
     'In the past, only very rich people could afford to travel long distances.',
     'The invention of cars and trains had changed everything and made travelling cheaper.',
     'After these two means of transport, travelling becomes even easier with aeroplanes.',
@@ -106,7 +97,7 @@ const question2Content_11 = [
 ];
 
 // READING EXTRA P2-13 - Topic: University open day
-const question2Content_12 = [
+const question2Content_11 = [
     'Before the open day, please contact us by phone or email so we can record your personal details.',
     'Using this information, we’ll prepare an identification card for you to collect upon arrival.',
     'You’ll need to show this card to enter the introductory talk and morning lectures.',
@@ -114,13 +105,22 @@ const question2Content_12 = [
     'After the presentations, you’ll be able to explore different departments across the campus.',
 ];
 
-// READING EXTRA P2-7 - Topic: Tech fair
-const question2Content_13 = [
+// Bộ đề 14 - Topic: 
+const question2Content_12 = [
     'The tech fair took place on Saturday morning, showcasing a variety of exciting new gadgets.',
     'More than 60 exhibitors participated, with Mr. A presenting an impressive robot demonstration.',
-    'After the demonstrations, awards were given to the creators of the most innovative products.',
     'The event featured engaging activities such as VR gaming, coding workshops, and thrilling drone races.',
+    'After the demonstrations, awards were given to the creators of the most innovative products.',
     'Visitors enjoyed complimentary coffee and snacks while exploring the interactive exhibits.',
+];
+
+// Bộ đề 15 - Topic: 
+const question2Content_13 = [
+    'The tech expo was held on Sunday morning, showcasing cutting-edge innovations.',
+    'Over 75 participants attended, with Ms. Tran presenting a smart home device.',
+    'Activities included 3D printing demos, Al workshops, and virtual reality trials.',
+    'After the presentations, awards were given for the most creative prototype.',
+    'Attendees enjoyed networking over coffee and exploring interactive displays.',
 ];
 
 const questionSets = [
@@ -142,19 +142,19 @@ const questionSets = [
 window.questionSets = questionSets;
 
 const questheader1 = {
-    question2Content_1: "Đề dự phòng thêm: Tech Innovation Expo",
-    question2Content_2: "Music festivals",
-    question2Content_3: "Family sports day",
-    question2Content_4: "Means of transportation",
-    question2Content_5: "A new coffee shop (2)",
-    question2Content_6: "Making films",
-    question2Content_7: "The famous singer (2)",
-    question2Content_8: "The famous singer (3)",
-    question2Content_9: "Writing about a place (2)",
-    question2Content_10: "My visit to a new coffee shop",
-    question2Content_11: "History to travel",
-    question2Content_12: "University open day",
-    question2Content_13: "Tech fair",
+    question2Content_1: "Music festivals",
+    question2Content_2: "Family sports day",
+    question2Content_3: "Means of transportation",
+    question2Content_4: "A new coffee shop (2)",
+    question2Content_5: "Making films",
+    question2Content_6: "The famous singer (2)",
+    question2Content_7: "The famous singer (3)",
+    question2Content_8: "Writing about a place (2)",
+    question2Content_9: "My visit to a new coffee shop",
+    question2Content_10: "History to travel",
+    question2Content_11: "University open day",
+    question2Content_12: "Bộ đề 14",
+    question2Content_13: "Bộ đề 15",
 };
 
 function getQuestHeaders(obj) {
@@ -383,20 +383,6 @@ if (document.readyState === 'loading') {
   "sets": [
     {
       "id": 1,
-      "title": "READING EXTRA P2",
-      "data": {
-        "topic": "Đề dự phòng thêm: Tech Innovation Expo",
-        "sentences": [
-          "The tech expo was held on Sunday morning, showcasing cutting-edge innovations.",
-          "Over 75 participants attended, with Ms. Tran presenting a smart home device.",
-          "After the presentations, awards were given for the most creative prototype.",
-          "Activities included 3D printing demos, Al workshops, and virtual reality trials.",
-          "Attendees enjoyed networking over coffee and exploring interactive displays."
-        ]
-      }
-    },
-    {
-      "id": 2,
       "title": "READING EXTRA P2-2",
       "data": {
         "topic": "Music festivals",
@@ -411,7 +397,7 @@ if (document.readyState === 'loading') {
       }
     },
     {
-      "id": 3,
+      "id": 2,
       "title": "READING EXTRA P2-3",
       "data": {
         "topic": "Family sports day",
@@ -426,7 +412,7 @@ if (document.readyState === 'loading') {
       }
     },
     {
-      "id": 4,
+      "id": 3,
       "title": "READING EXTRA P2-4",
       "data": {
         "topic": "Means of transportation",
@@ -440,7 +426,7 @@ if (document.readyState === 'loading') {
       }
     },
     {
-      "id": 5,
+      "id": 4,
       "title": "READING EXTRA P2-5",
       "data": {
         "topic": "A new coffee shop (2)",
@@ -454,7 +440,7 @@ if (document.readyState === 'loading') {
       }
     },
     {
-      "id": 6,
+      "id": 5,
       "title": "READING EXTRA P2-6",
       "data": {
         "topic": "Making films",
@@ -469,7 +455,7 @@ if (document.readyState === 'loading') {
       }
     },
     {
-      "id": 7,
+      "id": 6,
       "title": "READING EXTRA P2-8",
       "data": {
         "topic": "The famous singer (2)",
@@ -483,7 +469,7 @@ if (document.readyState === 'loading') {
       }
     },
     {
-      "id": 8,
+      "id": 7,
       "title": "READING EXTRA P2-9",
       "data": {
         "topic": "The famous singer (3)",
@@ -498,7 +484,7 @@ if (document.readyState === 'loading') {
       }
     },
     {
-      "id": 9,
+      "id": 8,
       "title": "READING EXTRA P2-10",
       "data": {
         "topic": "Writing about a place (2)",
@@ -512,7 +498,7 @@ if (document.readyState === 'loading') {
       }
     },
     {
-      "id": 10,
+      "id": 9,
       "title": "READING EXTRA P2-11",
       "data": {
         "topic": "My visit to a new coffee shop",
@@ -526,7 +512,7 @@ if (document.readyState === 'loading') {
       }
     },
     {
-      "id": 11,
+      "id": 10,
       "title": "READING EXTRA P2-12",
       "data": {
         "topic": "History to travel",
@@ -540,7 +526,7 @@ if (document.readyState === 'loading') {
       }
     },
     {
-      "id": 12,
+      "id": 11,
       "title": "READING EXTRA P2-13",
       "data": {
         "topic": "University open day",
@@ -554,16 +540,30 @@ if (document.readyState === 'loading') {
       }
     },
     {
-      "id": 13,
-      "title": "READING EXTRA P2-7",
+      "id": 12,
+      "title": "Bộ đề 14",
       "data": {
-        "topic": "Tech fair",
+        "topic": "",
         "sentences": [
           "The tech fair took place on Saturday morning, showcasing a variety of exciting new gadgets.",
           "More than 60 exhibitors participated, with Mr. A presenting an impressive robot demonstration.",
-          "After the demonstrations, awards were given to the creators of the most innovative products.",
           "The event featured engaging activities such as VR gaming, coding workshops, and thrilling drone races.",
+          "After the demonstrations, awards were given to the creators of the most innovative products.",
           "Visitors enjoyed complimentary coffee and snacks while exploring the interactive exhibits."
+        ]
+      }
+    },
+    {
+      "id": 13,
+      "title": "Bộ đề 15",
+      "data": {
+        "topic": "",
+        "sentences": [
+          "The tech expo was held on Sunday morning, showcasing cutting-edge innovations.",
+          "Over 75 participants attended, with Ms. Tran presenting a smart home device.",
+          "Activities included 3D printing demos, Al workshops, and virtual reality trials.",
+          "After the presentations, awards were given for the most creative prototype.",
+          "Attendees enjoyed networking over coffee and exploring interactive displays."
         ]
       }
     }
