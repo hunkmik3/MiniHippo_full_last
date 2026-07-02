@@ -2,7 +2,7 @@
 // ////////////// DANH SÁCH CÂU HỎI PART 2 & 3 ///////////////
 // ===============================================================================================================
 
-// READING EXTRA P2-3 - Topic: Family sports day
+// READING EXTRA P2 - Topic: Family sports day
 const question2Content_1 = [
     '0. Last week, the weather was great. The town organized a ten-mile race.',
     'It took place on Sunday morning in the park, there was a race for adults.',
@@ -383,7 +383,7 @@ if (document.readyState === 'loading') {
   "sets": [
     {
       "id": 1,
-      "title": "READING EXTRA P2-3",
+      "title": "READING EXTRA P2",
       "data": {
         "topic": "Family sports day",
         "sentences": [
