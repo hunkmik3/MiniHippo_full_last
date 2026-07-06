@@ -2,7 +2,12 @@ import { parseJsonBody } from '../../_utils/parseBody.js';
 import { verifyAdminRequest } from '../../_utils/auth.js';
 import { callSupabaseAuth, deleteFrom, insertInto, selectFrom, updateTable, upsertInto } from '../../_utils/supabase.js';
 import { resolveDeviceLimit } from '../../_utils/device.js';
-import { computeVstepExpiresAtDate, vstepSchemaErrorResponse } from '../_utils.js';
+import {
+  computeVstepExpiresAtDate,
+  vstepSchemaErrorResponse,
+  normalizeScheduleType,
+  defaultNumSessionsForBand
+} from '../_utils.js';
 
 function todayLocalYmd() {
   const d = new Date();
@@ -255,6 +260,66 @@ async function createOrUpdateStudent(row, batchId, defaultLearningProgram = 'vst
   }
 }
 
+// ===== Auto gom HV vào lớp theo cột "tên lớp" + "ca học" trong file import =====
+// Feedback KH: import đông HV rồi phải tích tay từng em vào lớp rất khó kiểm soát.
+// File import thêm cột className (tên lớp) + scheduleType (246/357) → tự tìm lớp
+// theo tên (tạo mới nếu chưa có) rồi add HV vào. classCache dùng chung 1 batch
+// để 500 row cùng lớp không tạo trùng.
+async function attachToClassByName(student, className, scheduleType, band, adminId, classCache) {
+  if (!student?.id || !className) return null;
+  const cacheKey = className.toLowerCase();
+  let klass = classCache.get(cacheKey);
+
+  if (!klass) {
+    klass = await selectFrom('vstep_classes', {
+      filters: [
+        { column: 'title', value: className, operator: 'ilike' },
+        { column: 'status', value: 'active' }
+      ],
+      single: true
+    }).catch(() => null);
+
+    if (!klass) {
+      const resolvedBand = normalizeBand(band) || 'B1';
+      const [created] = await insertInto('vstep_classes', [{
+        title: className,
+        band: resolvedBand,
+        schedule_type: normalizeScheduleType(scheduleType) || null,
+        num_sessions: defaultNumSessionsForBand(resolvedBand),
+        sessions: [],
+        status: 'active',
+        created_by: adminId || null
+      }]);
+      klass = created;
+    }
+    if (klass) classCache.set(cacheKey, klass);
+  }
+  if (!klass?.id) return null;
+
+  // Membership idempotent: UNIQUE (class_id, student_id) — check trước, catch duplicate sau.
+  const existing = await selectFrom('vstep_class_students', {
+    filters: [
+      { column: 'class_id', value: klass.id },
+      { column: 'student_id', value: student.id }
+    ],
+    single: true
+  }).catch(() => null);
+  if (!existing) {
+    try {
+      await insertInto('vstep_class_students', [{
+        class_id: klass.id,
+        student_id: student.id,
+        status: 'active'
+      }]);
+    } catch (err) {
+      const msg = String(err?.message || '');
+      if (!/duplicate|unique/i.test(msg)) throw err;
+    }
+  }
+  await updateTable('vstep_students', [{ column: 'id', value: student.id }], { class_id: klass.id });
+  return { classId: klass.id, classTitle: klass.title };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -277,11 +342,30 @@ export default async function handler(req, res) {
     const defaultProgram = bodyProgram === 'vstep_onthi' ? 'vstep_onthi' : 'vstep_lophoc';
 
     const batchId = `vstep-import-${Date.now()}`;
+    const classCache = new Map();
     const results = [];
     for (let index = 0; index < rows.length; index += 1) {
+      const row = rows[index];
       try {
-        const result = await createOrUpdateStudent(rows[index], batchId, defaultProgram);
-        results.push({ row: index + 1, ok: true, ...result });
+        const result = await createOrUpdateStudent(row, batchId, defaultProgram);
+        // Gán lớp nếu row có cột tên lớp — lỗi gán lớp KHÔNG fail cả row
+        // (HV đã tạo xong), chỉ ghi chú lại để admin biết.
+        const className = clean(row.className || row.class_name || row.ten_lop || row.tenlop || row.classname || '');
+        const scheduleType = row.scheduleType || row.schedule_type || row.ca_hoc || row.cahoc || row.scheduletype || '';
+        let classAssigned = null;
+        let classError = null;
+        if (className && result?.student?.id) {
+          try {
+            classAssigned = await attachToClassByName(
+              result.student, String(className), scheduleType,
+              row.band || row.level, adminCheck.user.id, classCache
+            );
+          } catch (err) {
+            classError = err?.message || 'Không thể gán lớp';
+            console.warn(`bulk-import: gán lớp fail cho row ${index + 1}:`, classError);
+          }
+        }
+        results.push({ row: index + 1, ok: true, ...result, classAssigned, classError });
       } catch (error) {
         results.push({ row: index + 1, ok: false, error: error?.details?.message || error.message });
       }
@@ -293,6 +377,7 @@ export default async function handler(req, res) {
       created: results.filter(item => item.ok && item.action === 'created').length,
       updated: results.filter(item => item.ok && item.action === 'updated').length,
       failed: results.filter(item => !item.ok).length,
+      classAssignedCount: results.filter(item => item.classAssigned).length,
       results
     });
   } catch (error) {
