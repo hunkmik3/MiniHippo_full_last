@@ -146,6 +146,35 @@
         });
     }
 
+    // Bảng đối chiếu đáp án Listening/Reading từ metadata details (feedback KH:
+    // "chỗ đáp án và lời giải sau khi nộp bài xong xem ở đâu").
+    function buildMcqReviewHtml(md) {
+        const sections = [
+            { label: 'Listening', details: md.listening_details },
+            { label: 'Reading', details: md.reading_details }
+        ].filter(s => Array.isArray(s.details) && s.details.length);
+        if (!sections.length) return '';
+        return sections.map(section => {
+            const correctCount = section.details.filter(d => d.isCorrect).length;
+            return `
+            <div class="mb-3">
+                <h6>${escapeHtml(section.label)} — ${correctCount}/${section.details.length} câu đúng</h6>
+                ${section.details.map((d, i) => `
+                    <div class="p-2 mb-1 border rounded small" style="border-left:4px solid ${d.isCorrect ? '#198754' : '#dc3545'} !important; background:${d.isCorrect ? '#f2fbf6' : '#fdf3f4'};">
+                        <div><strong>Câu ${escapeHtml(String(d.number || i + 1))}.</strong> ${escapeHtml(d.prompt || '')}</div>
+                        <div class="d-flex flex-wrap gap-3 mt-1">
+                            <span>Bạn chọn: <strong>${escapeHtml(d.userAnswer || '—')}</strong></span>
+                            <span>Đáp án đúng: <strong>${escapeHtml(d.correct || '')}</strong></span>
+                            <span>${d.isCorrect ? '<i class="bi bi-check-circle-fill text-success"></i> Đúng' : '<i class="bi bi-x-circle-fill text-danger"></i> Sai'}</span>
+                        </div>
+                        ${d.explanation ? `<div class="mt-1 p-2 rounded" style="background:#fff8e6;color:#664d03;"><i class="bi bi-lightbulb me-1"></i>${escapeHtml(d.explanation)}</div>` : ''}
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        }).join('');
+    }
+
     function showDetail(id) {
         const result = state.results.find(r => String(r.id) === String(id));
         if (!result || !refs.detail) return;
@@ -154,6 +183,7 @@
         const dump = JSON.parse(JSON.stringify(result));
         if (dump.metadata?.proctor_photo) dump.metadata.proctor_photo = '[đã ẩn]';
         if (dump.metadata?.answers) dump.metadata.answers = '[xem chi tiết phía dưới]';
+        const mcqReviewHtml = buildMcqReviewHtml(md);
         const writingHtml = (md.writing_answers || []).map((w, i) => `
             <div class="mb-3">
                 <strong>Writing Part ${i + 1}</strong>
@@ -168,13 +198,29 @@
             </div>
         `).join('');
 
+        // Điểm thành phần theo kỹ năng (GV chấm qua part_scores.manualScore).
+        const partScores = result.part_scores && typeof result.part_scores === 'object' ? result.part_scores : {};
+        const skillLabels = { listening: 'Listening', reading: 'Reading', writing: 'Writing', speaking: 'Speaking' };
+        const skillScoreRows = Object.keys(skillLabels).map(key => {
+            const item = partScores[key] || {};
+            const hasManual = Number.isFinite(Number(item.manualScore));
+            const hasAuto = Number(item.total || 0) > 0;
+            if (!hasManual && !hasAuto) return '';
+            const text = hasManual
+                ? `${Number(item.manualScore)} điểm (GV chấm)`
+                : `${Number(item.score || 0)}/${Number(item.total || 0)}`;
+            return `<span class="badge bg-light text-dark border me-2 mb-1">${skillLabels[key]}: <strong>${escapeHtml(text)}</strong></span>`;
+        }).filter(Boolean).join('');
+
         refs.detail.style.display = 'block';
         refs.detail.innerHTML = `
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <strong><i class="bi bi-file-text me-1"></i>Chi tiết bài nộp #${escapeHtml(String(result.id).slice(0, 8))}</strong>
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="vstep-history-close-detail">Đóng</button>
             </div>
+            ${skillScoreRows ? `<div class="mb-2">${skillScoreRows}</div>` : ''}
             ${result.manual_feedback ? `<div class="alert alert-info py-2 small mb-3"><strong>Giáo viên:</strong> ${escapeHtml(result.manual_feedback)}</div>` : ''}
+            ${mcqReviewHtml ? `<div class="mb-3"><h6><i class="bi bi-journal-check me-1"></i>Đáp án & giải thích</h6>${mcqReviewHtml}</div>` : ''}
             ${writingHtml ? `<div class="mb-3"><h6>Writing answers</h6>${writingHtml}</div>` : ''}
             ${speakingHtml ? `<div class="mb-3"><h6>Speaking recordings</h6>${speakingHtml}</div>` : ''}
             <details>

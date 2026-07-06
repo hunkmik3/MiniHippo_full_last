@@ -1722,10 +1722,37 @@ body.vstep-body {
 }
 
 .vstep-camera-box {
-  width: 170px;
-  height: 112px;
+  width: 240px;
+  height: 158px;
   background: #12263a;
   object-fit: cover;
+  border-radius: 6px;
+}
+
+/* Khung chụp hình chung: webcam + ảnh chụp + nút, xếp dọc căn giữa. */
+.vstep-photo-frame {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 22px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
+  max-width: 560px;
+}
+
+.vstep-photo-frame-media {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+}
+
+.vstep-photo-frame-media canvas {
+  border-radius: 6px;
+  border: 2px solid rgba(255, 255, 255, 0.5);
 }
 
 .vstep-exam {
@@ -2551,22 +2578,139 @@ body.vstep-body {
   left: 50%;
   top: 58px;
   transform: translateX(-50%);
-  background: #fff3cd;
-  border: 1px solid #ffd966;
-  color: #7a4d00;
-  padding: 8px 14px;
-  border-radius: 4px;
+  background: #dc3545;
+  border: 2px solid #b02a37;
+  color: #fff;
+  padding: 14px 22px;
+  border-radius: 8px;
   z-index: 1200;
   display: none;
-  font-weight: 700;
+  font-weight: 800;
+  font-size: 1.05rem;
+  max-width: min(92vw, 640px);
+  text-align: center;
+  box-shadow: 0 6px 24px rgba(176, 42, 55, 0.45);
 }
 
 .vstep-warning.show {
   display: block;
+  animation: vstep-warning-pulse 1.2s ease-in-out 3;
+}
+
+@keyframes vstep-warning-pulse {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  50% { transform: translateX(-50%) scale(1.04); }
+}
+
+.vstep-warning .vstep-warning-action {
+  background: #fff;
+  color: #b02a37;
+  border: none;
+  font-weight: 800;
+  margin-top: 8px;
+}
+
+.vstep-warning .vstep-warning-action:hover {
+  background: #ffe3e6;
+  color: #b02a37;
 }
 
 .vstep-hidden {
   display: none !important;
+}
+
+/* ===== Điểm nổi bật sau khi nộp bài ===== */
+.vstep-score-highlight {
+  text-align: center;
+  padding: 14px 10px 6px;
+}
+
+.vstep-score-check {
+  color: #198754;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.vstep-score-big {
+  font-size: 3.2rem;
+  font-weight: 900;
+  line-height: 1.1;
+  color: #0d6efd;
+}
+
+.vstep-score-big .vstep-score-max {
+  font-size: 1.6rem;
+  color: #6c757d;
+  font-weight: 700;
+}
+
+.vstep-score-label {
+  font-size: 0.95rem;
+  color: #495057;
+  font-weight: 600;
+}
+
+/* ===== Màn review đáp án + giải thích sau nộp ===== */
+.vstep-review-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 25, 47, 0.88);
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+.vstep-review-panel {
+  background: #fff;
+  border-radius: 12px;
+  max-width: 860px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px;
+}
+
+.vstep-review-body {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.vstep-review-item {
+  border: 1px solid #dee2e6;
+  border-left-width: 4px;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.vstep-review-item.vstep-review-correct {
+  border-left-color: #198754;
+  background: #f2fbf6;
+}
+
+.vstep-review-item.vstep-review-wrong {
+  border-left-color: #dc3545;
+  background: #fdf3f4;
+}
+
+.vstep-review-a {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 0.9rem;
+  margin-top: 4px;
+}
+
+.vstep-review-explain {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: #fff8e6;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: #664d03;
 }
 
 @media (max-width: 1180px) {

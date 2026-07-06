@@ -349,6 +349,58 @@
         partEl.querySelectorAll('.vstep-question-builder').forEach(b => { b.innerHTML = ''; });
     }
 
+    // Preset label + số câu mặc định cho từng part chuẩn VSTEP.
+    // Feedback KH: BTVN có thể lặp 2 part giống nhau hoặc chỉ có Part 3 —
+    // nút thêm part giờ chọn ĐÍCH DANH part nào (set title + số câu tương ứng
+    // vào slot vật lý kế tiếp; slot vật lý chỉ là chỗ chứa, title mới là thứ HV thấy).
+    const PART_PRESETS = {
+        listening: [
+            { label: 'Part 1', title: 'Part 1', questionCount: 8 },
+            { label: 'Part 2', title: 'Part 2', questionCount: 12 },
+            { label: 'Part 3', title: 'Part 3', questionCount: 15 }
+        ],
+        reading: [
+            { label: 'Part 1', title: 'Part 1', questionCount: 10 },
+            { label: 'Part 2', title: 'Part 2', questionCount: 10 },
+            { label: 'Part 3', title: 'Part 3', questionCount: 10 },
+            { label: 'Part 4', title: 'Part 4', questionCount: 10 }
+        ],
+        writing: [
+            { label: 'Task 1', title: 'Part 1: Letter / Email' },
+            { label: 'Task 2', title: 'Part 2: Essay' }
+        ],
+        speaking: [
+            { label: 'Part 1', title: 'Part 1: Social Interaction', prep: 0, answer: 180 },
+            { label: 'Part 2', title: 'Part 2: Solution Discussion', prep: 60, answer: 180 },
+            { label: 'Part 3', title: 'Part 3: Topic Development', prep: 60, answer: 240 }
+        ]
+    };
+
+    function addPartFromPreset(skill, preset) {
+        if (currentPartCounts[skill] >= MAX_PARTS[skill]) return;
+        currentPartCounts[skill] += 1;
+        const slotIndex = currentPartCounts[skill]; // slot vật lý vừa mở (1-based)
+        if (!currentEnabledSkills.has(skill)) {
+            currentEnabledSkills.add(skill);
+            applySkillVisibility();
+            renderSkillToolbar();
+        }
+        applyPartVisibility(skill);
+        // Set title + số câu/timing mặc định theo part đã chọn.
+        const titleEl = $(`vstep-${skill}-${slotIndex}-title`);
+        if (titleEl && preset.title) titleEl.value = preset.title;
+        if (preset.questionCount) {
+            const countInput = $(`vstep-${skill}-${slotIndex}-questions-count`);
+            if (countInput) countInput.value = String(preset.questionCount);
+        }
+        if (skill === 'speaking') {
+            const prepEl = $(`vstep-speaking-${slotIndex}-prep`);
+            const ansEl = $(`vstep-speaking-${slotIndex}-answer`);
+            if (prepEl && Number.isFinite(preset.prep)) prepEl.value = String(preset.prep);
+            if (ansEl && Number.isFinite(preset.answer)) ansEl.value = String(preset.answer);
+        }
+    }
+
     function injectPartControls(skill) {
         const container = document.getElementById(`vstep-${skill}-editors`);
         if (!container) return;
@@ -356,43 +408,46 @@
 
         const max = MAX_PARTS[skill];
         const count = currentPartCounts[skill];
+        const presets = PART_PRESETS[skill] || [];
 
         const wrap = document.createElement('div');
         wrap.className = 'vstep-part-controls d-flex flex-wrap align-items-center gap-2 mt-2 p-2 border rounded bg-light';
+        // Nút thêm theo ĐÍCH DANH part (cho phép chọn cùng part 2 lần — lặp BTVN).
+        const addButtonsHtml = count < max
+            ? presets.map((p, i) => `
+                <button type="button" class="btn btn-sm btn-outline-primary vstep-add-part-preset-btn"
+                    data-skill="${skill}" data-preset="${i}"
+                    title="Thêm ${SKILL_META[skill].label} ${p.label} vào buổi (có thể thêm lặp)">
+                    <i class="bi bi-plus-circle me-1"></i>${p.label}
+                </button>
+            `).join('')
+            : '<span class="badge bg-secondary">Đã dùng tối đa slot</span>';
         wrap.innerHTML = `
             <span class="small text-muted me-auto">
                 <i class="bi ${SKILL_META[skill].icon} me-1"></i>
-                ${SKILL_META[skill].label}: đang dùng <strong>${count}/${max}</strong> part
+                ${SKILL_META[skill].label}: đang dùng <strong>${count}/${max}</strong> phần
             </span>
             ${count > 0 ? `
                 <button type="button" class="btn btn-sm btn-outline-warning vstep-remove-last-part-btn" data-skill="${skill}">
-                    <i class="bi bi-dash-circle me-1"></i>Bỏ Part ${count}
+                    <i class="bi bi-dash-circle me-1"></i>Bỏ phần cuối
                 </button>
             ` : ''}
-            ${count < max ? `
-                <button type="button" class="btn btn-sm btn-outline-primary vstep-add-part-btn" data-skill="${skill}">
-                    <i class="bi bi-plus-circle me-1"></i>Thêm Part ${count + 1}
-                </button>
-            ` : '<span class="badge bg-secondary">Đã dùng tối đa</span>'}
+            ${count < max ? '<span class="small text-muted">Thêm:</span>' : ''}
+            ${addButtonsHtml}
         `;
         container.appendChild(wrap);
 
-        wrap.querySelector('.vstep-add-part-btn')?.addEventListener('click', () => {
-            if (currentPartCounts[skill] < MAX_PARTS[skill]) {
-                currentPartCounts[skill] += 1;
-                // Nếu skill chưa bật → tự bật.
-                if (!currentEnabledSkills.has(skill)) {
-                    currentEnabledSkills.add(skill);
-                    applySkillVisibility();
-                    renderSkillToolbar();
-                }
-                applyPartVisibility(skill);
-            }
+        wrap.querySelectorAll('.vstep-add-part-preset-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const preset = presets[Number(btn.dataset.preset)] || {};
+                addPartFromPreset(skill, preset);
+            });
         });
         wrap.querySelector('.vstep-remove-last-part-btn')?.addEventListener('click', () => {
             const idx = currentPartCounts[skill];
             if (idx <= 0) return;
-            if (!window.confirm(`Bỏ Part ${idx} của ${SKILL_META[skill].label}? Dữ liệu Part ${idx} sẽ mất.`)) return;
+            const titleNow = $(`vstep-${skill}-${idx}-title`)?.value || `Part ${idx}`;
+            if (!window.confirm(`Bỏ "${titleNow}" của ${SKILL_META[skill].label}? Dữ liệu phần này sẽ mất.`)) return;
             clearPartData(skill, idx);
             currentPartCounts[skill] -= 1;
             // Nếu hết part → coi như tắt skill luôn.

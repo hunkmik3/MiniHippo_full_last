@@ -137,6 +137,16 @@
         return escapeHtml(value).replace(/\r?\n/g, '<br>');
     }
 
+    // Markdown-lite cho passage/prompt: **đậm**, *nghiêng*, __gạch chân__.
+    // Escape HTML TRƯỚC rồi mới thay marker → an toàn XSS, admin không cần nhập thẻ HTML.
+    function richText(value) {
+        return escapeHtml(value)
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/__([^_]+)__/g, '<u>$1</u>')
+            .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>')
+            .replace(/\r?\n/g, '<br>');
+    }
+
     function safeText(value, fallback = '') {
         const text = typeof value === 'string' ? value.trim() : '';
         return text || fallback;
@@ -197,11 +207,29 @@
         section?.classList.remove('vstep-hidden');
     }
 
-    function showWarning(message) {
-        refs.warning.textContent = message;
+    // duration 8s (feedback KH: 2.2s tắt nhanh quá đọc không kịp).
+    // options.actionLabel + options.onAction → render nút hành động trong banner
+    // (vd "Bật lại toàn màn hình" — fullscreen cần user gesture nên phải qua click).
+    function showWarning(message, options = {}) {
+        const duration = Number(options.duration) > 0 ? Number(options.duration) : 8000;
+        refs.warning.innerHTML = '';
+        const text = document.createElement('span');
+        text.textContent = message;
+        refs.warning.appendChild(text);
+        if (options.actionLabel && typeof options.onAction === 'function') {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-sm btn-danger ms-2 vstep-warning-action';
+            btn.textContent = options.actionLabel;
+            btn.addEventListener('click', () => {
+                options.onAction();
+                refs.warning.classList.remove('show');
+            });
+            refs.warning.appendChild(btn);
+        }
         refs.warning.classList.add('show');
         clearTimeout(showWarning._timer);
-        showWarning._timer = setTimeout(() => refs.warning.classList.remove('show'), 2200);
+        showWarning._timer = setTimeout(() => refs.warning.classList.remove('show'), duration);
     }
 
     function showModal(modal) {
@@ -395,18 +423,25 @@
             : getDuration() * 60;
         state.skillRemainingBySkill[skill] = state.skillRemaining;
         renderTimer(state.skillRemaining);
+        // Tính theo mốc deadline tuyệt đối (Date.now) thay vì trừ dần mỗi tick —
+        // setInterval drift/throttle làm đồng hồ chậm 2-3s so với thời gian thực
+        // trong bài dài (feedback KH). Tick 500ms để giây nhảy mượt.
+        const deadline = Date.now() + state.skillRemaining * 1000;
         state.timerInterval = setInterval(() => {
-            state.skillRemaining -= 1;
-            state.skillRemainingBySkill[getCurrentSkill()] = state.skillRemaining;
-            renderTimer(state.skillRemaining);
-            if (state.skillRemaining <= 60) {
+            const remaining = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+            if (remaining !== state.skillRemaining) {
+                state.skillRemaining = remaining;
+                state.skillRemainingBySkill[getCurrentSkill()] = remaining;
+                renderTimer(remaining);
+            }
+            if (remaining <= 60) {
                 refs.timer.style.filter = 'brightness(1.16)';
             }
-            if (state.skillRemaining <= 0) {
+            if (remaining <= 0) {
                 clearInterval(state.timerInterval);
                 handleSkillTimeout();
             }
-        }, 1000);
+        }, 500);
     }
 
     function handleSkillTimeout() {
@@ -470,8 +505,9 @@
         }).length;
     }
 
+    // Đánh số câu LIÊN TỤC qua các part cho mọi kỹ năng MCQ (feedback KH):
+    // Reading P1 1-10, P2 11-20, P3 21-30, P4 31-40; Listening P1 1-8, P2 9-20, P3 21-35.
     function getQuestionNumber(skill, partIndex, questionIndex) {
-        if (skill !== 'listening') return questionIndex + 1;
         const offset = getParts(skill).slice(0, partIndex).reduce((sum, part) => {
             return sum + (part.questions || []).length;
         }, 0);
@@ -696,15 +732,16 @@
     function renderReading(part, partIndex) {
         const title = safeText(part.title, `Reading Part ${partIndex + 1}`);
         const passage = part.passage || part.text || part.content || '';
-        const questionCount = (part.questions || []).length;
+        // Header hiện range THẬT theo đánh số liên tục (vd Part 2 → Questions 11-20).
+        const rangeLabel = getQuestionRange('reading', part, partIndex) || 'Questions';
         refs.content.innerHTML = `
             <div class="vstep-reading-layout">
                 <article class="vstep-passage vstep-reading-pane">
                     <h1>${escapeHtml(title)}</h1>
-                    <div class="vstep-reading-passage-copy">${nl2br(passage)}</div>
+                    <div class="vstep-reading-passage-copy">${richText(passage)}</div>
                 </article>
                 <section class="vstep-reading-questions vstep-reading-pane">
-                    <div class="vstep-reading-question-head">Questions 1-${questionCount || 0}</div>
+                    <div class="vstep-reading-question-head">${escapeHtml(rangeLabel)}</div>
                     ${renderMcqQuestions('reading', part, partIndex)}
                 </section>
             </div>
@@ -1096,13 +1133,18 @@
                 finish();
                 return;
             }
+            // Deadline tuyệt đối — tránh drift của setInterval (đồng hồ chậm dần).
+            const deadline = Date.now() + remaining * 1000;
             interval = setInterval(() => {
-                remaining -= 1;
-                render(remaining);
+                const next = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+                if (next !== remaining) {
+                    remaining = next;
+                    render(remaining);
+                }
                 if (remaining <= 0) {
                     finish();
                 }
-            }, 1000);
+            }, 500);
         });
     }
 
@@ -1581,14 +1623,74 @@
                 details.push({
                     id,
                     part: partIndex + 1,
+                    number: getQuestionNumber(skill, partIndex, questionIndex),
                     prompt: question.prompt || '',
                     userAnswer,
                     correct,
-                    isCorrect: ok
+                    isCorrect: ok,
+                    // Giải thích admin nhập — lưu vào metadata để HV xem lại
+                    // trong màn review sau nộp + trang lịch sử.
+                    explanation: question.explanation || ''
                 });
             });
         });
         return { score, max, details };
+    }
+
+    // ===== Màn review đáp án + giải thích sau khi nộp (feedback KH) =====
+    function buildReviewHtml(listening, reading) {
+        const sections = [
+            { label: 'Listening', data: listening },
+            { label: 'Reading', data: reading }
+        ].filter(s => s.data && s.data.max > 0);
+        if (!sections.length) return '';
+        return sections.map(section => `
+            <div class="vstep-review-section">
+                <h3 class="h6 mt-3 mb-2">${escapeHtml(section.label)} — ${section.data.score}/${section.data.max} câu đúng</h3>
+                ${section.data.details.map(d => `
+                    <div class="vstep-review-item ${d.isCorrect ? 'vstep-review-correct' : 'vstep-review-wrong'}">
+                        <div class="vstep-review-q">
+                            <strong>Câu ${escapeHtml(String(d.number || ''))}.</strong> ${escapeHtml(d.prompt)}
+                        </div>
+                        <div class="vstep-review-a">
+                            <span>Bạn chọn: <strong>${escapeHtml(d.userAnswer || '—')}</strong></span>
+                            <span>Đáp án đúng: <strong>${escapeHtml(d.correct)}</strong></span>
+                            <span>${d.isCorrect ? '<i class="bi bi-check-circle-fill text-success"></i> Đúng' : '<i class="bi bi-x-circle-fill text-danger"></i> Sai'}</span>
+                        </div>
+                        ${d.explanation ? `<div class="vstep-review-explain"><i class="bi bi-lightbulb me-1"></i>${richText(d.explanation)}</div>` : ''}
+                    </div>
+                `).join('')}
+            </div>
+        `).join('');
+    }
+
+    function showAnswerReview(listening, reading) {
+        const html = buildReviewHtml(listening, reading);
+        if (!html) return;
+        // Render overlay full-screen review — HV đọc xong bấm Quay về trang chủ.
+        const overlay = document.createElement('div');
+        overlay.className = 'vstep-review-overlay';
+        overlay.innerHTML = `
+            <div class="vstep-review-panel">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h2 class="h5 mb-0"><i class="bi bi-journal-check me-2"></i>Đáp án & giải thích</h2>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="vstepReviewCloseBtn">
+                        <i class="bi bi-x-lg me-1"></i>Đóng
+                    </button>
+                </div>
+                <div class="vstep-review-body">${html}</div>
+                <div class="text-center mt-3">
+                    <button type="button" class="btn btn-primary" id="vstepReviewHomeBtn">
+                        <i class="bi bi-house me-1"></i>Quay về trang chủ
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.querySelector('#vstepReviewCloseBtn')?.addEventListener('click', () => overlay.remove());
+        overlay.querySelector('#vstepReviewHomeBtn')?.addEventListener('click', () => {
+            window.location.href = '/vstep_bode.html';
+        });
     }
 
     function collectWritingMetadata() {
@@ -1686,7 +1788,23 @@
             if (!saved) throw new Error('Không thể lưu kết quả. Vui lòng kiểm tra đăng nhập hoặc báo admin.');
 
             localStorage.removeItem(attemptKey);
-            refs.submitStatus.textContent = `Đã nộp bài thành công. Điểm tự động Listening + Reading: ${totalScore}/${maxScore}.`;
+            // Điểm hiện NỔI BẬT (feedback KH: text nhỏ khó nhìn) + nút xem đáp án.
+            const hasAutoScore = maxScore > 0;
+            refs.submitStatus.innerHTML = `
+                <div class="vstep-score-highlight">
+                    <div class="vstep-score-check"><i class="bi bi-check-circle-fill"></i> Đã nộp bài thành công</div>
+                    ${hasAutoScore ? `
+                        <div class="vstep-score-big">${totalScore}<span class="vstep-score-max">/${maxScore}</span></div>
+                        <div class="vstep-score-label">Điểm tự động Listening + Reading</div>
+                        <button type="button" class="btn btn-outline-primary btn-sm mt-2" id="vstepShowReviewBtn">
+                            <i class="bi bi-journal-check me-1"></i>Xem đáp án & giải thích
+                        </button>
+                    ` : '<div class="vstep-score-label">Bài Writing/Speaking sẽ được giáo viên chấm và trả điểm sau.</div>'}
+                </div>
+            `;
+            document.getElementById('vstepShowReviewBtn')?.addEventListener('click', () => {
+                showAnswerReview(listening, reading);
+            });
             confirmBtn.style.display = 'none';
             // Đã nộp xong: đổi nút thành "Quay về trang chủ" (xem handler ở bindEvents).
             state.submitted = true;
@@ -1711,7 +1829,25 @@
         document.addEventListener('fullscreenchange', () => {
             const inExam = refs.exam && !refs.exam.classList.contains('vstep-hidden');
             if (inExam && !document.fullscreenElement && !state.submitted) {
-                showWarning('Bạn đã thoát toàn màn hình. Vui lòng giữ chế độ làm bài để kết quả được ghi nhận.');
+                showWarning('Bạn đã thoát toàn màn hình. Vui lòng giữ chế độ làm bài để kết quả được ghi nhận.', {
+                    duration: 15000,
+                    actionLabel: 'Bật lại toàn màn hình',
+                    onAction: requestExamFullscreen
+                });
+            }
+        });
+        // Phát hiện chuyển tab / minimize khi đang làm bài. Khi quay lại tab:
+        // cảnh báo + đề nghị bật lại fullscreen (browser đã thoát fullscreen khi
+        // rời tab; requestFullscreen chỉ chạy được từ user gesture → nút bấm).
+        document.addEventListener('visibilitychange', () => {
+            const inExam = refs.exam && !refs.exam.classList.contains('vstep-hidden');
+            if (!inExam || state.submitted) return;
+            if (document.visibilityState === 'visible' && !document.fullscreenElement) {
+                showWarning('Bạn đã rời khỏi màn hình làm bài. Vui lòng không chuyển tab trong khi thi.', {
+                    duration: 15000,
+                    actionLabel: 'Bật lại toàn màn hình',
+                    onAction: requestExamFullscreen
+                });
             }
         });
         refs.continueBtn.addEventListener('click', continueFlow);

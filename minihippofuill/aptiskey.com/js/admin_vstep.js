@@ -991,6 +991,12 @@
                         </div>
                         <div class="col-12">
                             <label class="form-label" for="vstep-reading-${index}-passage">Bài đọc</label>
+                            <div class="d-flex gap-1 mb-1 vstep-format-toolbar" data-target="vstep-reading-${index}-passage">
+                                <button type="button" class="btn btn-sm btn-outline-secondary vstep-format-btn" data-format="bold" title="In đậm: **chữ**"><strong>B</strong></button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary vstep-format-btn" data-format="italic" title="In nghiêng: *chữ*"><em>I</em></button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary vstep-format-btn" data-format="underline" title="Gạch chân: __chữ__"><u>U</u></button>
+                                <span class="vstep-help ms-2 align-self-center">Bôi đen chữ rồi bấm nút, hoặc gõ **đậm**, *nghiêng*, __gạch chân__.</span>
+                            </div>
                             <textarea class="form-control" id="vstep-reading-${index}-passage" rows="8" placeholder="Nhập passage hoặc để placeholder để dựng khung trước."></textarea>
                         </div>
                         <div class="col-12">
@@ -1106,6 +1112,24 @@
 
         document.querySelectorAll('.vstep-media-file').forEach(input => {
             input.addEventListener('change', () => uploadMediaFromInput(input));
+        });
+        // Toolbar format B/I/U: bọc đoạn đang bôi đen bằng marker markdown-lite.
+        // vstep_exam.js render **đậm** / *nghiêng* / __gạch chân__ qua richText().
+        document.querySelectorAll('.vstep-format-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                const toolbar = button.closest('.vstep-format-toolbar');
+                const target = toolbar ? $(toolbar.dataset.target) : null;
+                if (!target) return;
+                const markers = { bold: '**', italic: '*', underline: '__' };
+                const marker = markers[button.dataset.format] || '**';
+                const start = target.selectionStart || 0;
+                const end = target.selectionEnd || 0;
+                const value = target.value || '';
+                const selected = value.slice(start, end) || 'chữ';
+                target.value = value.slice(0, start) + marker + selected + marker + value.slice(end);
+                target.focus();
+                target.setSelectionRange(start + marker.length, start + marker.length + selected.length);
+            });
         });
         document.querySelectorAll('.vstep-generate-question-lines').forEach(button => {
             button.addEventListener('click', () => {
@@ -1954,7 +1978,17 @@
             module: 'learningProgram',
             devicelimit: 'deviceLimit',
             device_limit: 'deviceLimit',
-            username: 'username'
+            username: 'username',
+            classname: 'className',
+            class_name: 'className',
+            ten_lop: 'className',
+            tenlop: 'className',
+            lop_hoc: 'className',
+            scheduletype: 'scheduleType',
+            schedule_type: 'scheduleType',
+            ca_hoc: 'scheduleType',
+            cahoc: 'scheduleType',
+            ca: 'scheduleType'
         };
         const first = rows[0].map(cell => cell.toLowerCase().replace(/\s+/g, '_'));
         const hasHeader = first.some(cell => headerAliases[cell]);
@@ -2016,11 +2050,13 @@
     function downloadImportTemplateCSV() {
         const headers = [
             'accountCode', 'fullName', 'email', 'phone', 'band',
-            'startedOn', 'expiresAt', 'practiceAccess', 'password'
+            'startedOn', 'expiresAt', 'practiceAccess', 'password',
+            'className', 'scheduleType'
         ];
         const sample = [
             'VSTEP001', 'Nguyễn Văn A', 'student001@vstep.example', '0901234567', 'B1',
-            '2026-06-09', '', 'true', ''
+            '2026-06-09', '', 'true', '',
+            'Lớp B1 tối 246', '246'
         ];
         // BOM để Excel mở UTF-8 không vỡ tiếng Việt + dùng tab delimiter (TSV).
         const content = '﻿' + headers.join('\t') + '\n' + sample.join('\t') + '\n';
@@ -2060,14 +2096,19 @@
                 })
             });
             const failed = Number(result.failed || 0);
+            const classCount = Number(result.classAssignedCount || 0);
             let message = `Import xong: tạo mới ${result.created || 0}, cập nhật ${result.updated || 0}, lỗi ${failed}.`;
+            if (classCount) message += ` Đã gán ${classCount} HV vào lớp theo cột tên lớp.`;
             // Hiện chi tiết dòng nào fail + lý do (giúp admin debug ngay).
-            if (failed && Array.isArray(result.results)) {
+            if (Array.isArray(result.results)) {
                 const errs = result.results
                     .filter(r => !r.ok)
-                    .map(r => `• Dòng ${r.row}: ${r.error || 'không rõ lỗi'}`)
-                    .join('\n');
-                if (errs) message += `\n\nChi tiết lỗi:\n${errs}`;
+                    .map(r => `• Dòng ${r.row}: ${r.error || 'không rõ lỗi'}`);
+                const classErrs = result.results
+                    .filter(r => r.ok && r.classError)
+                    .map(r => `• Dòng ${r.row}: tạo HV OK nhưng gán lớp lỗi — ${r.classError}`);
+                const all = [...errs, ...classErrs];
+                if (all.length) message += `\n\nChi tiết lỗi:\n${all.join('\n')}`;
             }
             setImportAlert(message, failed ? 'warning' : 'success');
             await loadUsers();
@@ -2956,9 +2997,30 @@
     }
 
     function buildResultGradeForm(result) {
+        // Ô nhập điểm THÀNH PHẦN theo kỹ năng (feedback KH). Listening/Reading
+        // pre-fill điểm auto; Writing/Speaking admin chấm tay.
+        const partScores = result.part_scores && typeof result.part_scores === 'object' ? result.part_scores : {};
+        const skillValue = (key) => {
+            const item = partScores[key] || {};
+            if (item.pendingManualGrade === true && !Number.isFinite(Number(item.manualScore))) return '';
+            const v = Number.isFinite(Number(item.manualScore)) ? item.manualScore : item.score;
+            return v == null ? '' : String(v);
+        };
+        const skillInputs = ['listening', 'reading', 'writing', 'speaking'].map(key => `
+            <div class="col-6 col-lg-3">
+                <label class="form-label small mb-1">${escapeHtml(CONTENT_SKILL_LABELS[key] || key)}</label>
+                <input type="number" step="0.1" min="0" class="form-control form-control-sm vstep-skill-score-input"
+                    id="vstep-skill-score-${key}" data-skill="${key}" value="${escapeHtml(skillValue(key))}"
+                    placeholder="—">
+            </div>
+        `).join('');
         return `
             <div class="mb-2">
-                <label class="form-label small">Điểm chấm tay</label>
+                <label class="form-label small fw-semibold">Điểm thành phần theo kỹ năng</label>
+                <div class="row g-2">${skillInputs}</div>
+            </div>
+            <div class="mb-2 mt-3">
+                <label class="form-label small">Điểm chấm tay (tổng)</label>
                 <input type="number" step="0.1" min="0" class="form-control form-control-sm" id="vstep-manual-score" value="${escapeHtml(result.manual_score ?? '')}">
             </div>
             <div class="mt-2">
@@ -2966,7 +3028,7 @@
                 <textarea class="form-control form-control-sm" id="vstep-manual-feedback" rows="5" placeholder="Nhập nhận xét cho bài nộp này...">${escapeHtml(result.manual_feedback || '')}</textarea>
             </div>
             <div class="alert alert-light border small mt-3 mb-0">
-                Điểm và nhận xét sẽ lưu trực tiếp vào kết quả VSTEP để giáo viên theo dõi lại sau.
+                Điểm thành phần + tổng + nhận xét sẽ lưu vào kết quả và hiển thị cho học viên trong lịch sử bài học.
             </div>
             <div class="small mt-2 text-muted" id="vstepGradeStatus"></div>
         `;
@@ -2978,10 +3040,13 @@
         const rows = keys.length
             ? keys.map(key => {
                 const item = partScores[key] || {};
-                const pending = item.pendingManualGrade === true;
-                const scoreText = pending
-                    ? 'Chờ chấm tay'
-                    : `${Number(item.score || 0)}/${Number(item.total || 0)}`;
+                const hasManual = Number.isFinite(Number(item.manualScore));
+                const pending = item.pendingManualGrade === true && !hasManual;
+                const scoreText = hasManual
+                    ? `${Number(item.manualScore)} điểm (GV chấm)`
+                    : pending
+                        ? 'Chờ chấm tay'
+                        : `${Number(item.score || 0)}/${Number(item.total || 0)}`;
                 return `
                     <div class="vstep-result-score-row">
                         <span>${escapeHtml(CONTENT_SKILL_LABELS[key] || key)}</span>
@@ -3123,18 +3188,41 @@
         const status = $('vstepGradeStatus');
         if (status) status.textContent = 'Đang lưu chấm tay...';
         try {
+            // Gom điểm thành phần từ 4 input kỹ năng — merge vào part_scores hiện có
+            // (backend results/update đã hỗ trợ body.partScores).
+            const result = state.results.find(r => String(r.id) === String(id));
+            const existingPartScores = (result?.part_scores && typeof result.part_scores === 'object')
+                ? JSON.parse(JSON.stringify(result.part_scores))
+                : {};
+            let partScoresChanged = false;
+            document.querySelectorAll('.vstep-skill-score-input').forEach(input => {
+                const skill = input.dataset.skill;
+                const raw = String(input.value || '').trim();
+                if (!skill || raw === '') return;
+                const value = Number(raw);
+                if (!Number.isFinite(value)) return;
+                const current = existingPartScores[skill] || {};
+                existingPartScores[skill] = {
+                    ...current,
+                    manualScore: value,
+                    pendingManualGrade: false
+                };
+                partScoresChanged = true;
+            });
+            const body = {
+                manualScore: getValue('vstep-manual-score'),
+                manualFeedback: getValue('vstep-manual-feedback')
+            };
+            if (partScoresChanged) body.partScores = existingPartScores;
             await fetchJson(`/api/vstep/results/update?id=${encodeURIComponent(id)}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    manualScore: getValue('vstep-manual-score'),
-                    manualFeedback: getValue('vstep-manual-feedback')
-                })
+                body: JSON.stringify(body)
             });
             await loadResults();
             showResultDetail(id);
             const nextStatus = $('vstepGradeStatus');
-            if (nextStatus) nextStatus.textContent = 'Đã lưu điểm và nhận xét.';
+            if (nextStatus) nextStatus.textContent = 'Đã lưu điểm thành phần + nhận xét.';
         } catch (error) {
             if (status) status.textContent = error.message;
         }

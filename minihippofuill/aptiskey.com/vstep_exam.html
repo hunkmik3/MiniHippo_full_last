@@ -72,13 +72,16 @@
         </div>
       </div>
 
-      <div class="mt-4 d-flex flex-column flex-lg-row gap-3 align-items-start">
-        <video id="webcamPreview" class="vstep-camera-box" autoplay muted playsinline></video>
-        <canvas id="webcamCanvas" width="320" height="210" class="vstep-hidden"></canvas>
+      <!-- Khung chụp hình: webcam + ảnh chụp + nút CHỤP HÌNH nằm CHUNG 1 khung, căn giữa (feedback KH). -->
+      <div class="mt-4 vstep-photo-frame mx-auto">
+        <div class="vstep-photo-frame-media">
+          <video id="webcamPreview" class="vstep-camera-box" autoplay muted playsinline></video>
+          <canvas id="webcamCanvas" width="320" height="210" class="vstep-hidden"></canvas>
+        </div>
         <button type="button" class="vstep-red-button" id="capturePhotoBtn">
           <i class="bi bi-camera me-1"></i> CHỤP HÌNH
         </button>
-        <div class="small" id="photoStatus">Chụp hình nếu được yêu cầu trước khi nhận đề.</div>
+        <div class="small text-center" id="photoStatus">Chụp hình nếu được yêu cầu trước khi nhận đề.</div>
       </div>
     </div>
   </section>
