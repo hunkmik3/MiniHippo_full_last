@@ -5415,6 +5415,7 @@ async function triggerAIGrading() {
       }
 
       // Render per-item feedback
+      const submittedResultId = result.result?.id || result.id || null;
       if (feedback.items) {
         feedback.items.forEach(item => {
           const container = document.getElementById('ai-fb-' + item.key);
@@ -5429,8 +5430,19 @@ async function triggerAIGrading() {
               <h6><i class="bi bi-magic me-1"></i>AI sửa lỗi</h6>
               <div style="font-size:0.9rem; line-height:1.7;">${diffHtml}</div>
               ${item.feedback ? `<p class="text-muted mt-2 mb-0" style="font-size:0.82rem;"><i class="bi bi-info-circle me-1"></i>${esc(item.feedback)}</p>` : ''}
+              ${submittedResultId ? `
+                <div class="mt-2">
+                  <button type="button" class="btn btn-sm btn-outline-primary buoi-hoc-ai-detail-btn"
+                      data-result-id="${esc(String(submittedResultId))}" data-key="${esc(item.key)}">
+                    <i class="bi bi-robot me-1"></i>AI sửa lỗi chi tiết (giải thích từng lỗi)
+                  </button>
+                  <span class="small text-muted ms-2 buoi-hoc-ai-status"></span>
+                  <div class="buoi-hoc-ai-detail"></div>
+                </div>
+              ` : ''}
             </div>`;
         });
+        bindDetailedAiButtons();
       }
     } else {
       if (statusEl) statusEl.innerHTML = `<span class="badge bg-secondary">Bài đã lưu – sửa lỗi tự động chưa khả dụng</span>`;
@@ -5440,6 +5452,75 @@ async function triggerAIGrading() {
     if (statusEl) statusEl.innerHTML = `<span class="badge bg-secondary">Bài đã lưu</span>`;
     console.error('AI grading error:', err);
   }
+}
+
+// ===== Chấm AI chi tiết (clone LexiBot): band + criteria + diff + giải thích =====
+function renderBuoiHocAiDiff(diffText) {
+  return esc(diffText)
+    .replace(/\{-([\s\S]*?)-\}/g, '<del style="background:#fde8e8;color:#c0392b;text-decoration:line-through;border-radius:2px;padding:0 2px;">$1</del>')
+    .replace(/\{\+([\s\S]*?)\+\}/g, '<ins style="background:#e6f7ec;color:#1e7e34;text-decoration:underline;border-radius:2px;padding:0 2px;">$1</ins>')
+    .replace(/\r?\n/g, '<br>');
+}
+
+function renderBuoiHocAiGradingBlock(grading) {
+  if (!grading) return '';
+  const correctionsHtml = (grading.corrections || []).length
+    ? `<details class="mt-2"><summary class="small fw-semibold">Danh sách lỗi & giải thích (${grading.corrections.length})</summary>
+        ${grading.corrections.map(c => `
+          <div class="small py-1 border-bottom">
+            <del style="color:#c0392b;">${esc(c.original || '')}</del>
+            → <ins style="color:#1e7e34;text-decoration:underline;">${esc(c.corrected || '')}</ins>
+            ${c.explanation ? `<div class="text-muted">${esc(c.explanation)}</div>` : ''}
+          </div>
+        `).join('')}</details>`
+    : '';
+  const sampleHtml = grading.improvedVersion
+    ? `<details class="mt-2"><summary class="small fw-semibold">Bài mẫu tham khảo</summary>
+        <div class="p-2 bg-white border rounded small mt-1" style="white-space:pre-wrap;">${esc(grading.improvedVersion)}</div></details>`
+    : '';
+  return `
+    <div class="p-2 border rounded mt-2" style="background:#f6f9ff;">
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+        <span class="badge bg-primary"><i class="bi bi-robot me-1"></i>AI sửa lỗi${(grading.corrections || []).length ? ` — ${grading.corrections.length} lỗi` : ''}</span>
+      </div>
+      ${grading.diffText ? `
+        <div class="small fw-semibold mt-1">Bài sửa lỗi (đỏ = sai, xanh = sửa đúng):</div>
+        <div class="p-2 bg-white border rounded small" style="line-height:1.8;">${renderBuoiHocAiDiff(grading.diffText)}</div>
+      ` : ''}
+      ${grading.feedback ? `<div class="small mt-2"><strong>Nhận xét:</strong> ${esc(grading.feedback)}</div>` : ''}
+      ${correctionsHtml}
+      ${sampleHtml}
+    </div>
+  `;
+}
+
+function bindDetailedAiButtons() {
+  document.querySelectorAll('.buoi-hoc-ai-detail-btn').forEach(btn => {
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      const wrap = btn.parentElement;
+      const statusEl = wrap?.querySelector('.buoi-hoc-ai-status');
+      const detailEl = wrap?.querySelector('.buoi-hoc-ai-detail');
+      if (statusEl) statusEl.textContent = 'AI đang chấm chi tiết... (10-40 giây)';
+      try {
+        const res = await fetch('/api/practice_results/ai-grade-writing', {
+          method: 'POST',
+          headers: buildAuthorizedHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ resultId: btn.dataset.resultId, answerKey: btn.dataset.key })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Không thể chấm AI.');
+        if (statusEl) statusEl.textContent = '';
+        if (detailEl) detailEl.innerHTML = renderBuoiHocAiGradingBlock(data.grading);
+        btn.style.display = 'none';
+      } catch (err) {
+        if (statusEl) statusEl.textContent = 'Lỗi: ' + err.message;
+        btn.disabled = false;
+      }
+    });
+  });
 }
 
 function buildSimpleDiff(original, corrected) {

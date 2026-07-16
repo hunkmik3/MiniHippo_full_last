@@ -2713,6 +2713,28 @@ body.vstep-body {
   color: #664d03;
 }
 
+/* ===== AI grading diff (clone LexiBot): đỏ gạch = sai, xanh = sửa đúng ===== */
+del.vstep-ai-del {
+  background: #fde8e8;
+  color: #c0392b;
+  text-decoration: line-through;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+ins.vstep-ai-ins {
+  background: #e6f7ec;
+  color: #1e7e34;
+  text-decoration: underline;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+.vstep-ai-diff {
+  line-height: 1.8;
+  white-space: normal;
+}
+
 @media (max-width: 1180px) {
   .vstep-admin-overview {
     grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -3073,9 +3073,38 @@
         `;
     }
 
+    // Render diff {-sai-}{+đúng+} của AI grading thành del/ins màu (clone LexiBot).
+    function renderAiDiffText(diffText) {
+        return escapeHtml(diffText)
+            .replace(/\{-([\s\S]*?)-\}/g, '<del class="vstep-ai-del">$1</del>')
+            .replace(/\{\+([\s\S]*?)\+\}/g, '<ins class="vstep-ai-ins">$1</ins>')
+            .replace(/\r?\n/g, '<br>');
+    }
+
+    function buildAiGradingBlock(grading, options = {}) {
+        if (!grading) return '';
+        return `
+            <div class="p-2 border rounded mt-2" style="background:#f6f9ff;">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                    <span class="badge bg-primary"><i class="bi bi-robot me-1"></i>AI sửa lỗi${(grading.corrections || []).length ? ` — ${grading.corrections.length} lỗi` : ''}</span>
+                </div>
+                ${grading.transcript && options.showTranscript ? `
+                    <details class="mb-1"><summary class="small fw-semibold">Transcript</summary>
+                    <div class="p-2 bg-white border rounded small mt-1">${escapeHtml(grading.transcript)}</div></details>
+                ` : ''}
+                ${grading.diffText ? `
+                    <div class="small fw-semibold mt-1">Bài sửa lỗi:</div>
+                    <div class="p-2 bg-white border rounded small vstep-ai-diff">${renderAiDiffText(grading.diffText)}</div>
+                ` : ''}
+                ${grading.feedback ? `<div class="small mt-2"><strong>Nhận xét AI:</strong> ${escapeHtml(grading.feedback)}</div>` : ''}
+            </div>
+        `;
+    }
+
     function buildWritingAnswerSection(metadata) {
         const answers = collectWritingAnswersFromMetadata(metadata);
         if (!answers.length) return '';
+        const aiWriting = metadata?.ai_writing || {};
         const cards = answers.map((item, index) => `
             <article class="vstep-result-answer-card">
                 <div class="vstep-result-answer-head">
@@ -3085,6 +3114,14 @@
                 ${item.title ? `<div class="vstep-result-answer-subtitle">${escapeHtml(item.title)}</div>` : ''}
                 ${item.prompt ? `<div class="vstep-result-answer-prompt">${escapeHtml(item.prompt)}</div>` : ''}
                 <div class="vstep-result-answer-body">${escapeHtml(item.answer || '(Học viên chưa nhập bài)')}</div>
+                ${buildAiGradingBlock(aiWriting[String(index)])}
+                ${!aiWriting[String(index)] && String(item.answer || '').trim() ? `
+                    <button type="button" class="btn btn-sm btn-outline-primary mt-2 vstep-admin-ai-grade-btn"
+                        data-kind="writing" data-part="${index}">
+                        <i class="bi bi-robot me-1"></i>Chấm AI + sửa lỗi
+                    </button>
+                    <span class="small text-muted ms-2 vstep-admin-ai-status"></span>
+                ` : ''}
             </article>
         `).join('');
         return `
@@ -3098,14 +3135,16 @@
     function buildSpeakingAnswerSection(metadata) {
         const entries = collectSpeakingEntriesFromMetadata(metadata);
         if (!entries.length) return '';
+        const aiSpeaking = metadata?.ai_speaking || {};
         const cards = entries.map((item, index) => {
             const recordingUrl = normalizeMediaUrl(item?.recording_url || item?.recordingUrl || item?.audio_url || item?.audioUrl);
             const transcript = String(item?.answer || item?.transcript || '').trim();
             const prompt = String(item?.prompt || '').trim();
+            const partKey = String(item.key || `part${index + 1}`);
             return `
                 <article class="vstep-result-answer-card">
                     <div class="vstep-result-answer-head">
-                        <strong>Speaking ${escapeHtml(String(item.key || index + 1))}</strong>
+                        <strong>Speaking ${escapeHtml(partKey)}</strong>
                         <span>${recordingUrl ? 'Có file ghi âm' : 'Chưa có file'}</span>
                     </div>
                     ${prompt ? `<div class="vstep-result-answer-prompt">${escapeHtml(prompt)}</div>` : ''}
@@ -3116,6 +3155,14 @@
                                 <source src="${escapeHtml(recordingUrl)}">
                             </audio>
                         </div>
+                    ` : ''}
+                    ${buildAiGradingBlock(aiSpeaking[partKey], { showTranscript: true })}
+                    ${!aiSpeaking[partKey] && recordingUrl ? `
+                        <button type="button" class="btn btn-sm btn-outline-primary mt-2 vstep-admin-ai-grade-btn"
+                            data-kind="speaking" data-part="${escapeHtml(partKey)}">
+                            <i class="bi bi-robot me-1"></i>Chấm AI + sửa lỗi
+                        </button>
+                        <span class="small text-muted ms-2 vstep-admin-ai-status"></span>
                     ` : ''}
                 </article>
             `;
@@ -3227,6 +3274,44 @@
             if (status) status.textContent = error.message;
         }
     }
+
+    // Chấm AI writing/speaking từ result detail (event delegation vì nút render
+    // động trong modal/aside). resultId lấy từ state.activeResultId.
+    document.addEventListener('click', async (event) => {
+        const btn = event.target.closest('.vstep-admin-ai-grade-btn');
+        if (!btn) return;
+        const resultId = state.activeResultId;
+        if (!resultId) return;
+        btn.disabled = true;
+        const statusEl = btn.parentElement?.querySelector('.vstep-admin-ai-status');
+        if (statusEl) statusEl.textContent = 'AI đang chấm... (10-30 giây)';
+        try {
+            const kind = btn.dataset.kind;
+            const endpoint = kind === 'speaking' ? '/api/vstep/ai/grade-speaking' : '/api/vstep/ai/grade-writing';
+            const body = kind === 'speaking'
+                ? { resultId, partKey: btn.dataset.part }
+                : { resultId, partIndex: Number(btn.dataset.part) };
+            const data = await fetchJson(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            // Cập nhật state.results để render lại có AI grading mới.
+            const result = state.results.find(r => String(r.id) === String(resultId));
+            if (result && data.grading) {
+                result.metadata = result.metadata || {};
+                if (kind === 'speaking') {
+                    result.metadata.ai_speaking = { ...(result.metadata.ai_speaking || {}), [btn.dataset.part]: data.grading };
+                } else {
+                    result.metadata.ai_writing = { ...(result.metadata.ai_writing || {}), [String(btn.dataset.part)]: data.grading };
+                }
+            }
+            showResultDetail(resultId);
+        } catch (error) {
+            if (statusEl) statusEl.textContent = 'Lỗi: ' + error.message;
+            btn.disabled = false;
+        }
+    });
 
     function showPanel(panel) {
         state.currentPanel = panel;

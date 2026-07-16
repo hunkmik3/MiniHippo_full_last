@@ -13,6 +13,7 @@ const DEFAULT_OPENAI_MODEL = cleanEnvValue(process.env.OPENAI_MODEL) || 'gpt-4o-
 const DEFAULT_ANTHROPIC_MODEL =
   cleanEnvValue(process.env.ANTHROPIC_MODEL) || 'claude-sonnet-4-20250514';
 const DEFAULT_GEMINI_MODEL = cleanEnvValue(process.env.GEMINI_MODEL) || 'gemini-2.5-flash';
+const DEFAULT_XAI_MODEL = cleanEnvValue(process.env.XAI_MODEL) || 'grok-4.3';
 
 export function getConfiguredAIProvider() {
   const providers = [
@@ -30,6 +31,11 @@ export function getConfiguredAIProvider() {
       provider: 'gemini',
       apiKey: cleanEnvValue(process.env.GEMINI_API_KEY),
       model: DEFAULT_GEMINI_MODEL
+    },
+    {
+      provider: 'xai',
+      apiKey: cleanEnvValue(process.env.XAI_API_KEY),
+      model: DEFAULT_XAI_MODEL
     }
   ];
 
@@ -75,6 +81,16 @@ export async function generateAIText({
     });
   } else if (config.provider === 'openai') {
     text = await callOpenAI({
+      apiKey: config.apiKey,
+      model: config.model,
+      systemPrompt,
+      userPrompt,
+      maxTokens,
+      temperature,
+      responseMimeType
+    });
+  } else if (config.provider === 'xai') {
+    text = await callXAI({
       apiKey: config.apiKey,
       model: config.model,
       systemPrompt,
@@ -172,7 +188,9 @@ async function callOpenAI({
   userPrompt,
   maxTokens,
   temperature,
-  responseMimeType
+  responseMimeType,
+  baseUrl = 'https://api.openai.com/v1',
+  providerLabel = 'OpenAI'
 }) {
   const messages = [];
   if (systemPrompt) {
@@ -180,7 +198,7 @@ async function callOpenAI({
   }
   messages.push({ role: 'user', content: userPrompt });
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -203,11 +221,20 @@ async function callOpenAI({
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`OpenAI API error (${response.status}): ${text}`);
+    throw new Error(`${providerLabel} API error (${response.status}): ${text}`);
   }
 
   const data = await response.json();
   return data.choices?.[0]?.message?.content || '';
+}
+
+// xAI (Grok) — API tương thích OpenAI chat/completions, chỉ khác base URL.
+async function callXAI(options) {
+  return callOpenAI({
+    ...options,
+    baseUrl: 'https://api.x.ai/v1',
+    providerLabel: 'xAI'
+  });
 }
 
 async function callGemini({

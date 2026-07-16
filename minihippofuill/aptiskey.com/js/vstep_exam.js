@@ -1757,6 +1757,8 @@
                 reading_details: reading.details,
                 writing_answers: collectWritingMetadata(),
                 speaking_answers: state.answers.speaking,
+                // Đề Speaking từng part — để AI grading có ngữ cảnh đề khi chấm sau.
+                speaking_prompts: getParts('speaking').map(part => part.prompt || part.title || ''),
                 durations: state.data.durations
             };
 
