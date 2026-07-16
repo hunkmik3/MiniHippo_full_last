@@ -19,6 +19,8 @@ import listResults from '../../../server/api/vstep/results/list.js';
 import listMyResults from '../../../server/api/vstep/results/my-list.js';
 import submitResult from '../../../server/api/vstep/results/submit.js';
 import updateResult from '../../../server/api/vstep/results/update.js';
+import gradeWriting from '../../../server/api/vstep/ai/grade-writing.js';
+import gradeSpeaking from '../../../server/api/vstep/ai/grade-speaking.js';
 import createStudent from '../../../server/api/vstep/students/create.js';
 import listStudents from '../../../server/api/vstep/students/list.js';
 import bulkImportStudents from '../../../server/api/vstep/students/bulk-import.js';
@@ -26,6 +28,12 @@ import updateStudent from '../../../server/api/vstep/students/update.js';
 import deleteStudent from '../../../server/api/vstep/students/delete.js';
 
 const handlers = {
+  ai: {
+    'grade-writing': gradeWriting,
+    grade_writing: gradeWriting,
+    'grade-speaking': gradeSpeaking,
+    grade_speaking: gradeSpeaking
+  },
   assignments: {
     create: createAssignment,
     list: listAssignments

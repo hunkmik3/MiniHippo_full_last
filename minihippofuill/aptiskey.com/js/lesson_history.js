@@ -303,6 +303,10 @@
                                 <h6 class="mb-2">Nhận xét theo từng câu</h6>
                                 <div id="history-detail-writing-feedback"></div>
                             </div>
+                            <div class="mt-3" id="history-detail-ai-wrap" style="display: none;">
+                                <h6 class="mb-2"><i class="bi bi-robot me-1"></i>AI sửa lỗi chi tiết (giải thích từng lỗi)</h6>
+                                <div id="history-detail-ai"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -385,6 +389,130 @@
         }
     }
 
+    // ===== AI sửa lỗi chi tiết (clone LexiBot): diff {-sai-}{+đúng+} + giải thích =====
+    function renderAiDiff(diffText) {
+        return escapeHtml(diffText)
+            .replace(/\{-([\s\S]*?)-\}/g, '<del style="background:#fde8e8;color:#c0392b;text-decoration:line-through;border-radius:2px;padding:0 2px;">$1</del>')
+            .replace(/\{\+([\s\S]*?)\+\}/g, '<ins style="background:#e6f7ec;color:#1e7e34;text-decoration:underline;border-radius:2px;padding:0 2px;">$1</ins>')
+            .replace(/\r?\n/g, '<br>');
+    }
+
+    function renderAiGradingBlock(grading, options = {}) {
+        if (!grading) return '';
+        const correctionsHtml = (grading.corrections || []).length
+            ? `<details class="mt-2"><summary class="small fw-semibold">Danh sách lỗi & giải thích (${grading.corrections.length})</summary>
+                ${grading.corrections.map(c => `
+                    <div class="small py-1 border-bottom">
+                        <del style="color:#c0392b;">${escapeHtml(c.original || '')}</del>
+                        → <ins style="color:#1e7e34;text-decoration:underline;">${escapeHtml(c.corrected || '')}</ins>
+                        ${c.explanation ? `<div class="text-muted">${escapeHtml(c.explanation)}</div>` : ''}
+                    </div>
+                `).join('')}</details>`
+            : '';
+        const sampleHtml = (grading.improvedVersion || grading.sampleAnswer)
+            ? `<details class="mt-2"><summary class="small fw-semibold">Bài mẫu tham khảo</summary>
+                <div class="p-2 bg-white border rounded small mt-1" style="white-space:pre-wrap;">${escapeHtml(grading.improvedVersion || grading.sampleAnswer)}</div></details>`
+            : '';
+        return `
+            <div class="p-2 border rounded mt-2" style="background:#f6f9ff;">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                    <span class="badge bg-primary"><i class="bi bi-robot me-1"></i>AI sửa lỗi${(grading.corrections || []).length ? ` — ${grading.corrections.length} lỗi` : ''}</span>
+                </div>
+                ${grading.transcript && options.showTranscript ? `
+                    <details class="mb-1"><summary class="small fw-semibold">Transcript (bản ghi lời nói)</summary>
+                    <div class="p-2 bg-white border rounded small mt-1">${escapeHtml(grading.transcript)}</div></details>
+                ` : ''}
+                ${grading.diffText ? `
+                    <div class="small fw-semibold mt-1">Bài sửa lỗi (đỏ = sai, xanh = sửa đúng):</div>
+                    <div class="p-2 bg-white border rounded small" style="line-height:1.8;">${renderAiDiff(grading.diffText)}</div>
+                ` : ''}
+                ${grading.feedback ? `<div class="small mt-2"><strong>Nhận xét:</strong> ${escapeHtml(grading.feedback)}</div>` : ''}
+                ${correctionsHtml}
+                ${sampleHtml}
+            </div>
+        `;
+    }
+
+    function renderAiSection(result, metadata) {
+        const aiWriting = metadata.ai_writing || {};
+        const aiSpeaking = metadata.ai_speaking || {};
+        const blocks = [];
+
+        if (result.practice_type === 'writing' && metadata.user_answers && typeof metadata.user_answers === 'object') {
+            Object.values(metadata.user_answers).forEach(items => {
+                (Array.isArray(items) ? items : []).forEach(item => {
+                    const key = String(item?.key || '');
+                    if (!key || !String(item?.answer || '').trim()) return;
+                    const grading = aiWriting[key];
+                    blocks.push(`
+                        <div class="border rounded p-2 mb-2">
+                            <strong class="small">${escapeHtml(key)}</strong>
+                            ${grading
+                                ? renderAiGradingBlock(grading)
+                                : `<div class="mt-1">
+                                    <button type="button" class="btn btn-sm btn-outline-primary history-ai-grade-btn"
+                                        data-kind="writing" data-key="${escapeHtml(key)}">
+                                        <i class="bi bi-robot me-1"></i>Chấm AI + sửa lỗi
+                                    </button>
+                                    <span class="small text-muted ms-2 history-ai-status"></span>
+                                </div>`}
+                        </div>
+                    `);
+                });
+            });
+        }
+
+        if (result.practice_type === 'speaking' && Array.isArray(metadata.speaking_answers)) {
+            metadata.speaking_answers.forEach(item => {
+                const key = String(item?.key || '');
+                const recordingUrl = item?.recording_url || item?.recordingUrl || '';
+                if (!key || !recordingUrl) return;
+                const grading = aiSpeaking[key];
+                blocks.push(`
+                    <div class="border rounded p-2 mb-2">
+                        <strong class="small">${escapeHtml(key)}${item.part ? ` (Part ${escapeHtml(String(item.part))})` : ''}</strong>
+                        <audio controls src="${escapeHtml(recordingUrl)}" class="d-block mt-1 w-100" style="max-width:360px;"></audio>
+                        ${grading
+                            ? renderAiGradingBlock(grading, { showTranscript: true })
+                            : `<div class="mt-1">
+                                <button type="button" class="btn btn-sm btn-outline-primary history-ai-grade-btn"
+                                    data-kind="speaking" data-key="${escapeHtml(key)}">
+                                    <i class="bi bi-robot me-1"></i>Chấm AI + sửa lỗi
+                                </button>
+                                <span class="small text-muted ms-2 history-ai-status"></span>
+                            </div>`}
+                    </div>
+                `);
+            });
+        }
+
+        return blocks.join('');
+    }
+
+    async function requestHistoryAiGrading(kind, resultId, answerKey, statusEl) {
+        if (statusEl) statusEl.textContent = 'AI đang chấm bài... (10-40 giây)';
+        try {
+            const endpoint = kind === 'speaking'
+                ? '/api/practice_results/ai-grade-speaking'
+                : '/api/practice_results/ai-grade-writing';
+            const data = await fetchJson(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ resultId, answerKey })
+            });
+            const result = state.results.find(item => item.id === resultId);
+            if (result && data.grading) {
+                result.metadata = result.metadata || {};
+                const bucket = kind === 'speaking' ? 'ai_speaking' : 'ai_writing';
+                result.metadata[bucket] = { ...(result.metadata[bucket] || {}), [answerKey]: data.grading };
+            }
+            // Render lại modal với data mới (modal đang mở).
+            window.openHistoryResultDetail(resultId);
+        } catch (error) {
+            if (statusEl) statusEl.textContent = 'Lỗi: ' + error.message;
+        }
+    }
+
     window.openHistoryResultDetail = function (resultId) {
         const result = state.results.find(item => item.id === resultId);
         if (!result) return;
@@ -462,8 +590,24 @@
             if (writingFeedbackEl) writingFeedbackEl.innerHTML = '';
         }
 
+        // Chấm AI chi tiết (writing + speaking) — nút chấm on-demand + hiện grading đã lưu.
+        const aiWrapEl = document.getElementById('history-detail-ai-wrap');
+        const aiEl = document.getElementById('history-detail-ai');
+        if (aiWrapEl && aiEl) {
+            const aiHtml = renderAiSection(result, metadata);
+            aiWrapEl.style.display = aiHtml ? 'block' : 'none';
+            aiEl.innerHTML = aiHtml;
+            aiEl.querySelectorAll('.history-ai-grade-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    btn.disabled = true;
+                    const statusEl = btn.parentElement?.querySelector('.history-ai-status');
+                    requestHistoryAiGrading(btn.dataset.kind, resultId, btn.dataset.key, statusEl);
+                });
+            });
+        }
+
         if (window.bootstrap && modalEl) {
-            new bootstrap.Modal(modalEl).show();
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
         }
     };
 

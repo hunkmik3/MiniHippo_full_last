@@ -146,6 +146,89 @@
         });
     }
 
+    // ===== AI grading (clone LexiBot): diff sửa lỗi inline + band + nhận xét =====
+    // diffText dùng marker {-sai-}{+đúng+} từ AI → render <del> đỏ gạch / <ins> xanh.
+    function renderDiffText(diffText) {
+        const escaped = escapeHtml(diffText);
+        return escaped
+            .replace(/\{-([\s\S]*?)-\}/g, '<del class="vstep-ai-del">$1</del>')
+            .replace(/\{\+([\s\S]*?)\+\}/g, '<ins class="vstep-ai-ins">$1</ins>')
+            .replace(/\r?\n/g, '<br>');
+    }
+
+
+    function renderAiGradingBlock(grading, options = {}) {
+        if (!grading) return '';
+        const correctionsHtml = (grading.corrections || []).length
+            ? `<details class="mt-2">
+                <summary class="small fw-semibold">Danh sách lỗi & giải thích (${grading.corrections.length})</summary>
+                ${grading.corrections.map(c => `
+                    <div class="small py-1 border-bottom">
+                        <del class="vstep-ai-del">${escapeHtml(c.original || '')}</del>
+                        → <ins class="vstep-ai-ins">${escapeHtml(c.corrected || '')}</ins>
+                        ${c.explanation ? `<div class="text-muted">${escapeHtml(c.explanation)}</div>` : ''}
+                    </div>
+                `).join('')}
+            </details>`
+            : '';
+        const sampleHtml = (grading.improvedVersion || grading.sampleAnswer)
+            ? `<details class="mt-2">
+                <summary class="small fw-semibold">Bài mẫu tham khảo</summary>
+                <div class="p-2 bg-white border rounded small mt-1" style="white-space:pre-wrap;">${escapeHtml(grading.improvedVersion || grading.sampleAnswer)}</div>
+            </details>`
+            : '';
+        return `
+            <div class="vstep-ai-grading p-2 border rounded mt-2" style="background:#f6f9ff;">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                    <span class="badge bg-primary"><i class="bi bi-robot me-1"></i>AI sửa lỗi${(grading.corrections || []).length ? ` — ${grading.corrections.length} lỗi` : ''}</span>
+                </div>
+                ${grading.transcript && options.showTranscript ? `
+                    <details class="mb-1">
+                        <summary class="small fw-semibold">Transcript (bản ghi lời nói)</summary>
+                        <div class="p-2 bg-white border rounded small mt-1">${escapeHtml(grading.transcript)}</div>
+                    </details>
+                ` : ''}
+                ${grading.diffText ? `
+                    <div class="small fw-semibold mt-1">Bài sửa lỗi (đỏ = sai, xanh = sửa đúng):</div>
+                    <div class="p-2 bg-white border rounded small vstep-ai-diff">${renderDiffText(grading.diffText)}</div>
+                ` : ''}
+                ${grading.feedback ? `<div class="small mt-2"><strong>Nhận xét:</strong> ${escapeHtml(grading.feedback)}</div>` : ''}
+                ${correctionsHtml}
+                ${sampleHtml}
+            </div>
+        `;
+    }
+
+    async function requestAiGrading(kind, resultId, partRef, statusEl) {
+        if (statusEl) statusEl.textContent = 'AI đang chấm bài... (10-30 giây)';
+        try {
+            const endpoint = kind === 'speaking' ? '/api/vstep/ai/grade-speaking' : '/api/vstep/ai/grade-writing';
+            const body = kind === 'speaking'
+                ? { resultId, partKey: partRef }
+                : { resultId, partIndex: partRef };
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: authorizedHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify(body)
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.error || 'Không thể chấm AI.');
+            // Cập nhật result trong state để render lại có data mới.
+            const result = state.results.find(r => String(r.id) === String(resultId));
+            if (result) {
+                result.metadata = result.metadata || {};
+                if (kind === 'speaking') {
+                    result.metadata.ai_speaking = { ...(result.metadata.ai_speaking || {}), [partRef]: data.grading };
+                } else {
+                    result.metadata.ai_writing = { ...(result.metadata.ai_writing || {}), [String(partRef)]: data.grading };
+                }
+            }
+            showDetail(resultId);
+        } catch (error) {
+            if (statusEl) statusEl.textContent = 'Lỗi: ' + error.message;
+        }
+    }
+
     // Bảng đối chiếu đáp án Listening/Reading từ metadata details (feedback KH:
     // "chỗ đáp án và lời giải sau khi nộp bài xong xem ở đâu").
     function buildMcqReviewHtml(md) {
@@ -184,19 +267,46 @@
         if (dump.metadata?.proctor_photo) dump.metadata.proctor_photo = '[đã ẩn]';
         if (dump.metadata?.answers) dump.metadata.answers = '[xem chi tiết phía dưới]';
         const mcqReviewHtml = buildMcqReviewHtml(md);
-        const writingHtml = (md.writing_answers || []).map((w, i) => `
+        const aiWriting = md.ai_writing || {};
+        const writingHtml = (md.writing_answers || []).map((w, i) => {
+            const grading = aiWriting[String(i)];
+            const hasAnswer = String(w.answer || '').trim();
+            return `
             <div class="mb-3">
                 <strong>Writing Part ${i + 1}</strong>
                 <div class="small text-muted mb-1">${escapeHtml(w.title || '')}</div>
                 <div class="p-2 bg-white border rounded small" style="white-space:pre-wrap;">${escapeHtml(w.answer || '(trống)')}</div>
+                ${grading
+                    ? renderAiGradingBlock(grading)
+                    : hasAnswer ? `
+                        <button type="button" class="btn btn-sm btn-outline-primary mt-2 vstep-ai-grade-btn"
+                            data-kind="writing" data-result-id="${escapeHtml(String(result.id))}" data-part="${i}">
+                            <i class="bi bi-robot me-1"></i>Chấm AI + sửa lỗi
+                        </button>
+                        <span class="small text-muted ms-2 vstep-ai-grade-status"></span>
+                    ` : ''}
             </div>
-        `).join('');
-        const speakingHtml = Object.entries(md.speaking_answers || {}).map(([key, val]) => `
+        `;
+        }).join('');
+        const aiSpeaking = md.ai_speaking || {};
+        const speakingHtml = Object.entries(md.speaking_answers || {}).map(([key, val]) => {
+            const grading = aiSpeaking[key];
+            return `
             <div class="mb-2">
                 <strong>Speaking ${escapeHtml(key)}</strong>
                 ${val?.recordingUrl ? `<audio controls src="${escapeHtml(val.recordingUrl)}" class="d-block mt-1" style="max-width:320px;"></audio>` : '<div class="small text-muted">Không có file ghi âm</div>'}
+                ${grading
+                    ? renderAiGradingBlock(grading, { showTranscript: true })
+                    : val?.recordingUrl ? `
+                        <button type="button" class="btn btn-sm btn-outline-primary mt-1 vstep-ai-grade-btn"
+                            data-kind="speaking" data-result-id="${escapeHtml(String(result.id))}" data-part="${escapeHtml(key)}">
+                            <i class="bi bi-robot me-1"></i>Chấm AI + sửa lỗi
+                        </button>
+                        <span class="small text-muted ms-2 vstep-ai-grade-status"></span>
+                    ` : ''}
             </div>
-        `).join('');
+        `;
+        }).join('');
 
         // Điểm thành phần theo kỹ năng (GV chấm qua part_scores.manualScore).
         const partScores = result.part_scores && typeof result.part_scores === 'object' ? result.part_scores : {};
@@ -232,6 +342,16 @@
         document.getElementById('vstep-history-close-detail')?.addEventListener('click', () => {
             refs.detail.style.display = 'none';
             refs.detail.innerHTML = '';
+        });
+        // Nút "Chấm AI + sửa lỗi" cho writing/speaking chưa chấm.
+        refs.detail.querySelectorAll('.vstep-ai-grade-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                btn.disabled = true;
+                const statusEl = btn.parentElement?.querySelector('.vstep-ai-grade-status');
+                const kind = btn.dataset.kind;
+                const partRef = kind === 'speaking' ? btn.dataset.part : Number(btn.dataset.part);
+                requestAiGrading(kind, btn.dataset.resultId, partRef, statusEl);
+            });
         });
     }
 
