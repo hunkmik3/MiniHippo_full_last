@@ -27,6 +27,10 @@ import bulkImportStudents from '../../../server/api/vstep/students/bulk-import.j
 import updateStudent from '../../../server/api/vstep/students/update.js';
 import deleteStudent from '../../../server/api/vstep/students/delete.js';
 
+// Chấm AI (Grok reasoning + Whisper) có thể mất 60-120s/bài → nới maxDuration.
+// Cần Vercel Pro để >60s; Hobby cap 60s.
+export const config = { maxDuration: 300 };
+
 const handlers = {
   ai: {
     'grade-writing': gradeWriting,

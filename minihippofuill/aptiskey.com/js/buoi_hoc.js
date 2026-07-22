@@ -5431,18 +5431,15 @@ async function triggerAIGrading() {
               <div style="font-size:0.9rem; line-height:1.7;">${diffHtml}</div>
               ${item.feedback ? `<p class="text-muted mt-2 mb-0" style="font-size:0.82rem;"><i class="bi bi-info-circle me-1"></i>${esc(item.feedback)}</p>` : ''}
               ${submittedResultId ? `
-                <div class="mt-2">
-                  <button type="button" class="btn btn-sm btn-outline-primary buoi-hoc-ai-detail-btn"
-                      data-result-id="${esc(String(submittedResultId))}" data-key="${esc(item.key)}">
-                    <i class="bi bi-robot me-1"></i>AI sửa lỗi chi tiết (giải thích từng lỗi)
-                  </button>
-                  <span class="small text-muted ms-2 buoi-hoc-ai-status"></span>
+                <div class="mt-2 buoi-hoc-ai-detail-slot" data-result-id="${esc(String(submittedResultId))}" data-key="${esc(item.key)}">
+                  <span class="small text-muted buoi-hoc-ai-status"><span class="spinner-border spinner-border-sm me-1"></span>AI đang chấm chi tiết...</span>
                   <div class="buoi-hoc-ai-detail"></div>
                 </div>
               ` : ''}
             </div>`;
         });
-        bindDetailedAiButtons();
+        // TỰ ĐỘNG chấm chi tiết Grok cho từng câu (không cần bấm nút).
+        autoRunDetailedAi();
       }
     } else {
       if (statusEl) statusEl.innerHTML = `<span class="badge bg-secondary">Bài đã lưu – sửa lỗi tự động chưa khả dụng</span>`;
@@ -5494,33 +5491,29 @@ function renderBuoiHocAiGradingBlock(grading) {
   `;
 }
 
-function bindDetailedAiButtons() {
-  document.querySelectorAll('.buoi-hoc-ai-detail-btn').forEach(btn => {
-    if (btn.dataset.bound) return;
-    btn.dataset.bound = '1';
-    btn.addEventListener('click', async () => {
-      btn.disabled = true;
-      const wrap = btn.parentElement;
-      const statusEl = wrap?.querySelector('.buoi-hoc-ai-status');
-      const detailEl = wrap?.querySelector('.buoi-hoc-ai-detail');
-      if (statusEl) statusEl.textContent = 'AI đang chấm chi tiết... (10-40 giây)';
-      try {
-        const res = await fetch('/api/practice_results/ai-grade-writing', {
-          method: 'POST',
-          headers: buildAuthorizedHeaders({ 'Content-Type': 'application/json' }),
-          body: JSON.stringify({ resultId: btn.dataset.resultId, answerKey: btn.dataset.key })
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || 'Không thể chấm AI.');
-        if (statusEl) statusEl.textContent = '';
-        if (detailEl) detailEl.innerHTML = renderBuoiHocAiGradingBlock(data.grading);
-        btn.style.display = 'none';
-      } catch (err) {
-        if (statusEl) statusEl.textContent = 'Lỗi: ' + err.message;
-        btn.disabled = false;
-      }
-    });
-  });
+// Tự động chấm chi tiết Grok cho từng slot (tuần tự để tránh dồn request nặng).
+// Kết quả cache metadata nên mở lại không chấm lại.
+async function autoRunDetailedAi() {
+  const slots = Array.from(document.querySelectorAll('.buoi-hoc-ai-detail-slot'));
+  for (const slot of slots) {
+    if (slot.dataset.done) continue;
+    slot.dataset.done = '1';
+    const statusEl = slot.querySelector('.buoi-hoc-ai-status');
+    const detailEl = slot.querySelector('.buoi-hoc-ai-detail');
+    try {
+      const res = await fetch('/api/practice_results/ai-grade-writing', {
+        method: 'POST',
+        headers: buildAuthorizedHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ resultId: slot.dataset.resultId, answerKey: slot.dataset.key })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Không thể chấm AI.');
+      if (statusEl) statusEl.remove();
+      if (detailEl) detailEl.innerHTML = renderBuoiHocAiGradingBlock(data.grading);
+    } catch (err) {
+      if (statusEl) statusEl.innerHTML = `<span class="text-muted">Chưa chấm chi tiết được: ${esc(err.message)}</span>`;
+    }
+  }
 }
 
 function buildSimpleDiff(original, corrected) {
