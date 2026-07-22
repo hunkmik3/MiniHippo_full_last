@@ -449,12 +449,8 @@
                             <strong class="small">${escapeHtml(key)}</strong>
                             ${grading
                                 ? renderAiGradingBlock(grading)
-                                : `<div class="mt-1">
-                                    <button type="button" class="btn btn-sm btn-outline-primary history-ai-grade-btn"
-                                        data-kind="writing" data-key="${escapeHtml(key)}">
-                                        <i class="bi bi-robot me-1"></i>Chấm AI + sửa lỗi
-                                    </button>
-                                    <span class="small text-muted ms-2 history-ai-status"></span>
+                                : `<div class="mt-1 history-ai-slot" data-kind="writing" data-key="${escapeHtml(key)}">
+                                    <span class="small text-muted history-ai-status"><span class="spinner-border spinner-border-sm me-1"></span>AI đang chấm tự động...</span>
                                 </div>`}
                         </div>
                     `);
@@ -474,12 +470,8 @@
                         <audio controls src="${escapeHtml(recordingUrl)}" class="d-block mt-1 w-100" style="max-width:360px;"></audio>
                         ${grading
                             ? renderAiGradingBlock(grading, { showTranscript: true })
-                            : `<div class="mt-1">
-                                <button type="button" class="btn btn-sm btn-outline-primary history-ai-grade-btn"
-                                    data-kind="speaking" data-key="${escapeHtml(key)}">
-                                    <i class="bi bi-robot me-1"></i>Chấm AI + sửa lỗi
-                                </button>
-                                <span class="small text-muted ms-2 history-ai-status"></span>
+                            : `<div class="mt-1 history-ai-slot" data-kind="speaking" data-key="${escapeHtml(key)}">
+                                <span class="small text-muted history-ai-status"><span class="spinner-border spinner-border-sm me-1"></span>AI đang chấm tự động...</span>
                             </div>`}
                     </div>
                 `);
@@ -489,8 +481,10 @@
         return blocks.join('');
     }
 
+    // Chấm 1 câu, render kết quả THẲNG vào slot (không re-render cả modal → không
+    // chấm lặp). statusEl nằm trong slot; thay slot bằng block kết quả khi xong.
     async function requestHistoryAiGrading(kind, resultId, answerKey, statusEl) {
-        if (statusEl) statusEl.textContent = 'AI đang chấm bài... (10-40 giây)';
+        const slot = statusEl?.closest('.history-ai-slot');
         try {
             const endpoint = kind === 'speaking'
                 ? '/api/practice_results/ai-grade-speaking'
@@ -506,10 +500,11 @@
                 const bucket = kind === 'speaking' ? 'ai_speaking' : 'ai_writing';
                 result.metadata[bucket] = { ...(result.metadata[bucket] || {}), [answerKey]: data.grading };
             }
-            // Render lại modal với data mới (modal đang mở).
-            window.openHistoryResultDetail(resultId);
+            if (slot && data.grading) {
+                slot.innerHTML = renderAiGradingBlock(data.grading, { showTranscript: kind === 'speaking' });
+            }
         } catch (error) {
-            if (statusEl) statusEl.textContent = 'Lỗi: ' + error.message;
+            if (statusEl) statusEl.innerHTML = `<span class="text-muted">Chưa chấm được: ${escapeHtml(error.message)}</span>`;
         }
     }
 
@@ -597,13 +592,17 @@
             const aiHtml = renderAiSection(result, metadata);
             aiWrapEl.style.display = aiHtml ? 'block' : 'none';
             aiEl.innerHTML = aiHtml;
-            aiEl.querySelectorAll('.history-ai-grade-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    btn.disabled = true;
-                    const statusEl = btn.parentElement?.querySelector('.history-ai-status');
-                    requestHistoryAiGrading(btn.dataset.kind, resultId, btn.dataset.key, statusEl);
-                });
-            });
+            // TỰ ĐỘNG chấm mọi câu chưa chấm khi mở chi tiết (không cần bấm nút).
+            // Chạy tuần tự để tránh dồn nhiều request nặng cùng lúc.
+            (async () => {
+                const slots = Array.from(aiEl.querySelectorAll('.history-ai-slot'));
+                for (const slot of slots) {
+                    if (slot.dataset.done) continue;
+                    slot.dataset.done = '1';
+                    const statusEl = slot.querySelector('.history-ai-status');
+                    await requestHistoryAiGrading(slot.dataset.kind, resultId, slot.dataset.key, statusEl);
+                }
+            })();
         }
 
         if (window.bootstrap && modalEl) {

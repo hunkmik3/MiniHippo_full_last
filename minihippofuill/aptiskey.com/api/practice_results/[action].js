@@ -6,6 +6,10 @@ import update from '../../server/api/practice_results/update.js';
 import aiGradeWriting from '../../server/api/practice_results/ai-grade-writing.js';
 import aiGradeSpeaking from '../../server/api/practice_results/ai-grade-speaking.js';
 
+// Chấm AI (Grok reasoning + Whisper) có thể mất 60-120s/bài → nới maxDuration.
+// Cần Vercel Pro để >60s; Hobby cap 60s (dùng model nhanh hơn nếu ở Hobby).
+export const config = { maxDuration: 300 };
+
 const handlers = {
   delete: remove,
   list,
