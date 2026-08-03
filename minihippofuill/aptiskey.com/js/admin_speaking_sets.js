@@ -164,6 +164,7 @@
                 }
 
                 try {
+                    if (typeof window.ensureAuthTokenInteractive === 'function') await window.ensureAuthTokenInteractive();
                     const response = await fetch('/api/upload-audio', {
                         method: 'POST',
                         headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),

@@ -90,6 +90,7 @@
                 const base64 = String(reader.result || '').split(',')[1];
                 if (!base64) { reject(new Error('Không thể đọc nội dung file.')); return; }
                 try {
+                    if (typeof window.ensureAuthTokenInteractive === 'function') await window.ensureAuthTokenInteractive();
                     const resp = await fetch('/api/upload-audio', {
                         method: 'POST',
                         headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),

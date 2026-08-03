@@ -1210,6 +1210,7 @@ async function uploadLessonToGitHub() {
     
     try {
         // Send POST request to API
+        if (typeof window.ensureAuthTokenInteractive === 'function') await window.ensureAuthTokenInteractive();
         const response = await fetch('/api/upload-lesson', {
             method: 'POST',
             headers: getJsonAuthHeaders(),
