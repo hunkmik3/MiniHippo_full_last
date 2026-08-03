@@ -202,6 +202,7 @@
             reader.onload = async () => {
                 const base64 = reader.result.split(',')[1];
                 try {
+                    if (typeof window.ensureAuthTokenInteractive === 'function') await window.ensureAuthTokenInteractive();
                     const response = await fetch('/api/upload-audio', {
                         method: 'POST',
                         headers: buildAuthHeaders(),

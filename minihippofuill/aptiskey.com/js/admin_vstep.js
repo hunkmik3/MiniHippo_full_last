@@ -426,13 +426,18 @@
             const errMsg = String(result.error || '').toLowerCase();
             const isTokenError = (response.status === 401 || response.status === 403)
                 && (errMsg.includes('token') || errMsg.includes('unauthor') || errMsg.includes('expired') || errMsg.includes('missing authorization'));
-            if (isTokenError && !_retry && typeof window.refreshAuthToken === 'function') {
-                try {
-                    const newToken = await window.refreshAuthToken();
-                    if (newToken) return fetchJson(url, options, true);
-                } catch {
-                    // fall-through để throw error gốc
+            if (isTokenError && !_retry) {
+                // 1) Thử refresh im lặng. 2) Nếu hỏng → hỏi đăng nhập lại NGAY TẠI CHỖ
+                //    (modal, không rời trang) → form đang soạn được giữ nguyên → retry.
+                let newToken = null;
+                if (typeof window.refreshAuthToken === 'function') {
+                    try { newToken = await window.refreshAuthToken(); } catch { /* ignore */ }
                 }
+                if (!newToken && typeof window.showReLoginModal === 'function') {
+                    const ok = await window.showReLoginModal();
+                    if (ok) newToken = (typeof getAuthToken === 'function' ? getAuthToken() : null);
+                }
+                if (newToken) return fetchJson(url, options, true);
             }
             throw new Error(result.error || result.details || 'Không thể xử lý yêu cầu.');
         }
@@ -467,7 +472,17 @@
         });
     }
 
-    async function requestR2UploadTicket(file, filePath) {
+    async function requestR2UploadTicket(file, filePath, _retry = false) {
+        // Session có thể vừa hết hạn → nếu chưa có token, refresh trước khi gọi
+        // (tránh lỗi "Missing Authorization header" khi upload).
+        if (!_retry && !(typeof getAuthToken === 'function' && getAuthToken())) {
+            if (typeof window.ensureAuthTokenInteractive === 'function') {
+                try { await window.ensureAuthTokenInteractive(); } catch { /* ignore */ }
+            } else if (typeof window.refreshAuthToken === 'function') {
+                try { await window.refreshAuthToken(); } catch { /* ignore */ }
+            }
+        }
+
         const response = await fetch('/api/upload-audio', {
             method: 'POST',
             headers: authHeaders({ 'Content-Type': 'application/json' }),
@@ -480,7 +495,27 @@
         });
         const result = await response.json().catch(() => ({}));
         if (!response.ok) {
-            const error = new Error(result.error || result.details || 'Không thể tạo link upload R2.');
+            // Token hết hạn/thiếu → refresh 1 lần rồi thử lại (giống fetchJson).
+            const errMsg = String(result.error || '').toLowerCase();
+            const isTokenError = (response.status === 401 || response.status === 403)
+                && (errMsg.includes('token') || errMsg.includes('unauthor')
+                    || errMsg.includes('expired') || errMsg.includes('missing authorization'));
+            if (isTokenError && !_retry) {
+                let newToken = null;
+                if (typeof window.refreshAuthToken === 'function') {
+                    newToken = await window.refreshAuthToken().catch(() => null);
+                }
+                if (!newToken && typeof window.showReLoginModal === 'function') {
+                    const ok = await window.showReLoginModal();
+                    if (ok) newToken = (typeof getAuthToken === 'function' ? getAuthToken() : null);
+                }
+                if (newToken) return requestR2UploadTicket(file, filePath, true);
+            }
+            const error = new Error(
+                isTokenError
+                    ? 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại rồi thử lại.'
+                    : (result.error || result.details || 'Không thể tạo link upload R2.')
+            );
             error.status = response.status;
             error.code = result.code || '';
             error.stage = 'r2-ticket';

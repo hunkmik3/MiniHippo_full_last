@@ -336,6 +336,86 @@ function getAuthToken() {
     return localStorage.getItem('auth_token');
 }
 
+// Đảm bảo có token hợp lệ trước khi gọi API (dùng cho upload/các call fetch thô).
+// Nếu token rỗng mà còn refresh_token → refresh để tránh "Missing Authorization header".
+async function ensureAuthToken() {
+    if (!getAuthToken()
+        && localStorage.getItem('auth_refresh_token')
+        && typeof refreshAuthToken === 'function') {
+        try { await refreshAuthToken(); } catch (_) { /* ignore */ }
+    }
+    return getAuthToken();
+}
+
+// Modal đăng nhập lại NGAY TẠI CHỖ (không rời trang) → giữ nguyên form đang soạn.
+// Trả về Promise<boolean>: true nếu đăng nhập lại thành công.
+let _reLoginPromise = null;
+function showReLoginModal(message) {
+    if (_reLoginPromise) return _reLoginPromise;
+    _reLoginPromise = new Promise((resolve) => {
+        const user = (typeof getCurrentUser === 'function' ? getCurrentUser() : null) || {};
+        const overlay = document.createElement('div');
+        overlay.id = 'relogin-overlay';
+        overlay.setAttribute('style', 'position:fixed;inset:0;z-index:2147483000;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:16px;');
+        overlay.innerHTML =
+            '<div style="background:#fff;border-radius:12px;max-width:380px;width:100%;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.3);">' +
+            '<h3 style="margin:0 0 6px;font-size:1.1rem;color:#1e293b;">Phiên đăng nhập đã hết hạn</h3>' +
+            '<p style="margin:0 0 14px;font-size:.86rem;color:#64748b;">' + (message || 'Đăng nhập lại để tiếp tục — nội dung bạn đang soạn vẫn được giữ nguyên.') + '</p>' +
+            '<label style="display:block;font-size:.78rem;font-weight:600;color:#334155;margin-bottom:4px;">Email</label>' +
+            '<input id="relogin-email" type="email" value="' + String(user.email || '').replace(/"/g, '&quot;') + '" style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;margin-bottom:10px;font-size:.9rem;">' +
+            '<label style="display:block;font-size:.78rem;font-weight:600;color:#334155;margin-bottom:4px;">Mật khẩu</label>' +
+            '<input id="relogin-password" type="password" placeholder="Nhập mật khẩu" style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;margin-bottom:6px;font-size:.9rem;">' +
+            '<div id="relogin-error" style="color:#dc2626;font-size:.8rem;min-height:18px;margin-bottom:6px;"></div>' +
+            '<div style="display:flex;gap:8px;">' +
+            '<button id="relogin-submit" style="flex:1;background:#2563eb;color:#fff;border:0;border-radius:8px;padding:10px;font-weight:600;cursor:pointer;">Đăng nhập lại</button>' +
+            '<button id="relogin-cancel" style="background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:8px;padding:10px 14px;cursor:pointer;">Để sau</button>' +
+            '</div></div>';
+        document.body.appendChild(overlay);
+        const pass = overlay.querySelector('#relogin-password');
+        const errEl = overlay.querySelector('#relogin-error');
+        const submitBtn = overlay.querySelector('#relogin-submit');
+        setTimeout(() => pass.focus(), 50);
+        const cleanup = (val) => { overlay.remove(); _reLoginPromise = null; resolve(val); };
+        async function doLogin() {
+            const email = overlay.querySelector('#relogin-email').value.trim();
+            const password = pass.value;
+            if (!email || !password) { errEl.textContent = 'Nhập email và mật khẩu.'; return; }
+            submitBtn.disabled = true; submitBtn.textContent = 'Đang đăng nhập...'; errEl.textContent = '';
+            try {
+                const resp = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: buildDeviceHeaders({ 'Content-Type': 'application/json' }),
+                    // Không gửi module → server bỏ qua check module (tránh 403 khi re-login).
+                    body: JSON.stringify({ email, password, deviceId: getDeviceId(), deviceName: navigator.userAgent || '' })
+                });
+                const result = await resp.json().catch(() => ({}));
+                if (!resp.ok || !result.token) throw new Error(result.error || 'Đăng nhập thất bại.');
+                localStorage.setItem('auth_token', result.token);
+                if (result.refreshToken) localStorage.setItem('auth_refresh_token', result.refreshToken);
+                if (result.user) localStorage.setItem('auth_user', JSON.stringify(result.user));
+                if (typeof startTokenRefreshTimer === 'function') { try { startTokenRefreshTimer(); } catch (_) {} }
+                cleanup(true);
+            } catch (e) {
+                submitBtn.disabled = false; submitBtn.textContent = 'Đăng nhập lại';
+                errEl.textContent = e.message || 'Đăng nhập thất bại.';
+            }
+        }
+        submitBtn.addEventListener('click', doLogin);
+        pass.addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+        overlay.querySelector('#relogin-cancel').addEventListener('click', () => cleanup(false));
+    });
+    return _reLoginPromise;
+}
+
+// Đảm bảo token, và nếu refresh thất bại (refresh_token cũng hết) → hỏi đăng nhập
+// lại ngay tại chỗ (modal), KHÔNG rời trang nên form đang soạn được giữ nguyên.
+async function ensureAuthTokenInteractive() {
+    const t = await ensureAuthToken();
+    if (t) return t;
+    const ok = await showReLoginModal();
+    return ok ? getAuthToken() : null;
+}
+
 async function refreshAuthToken() {
     const refreshToken = localStorage.getItem('auth_refresh_token');
     if (!refreshToken) {
@@ -558,6 +638,9 @@ window.startTokenRefreshTimer = startTokenRefreshTimer;
 window.stopTokenRefreshTimer = stopTokenRefreshTimer;
 window.getCurrentUser = getCurrentUser;
 window.getAuthToken = getAuthToken;
+window.ensureAuthToken = ensureAuthToken;
+window.ensureAuthTokenInteractive = ensureAuthTokenInteractive;
+window.showReLoginModal = showReLoginModal;
 window.refreshAuthToken = refreshAuthToken;
 window.logout = logout;
 window.clearAuth = clearAuth;
