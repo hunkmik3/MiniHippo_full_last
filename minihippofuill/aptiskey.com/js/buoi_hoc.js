@@ -3210,7 +3210,7 @@ function renderGrammarPage(page) {
   return `
     <div class="question-card">
       <div class="q-number-label">Grammar – Câu ${num} (${num}/${totalGrammar})</div>
-      <p class="q-text">${esc(item.q)}</p>
+      <p class="q-text">${renderRichText(item.q)}</p>
       <ul class="option-list">${optionsHtml}</ul>
     </div>`;
 }
@@ -3252,7 +3252,7 @@ function renderListeningQ(page) {
       <audio id="${audioId}" src="${item.audio}" preload="none"></audio>
 
       <div class="listening-q-box">
-        <div class="lq-text">${esc(item.q)}</div>
+        <div class="lq-text">${renderRichText(item.q)}</div>
         <ul class="option-list">${optionsHtml}</ul>
       </div>
     </div>`;
@@ -3309,7 +3309,7 @@ function renderListeningTopic(page) {
 
       <div class="listening-q-box">
         <div class="topic-banner">${esc(d.topic)}</div>
-        <p class="text-muted mb-3" style="font-size:0.9rem;">${esc(d.instruction)}</p>
+        <p class="text-muted mb-3" style="font-size:0.9rem;">${renderRichText(d.instruction)}</p>
         ${personsHtml}
       </div>
     </div>`;
@@ -3361,7 +3361,7 @@ function renderListeningOpinion(page) {
 
       <div class="listening-q-box">
         <div class="topic-banner">${esc(d.topic)}</div>
-        <p class="text-muted mb-3" style="font-size:0.9rem;">${esc(d.instruction || 'Listen and choose who says each statement.')}</p>
+        <p class="text-muted mb-3" style="font-size:0.9rem;">${renderRichText(d.instruction || 'Listen and choose who says each statement.')}</p>
         ${statementsHtml}
       </div>
 
@@ -3370,7 +3370,7 @@ function renderListeningOpinion(page) {
       </button>
       <div id="${transcriptId}" class="listening-transcript" style="display:none;">
         <p class="mb-2"><strong>Paragraph:</strong></p>
-        <div>${esc(d.transcript || '')}</div>
+        <div>${renderRichText(d.transcript || '')}</div>
       </div>
     </div>`;
 }
@@ -3401,7 +3401,7 @@ function renderListeningMcqBatch(page) {
     }).join('');
     return `
       <div class="listening-mcq-item">
-        <div class="lq-text">${esc(q.id ? `${q.id}. ${q.question}` : `${qi + 1}. ${q.question}`)}</div>
+        <div class="lq-text">${renderRichText(q.id ? `${q.id}. ${q.question}` : `${qi + 1}. ${q.question}`)}</div>
         <ul class="option-list">${optionsHtml}</ul>
       </div>`;
   }).join('');
@@ -3422,7 +3422,7 @@ function renderListeningMcqBatch(page) {
 
       <div class="listening-q-box">
         <div class="topic-banner">${esc(d.topic)}</div>
-        <p class="text-muted mb-3" style="font-size:0.9rem;">${esc(d.instruction || 'Choose the correct option for each question.')}</p>
+        <p class="text-muted mb-3" style="font-size:0.9rem;">${renderRichText(d.instruction || 'Choose the correct option for each question.')}</p>
         ${questionsHtml}
       </div>
 
@@ -3431,7 +3431,7 @@ function renderListeningMcqBatch(page) {
       </button>
       <div id="${transcriptId}" class="listening-transcript" style="display:none;">
         <p class="mb-2"><strong>Paragraph:</strong></p>
-        <div>${esc(d.transcript || '')}</div>
+        <div>${renderRichText(d.transcript || '')}</div>
       </div>
     </div>`;
 }
@@ -3452,15 +3452,15 @@ function renderVocabPage(page) {
     }
     const wHtml = (p.words).map(w => `<div class="vocab-row"><span class="v-num">${w.num}.</span><span class="v-word">${esc(w.word)}</span><div class="ms-auto">${buildDropdown('v'+partKey.replace('part','p')+'-q'+w.num, p.options, w.answer)}</div></div>`).join('');
     const oHtml = p.options.map(o => `<div class="vocab-option"><span class="v-letter">${o.letter}</span>${esc(o.word)}</div>`).join('');
-    bodyHtml = `<div class="vocab-table"><div class="vocab-header"><h5>${p.title}</h5><p>${esc(p.instruction)}</p><p class="fst-italic" style="font-size:.75rem;">${esc(p.instructionVi)}</p></div><div class="vocab-body"><div class="vocab-left">${exHtml}${wHtml}</div><div class="vocab-right">${oHtml}</div></div></div>`;
+    bodyHtml = `<div class="vocab-table"><div class="vocab-header"><h5>${p.title}</h5><p>${renderRichText(p.instruction)}</p><p class="fst-italic" style="font-size:.75rem;">${renderRichText(p.instructionVi)}</p></div><div class="vocab-body"><div class="vocab-left">${exHtml}${wHtml}</div><div class="vocab-right">${oHtml}</div></div></div>`;
   } else if (partKey === 'part2') {
     const sHtml = p.sentences.map(s => `<div class="vocab-row"><span class="v-num">${s.num}.</span><span class="v-word flex-grow-1">${esc(s.text)}</span><div class="ms-2">${buildDropdown('vp2-q'+s.num, p.options, s.answer)}</div></div>`).join('');
     const oHtml = p.options.map(o => `<div class="vocab-option"><span class="v-letter">${o.letter}</span>${esc(o.word)}</div>`).join('');
-    bodyHtml = `<div class="vocab-table"><div class="vocab-header"><h5>${p.title}</h5><p>${esc(p.instruction)}</p><p class="fst-italic" style="font-size:.75rem;">${esc(p.instructionVi)}</p></div><div class="vocab-body"><div class="vocab-left">${sHtml}</div><div class="vocab-right">${oHtml}</div></div></div>`;
+    bodyHtml = `<div class="vocab-table"><div class="vocab-header"><h5>${p.title}</h5><p>${renderRichText(p.instruction)}</p><p class="fst-italic" style="font-size:.75rem;">${renderRichText(p.instructionVi)}</p></div><div class="vocab-body"><div class="vocab-left">${sHtml}</div><div class="vocab-right">${oHtml}</div></div></div>`;
   } else if (partKey === 'part3') {
     const sHtml = p.sentences.map(s => `<div class="sentence-fill"><span class="sf-num">${s.num}.</span>${esc(s.before)} ${buildDropdown('vp3-q'+s.num, p.options, s.answer)} ${esc(s.after)}</div>`).join('');
     const oRef = '<div class="d-flex flex-wrap gap-3">' + p.options.map(o => `<span class="vocab-option"><span class="v-letter">${o.letter}</span>${esc(o.word)}</span>`).join('') + '</div>';
-    bodyHtml = `<div class="vocab-table"><div class="vocab-header"><h5>${p.title}</h5><p>${esc(p.instruction)}</p><p class="fst-italic" style="font-size:.75rem;">${esc(p.instructionVi)}</p></div><div class="p-3">${sHtml}</div><div class="p-3 bg-light border-top">${oRef}</div></div>`;
+    bodyHtml = `<div class="vocab-table"><div class="vocab-header"><h5>${p.title}</h5><p>${renderRichText(p.instruction)}</p><p class="fst-italic" style="font-size:.75rem;">${renderRichText(p.instructionVi)}</p></div><div class="p-3">${sHtml}</div><div class="p-3 bg-light border-top">${oRef}</div></div>`;
   }
 
   return `<div class="question-card"><span class="q-badge q-badge-vocab"><i class="bi bi-book me-1"></i>Vocabulary – Part ${page.partNum}</span>${bodyHtml}</div>`;
@@ -3505,7 +3505,7 @@ function renderReadingGap(page) {
   return `
     <div class="question-card legacy-skill-card reading-part1-layout">
       <h1 class="reading-part1-title"><strong>${title}</strong></h1>
-      <p class="reading-part1-instruction">${esc(d.instruction || 'Choose the right word to fill in the blank.')}</p>
+      <p class="reading-part1-instruction">${renderRichText(d.instruction || 'Choose the right word to fill in the blank.')}</p>
 
       <div class="reading-part1-shell">
         ${rowsHtml}
@@ -3591,7 +3591,7 @@ function renderReadingOrder(page) {
   const cardsHtml = shuffled.map((s, i) => `
     <div class="reading-order-card" data-text="${esc(s)}" data-order-index="${i}">
       <div class="reading-order-card-body">
-        <span class="reading-order-text">${esc(s)}</span>
+        <span class="reading-order-text">${renderRichText(s)}</span>
         <div class="reading-order-actions" aria-label="Đổi vị trí câu">
           <button type="button" class="btn btn-sm btn-outline-primary reading-order-move-btn"
                   data-order-action="up"
@@ -3631,7 +3631,7 @@ function renderReadingMatch(page) {
   const title = page.partTitle ? esc(page.partTitle) : `Reading Question 4 (${num}/${page.totalInPart})`;
 
   const parasHtml = Object.entries(d.paragraphs).map(([letter, text]) =>
-    `<div class="paragraph-box"><p><strong>${letter}:</strong> ${esc(text)}</p></div>`
+    `<div class="paragraph-box"><p><strong>${letter}:</strong> ${renderRichText(text)}</p></div>`
   ).join('');
 
   const matchHtml = d.questions.map((q, qi) => {
@@ -3640,7 +3640,7 @@ function renderReadingMatch(page) {
     const letters = Object.keys(d.paragraphs);
     const opts = letters.map(l => `<option value="${l}" ${saved===l?'selected':''}>${l}</option>`).join('');
     return `<div class="match-row">
-      <span class="match-label">${esc(q.prompt)}</span>
+      <span class="match-label">${renderRichText(q.prompt)}</span>
       <select class="form-select form-select-sm" name="${key}" data-answer="${q.answer}" onchange="userAnswers['${key}']=this.value" style="width:70px;">
         <option value="">--</option>${opts}
       </select>
@@ -3804,7 +3804,7 @@ function renderWritingEmail(page) {
   const d = page.data;
 
   const contextHtml = d.contextText
-    ? `<div class="alert alert-light border mb-3" style="font-size:0.88rem;line-height:1.6;">${esc(d.contextText)}</div>`
+    ? `<div class="alert alert-light border mb-3" style="font-size:0.88rem;line-height:1.6;">${renderRichText(d.contextText)}</div>`
     : '';
 
   const emailsHtml = d.emails.map(e => {
@@ -3898,7 +3898,7 @@ function renderWritingDescribeImage(page) {
   return `
     <div class="question-card legacy-skill-card legacy-writing-card">
       <div class="q-number-label">${esc(partLabel)}</div>
-      <p class="fw-semibold mb-3" style="font-size:1.1rem;">${esc(q.prompt)}</p>
+      <p class="fw-semibold mb-3" style="font-size:1.1rem;">${renderRichText(q.prompt)}</p>
 
       <div style="margin-bottom:1.5rem; text-align:center;">
         ${imgHtml}
@@ -3929,7 +3929,7 @@ function renderWritingFollowup(page) {
     const wc = saved.split(/\s+/).filter(Boolean).length;
     return `
       <div style="margin-bottom:1.25rem;">
-        <label style="font-weight:700; display:block; margin-bottom:0.4rem; font-size:0.95rem;">${esc(q.prompt)}</label>
+        <label style="font-weight:700; display:block; margin-bottom:0.4rem; font-size:0.95rem;">${renderRichText(q.prompt)}</label>
         <textarea class="form-control writing-textarea" name="${q.key}" rows="4"
                   data-min="${q.minWords}" data-max="${q.maxWords}"
                   placeholder="Viết ${q.minWords}-${q.maxWords} từ..."
@@ -3995,7 +3995,7 @@ function renderSpeakingQ(page) {
 
           ${audioPanelHtml}
 
-          <p class="fw-semibold mb-3" style="font-size:1.1rem;">${esc(d.prompt)}</p>
+          <p class="fw-semibold mb-3" style="font-size:1.1rem;">${renderRichText(d.prompt)}</p>
 
           <label class="form-label fw-semibold">Câu trả lời của bạn</label>
           <textarea class="form-control answer-box" name="${esc(recordingKey)}"
@@ -4098,13 +4098,13 @@ function renderSpeakingImage(page) {
   return `
     <div class="question-card" style="text-align:center;">
       <div class="page-dots-bar">${dotsHtml}</div>
-      <div class="q-number-label" style="text-align:left;">${esc(d.instruction || page.partLabel)} – Câu ${((page.idx % page.totalQ) + 1)} / ${page.totalQ}</div>
+      <div class="q-number-label" style="text-align:left;">${renderRichText(d.instruction || page.partLabel)} – Câu ${((page.idx % page.totalQ) + 1)} / ${page.totalQ}</div>
 
       <div class="speaking-image-container">
         ${imagesHtml || '<div class="p-4 bg-light border rounded text-muted"><i class="bi bi-image fs-1 d-block mb-2"></i>Hình ảnh sẽ được cập nhật sau</div>'}
       </div>
 
-      <div class="speaking-question-text">${esc(d.prompt)}</div>
+      <div class="speaking-question-text">${renderRichText(d.prompt)}</div>
 
       <div class="speaking-timer-ring running" id="speaking-ring">
         <span id="speaking-seconds">${page.responseSeconds}</span>
@@ -4153,7 +4153,7 @@ function renderSpeakingIntro(page) {
             <span class="page-hint" id="speaking-status">Audio xong sẽ chờ ${prepSeconds} giây chuẩn bị rồi tự chuyển sang câu hỏi.</span>
           </div>
           <h4 class="mb-2">${esc(d.partLabel)} – Giới thiệu</h4>
-          <p class="text-muted mb-3">${esc(d.introText)}</p>
+          <p class="text-muted mb-3">${renderRichText(d.introText)}</p>
 
           <div class="row g-3 mb-3">${imagesHtml}</div>
 
@@ -4393,7 +4393,7 @@ function renderSpeakingAudioQ(page) {
             <div class="small" id="audio-status-label">Đang phát audio 1...</div>
           </div>
 
-          <p class="fw-semibold mb-2">Câu hỏi: ${esc(d.prompt)}</p>
+          <p class="fw-semibold mb-2">Câu hỏi: ${renderRichText(d.prompt)}</p>
           <label class="form-label fw-semibold">Câu trả lời của bạn</label>
           <textarea class="form-control answer-box" id="${answerId}"
                     placeholder="Nhập câu trả lời hoặc transcript bạn nói..."
@@ -4637,7 +4637,7 @@ function renderWritingSentences(page) {
     const wc = saved.split(/\s+/).filter(Boolean).length;
     return `
       <div class="writing-q-item">
-        <div class="writing-sentence-prompt">${esc(q.prompt)}</div>
+        <div class="writing-sentence-prompt">${renderRichText(q.prompt)}</div>
         <textarea class="form-control writing-textarea" name="${q.key}" rows="3"
                   data-min="${q.minWords}" data-max="${q.maxWords}"
                   placeholder="Viết ${q.minWords}-${q.maxWords} từ..."
@@ -4654,7 +4654,7 @@ function renderWritingSentences(page) {
   return `
     <div class="question-card legacy-skill-card legacy-writing-card">
       <div class="q-number-label">${title}</div>
-      <div class="writing-topic-bar">${esc(d.instruction)}</div>
+      <div class="writing-topic-bar">${renderRichText(d.instruction)}</div>
       ${qsHtml}
     </div>`;
 }
@@ -4671,7 +4671,7 @@ function renderWritingChat(page) {
     const wc = saved.split(/\s+/).filter(Boolean).length;
     return `
       <div class="writing-q-item">
-        <label>${esc(q.prompt)}</label>
+        <label>${renderRichText(q.prompt)}</label>
         <textarea class="form-control writing-textarea" name="${q.key}" rows="4"
                   data-min="${q.minWords}" data-max="${q.maxWords}"
                   placeholder="Viết ${q.minWords}-${q.maxWords} từ..."
@@ -5118,7 +5118,7 @@ function renderResultsPage() {
         const correct = q.answer;
         const ok = user === correct;
         if (ok) totalCorrect++;
-        rows += `<tr><td>Listening P2 ${qi+1}</td><td>${esc(q.question)}</td><td class="${ok?'result-correct':'result-incorrect'}">${esc(user)}</td><td class="result-correct">${esc(correct)}</td></tr>`;
+        rows += `<tr><td>Listening P2 ${qi+1}</td><td>${renderRichText(q.question)}</td><td class="${ok?'result-correct':'result-incorrect'}">${esc(user)}</td><td class="result-correct">${esc(correct)}</td></tr>`;
       });
     }
     else if (pg.type === 'reading-gap') {
@@ -5149,7 +5149,7 @@ function renderResultsPage() {
         const user = userAnswers[key] || '(chưa chọn)';
         const ok = user === q.answer;
         if (ok) totalCorrect++;
-        rows += `<tr><td>R-Match ${pg.idx+1}.${qi+1}</td><td>${esc(q.prompt)}</td><td class="${ok?'result-correct':'result-incorrect'}">${esc(user)}</td><td class="result-correct">${esc(q.answer)}</td></tr>`;
+        rows += `<tr><td>R-Match ${pg.idx+1}.${qi+1}</td><td>${renderRichText(q.prompt)}</td><td class="${ok?'result-correct':'result-incorrect'}">${esc(user)}</td><td class="result-correct">${esc(q.answer)}</td></tr>`;
       });
     }
     else if (pg.type === 'reading-heading') {
@@ -5188,7 +5188,7 @@ function renderResultsPage() {
         const recordingHtml = recordingUrl
           ? `<audio controls preload="none" style="width:100%; max-width:320px;" src="${esc(recordingUrl)}"></audio>${recording?.uploadedUrl ? '' : '<div class="small text-muted mt-1">Đang upload ghi âm...</div>'}`
           : '<span class="text-muted small">Chưa có ghi âm</span>';
-        rows += `<tr><td>${esc(pg.partLabel || 'Speaking Intro')}</td><td>${esc(pg.data?.introText || '')}</td><td><em>${esc(note || '(không có ghi chú)')}</em></td><td>${recordingHtml}</td></tr>`;
+        rows += `<tr><td>${esc(pg.partLabel || 'Speaking Intro')}</td><td>${renderRichText(pg.data?.introText || '')}</td><td><em>${esc(note || '(không có ghi chú)')}</em></td><td>${recordingHtml}</td></tr>`;
       }
     }
     else if (pg.type === 'speaking-q' || pg.type === 'speaking-image' || pg.type === 'speaking-audio-q') {
@@ -5201,7 +5201,7 @@ function renderResultsPage() {
       const recordingHtml = recordingUrl
         ? `<audio controls preload="none" style="width:100%; max-width:320px;" src="${esc(recordingUrl)}"></audio>${recording?.uploadedUrl ? '' : '<div class="small text-muted mt-1">Đang upload ghi âm...</div>'}`
         : '<span class="text-muted small">Chưa có ghi âm</span>';
-      rows += `<tr><td>${esc(label)}</td><td>${esc(pg.data.prompt)}</td><td><em>${esc(note)}</em></td><td>${recordingHtml}</td></tr>`;
+      rows += `<tr><td>${esc(label)}</td><td>${renderRichText(pg.data.prompt)}</td><td><em>${esc(note)}</em></td><td>${recordingHtml}</td></tr>`;
     }
   });
 
@@ -5265,7 +5265,7 @@ function renderWritingResults() {
       const items = pg.data.questions.map(q => {
         const ans = userAnswers[q.key] || '(chưa trả lời)';
         return `<div class="writing-q-item">
-          <label>${esc(q.prompt)}</label>
+          <label>${renderRichText(q.prompt)}</label>
           <div class="p-2 bg-light border rounded" style="font-size:0.95rem;">${esc(ans)}</div>
           <div id="ai-fb-${q.key}"></div>
         </div>`;
@@ -5280,7 +5280,7 @@ function renderWritingResults() {
         const ans = userAnswers[q.key] || '(chưa trả lời)';
         const wc = ans.split(/\s+/).filter(Boolean).length;
         return `<div class="writing-q-item">
-          <label>${esc(q.prompt)}</label>
+          <label>${renderRichText(q.prompt)}</label>
           <div class="p-3 bg-light border rounded" style="font-size:0.95rem; white-space:pre-wrap;">${esc(ans)}</div>
           <div class="word-counter">Số từ: ${wc}</div>
           <div id="ai-fb-${q.key}"></div>
@@ -5296,7 +5296,7 @@ function renderWritingResults() {
         const ans = userAnswers[q.key] || '(chưa trả lời)';
         const wc = ans.split(/\s+/).filter(Boolean).length;
         return `<div class="writing-q-item">
-          <label>${esc(q.prompt)}</label>
+          <label>${renderRichText(q.prompt)}</label>
           <div class="p-3 bg-light border rounded" style="font-size:0.95rem; white-space:pre-wrap;">${esc(ans)}</div>
           <div class="word-counter">Số từ: ${wc}</div>
           <div id="ai-fb-${q.key}"></div>
@@ -5334,7 +5334,7 @@ function renderWritingResults() {
       sections.push(`<h5 class="fw-bold mb-3">${sectionTitle}</h5>
         ${imgHtml}
         <div class="writing-q-item">
-          <label>${esc(q.prompt)}</label>
+          <label>${renderRichText(q.prompt)}</label>
           <div class="p-3 bg-light border rounded" style="font-size:0.95rem; white-space:pre-wrap;">${esc(ans)}</div>
           <div class="word-counter">Số từ: ${wc}</div>
           <div id="ai-fb-${q.key}"></div>
@@ -5345,7 +5345,7 @@ function renderWritingResults() {
         const ans = userAnswers[q.key] || '(chưa viết)';
         const wc = ans.split(/\s+/).filter(Boolean).length;
         return `<div class="writing-q-item">
-          <label>${esc(q.prompt)}</label>
+          <label>${renderRichText(q.prompt)}</label>
           <div class="p-3 bg-light border rounded" style="font-size:0.95rem; white-space:pre-wrap;">${esc(ans)}</div>
           <div class="word-counter">Số từ: ${wc}</div>
           <div id="ai-fb-${q.key}"></div>
@@ -5566,4 +5566,11 @@ function esc(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+// Cho phép HIỂN THỊ các thẻ định dạng cơ bản (đậm/nghiêng/gạch chân/gạch ngang)
+// do admin soạn trong form builder, nhưng vẫn escape mọi thứ khác để chống XSS.
+function renderRichText(str) {
+  const safe = esc(str);
+  return safe.replace(/&lt;(\/?)(b|i|u|s|strong|em)&gt;/gi, '<$1$2>');
 }

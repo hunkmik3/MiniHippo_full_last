@@ -219,6 +219,31 @@
       background: rgba(124, 58, 237, 0.15) !important;
       color: #a78bfa !important;
     }
+
+    /* ── Popup 2 thẻ chọn phần làm bài ── */
+    .choice-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 22px 16px;
+      text-align: center;
+      color: #1e293b;
+      background: #fff;
+      transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+      height: 100%;
+    }
+    .choice-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(2, 6, 23, 0.12);
+      border-color: #a5b4fc;
+      color: #1e293b;
+    }
+    .choice-icon {
+      width: 56px; height: 56px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.6rem; margin: 0 auto 12px;
+    }
+    .choice-title { font-weight: 700; font-size: 1rem; margin-bottom: 4px; }
+    .choice-desc { font-size: 0.8rem; color: #64748b; }
   </style>
 </head>
 
@@ -433,6 +458,22 @@
       All rights reserved.
     </footer>
 
+  </div>
+
+  <!-- ═══ Popup chọn phần làm bài của buổi (BTVN + Key) ═══ -->
+  <div class="modal fade" id="session-choice-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="session-choice-title">Buổi</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted mb-3" style="font-size:0.85rem;">Chọn phần bạn muốn làm trong buổi này:</p>
+          <div id="session-choice-body"></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- ═══ SCRIPTS ═══ -->

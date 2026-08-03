@@ -24,7 +24,9 @@ const lopHocRuntime = {
   user: null,
   classes: [],
   activeClassByBand: { B1: null, B2: null },
-  activeBand: null
+  activeBand: null,
+  // Map Key đính kèm theo band-buổi: { 'B1-2': { keySetId, keyType, keyTitle } }
+  sessionKeyMap: {}
 };
 
 function normalizeText(value) {
@@ -475,31 +477,92 @@ function showLockedMessage(number, band) {
   alert(`Buổi ${number} hiện đang bị khóa.`);
 }
 
-function openSession(band, number) {
+// URL vào bài BTVN của buổi (speaking dùng trang riêng).
+function buildBtvnUrl(band, number, meta) {
   const key = `${band}-${number}`;
+  if (SPEAKING_SESSIONS[key]) {
+    const q = new URLSearchParams({ buoi: key, band, session: String(number) });
+    if (meta.classId) q.set('classId', meta.classId);
+    return `speaking_cauhoi_part.html?${q.toString()}`;
+  }
+  const q = new URLSearchParams({ band, session: String(number) });
+  if (meta.classId) q.set('classId', meta.classId);
+  return `buoi_hoc.html?${q.toString()}`;
+}
+
+// URL vào bài Key (gắn ngữ cảnh buổi để kết quả tổng hợp theo buổi).
+function buildKeyUrl(band, number, meta, keyInfo) {
+  const page = keyInfo.keyType === 'key_reading' ? 'reading_bode_set.html' : 'listening_bode_set.html';
+  const q = new URLSearchParams({
+    set: keyInfo.keySetId,
+    from: 'lop_hoc',
+    session: String(number),
+    band
+  });
+  if (meta.classId) q.set('classId', meta.classId);
+  return `${page}?${q.toString()}`;
+}
+
+function openSession(band, number) {
   const meta = getSessionMeta(band, number);
   if (meta.isLocked) {
     showLockedMessage(number, band);
     return;
   }
 
-  if (SPEAKING_SESSIONS[key]) {
-    const query = new URLSearchParams({
-      buoi: key,
-      band,
-      session: String(number)
-    });
-    if (meta.classId) query.set('classId', meta.classId);
-    window.location.href = `speaking_cauhoi_part.html?${query.toString()}`;
+  const btvnUrl = buildBtvnUrl(band, number, meta);
+  const keyInfo = getSessionKeyInfo(band, number);
+
+  // Buổi không có Key đính kèm → vào thẳng BTVN (không cần popup).
+  if (!keyInfo) {
+    window.location.href = btvnUrl;
     return;
   }
 
-  const query = new URLSearchParams({
-    band,
-    session: String(number)
-  });
-  if (meta.classId) query.set('classId', meta.classId);
-  window.location.href = `buoi_hoc.html?${query.toString()}`;
+  // Có Key → hiện popup 2 thẻ để HV chọn phần muốn làm.
+  openSessionChoice(band, number, btvnUrl, buildKeyUrl(band, number, meta, keyInfo), keyInfo);
+}
+
+// Popup 2 thẻ: Bài tập buổi + Key.
+function openSessionChoice(band, number, btvnUrl, keyUrl, keyInfo) {
+  const modalEl = document.getElementById('session-choice-modal');
+  if (!modalEl) {
+    // Fallback nếu thiếu modal: vào thẳng BTVN.
+    window.location.href = btvnUrl;
+    return;
+  }
+  const keyLabel = keyInfo.keyType === 'key_reading' ? 'Key Reading' : 'Key Listening';
+  const keyTitle = keyInfo.keyTitle || keyLabel;
+  const keyIcon = keyInfo.keyType === 'key_reading' ? 'bi-book' : 'bi-headphones';
+
+  document.getElementById('session-choice-title').textContent = `Buổi ${number} (${band})`;
+  document.getElementById('session-choice-body').innerHTML = `
+    <div class="row g-3">
+      <div class="col-12 col-sm-6">
+        <a href="${escapeHtml(btvnUrl)}" class="choice-card d-block text-decoration-none">
+          <div class="choice-icon" style="background:linear-gradient(135deg,#e0e7ff,#a5b4fc);color:#312e81;">
+            <i class="bi bi-pencil-square"></i>
+          </div>
+          <div class="choice-title">Bài tập Buổi ${number}</div>
+          <div class="choice-desc">Bài tập về nhà theo buổi</div>
+        </a>
+      </div>
+      <div class="col-12 col-sm-6">
+        <a href="${escapeHtml(keyUrl)}" class="choice-card d-block text-decoration-none">
+          <div class="choice-icon" style="background:linear-gradient(135deg,#dbeafe,#93c5fd);color:#1e3a8a;">
+            <i class="bi ${keyIcon}"></i>
+          </div>
+          <div class="choice-title">${escapeHtml(keyTitle)}</div>
+          <div class="choice-desc">${escapeHtml(keyLabel)} của buổi</div>
+        </a>
+      </div>
+    </div>
+  `;
+  if (window.bootstrap) {
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  } else {
+    modalEl.style.display = 'block';
+  }
 }
 
 function pickInitialView() {
@@ -518,6 +581,34 @@ async function loadHomeworkClasses() {
 
   lopHocRuntime.activeClassByBand.B1 = pickActiveClassForBand(lopHocRuntime.classes, 'B1', lopHocRuntime.user);
   lopHocRuntime.activeClassByBand.B2 = pickActiveClassForBand(lopHocRuntime.classes, 'B2', lopHocRuntime.user);
+}
+
+// Nạp Key đính kèm theo band-buổi từ record session_content (admin gắn 1 lần/band).
+async function loadSessionKeyMap() {
+  lopHocRuntime.sessionKeyMap = {};
+  try {
+    const data = await apiGet('/api/practice_sets/list?type=session_content');
+    const sets = Array.isArray(data?.sets) ? data.sets : [];
+    sets.forEach((set) => {
+      const d = set?.data || {};
+      const sessionKey = String(d.session_key || '').toUpperCase();
+      const keySetId = String(d.key_set_id || '').trim();
+      const keyType = String(d.key_type || '').trim();
+      if (sessionKey && keySetId && (keyType === 'key_listening' || keyType === 'key_reading')) {
+        lopHocRuntime.sessionKeyMap[sessionKey] = {
+          keySetId,
+          keyType,
+          keyTitle: String(d.key_title || '').trim()
+        };
+      }
+    });
+  } catch (error) {
+    console.warn('Load session key map failed:', error);
+  }
+}
+
+function getSessionKeyInfo(band, number) {
+  return lopHocRuntime.sessionKeyMap[`${band}-${number}`] || null;
 }
 
 async function initStudentView() {
@@ -541,6 +632,7 @@ async function initStudentView() {
   }
 
   await loadHomeworkClasses();
+  await loadSessionKeyMap();
   applyBandVisibility();
 
   renderBandSessions('B1');

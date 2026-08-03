@@ -3,7 +3,7 @@ import { verifyAdminRequest } from '../_utils/auth.js';
 import { callSupabaseAuth, insertInto, selectFrom, updateTable } from '../_utils/supabase.js';
 import { resolveDeviceLimit } from '../_utils/device.js';
 
-const OPTIONAL_USER_COLUMNS = ['learning_program', 'started_on'];
+const OPTIONAL_USER_COLUMNS = ['learning_program', 'started_on', 'assigned_class_id'];
 
 function generatePassword() {
   const random = Math.random().toString(36).slice(-8);
@@ -185,7 +185,8 @@ export default async function handler(req, res) {
       course,
       band,
       startedOn,
-      learningProgram
+      learningProgram,
+      assignedClassId
     } = body || {};
 
     const trimmedAccountCode = accountCode?.trim();
@@ -264,6 +265,10 @@ export default async function handler(req, res) {
     }
     if (typeof startedOn !== 'undefined') {
       userPayload.started_on = resolvedStartedOn || null;
+    }
+    // Gán lớp ngay khi tạo (dùng cho import theo mã lớp). Rỗng -> không gán.
+    if (typeof assignedClassId === 'string' && assignedClassId.trim()) {
+      userPayload.assigned_class_id = assignedClassId.trim();
     }
 
     const existingUser = await selectFrom('users', {

@@ -3,6 +3,10 @@
     const setId = query.get('set');
     const fromSource = (query.get('from') || '').toLowerCase();
     const returnPage = fromSource === 'lop_hoc' ? 'lop_hoc.html' : 'reading_bode.html';
+    // Ngữ cảnh buổi khi Key mở từ 1 buổi (tuần tự sau BTVN) — để tổng hợp kết quả theo buổi.
+    const keySessionNumber = parseInt(query.get('session'), 10);
+    const keyClassId = (query.get('classId') || '').trim();
+    const keyBand = (query.get('band') || '').trim().toUpperCase();
 
     const sections = [
         { id: 'intro-section', label: 'Intro', key: 'intro' },
@@ -977,7 +981,9 @@
             refs.totalScore.textContent = `Total Score: ${totalScore} / ${totalPossible}`;
         }
         if (refs.scoreClassification) {
-            refs.scoreClassification.textContent = `Your band: ${determineGrade(totalScore)}`;
+            // Bỏ hiển thị "Your band" ở kết quả Key theo yêu cầu.
+            refs.scoreClassification.textContent = '';
+            refs.scoreClassification.style.display = 'none';
         }
 
         refs.content.style.display = 'none';
@@ -1003,6 +1009,13 @@
                 if (currentUser?.assignedClassId) {
                     submissionMetadata.class_id = String(currentUser.assignedClassId);
                 }
+                // Ngữ cảnh buổi (khi Key mở tuần tự từ 1 buổi): ưu tiên tham số URL.
+                if (Number.isFinite(keySessionNumber) && keySessionNumber > 0) {
+                    submissionMetadata.session_number = keySessionNumber;
+                    submissionMetadata.session = keySessionNumber;
+                }
+                if (keyClassId) submissionMetadata.class_id = keyClassId;
+                if (keyBand === 'B1' || keyBand === 'B2') submissionMetadata.band = keyBand;
                 submissionMetadata.key_review = buildKeyReview([
                     ['Part 1', part1Result],
                     ['Part 2 & 3', part2Result],
