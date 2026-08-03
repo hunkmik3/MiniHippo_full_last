@@ -21,7 +21,9 @@ let lopHocState = {
     sessionDraft: null,
     selectedDraftPageIndex: -1,
     selectedStudentIds: new Set(),
-    classFormSelectedStudentIds: new Set()  // student ids ticked in class create/edit form
+    classFormSelectedStudentIds: new Set(),  // student ids ticked in class create/edit form
+    keySetOptions: { key_listening: null, key_reading: null },  // cache danh sách bộ Key theo type
+    submissionKeyByUser: {}  // map user_id → kết quả Key của buổi (gộp vào DS Trả BTVN)
 };
 
 // ── Tab metadata for hero header ──
@@ -432,8 +434,16 @@ function switchTab(tabId) {
     // Tab-specific initialization
     if (tabId === 'tab-homework' || tabId === 'tab-submissions') {
         populateClassDropdowns();
+        if (tabId === 'tab-submissions') {
+            // Bảng mặc định hiện TOÀN BỘ data; 2 dropdown chỉ để lọc.
+            const scs = document.getElementById('sub-class-select');
+            if (scs && scs.options[0]) scs.options[0].textContent = '-- Tất cả lớp --';
+            populateSubmissionSessionDropdown();
+            loadSubmissions();
+        }
     } else if (tabId === 'tab-key-results') {
         populateKeyResultClassDropdown();
+        populateKeyResultSessionDropdown();
         loadKeyResults();
     } else if (tabId === 'tab-session-content') {
         refreshSessionContentList();
@@ -1200,9 +1210,11 @@ async function deleteStudent() {
    ═══════════════════════════════════════════════════════ */
 
 function downloadCSVTemplate() {
-    const header = 'account_code,email,full_name,phone,device_limit,started_on,expires_at,notes,course,band,password';
-    const sample1 = 'HV001,,Nguyễn Văn A,0901234567,2,2025-04-01,2025-12-31,Lớp 18h 246,Lớp học,B1,';
-    const sample2 = 'HV002,,Trần Thị B,0912345678,2,2025-04-01,2025-12-31,Lớp 18h 246,Lớp học,B2,';
+    // Lấy 1 mã lớp có thật làm ví dụ (nếu đã có lớp) để admin điền/thử ngay.
+    const exampleCode = getClassCode(lopHocState.classes?.[0]) || 'LHXXXX';
+    const header = 'account_code,email,full_name,phone,device_limit,started_on,expires_at,notes,course,band,password,class_code';
+    const sample1 = `HV001,,Nguyễn Văn A,0901234567,2,2025-04-01,2025-12-31,Lớp 18h 246,Lớp học,B1,,${exampleCode}`;
+    const sample2 = `HV002,,Trần Thị B,0912345678,2,2025-04-01,2025-12-31,Lớp 18h 246,Lớp học,B2,,${exampleCode}`;
     const csv = [header, sample1, sample2].join('\n');
     downloadFile('template_hoc_vien.csv', csv, 'text/csv');
 }
@@ -1277,7 +1289,13 @@ async function importCSV() {
         return;
     }
 
+    // Cần danh sách lớp để tra mã lớp -> id khi gán.
+    if (!Array.isArray(lopHocState.classes) || !lopHocState.classes.length) {
+        try { await loadClasses(); } catch (_) { /* ignore */ }
+    }
+
     const validationErrors = [];
+    const classWarnings = [];
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         const lineNo = i + 2;
@@ -1292,6 +1310,16 @@ async function importCSV() {
         if (course === 'Lớp học' && !band) {
             validationErrors.push(`${accountCode}: course "Lớp học" bắt buộc có band (B1/B2).`);
             continue;
+        }
+
+        // Gán lớp theo mã (cột class_code / ma_lop / lop ...). Mã sai -> vẫn tạo HV, báo cảnh báo.
+        const classCodeRaw = row.class_code || row.ma_lop || row.malop || row.lop
+            || row.class || row.ma_lop_hoc || row.assign || '';
+        row._assignedClassId = '';
+        if (classCodeRaw) {
+            const cls = findClassByCode(classCodeRaw);
+            if (cls) row._assignedClassId = cls.id;
+            else classWarnings.push(`${accountCode}: mã lớp "${classCodeRaw}" không tồn tại → chưa gán lớp.`);
         }
 
         row.course = course;
@@ -1329,6 +1357,7 @@ async function importCSV() {
                 expiresAt: row.expires_at || undefined,
                 notes: row.notes || undefined,
                 password: row.password || undefined,
+                assignedClassId: row._assignedClassId || undefined,
                 learningProgram: USER_GROUP_CLASSROOM
             };
             return apiCall('/api/users/create', {
@@ -1350,10 +1379,17 @@ async function importCSV() {
     }
 
     let msg = `Import xong: <strong>${success}</strong> thành công, <strong>${fail}</strong> thất bại.`;
+    const assignedCount = rows.filter(r => r._assignedClassId).length;
+    if (assignedCount) {
+        msg += ` <span class="text-success">Đã gán ${assignedCount} HV vào lớp theo mã.</span>`;
+    }
     if (errors.length) {
         msg += `<br><small class="text-danger">${errors.slice(0, 10).join('<br>')}</small>`;
     }
-    showResult(resultEl, msg, fail === 0 ? 'success' : 'warning');
+    if (classWarnings.length) {
+        msg += `<br><small class="text-warning">${classWarnings.slice(0, 10).join('<br>')}</small>`;
+    }
+    showResult(resultEl, msg, (fail === 0 && !classWarnings.length) ? 'success' : 'warning');
     statusEl.textContent = '';
 
     btn.disabled = false;
@@ -1403,9 +1439,76 @@ async function loadClasses() {
         // Table may not exist yet - use empty array
         lopHocState.classes = [];
     }
+    await ensureClassCodes();
     renderClassList();
     populateClassDropdowns();
     refreshStudentAssignedClassField();
+}
+
+// Mã lớp: LH + 4 ký tự (bỏ ký tự dễ nhầm: I, L, O, 0, 1) → dễ đọc/gõ tay.
+const CLASS_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+function generateClassCode(existing) {
+    const taken = existing instanceof Set ? existing : new Set(existing || []);
+    let code = '';
+    do {
+        code = 'LH';
+        for (let i = 0; i < 4; i += 1) {
+            code += CLASS_CODE_ALPHABET[Math.floor(Math.random() * CLASS_CODE_ALPHABET.length)];
+        }
+    } while (taken.has(code));
+    taken.add(code);
+    return code;
+}
+
+// Đọc mã lớp hiện có (chuẩn hoá hoa).
+function getClassCode(cls) {
+    return String(cls?.data?.class_code || '').trim().toUpperCase();
+}
+
+// Copy mã lớp vào clipboard (nút trong danh sách lớp).
+function copyClassCode(code, btnEl) {
+    if (!code) return;
+    const done = () => {
+        if (btnEl) {
+            const old = btnEl.innerHTML;
+            btnEl.innerHTML = '<i class="bi bi-check2 text-success"></i>';
+            setTimeout(() => { btnEl.innerHTML = old; }, 1200);
+        }
+    };
+    if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(code).then(done).catch(done);
+    } else {
+        const ta = document.createElement('textarea');
+        ta.value = code; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch (_) {}
+        document.body.removeChild(ta); done();
+    }
+}
+
+// Tra lớp theo mã (dùng cho import). Trả về class hoặc null.
+function findClassByCode(code) {
+    const target = String(code || '').trim().toUpperCase();
+    if (!target) return null;
+    return lopHocState.classes.find((c) => getClassCode(c) === target) || null;
+}
+
+// Backfill: lớp nào chưa có mã thì sinh + lưu lại (chạy khi tải danh sách lớp).
+async function ensureClassCodes() {
+    const codes = new Set(lopHocState.classes.map(getClassCode).filter(Boolean));
+    const missing = lopHocState.classes.filter((c) => !getClassCode(c));
+    for (const cls of missing) {
+        const code = generateClassCode(codes);
+        cls.data = cls.data || {};
+        cls.data.class_code = code;
+        try {
+            await apiCall(`/api/practice_sets/update?id=${cls.id}`, {
+                method: 'PUT',
+                body: JSON.stringify({ data: cls.data })
+            });
+        } catch (err) {
+            console.warn('Không lưu được mã lớp cho', cls.id, err?.message || err);
+        }
+    }
 }
 
 function countAssignedStudents(classId) {
@@ -1439,6 +1542,15 @@ function renderClassList() {
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <h5 class="fw-bold mb-1" style="font-size: 0.95rem;">${esc(cls.title || d.name || 'Lớp')}</h5>
+                        <div class="mb-1">
+                            <span class="badge bg-dark" style="font-size:0.72rem;letter-spacing:0.05em;" title="Mã lớp — điền vào cột class_code khi import học viên">
+                                <i class="bi bi-upc-scan me-1"></i>${esc(getClassCode(cls) || '—')}
+                            </span>
+                            <button class="btn btn-sm btn-link p-0 ms-1" style="font-size:0.72rem;text-decoration:none;"
+                                onclick="event.stopPropagation(); copyClassCode('${esc(getClassCode(cls))}', this)" title="Copy mã lớp">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                        </div>
                         <div class="text-muted" style="font-size: 0.78rem;">
                             <i class="bi bi-calendar3 me-1"></i>Lịch: <strong>${d.schedule || '246'}</strong>
                             &nbsp;|&nbsp;
@@ -1864,6 +1976,13 @@ async function submitClassForm() {
         day_name: s.dayName
     }));
 
+    const editId = document.getElementById('class-form-panel').dataset.editId;
+
+    // Giữ mã lớp cũ khi sửa; sinh mã mới khi tạo lớp.
+    const existingCls = editId ? lopHocState.classes.find((c) => c.id === editId) : null;
+    const classCode = getClassCode(existingCls)
+        || generateClassCode(new Set(lopHocState.classes.map(getClassCode).filter(Boolean)));
+
     const payload = {
         title: name,
         type: 'homework_class',
@@ -1876,11 +1995,10 @@ async function submitClassForm() {
             num_sessions: numSessions,
             band,
             notes,
+            class_code: classCode,
             sessions: sessionsData
         }
     };
-
-    const editId = document.getElementById('class-form-panel').dataset.editId;
 
     try {
         let savedClassId = editId || '';
@@ -2059,21 +2177,17 @@ async function saveDeadline() {
    SUBMISSIONS TRACKING
    ═══════════════════════════════════════════════════════ */
 
-function loadSessionsForSubmission() {
-    const classId = document.getElementById('sub-class-select').value;
-    const sessionSelect = document.getElementById('sub-session-select');
-
-    sessionSelect.innerHTML = '<option value="">-- Chọn buổi --</option>';
-    document.getElementById('export-btn').disabled = true;
-
-    if (!classId) return;
-
-    const cls = lopHocState.classes.find(c => c.id === classId);
-    if (!cls?.data?.sessions) return;
-
-    cls.data.sessions.forEach(s => {
-        sessionSelect.innerHTML += `<option value="${s.number}">Buổi ${s.number} - ${formatDate(s.date)}</option>`;
-    });
+// Đổ danh sách buổi (1..max) vào dropdown lọc DS Trả BTVN. Buổi độc lập với lớp
+// vì bảng mặc định hiện TẤT CẢ data, 2 dropdown chỉ để lọc.
+function populateSubmissionSessionDropdown() {
+    const sel = document.getElementById('sub-session-select');
+    if (!sel) return;
+    const current = sel.value;
+    const maxSession = Math.max(SESSION_LIMITS.B1 || 12, SESSION_LIMITS.B2 || 19);
+    let html = '<option value="">-- Tất cả buổi --</option>';
+    for (let i = 1; i <= maxSession; i += 1) html += `<option value="${i}">Buổi ${i}</option>`;
+    sel.innerHTML = html;
+    sel.value = current;
 }
 
 function getSubmissionSortTime(submission) {
@@ -2131,69 +2245,83 @@ function renderSubmissionTypeBadges(submission) {
     return tags.join('');
 }
 
+// Khóa gộp 1 dòng = học viên + lớp + buổi (để BTVN & Key của cùng buổi khớp nhau,
+// và mỗi buổi của 1 HV là 1 dòng riêng khi hiển thị toàn bộ data).
+function submissionGroupKey(userId, classId, session) {
+    return `${userId}|${classId || ''}|${session != null ? session : ''}`;
+}
+
+// Đọc lớp + buổi từ 1 bản ghi practice_results.
+function submissionClassId(r) {
+    return String(r?.set_id || r?.metadata?.class_id || '');
+}
+function submissionSession(r) {
+    const s = parseInt(r?.metadata?.session_number ?? r?.metadata?.session);
+    return Number.isFinite(s) ? s : null;
+}
+function classTitleById(classId) {
+    const cls = lopHocState.classes.find(c => c.id === classId);
+    return cls?.title || '';
+}
+
+// Mặc định hiển thị TOÀN BỘ data (mọi lớp/buổi). 2 dropdown lớp + buổi chỉ để LỌC.
 async function loadSubmissions() {
-    const classId = document.getElementById('sub-class-select').value;
-    const sessionNum = document.getElementById('sub-session-select').value;
+    const classId = String(document.getElementById('sub-class-select')?.value || '').trim();
+    const sessionNum = String(document.getElementById('sub-session-select')?.value || '').trim();
     const tbody = document.getElementById('submission-table-body');
     const empty = document.getElementById('sub-empty');
     const table = document.getElementById('submission-table');
-    const summary = document.getElementById('sub-summary');
     const exportBtn = document.getElementById('export-btn');
 
-    if (!classId || !sessionNum) {
-        tbody.innerHTML = '';
-        if (table) table.style.display = 'none';
-        if (empty) empty.style.display = 'block';
-        if (summary) summary.style.display = 'none';
-        exportBtn.disabled = true;
-        return;
+    if (exportBtn) exportBtn.disabled = false;
+    if (tbody) {
+        if (table) table.style.display = 'table';
+        if (empty) empty.style.display = 'none';
+        tbody.innerHTML = `<tr><td colspan="14" class="text-center text-muted py-3">
+            <i class="spinner-border spinner-border-sm me-2"></i>Đang tải danh sách nộp bài...</td></tr>`;
     }
 
-    // Load submissions from practice_results filtered by this class+session
+    // Cần danh sách học viên để map band/họ tên/mã HV.
+    if (!Array.isArray(lopHocState.students) || !lopHocState.students.length) {
+        try { await loadStudents(); } catch (_) { /* ignore */ }
+    }
+
     try {
-        const submissionQuery = new URLSearchParams({
-            setId: classId,
-            sessionNumber: String(parseInt(sessionNum, 10)),
-            limit: '1000'
-        });
-        const data = await apiCall(`/api/practice_results/list?${submissionQuery.toString()}`);
+        // Lấy toàn bộ bài BTVN (mọi lớp/buổi) qua marker submission_kind=homework,
+        // không giới hạn theo lớp/buổi ở server — lọc phía client theo dropdown.
+        const data = await apiCall('/api/practice_results/list?submissionKind=homework&limit=1000');
         const results = data.results || data || [];
 
-        // Filter results for this class and session
-        const cls = lopHocState.classes.find(c => c.id === classId);
-        const classTitle = cls?.title || '';
+        // Nạp map Key (mọi lớp/buổi) một lần để gộp cạnh BTVN.
+        await loadSubmissionKeyMap();
 
-        // Accept both legacy homework rows (practice_type === 'homework') and
-        // new-style rows (submission_kind marker in metadata) so we don't miss
-        // writing/speaking homework submissions stored as writing/reading/etc.
-        const sessionNumInt = parseInt(sessionNum);
-        const classIdText = String(classId);
+        const sessionNumInt = sessionNum ? parseInt(sessionNum, 10) : null;
         const rawSubmissions = results.filter(r => {
             const md = r.metadata || {};
-            const mdSession = parseInt(md.session_number);
-            const matchesSession = mdSession === sessionNumInt;
-            const resultClassId = String(r.set_id || md.class_id || '');
-            const matchesClass = resultClassId === classIdText;
             const isHomework =
                 r.practice_type === 'homework' ||
-                md.submission_kind === 'homework';
-            const hasDetail = hasSubmissionDetailRecord(r);
-            return matchesClass && matchesSession && (isHomework || hasDetail);
+                md.submission_kind === 'homework' ||
+                hasSubmissionDetailRecord(r);
+            if (!isHomework) return false;
+            // Lọc theo dropdown (nếu có chọn).
+            if (classId && submissionClassId(r) !== classId) return false;
+            if (sessionNumInt != null && submissionSession(r) !== sessionNumInt) return false;
+            return true;
         });
 
-        // Keep a single row per user, but prefer rows containing writing/speaking payload
-        // so admin can open details directly in this module.
-        const byUser = new Map();
+        // Gộp 1 dòng / (học viên · lớp · buổi); ưu tiên bản ghi có writing/speaking.
+        const byGroup = new Map();
         rawSubmissions
             .sort((a, b) => new Date(b.submitted_at || 0).getTime() - new Date(a.submitted_at || 0).getTime())
             .forEach((item) => {
                 if (!item?.user_id) return;
-                if (!byUser.has(item.user_id)) byUser.set(item.user_id, []);
-                byUser.get(item.user_id).push(item);
+                const gk = submissionGroupKey(item.user_id, submissionClassId(item), submissionSession(item));
+                if (!byGroup.has(gk)) byGroup.set(gk, []);
+                byGroup.get(gk).push(item);
             });
 
         const merged = [];
-        byUser.forEach((rows, userId) => {
+        byGroup.forEach((rows) => {
             const latestRow = rows[0] || null;
             const writingRow = rows.find(isWritingSubmissionRecord) || null;
             const speakingRow = rows.find(isSpeakingSubmissionRecord) || null;
@@ -2214,12 +2342,52 @@ async function loadSubmissions() {
 
         merged.sort((a, b) => getSubmissionSortTime(b?._latestRow || b) - getSubmissionSortTime(a?._latestRow || a));
         lopHocState.submissions = merged;
-        renderSubmissions(classId, classTitle, sessionNum);
+        renderSubmissions();
     } catch (err) {
         console.error('Load submissions error:', err);
         lopHocState.submissions = [];
-        renderSubmissions(classId, '', sessionNum);
+        lopHocState.submissionKeyByGroup = {};
+        renderSubmissions();
     }
+}
+
+// Nạp toàn bộ kết quả Key → map theo (user·lớp·buổi) để gộp cạnh BTVN đúng buổi.
+async function loadSubmissionKeyMap() {
+    lopHocState.submissionKeyByGroup = {};
+    try {
+        let rows = [];
+        for (const kind of ['key_listening', 'key_reading']) {
+            const data = await apiCall(`/api/practice_results/list?submissionKind=${kind}&limit=1000`);
+            rows = rows.concat(data.results || data || []);
+        }
+        rows
+            .sort((a, b) => new Date(b.submitted_at || 0).getTime() - new Date(a.submitted_at || 0).getTime())
+            .forEach((r) => {
+                if (!r.user_id) return;
+                const session = submissionSession(r);
+                if (session == null) return; // Key nộp từ sidebar (không gắn buổi) không gộp vào bảng buổi.
+                const gk = submissionGroupKey(r.user_id, submissionClassId(r), session);
+                if (!lopHocState.submissionKeyByGroup[gk]) {
+                    lopHocState.submissionKeyByGroup[gk] = r;
+                }
+            });
+    } catch (err) {
+        console.warn('Load submission key map failed:', err);
+    }
+}
+
+// Text hiển thị Key khớp đúng buổi của 1 dòng BTVN.
+function keyCellForSubmission(sub) {
+    const gk = submissionGroupKey(sub.user_id, submissionClassId(sub), submissionSession(sub));
+    const r = (lopHocState.submissionKeyByGroup || {})[gk];
+    if (!r) return { html: '<span class="text-muted">Chưa làm</span>', kindLabel: '', score: '' };
+    const kind = String(r.metadata?.submission_kind || '').toLowerCase();
+    const kindLabel = kind === 'key_listening' ? 'Key Listening' : (kind === 'key_reading' ? 'Key Reading' : 'Key');
+    const badge = kind === 'key_listening'
+        ? '<span class="badge bg-info text-dark">Listening</span>'
+        : (kind === 'key_reading' ? '<span class="badge bg-success">Reading</span>' : '');
+    const score = `${r.total_score ?? 0}/${r.max_score ?? 0}`;
+    return { html: `${badge} <strong>${esc(score)}</strong>`, kindLabel, score };
 }
 
 function normalizeStr(value) {
@@ -2240,22 +2408,22 @@ function getExpectedStudentsForClass(classId) {
     });
 }
 
-function renderSubmissions(classId, classTitle, sessionNum) {
-    const submissions = lopHocState.submissions;
+function renderSubmissions() {
+    const submissions = lopHocState.submissions || [];
     const tbody = document.getElementById('submission-table-body');
     const table = document.getElementById('submission-table');
     const empty = document.getElementById('sub-empty');
     const summary = document.getElementById('sub-summary');
     const exportBtn = document.getElementById('export-btn');
 
-    exportBtn.disabled = false;
+    if (exportBtn) exportBtn.disabled = false;
 
     if (!submissions.length) {
         tbody.innerHTML = '';
         if (table) table.style.display = 'none';
         if (empty) {
             empty.style.display = 'block';
-            empty.innerHTML = `<i class="bi bi-clipboard-data d-block"></i><p class="mb-0">Chưa có học viên nào nộp bài cho buổi ${sessionNum}.</p>`;
+            empty.innerHTML = `<i class="bi bi-clipboard-data d-block"></i><p class="mb-0">Chưa có học viên nào nộp bài khớp bộ lọc hiện tại.</p>`;
         }
         if (summary) summary.style.display = 'none';
         return;
@@ -2268,7 +2436,10 @@ function renderSubmissions(classId, classTitle, sessionNum) {
     // Match submissions with student data
     tbody.innerHTML = submissions.map((sub, i) => {
         const user = lopHocState.students.find(u => u.id === sub.user_id) || {};
-        const canViewDetail = hasSubmissionDetailRecord(sub) || !!(sub?._detailRows?.writing || sub?._detailRows?.speaking);
+        const keyInfo = keyCellForSubmission(sub);
+        const canViewDetail = hasSubmissionDetailRecord(sub) || !!(sub?._detailRows?.writing || sub?._detailRows?.speaking) || !!keyInfo.score;
+        const session = submissionSession(sub);
+        const clsTitle = classTitleById(submissionClassId(sub));
         return `
             <tr>
                 <td>${i + 1}</td>
@@ -2280,11 +2451,13 @@ function renderSubmissions(classId, classTitle, sessionNum) {
                 <td>${formatDate(user.started_on)}</td>
                 <td>${formatDate(user.expires_at)}</td>
                 <td>${bandBadge(user.band)}</td>
+                <td>${esc(clsTitle || '--')}</td>
                 <td>${renderSubmissionTypeBadges(sub)}</td>
-                <td>Buổi ${sub.metadata?.session_number || sessionNum}</td>
+                <td>${session != null ? 'Buổi ' + session : '--'}</td>
+                <td>${keyInfo.html}</td>
                 <td>
                     <button class="btn btn-sm btn-outline-primary" ${canViewDetail ? '' : 'disabled'}
-                        onclick="openSubmissionDetailByUser('${esc(String(sub.user_id || ''))}')">
+                        onclick="openSubmissionDetailByIndex(${i})">
                         <i class="bi bi-eye me-1"></i>Xem bài
                     </button>
                 </td>
@@ -2292,12 +2465,14 @@ function renderSubmissions(classId, classTitle, sessionNum) {
         `;
     }).join('');
 
-    // Update summary
-    const expectedStudents = getExpectedStudentsForClass(classId);
-    document.getElementById('sub-total').textContent = expectedStudents.length;
-    document.getElementById('sub-submitted').textContent = submissions.length;
-    document.getElementById('sub-missing').textContent =
-        Math.max(0, expectedStudents.length - submissions.length);
+    // Update summary: tổng dòng đang hiển thị + số có Key.
+    const withKey = submissions.filter(s => keyCellForSubmission(s).score).length;
+    const totalEl = document.getElementById('sub-total');
+    const submittedEl = document.getElementById('sub-submitted');
+    const missingEl = document.getElementById('sub-missing');
+    if (totalEl) totalEl.textContent = submissions.length;
+    if (submittedEl) submittedEl.textContent = withKey;
+    if (missingEl) missingEl.textContent = Math.max(0, submissions.length - withKey);
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -2319,6 +2494,18 @@ function populateKeyResultClassDropdown() {
 }
 
 
+// Đổ danh sách buổi (1..19, max của B2) vào dropdown lọc kết quả Key.
+function populateKeyResultSessionDropdown() {
+    const sel = document.getElementById('kr-session-select');
+    if (!sel) return;
+    const current = sel.value;
+    const maxSession = Math.max(SESSION_LIMITS.B1 || 12, SESSION_LIMITS.B2 || 19);
+    let html = '<option value="">-- Tất cả buổi --</option>';
+    for (let i = 1; i <= maxSession; i += 1) html += `<option value="${i}">Buổi ${i}</option>`;
+    sel.innerHTML = html;
+    sel.value = current;
+}
+
 async function loadKeyResults() {
     const tbody = document.getElementById('kr-table-body');
     const table = document.getElementById('kr-table');
@@ -2331,7 +2518,7 @@ async function loadKeyResults() {
 
     if (table) table.style.display = 'table';
     if (empty) empty.style.display = 'none';
-    tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted py-3">
+    tbody.innerHTML = `<tr><td colspan="11" class="text-center text-muted py-3">
         <i class="spinner-border spinner-border-sm me-2"></i>Đang tải kết quả Key...</td></tr>`;
 
     // Cần danh sách học viên để map band/lớp/họ tên.
@@ -2348,21 +2535,24 @@ async function loadKeyResults() {
         }
     } catch (err) {
         console.error('Load key results error:', err);
-        tbody.innerHTML = `<tr><td colspan="10" class="text-center text-danger py-3">Không tải được kết quả Key.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="11" class="text-center text-danger py-3">Không tải được kết quả Key.</td></tr>`;
         const summary = document.getElementById('kr-summary');
         if (summary) summary.style.display = 'none';
         return;
     }
 
+    const sessionFilter = String(document.getElementById('kr-session-select')?.value || '').trim();
     const enriched = rows.map((r) => {
         const student = lopHocState.students.find(u => u.id === r.user_id) || {};
         const md = r.metadata || {};
         const studentClassId = String(md.class_id || student.assigned_class_id || student.assignedClassId || '').trim();
         const band = md.band || student.band || '';
-        return { result: r, student, studentClassId, band };
+        const session = Number(md.session_number || md.session) || null; // buổi nếu Key mở tuần tự từ buổi
+        return { result: r, student, studentClassId, band, session };
     }).filter((row) => {
         if (classId && row.studentClassId !== classId) return false;
         if (bandFilter && String(row.band).toUpperCase() !== bandFilter) return false;
+        if (sessionFilter && String(row.session || '') !== sessionFilter) return false;
         return true;
     });
 
@@ -2406,6 +2596,7 @@ function renderKeyResults(rows) {
         const durationText = Number.isFinite(durationSec) && durationSec > 0
             ? `${Math.floor(durationSec / 60)}p ${String(Math.round(durationSec % 60)).padStart(2, '0')}s`
             : '--';
+        const sessionCell = row.session ? `<span class="badge bg-secondary">Buổi ${row.session}</span>` : '<span class="text-muted">--</span>';
         return `
             <tr>
                 <td>${i + 1}</td>
@@ -2413,6 +2604,7 @@ function renderKeyResults(rows) {
                 <td>${esc(row.student.account_code || '')}</td>
                 <td>${esc(row.student.full_name || '')}</td>
                 <td>${bandBadge(row.band)}</td>
+                <td>${sessionCell}</td>
                 <td>${typeLabel}</td>
                 <td>${esc(r.set_title || r.set_id || '--')}</td>
                 <td><strong>${esc(score)}</strong></td>
@@ -2736,8 +2928,9 @@ function buildHomeworkResultDetailHtml(homeworkRow) {
     `;
 }
 
-function openSubmissionDetailByUser(userId) {
-    const target = lopHocState.submissions.find((sub) => String(sub?.user_id || '') === String(userId || ''));
+// Mở modal theo index dòng (mỗi dòng = 1 buổi của 1 HV, nên không dùng user_id).
+function openSubmissionDetailByIndex(idx) {
+    const target = (lopHocState.submissions || [])[idx];
     if (!target) return;
 
     const user = lopHocState.students.find((u) => String(u?.id || '') === String(target.user_id || '')) || {};
@@ -2755,12 +2948,31 @@ function openSubmissionDetailByUser(userId) {
     metaEl.innerHTML = buildSubmissionMetaChips(target, user);
 
     const sections = [];
-    if (writingRow) sections.push(buildWritingDetailHtml(writingRow));
-    if (speakingRow) sections.push(buildSpeakingDetailHtml(speakingRow));
-    if (!writingRow && !speakingRow && homeworkRow) sections.push(buildHomeworkResultDetailHtml(homeworkRow));
-    if (!sections.length) {
-        sections.push('<div class="text-muted">Bài nộp này chưa có dữ liệu chi tiết Writing/Speaking.</div>');
+    // 1) Phần BTVN
+    const btvnParts = [];
+    if (writingRow) btvnParts.push(buildWritingDetailHtml(writingRow));
+    if (speakingRow) btvnParts.push(buildSpeakingDetailHtml(speakingRow));
+    if (!writingRow && !speakingRow && homeworkRow) btvnParts.push(buildHomeworkResultDetailHtml(homeworkRow));
+    if (!btvnParts.length) btvnParts.push('<div class="text-muted">Bài BTVN này chưa có dữ liệu chi tiết Writing/Speaking.</div>');
+    sections.push(`<h5 class="mb-2"><i class="bi bi-journal-text me-1"></i>Bài tập về nhà (BTVN)</h5>${btvnParts.join('')}`);
+
+    // 2) Phần Key của đúng buổi (nếu có)
+    const gk = submissionGroupKey(target.user_id, submissionClassId(target), submissionSession(target));
+    const keyRow = (lopHocState.submissionKeyByGroup || {})[gk];
+    if (keyRow) {
+        const kind = String(keyRow.metadata?.submission_kind || '').toLowerCase();
+        const kindLabel = kind === 'key_listening' ? 'Key Listening' : (kind === 'key_reading' ? 'Key Reading' : 'Key');
+        const score = `${keyRow.total_score ?? 0}/${keyRow.max_score ?? 0}`;
+        sections.push(`
+            <h5 class="mb-2 mt-1"><i class="bi bi-key me-1"></i>${esc(kindLabel)}
+                <span class="badge bg-light text-dark border ms-1">Điểm: ${esc(score)}</span>
+            </h5>
+            ${buildKeyResultDetailHtml(keyRow)}
+        `);
+    } else {
+        sections.push('<h5 class="mb-2 mt-1"><i class="bi bi-key me-1"></i>Key</h5><div class="text-muted">Học viên chưa làm Key cho buổi này.</div>');
     }
+
     contentEl.innerHTML = sections.join('<hr class="my-3">');
 
     const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
@@ -2768,13 +2980,17 @@ function openSubmissionDetailByUser(userId) {
 }
 
 function exportSubmissionsCSV() {
-    const classId = document.getElementById('sub-class-select').value;
-    const sessionNum = document.getElementById('sub-session-select').value;
-    const cls = lopHocState.classes.find(c => c.id === classId);
+    const submissions = lopHocState.submissions || [];
+    if (!submissions.length) {
+        alert('Chưa có bài nộp nào để export (kiểm tra bộ lọc).');
+        return;
+    }
 
-    const header = 'Ngày nộp,Mã HV,Email,Họ tên,SĐT,Ngày khai giảng,Ngày kết thúc,Band,BTVN theo buổi nào';
-    const rows = lopHocState.submissions.map(sub => {
+    const header = 'Ngày nộp,Mã HV,Email,Họ tên,SĐT,Ngày khai giảng,Ngày kết thúc,Band,Lớp,BTVN buổi,Loại Key,Điểm Key';
+    const rows = submissions.map(sub => {
         const user = lopHocState.students.find(u => u.id === sub.user_id) || {};
+        const key = keyCellForSubmission(sub); // BTVN + Key ghép chung 1 dòng
+        const session = submissionSession(sub);
         return [
             formatDatetime(sub.submitted_at),
             user.account_code || '',
@@ -2784,12 +3000,49 @@ function exportSubmissionsCSV() {
             user.started_on || '',
             user.expires_at || '',
             user.band || '',
-            `Buổi ${sub.metadata?.session_number || sessionNum}`
-        ].map(v => `"${v}"`).join(',');
+            classTitleById(submissionClassId(sub)) || '',
+            session != null ? `Buổi ${session}` : '',
+            key.kindLabel || '',
+            key.score || ''
+        ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
     });
 
     const csv = [header, ...rows].join('\n');
-    const filename = `BTVN_${cls?.title || 'export'}_Buoi${sessionNum}_${new Date().toISOString().split('T')[0]}.csv`;
+    const filename = `BTVN_export_${new Date().toISOString().split('T')[0]}.csv`;
+    downloadFile(filename, '\uFEFF' + csv, 'text/csv;charset=utf-8');
+}
+
+// Export CSV k\u1EBFt qu\u1EA3 Key (\u0111ang l\u1ECDc) \u2014 c\u00F9ng m\u1EABu BTVN, th\u00EAm c\u1ED9t Bu\u1ED5i + Lo\u1EA1i Key.
+function exportKeyResultsCSV() {
+    const rows = lopHocState.keyResults || [];
+    if (!rows.length) {
+        alert('Ch\u01B0a c\u00F3 k\u1EBFt qu\u1EA3 Key n\u00E0o \u0111\u1EC3 export (ki\u1EC3m tra b\u1ED9 l\u1ECDc).');
+        return;
+    }
+    const header = 'STT,Ng\u00E0y n\u1ED9p,M\u00E3 HV,H\u1ECD t\u00EAn,Band,Bu\u1ED5i,Lo\u1EA1i Key,B\u1ED9 \u0111\u1EC1,\u0110i\u1EC3m,Th\u1EDDi gian';
+    const csvRows = rows.map((row, i) => {
+        const r = row.result;
+        const kind = String(r.metadata?.submission_kind || '').toLowerCase();
+        const kindLabel = kind === 'key_listening' ? 'Key Listening' : (kind === 'key_reading' ? 'Key Reading' : 'Key');
+        const durationSec = Number(r.duration_seconds);
+        const durationText = Number.isFinite(durationSec) && durationSec > 0
+            ? `${Math.floor(durationSec / 60)}p ${String(Math.round(durationSec % 60)).padStart(2, '0')}s`
+            : '';
+        return [
+            i + 1,
+            formatDatetime(r.submitted_at),
+            row.student.account_code || '',
+            row.student.full_name || '',
+            row.band || '',
+            row.session ? `Bu\u1ED5i ${row.session}` : '',
+            kindLabel,
+            r.set_title || r.set_id || '',
+            `${r.total_score ?? 0}/${r.max_score ?? 0}`,
+            durationText
+        ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
+    });
+    const csv = [header, ...csvRows].join('\n');
+    const filename = `KetQuaKey_${new Date().toISOString().split('T')[0]}.csv`;
     downloadFile(filename, '\uFEFF' + csv, 'text/csv;charset=utf-8');
 }
 
@@ -3050,7 +3303,7 @@ function renderReadingOrderSentenceCard(sentence = '', index = 1) {
                 </button>
             </div>
             <label class="builder-form-label">Nội dung câu</label>
-            <textarea class="form-control tf-reading-order-sentence" rows="2" placeholder="Nhập câu">${esc(sentence)}</textarea>
+            <textarea class="form-control tf-reading-order-sentence rich-text" rows="2" placeholder="Nhập câu">${esc(sentence)}</textarea>
         </div>
     `;
 }
@@ -3139,7 +3392,7 @@ function renderReadingMatchQuestionCard(question = {}, index = 1) {
             <div class="row g-2">
                 <div class="col-md-9">
                     <label class="builder-form-label">Nội dung câu hỏi</label>
-                    <input type="text" class="form-control tf-reading-match-prompt" value="${esc(safe.prompt || '')}" placeholder="Ví dụ: Who finds flying tiring?">
+                    <input type="text" class="form-control tf-reading-match-prompt rich-text" value="${esc(safe.prompt || '')}" placeholder="Ví dụ: Who finds flying tiring?">
                 </div>
                 <div class="col-md-3">
                     <label class="builder-form-label">Đáp án đúng</label>
@@ -3258,7 +3511,7 @@ function renderReadingHeadingParagraphCard(row = {}, index = 1, headings = []) {
             <div class="row g-2">
                 <div class="col-md-8">
                     <label class="builder-form-label">Nội dung paragraph</label>
-                    <textarea class="form-control tf-reading-heading-paragraph-text" rows="3" placeholder="Nhập đoạn văn">${esc(safe.text || '')}</textarea>
+                    <textarea class="form-control tf-reading-heading-paragraph-text rich-text" rows="3" placeholder="Nhập đoạn văn">${esc(safe.text || '')}</textarea>
                 </div>
                 <div class="col-md-4">
                     <label class="builder-form-label">Heading đúng</label>
@@ -3424,7 +3677,7 @@ function renderListeningOpinionRowCard(row = {}, index = 1) {
             <div class="row g-2">
                 <div class="col-md-9">
                     <label class="builder-form-label">Nội dung statement</label>
-                    <input type="text" class="form-control tf-listening-opinion-statement" value="${esc(safe.statement || '')}" placeholder="Ví dụ: likes quiet places">
+                    <input type="text" class="form-control tf-listening-opinion-statement rich-text" value="${esc(safe.statement || '')}" placeholder="Ví dụ: likes quiet places">
                 </div>
                 <div class="col-md-3">
                     <label class="builder-form-label">Đáp án</label>
@@ -3724,7 +3977,7 @@ function renderVocabItemRowCard(partKey = 'part1', row = {}, index = 1, letters 
                     </div>
                     <div class="col-md-7">
                         <label class="builder-form-label">Sentence</label>
-                        <input type="text" class="form-control tf-vocab-item-text" value="${esc(safe.text || '')}" placeholder="Nhập câu">
+                        <input type="text" class="form-control tf-vocab-item-text rich-text" value="${esc(safe.text || '')}" placeholder="Nhập câu">
                     </div>
                     <div class="col-md-3">
                         <label class="builder-form-label">Answer</label>
@@ -3977,7 +4230,7 @@ function renderListeningMcqRowCard(question = {}, index = 1) {
                 </div>
                 <div class="col-md-10">
                     <label class="builder-form-label">Câu hỏi</label>
-                    <input type="text" class="form-control tf-listening-mcq-question" value="${esc(safe.question || '')}" placeholder="Nhập câu hỏi">
+                    <input type="text" class="form-control tf-listening-mcq-question rich-text" value="${esc(safe.question || '')}" placeholder="Nhập câu hỏi">
                 </div>
                 <div class="col-md-4">
                     <label class="builder-form-label">Option 1</label>
@@ -4288,7 +4541,7 @@ function renderWritingShortQuestionCard(question = {}, index = 1) {
                 </div>
                 <div class="col-md-9">
                     <label class="builder-form-label">Prompt</label>
-                    <input type="text" class="form-control tf-writing-short-prompt" value="${esc(safe.prompt || '')}" placeholder="Nhập câu hỏi">
+                    <input type="text" class="form-control tf-writing-short-prompt rich-text" value="${esc(safe.prompt || '')}" placeholder="Nhập câu hỏi">
                 </div>
                 <div class="col-md-6">
                     <label class="builder-form-label">Min words</label>
@@ -4383,7 +4636,7 @@ function renderWritingSentencesQuestionCard(question = {}, index = 1) {
                 </div>
                 <div class="col-md-9">
                     <label class="builder-form-label">Prompt</label>
-                    <input type="text" class="form-control tf-writing-sentences-prompt" value="${esc(safe.prompt || '')}" placeholder="Nhập câu hỏi">
+                    <input type="text" class="form-control tf-writing-sentences-prompt rich-text" value="${esc(safe.prompt || '')}" placeholder="Nhập câu hỏi">
                 </div>
                 <div class="col-md-6">
                     <label class="builder-form-label">Min words</label>
@@ -4478,7 +4731,7 @@ function renderWritingChatQuestionCard(question = {}, index = 1) {
                 </div>
                 <div class="col-md-9">
                     <label class="builder-form-label">Prompt</label>
-                    <input type="text" class="form-control tf-writing-chat-prompt" value="${esc(safe.prompt || '')}" placeholder="Nhập câu hỏi">
+                    <input type="text" class="form-control tf-writing-chat-prompt rich-text" value="${esc(safe.prompt || '')}" placeholder="Nhập câu hỏi">
                 </div>
                 <div class="col-md-6">
                     <label class="builder-form-label">Min words</label>
@@ -4674,7 +4927,7 @@ function renderWritingFollowupQuestionCard(question = {}, index = 1) {
                 </div>
                 <div class="col-md-9">
                     <label class="builder-form-label">Prompt</label>
-                    <input type="text" class="form-control tf-writing-followup-prompt" value="${esc(safe.prompt || '')}" placeholder="Nhập câu hỏi">
+                    <input type="text" class="form-control tf-writing-followup-prompt rich-text" value="${esc(safe.prompt || '')}" placeholder="Nhập câu hỏi">
                 </div>
                 <div class="col-md-6">
                     <label class="builder-form-label">Min words</label>
@@ -5044,6 +5297,7 @@ async function loadSessionContentEditor(options = {}) {
 
     if (!record) {
         loadSessionTemplate();
+        await applyAttachedKeyToEditor({}); // reset dropdown Key về "không đính kèm"
         if (!quiet) {
             showResult(resultEl, `Không tìm thấy custom cho <strong>${esc(key)}</strong>. Đã nạp template theo cấu trúc buổi.`, 'warning');
         }
@@ -5061,12 +5315,63 @@ async function loadSessionContentEditor(options = {}) {
     lopHocState.selectedSessionContentRecord = record;
     applyDraftConfig(config);
     updateSessionStatus(record);
+    // Nạp Key đính kèm của buổi (nếu có) vào 2 dropdown.
+    await applyAttachedKeyToEditor(record?.data || {});
     if (!quiet) {
         const msg = introInserted
             ? `Đã nạp custom cho <strong>${esc(key)}</strong> và tự chèn page giới thiệu còn thiếu. Bấm <strong>Lưu custom</strong> để ghi vào database.`
             : `Đã nạp custom cho <strong>${esc(key)}</strong>.`;
         showResult(resultEl, msg, introInserted ? 'warning' : 'success');
     }
+}
+
+// ── Key đính kèm cho buổi (session content) ──
+// Tải danh sách bộ Key theo type (cache), đổ vào dropdown sc-key-set.
+async function loadKeySetOptions(type, selectedId = '') {
+    const sel = document.getElementById('sc-key-set');
+    if (!sel) return;
+    if (!type) {
+        sel.innerHTML = '<option value="">-- Chọn loại Key trước --</option>';
+        sel.disabled = true;
+        return;
+    }
+    sel.disabled = false;
+    sel.innerHTML = '<option value="">Đang tải...</option>';
+    let sets = lopHocState.keySetOptions[type];
+    if (!Array.isArray(sets)) {
+        try {
+            const data = await apiCall(`/api/practice_sets/list?type=${encodeURIComponent(type)}`);
+            sets = Array.isArray(data?.sets) ? data.sets : (Array.isArray(data) ? data : []);
+            lopHocState.keySetOptions[type] = sets;
+        } catch (err) {
+            sel.innerHTML = `<option value="">Lỗi tải: ${esc(err.message)}</option>`;
+            return;
+        }
+    }
+    sets = sets.slice().sort((a, b) =>
+        String(a?.title || '').localeCompare(String(b?.title || ''), 'vi', { sensitivity: 'base', numeric: true }));
+    const opts = ['<option value="">-- Không chọn --</option>'];
+    sets.forEach((s) => {
+        const id = String(s?.id || '');
+        const title = String(s?.title || id);
+        opts.push(`<option value="${escAttr(id)}" data-title="${escAttr(title)}"${id === String(selectedId) ? ' selected' : ''}>${esc(title)}</option>`);
+    });
+    sel.innerHTML = opts.join('');
+}
+
+// Khi admin đổi loại Key → nạp lại danh sách bộ tương ứng.
+function onSessionKeyTypeChange() {
+    const type = document.getElementById('sc-key-type')?.value || '';
+    loadKeySetOptions(type);
+}
+
+// Set 2 dropdown theo record đang mở.
+async function applyAttachedKeyToEditor(data = {}) {
+    const typeSel = document.getElementById('sc-key-type');
+    const keyType = String(data.key_type || '');
+    const keySetId = String(data.key_set_id || '');
+    if (typeSel) typeSel.value = keyType;
+    await loadKeySetOptions(keyType, keySetId);
 }
 
 function syncJsonFromDraft(showMessage = true) {
@@ -5549,6 +5854,26 @@ function renderDraftPageEditor() {
 
     bindTypeSpecificEditorInteractions();
     enhanceSessionBuilderMediaUploads(page);
+    enhanceProseFieldsWithRichToolbar(editorEl);
+}
+
+// Gắn thanh định dạng (đậm/nghiêng/gạch chân) cho các ô VĂN XUÔI trong form builder.
+// KHÔNG gắn cho ô đáp án/option/cấu hình (thêm thẻ HTML sẽ làm hỏng so khớp đáp án).
+const RICH_PROSE_FIELD_IDS = [
+    'tf-q', 'tf-prompt', 'tf-main-prompt', 'tf-context',
+    'tf-instruction', 'tf-topic', 'tf-topic-instruction',
+    'tf-vocab-instruction', 'tf-vocab-instruction-vi',
+    'tf-intro-text', 'tf-transcript',
+    'tf-pa', 'tf-pb', 'tf-pc', 'tf-pd'
+];
+function enhanceProseFieldsWithRichToolbar(root) {
+    if (!window.RichToolbar || !root) return;
+    RICH_PROSE_FIELD_IDS.forEach((id) => {
+        const el = root.querySelector('#' + id);
+        if (el) window.RichToolbar.attach(el);
+    });
+    // Các ô prose đánh dấu sẵn class rich-text (nếu có) — vd nội dung câu/paragraph.
+    root.querySelectorAll('input.rich-text, textarea.rich-text').forEach((el) => window.RichToolbar.attach(el));
 }
 
 function sanitizeSessionUploadFileName(name) {
@@ -7375,6 +7700,14 @@ async function saveSessionContent() {
         return;
     }
 
+    // Key đính kèm (tùy chọn): xong BTVN buổi này → HV được mời làm tiếp Key.
+    const keyType = document.getElementById('sc-key-type')?.value || '';
+    const keySetId = document.getElementById('sc-key-set')?.value || '';
+    const keySetEl = document.getElementById('sc-key-set');
+    const keyTitle = (keySetId && keySetEl)
+        ? (keySetEl.options[keySetEl.selectedIndex]?.dataset.title || keySetEl.options[keySetEl.selectedIndex]?.textContent || '')
+        : '';
+
     const payload = {
         title: `Session Content ${key}`,
         type: 'writing',
@@ -7384,7 +7717,11 @@ async function saveSessionContent() {
             __practice_type: 'session_content',
             session_key: key,
             session_config: config,
-            notes
+            notes,
+            // Chỉ lưu khi admin chọn đủ loại + bộ Key; nếu không → xóa gắn kết Key.
+            key_set_id: (keyType && keySetId) ? keySetId : '',
+            key_type: (keyType && keySetId) ? keyType : '',
+            key_title: (keyType && keySetId) ? String(keyTitle).trim() : ''
         }
     };
 
