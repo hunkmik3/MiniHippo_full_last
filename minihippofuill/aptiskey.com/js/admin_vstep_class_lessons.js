@@ -204,6 +204,9 @@
                 }
                 prefillFromBlueprint(band, sessionNumber);
             }
+            // fillForm/resetForm gọi form.reset() → làm rỗng 2 hidden input band+session.
+            // Set LẠI sau cùng để lúc bấm Lưu payload hook đọc đúng band+buổi.
+            setSessionHiddenInputs(band, sessionNumber);
             updateContextBanner(band, sessionNumber);
         }, 50);
     }
@@ -620,8 +623,15 @@
 
     // ===== Payload hook: gắn band + session_number vào content trước khi save =====
     window.__VSTEP_PAYLOAD_HOOK__ = function (payload) {
-        const band = $('vstep-content-band')?.value || '';
-        const sessionNumber = Number($('vstep-content-session-number')?.value || 0);
+        let band = $('vstep-content-band')?.value || '';
+        let sessionNumber = Number($('vstep-content-session-number')?.value || 0);
+        // form.reset() có thể đã xoá 2 hidden input này (chúng nằm trong vstepSetForm)
+        // → khôi phục từ state buổi đang mở để content luôn lưu ĐÚNG band+session.
+        // Chỉ fallback khi đang thực sự soạn 1 buổi (state.activeSession có giá trị).
+        if ((!band || !sessionNumber) && state.activeSession) {
+            band = band || state.activeBand || '';
+            sessionNumber = sessionNumber || Number(state.activeSession) || 0;
+        }
         if ((band === 'B1' || band === 'B2') && sessionNumber > 0) {
             payload.band = band;
             payload.session_number = sessionNumber;
