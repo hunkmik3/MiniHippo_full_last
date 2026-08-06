@@ -133,14 +133,25 @@
             .replace(/'/g, '&#39;');
     }
 
+    // Cho phép hiển thị các thẻ định dạng cơ bản do admin soạn bằng rich editor
+    // (<b><i><u><s>...), đồng thời GỠ các thẻ rỗng (vd "<b></b>" bị để lại) để
+    // không hiện thẻ thô trên trang thi. Vẫn escape mọi thứ khác → an toàn XSS.
+    function allowFormatting(escaped) {
+        return String(escaped || '')
+            .replace(/&lt;(\/?)(b|i|u|s|strong|em)&gt;/gi, '<$1$2>')
+            // gỡ thẻ định dạng rỗng: <b></b>, <b> </b>, <b>\n</b>, <b><br></b>...
+            .replace(/<(b|i|u|s|strong|em)>(?:\s|<br\s*\/?>)*<\/\1>/gi, '');
+    }
+
     function nl2br(value) {
-        return escapeHtml(value).replace(/\r?\n/g, '<br>');
+        return allowFormatting(escapeHtml(value)).replace(/\r?\n/g, '<br>');
     }
 
     // Markdown-lite cho passage/prompt: **đậm**, *nghiêng*, __gạch chân__.
-    // Escape HTML TRƯỚC rồi mới thay marker → an toàn XSS, admin không cần nhập thẻ HTML.
+    // Escape HTML TRƯỚC rồi mới thay marker → an toàn XSS. Cũng chấp nhận thẻ
+    // định dạng cơ bản (rich editor) và gỡ thẻ rỗng.
     function richText(value) {
-        return escapeHtml(value)
+        return allowFormatting(escapeHtml(value))
             .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
             .replace(/__([^_]+)__/g, '<u>$1</u>')
             .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>')
