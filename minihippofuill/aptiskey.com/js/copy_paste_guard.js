@@ -22,19 +22,10 @@
     return path === '/login' || path === '/login.html';
   }
 
-  function isAdminUser() {
-    try {
-      var raw = localStorage.getItem('auth_user');
-      if (!raw) return false;
-      var user = JSON.parse(raw);
-      return Boolean(user && String(user.role || '').toLowerCase() === 'admin');
-    } catch (error) {
-      return false;
-    }
-  }
-
-  // Admin pages/users must keep normal copy-paste behavior.
-  if (isLoginPath(window.location.pathname) || isAdminPath(window.location.pathname) || isAdminUser()) {
+  // Chỉ bỏ qua theo TRANG (admin_* + login) — KHÔNG bỏ qua theo tài khoản nữa.
+  // → Trang học/thi chặn copy-paste cho MỌI người (kể cả admin đang test),
+  //   còn trang soạn bài admin_* vẫn copy-paste bình thường.
+  if (isLoginPath(window.location.pathname) || isAdminPath(window.location.pathname)) {
     return;
   }
 
