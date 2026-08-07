@@ -106,17 +106,21 @@
   }
 
   // Chuẩn hoá HTML từ contenteditable: xuống dòng -> "\n" (giữ thẻ inline).
+  // QUAN TRỌNG: thẻ block MỞ (<div>/<p>) phải thành "\n" để không dính dòng.
+  // Chrome bọc dòng mới sau chữ đầu bằng <div> (vd "Both<div>Woman</div>") →
+  // nếu chỉ xoá <div> mở thì "Both" dính "Woman" → hỏng textarea "mỗi dòng 1 mục".
   function normalizeHtml(html, isSingle) {
     var out = String(html || '')
-      .replace(/<div><br\s*\/?><\/div>/gi, '\n')
+      .replace(/<div><br\s*\/?><\/div>/gi, '\n')   // dòng trống
       .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<\/(div|p|h[1-6])>/gi, '\n')
-      .replace(/<(div|p|h[1-6])[^>]*>/gi, '')
+      .replace(/<\/(div|p|h[1-6])>/gi, '')          // đóng block -> bỏ
+      .replace(/<(div|p|h[1-6])[^>]*>/gi, '\n')     // MỞ block -> xuống dòng
       .replace(/<\/?(span|font)[^>]*>/gi, '')
       .replace(/<strike>/gi, '<s>').replace(/<\/strike>/gi, '</s>')
       .replace(/&nbsp;/gi, ' ');
     if (isSingle) return out.replace(/\s*\n\s*/g, ' ').trim();
-    return out.replace(/\n{3,}/g, '\n\n').replace(/\n+$/, '');
+    // Gộp nhiều dòng trống, bỏ \n thừa ở đầu/cuối.
+    return out.replace(/\n{3,}/g, '\n\n').replace(/^\n+/, '').replace(/\n+$/, '');
   }
 
   function syncToField(field, editable) {
