@@ -147,10 +147,20 @@
     return false;
   }
 
+  // Ô ĐÁP ÁN / OPTION (giá trị được so khớp để chấm) → KHÔNG gắn định dạng,
+  // tránh admin lỡ bôi đậm làm hỏng so khớp (vd "Woman" -> "<b>Woman</b>").
+  // Ô câu hỏi/đề/nội dung (prose) vẫn được định dạng bình thường.
+  function isAnswerOrOptionField(el) {
+    var hay = ((el.id || '') + ' ' + (el.className || '') + ' ' +
+      (el.getAttribute('name') || '') + ' ' + (el.getAttribute('placeholder') || '')).toLowerCase();
+    return /answer|correct|option|đáp\s*án|dap[-_\s]?an|man\/woman/.test(hay);
+  }
+
   function attach(field) {
     if (!isEditable(field)) return;
     if (field.dataset.richAttached === '1') return;
     if (field.hasAttribute('data-no-rich')) return;
+    if (isAnswerOrOptionField(field)) return;
     field.dataset.richAttached = '1';
 
     var isSingle = field.tagName === 'INPUT';
