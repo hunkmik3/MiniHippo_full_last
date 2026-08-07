@@ -146,6 +146,14 @@
             .replace(/'/g, '&#39;');
     }
 
+    // Cho phép hiển thị thẻ định dạng cơ bản (<b><i><u><s>) do admin soạn bằng
+    // rich editor, GỠ thẻ rỗng (<b></b>...) — dùng sau escapeHtml → an toàn XSS.
+    function allowFormatting(escaped) {
+        return String(escaped || '')
+            .replace(/&lt;(\/?)(b|i|u|s|strong|em)&gt;/gi, '<$1$2>')
+            .replace(/<(b|i|u|s|strong|em)>(?:\s|<br\s*\/?>)*<\/\1>/gi, '');
+    }
+
     function resolveLogicalType(set) {
         const marker = set?.data?.__practice_type;
         if (typeof marker === 'string' && marker.trim()) {
@@ -467,7 +475,7 @@
 
         titleEl.textContent = title || 'Trang mở đầu';
         contentEl.innerHTML = content
-            ? escapeHtml(content).replace(/\n/g, '<br>')
+            ? allowFormatting(escapeHtml(content)).replace(/\n/g, '<br>')
             : '<span class="text-muted">Chưa có nội dung.</span>';
     }
 
