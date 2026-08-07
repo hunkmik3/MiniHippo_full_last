@@ -38,11 +38,21 @@ const question2Content_4 = [
     'Families enjoyed tasting healthy snacks and discovering practical tips for better overall wellness.',
 ];
 
+// UPDATE - Topic: Homework next week
+const question2Content_5 = [
+    'Before writing, we need to find some information about the place',
+    'That information can revolve around the aspects of people, culture, and history',
+    'You might not find all the information mentioned, but you will find a place with similarities',
+    'When collecting information about these three aspects, you can compare them with places in your own country',
+    'This comparison will help you find common ground between the countries',
+];
+
 const questionSets = [
     question2Content_1,
     question2Content_2,
     question2Content_3,
     question2Content_4,
+    question2Content_5,
 ];
 
 window.questionSets = questionSets;
@@ -52,6 +62,7 @@ const questheader1 = {
     question2Content_2: "Eating at restaurant",
     question2Content_3: "Artificial Intelligence (2)",
     question2Content_4: "Wellness Fair",
+    question2Content_5: "Homework next week",
 };
 
 function getQuestHeaders(obj) {
@@ -331,6 +342,20 @@ if (document.readyState === 'loading') {
           "The fair also included activities like cooking demonstrations, mindfulness sessions, and a fun run.",
           "After the workshops, prizes were awarded to participants who created the most creative health posters.",
           "Families enjoyed tasting healthy snacks and discovering practical tips for better overall wellness."
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "title": "UPDATE",
+      "data": {
+        "topic": "Homework next week",
+        "sentences": [
+          "Before writing, we need to find some information about the place",
+          "That information can revolve around the aspects of people, culture, and history",
+          "You might not find all the information mentioned, but you will find a place with similarities",
+          "When collecting information about these three aspects, you can compare them with places in your own country",
+          "This comparison will help you find common ground between the countries"
         ]
       }
     }
