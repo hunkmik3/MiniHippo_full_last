@@ -346,6 +346,8 @@
             const aiUsageText = aiUsage
                 ? (aiUsage.probability !== null ? `${aiUsage.label} (${aiUsage.probability}%)` : aiUsage.label)
                 : '—';
+            // Nút "Coi lại đề" chỉ hiện khi có chi tiết từng câu (reading/listening/key).
+            const hasReview = Array.isArray(metadata.key_review) && metadata.key_review.length;
 
             return `
                 <tr>
@@ -357,9 +359,14 @@
                     <td>${escapeHtml(duration)}</td>
                     <td>${aiUsage ? `<span class="badge ${aiUsage.badgeClass}">${escapeHtml(aiUsageText)}</span>` : '—'}</td>
                     <td>
-                        <button class="btn btn-sm btn-outline-primary" onclick="window.openHistoryResultDetail('${item.id}')">
-                            <i class="bi bi-eye"></i>
-                        </button>
+                        <div class="d-flex flex-wrap gap-1">
+                            <button class="btn btn-sm btn-outline-primary" onclick="window.openHistoryResultDetail('${item.id}')" title="Chi tiết">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            ${hasReview ? `<button class="btn btn-sm btn-outline-success" onclick="window.openAptisFullReview('${item.id}')" title="Coi lại đề">
+                                <i class="bi bi-layout-text-window me-1"></i>Coi lại đề
+                            </button>` : ''}
+                        </div>
                     </td>
                 </tr>
             `;
@@ -515,6 +522,129 @@
             if (statusEl) statusEl.innerHTML = `<span class="text-muted">Chưa chấm được: ${escapeHtml(error.message)}</span>`;
         }
     }
+
+    // ===================================================================
+    // COI LẠI ĐỀ (Aptis/Lớp Học) — overlay full-screen hiển thị NGỮ CẢNH ĐỀ
+    // (đoạn văn Reading / audio Listening lấy từ set gốc) + breakdown từng câu
+    // đúng/sai (metadata.key_review đã tính lúc nộp, faithful).
+    // Reading/Listening Aptis là engine dị hình + xáo trộn (gap-fill, matching,
+    // ordering, flow từng câu) nên KHÔNG re-render widget tương tác (rủi ro cao,
+    // vô nghĩa cho việc coi lại); thay vào đó cho xem lại đề + đối chiếu đáp án.
+    // ===================================================================
+    function reviewRichTextLH(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/__([^_]+)__/g, '<u>$1</u>')
+            .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>')
+            .replace(/\r?\n/g, '<br>');
+    }
+
+    function normalizeAudioUrlLH(url) {
+        const v = String(url || '').trim();
+        if (!v) return '';
+        if (/^https?:\/\//i.test(v)) return v;
+        return v.startsWith('/') ? v : `/${v}`;
+    }
+
+    // Trích đoạn văn (Reading) / audio (Listening) từ set để làm "đề bài" khi coi lại.
+    function collectAptisContext(set, practiceType) {
+        const data = (set && set.data) || {};
+        const blocks = [];
+        if (practiceType === 'reading') {
+            // Part 4: đoạn văn ghép (paragraphs = object A/B/C...).
+            const p4 = data.part4 && data.part4.paragraphs;
+            if (p4 && typeof p4 === 'object') {
+                const items = Object.keys(p4)
+                    .filter(letter => String(p4[letter] || '').trim())
+                    .map(letter => `<div class="mb-2"><strong>${escapeHtml(letter)}.</strong> ${reviewRichTextLH(p4[letter])}</div>`)
+                    .join('');
+                if (items) blocks.push(`<div class="mb-3"><div class="fw-bold mb-2">Đoạn văn (Part 4)</div>${items}</div>`);
+            }
+            // Part 5: sắp xếp đoạn văn (paragraphs = mảng {text}).
+            const p5 = Array.isArray(data.part5 && data.part5.paragraphs) ? data.part5.paragraphs : [];
+            const p5items = p5
+                .map((para, i) => String(para && para.text || '').trim() ? `<div class="mb-2"><strong>${i + 1}.</strong> ${reviewRichTextLH(para.text)}</div>` : '')
+                .filter(Boolean).join('');
+            if (p5items) blocks.push(`<div class="mb-3"><div class="fw-bold mb-2">Đoạn văn (Part 5)</div>${p5items}</div>`);
+        } else if (practiceType === 'listening') {
+            // Gom mọi audioUrl trong set (part1..part4) để HV nghe lại.
+            const urls = [];
+            const pushUrl = (u) => { const n = normalizeAudioUrlLH(u); if (n && !urls.includes(n)) urls.push(n); };
+            ['part1', 'part2', 'part3', 'part4'].forEach(pk => {
+                const part = data[pk];
+                if (!part) return;
+                if (part.audioUrl) pushUrl(part.audioUrl);
+                (part.questions || []).forEach(q => { if (q && q.audioUrl) pushUrl(q.audioUrl); });
+            });
+            if (urls.length) {
+                const players = urls.map((u, i) => `
+                    <div class="mb-2">
+                        <div class="small text-muted mb-1">Audio ${i + 1}</div>
+                        <audio controls preload="none" src="${escapeHtml(u)}" style="width:100%;max-width:480px;"></audio>
+                    </div>
+                `).join('');
+                blocks.push(`<div class="mb-3"><div class="fw-bold mb-2"><i class="bi bi-headphones me-1"></i>Nghe lại audio</div>${players}</div>`);
+            }
+        }
+        return blocks.join('');
+    }
+
+    window.openAptisFullReview = async function (resultId) {
+        const result = state.results.find(item => item.id === resultId);
+        if (!result) return;
+        const metadata = result.metadata && typeof result.metadata === 'object' ? result.metadata : {};
+        const practiceType = String(result.practice_type || '').toLowerCase();
+        const setId = result.set_id;
+        const keyReview = Array.isArray(metadata.key_review) ? metadata.key_review : [];
+
+        const overlay = document.createElement('div');
+        overlay.className = 'aptis-review-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:20000;background:rgba(0,0,0,.5);display:flex;justify-content:center;';
+        overlay.innerHTML = `
+            <div style="background:#f5f6f8;width:100%;max-width:1000px;height:100%;display:flex;flex-direction:column;box-shadow:0 0 40px rgba(0,0,0,.3);">
+                <div style="flex:0 0 auto;display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.75rem 1rem;background:#fff;border-bottom:1px solid #dee2e6;">
+                    <div class="text-truncate">
+                        <strong><i class="bi bi-layout-text-window me-1"></i>Coi lại đề</strong>
+                        <span class="text-muted small ms-2">${escapeHtml(result.set_title || result.set_id || '')}</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                        <span class="d-none d-md-inline small text-muted"><span class="text-success fw-semibold">Xanh</span> đúng · <span class="text-danger fw-semibold">Đỏ</span> sai</span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-review-close><i class="bi bi-x-lg me-1"></i>Đóng</button>
+                    </div>
+                </div>
+                <div style="flex:1 1 auto;overflow:auto;padding:1.25rem;" data-review-body>
+                    <div class="text-center py-5"><span class="spinner-border"></span><div class="mt-2 text-muted">Đang tải đề để coi lại...</div></div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        document.body.style.overflow = 'hidden';
+        const close = () => { overlay.remove(); document.body.style.overflow = ''; document.removeEventListener('keydown', onKey); };
+        const onKey = (e) => { if (e.key === 'Escape') close(); };
+        overlay.querySelector('[data-review-close]').addEventListener('click', close);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+        document.addEventListener('keydown', onKey);
+        const body = overlay.querySelector('[data-review-body]');
+
+        let contextHtml = '';
+        if (setId) {
+            try {
+                const data = await fetchJson(`/api/practice_sets/get?id=${encodeURIComponent(setId)}`);
+                contextHtml = collectAptisContext(data.set, practiceType);
+            } catch (err) {
+                contextHtml = `<div class="alert alert-warning py-2 small">Không tải được đề gốc để hiện ngữ cảnh (${escapeHtml(err.message)}). Vẫn xem được đối chiếu đáp án bên dưới.</div>`;
+            }
+        }
+        const reviewHtml = keyReview.length
+            ? renderKeyReviewDetail(keyReview)
+            : '<div class="alert alert-info py-2 small">Bài này không lưu chi tiết từng câu để coi lại.</div>';
+        body.innerHTML = `
+            ${contextHtml ? `<div class="p-3 rounded mb-3" style="background:#fff;border:1px solid #eee;">${contextHtml}</div>` : ''}
+            <div class="fw-bold fs-5 mb-2"><i class="bi bi-journal-check me-1"></i>Đối chiếu đáp án từng câu</div>
+            ${reviewHtml}
+        `;
+    };
 
     window.openHistoryResultDetail = function (resultId) {
         const result = state.results.find(item => item.id === resultId);
