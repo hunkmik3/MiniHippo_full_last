@@ -1006,6 +1006,14 @@
 
         if (typeof submitPracticeResult === 'function') {
             const submissionMetadata = { source: 'reading_bode_set' };
+            // Lưu đáp án từng câu cho MỌI bài (không chỉ Key) → học viên xem lại được
+            // trong Lịch sử bài học (modal "Chi tiết bài làm" đọc metadata.key_review).
+            submissionMetadata.key_review = buildKeyReview([
+                ['Part 1', part1Result],
+                ['Part 2 & 3', part2Result],
+                ['Part 4', part4Result],
+                ['Part 5', part5Result]
+            ]);
             // Bộ đề Key Reading (mở từ Lớp học): gắn cờ + lớp/band để kết quả
             // hiện nhãn riêng trong Lịch sử học viên và tổng hợp được ở trang admin Lớp học.
             if (isKeyReadingSet()) {
@@ -1024,12 +1032,6 @@
                 }
                 if (keyClassId) submissionMetadata.class_id = keyClassId;
                 if (keyBand === 'B1' || keyBand === 'B2') submissionMetadata.band = keyBand;
-                submissionMetadata.key_review = buildKeyReview([
-                    ['Part 1', part1Result],
-                    ['Part 2 & 3', part2Result],
-                    ['Part 4', part4Result],
-                    ['Part 5', part5Result]
-                ]);
             }
             submitPracticeResult({
                 practiceType: 'reading',

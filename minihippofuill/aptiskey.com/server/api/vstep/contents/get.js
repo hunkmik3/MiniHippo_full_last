@@ -23,6 +23,29 @@ export default async function handler(req, res) {
 
     if (!content) return res.status(404).json({ error: 'Không tìm thấy nội dung VSTEP' });
 
+    // BỘ ĐỀ TỔNG HỢP: content chỉ tham chiếu 4 bộ per-skill (data.combined_refs).
+    // Gộp đúng khối từng kỹ năng từ 4 bộ đó vào data → trang thi chạy full 4 kỹ năng
+    // như 1 đề hoàn chỉnh (không phải sửa engine thi).
+    const refs = content.data && content.data.combined_refs;
+    if (refs && typeof refs === 'object') {
+      content.data = content.data || {};
+      content.data.durations = content.data.durations || {};
+      for (const skill of ['reading', 'listening', 'writing', 'speaking']) {
+        const refId = refs[skill];
+        if (!refId) continue;
+        const src = await selectFrom('vstep_contents', {
+          filters: [{ column: 'id', value: refId }],
+          single: true
+        });
+        if (src && src.data && src.data[skill]) {
+          content.data[skill] = src.data[skill];
+          if (src.data.durations && src.data.durations[skill] != null) {
+            content.data.durations[skill] = src.data.durations[skill];
+          }
+        }
+      }
+    }
+
     const adminView = authResult.user.role === 'admin';
     if (!adminView) {
       const vstepStudent = await selectFrom('vstep_students', {
