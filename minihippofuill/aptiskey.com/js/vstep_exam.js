@@ -1790,12 +1790,30 @@
                 metadata
             };
 
-            const response = await fetch('/api/vstep/results/submit', {
+            let response = await fetch('/api/vstep/results/submit', {
                 method: 'POST',
                 headers: authorizedHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify(payload)
             });
+            // Token hết hạn giữa bài thi dài (VSTEP tới 177 phút) → refresh rồi nộp lại 1 lần.
+            if ((response.status === 401 || response.status === 403)
+                && typeof window.refreshAuthToken === 'function') {
+                let refreshed = null;
+                try { refreshed = await window.refreshAuthToken(); } catch (_) { /* ignore */ }
+                if (refreshed) {
+                    response = await fetch('/api/vstep/results/submit', {
+                        method: 'POST',
+                        headers: authorizedHeaders({ 'Content-Type': 'application/json' }),
+                        body: JSON.stringify(payload)
+                    });
+                }
+            }
             const savedResult = await response.json().catch(() => ({}));
+            // Vẫn lỗi token (refresh_token cũng hết / phiên cũ) → báo rõ, KHÔNG xoá bài
+            // làm (attemptKey vẫn còn) để HV đăng nhập lại vào nộp tiếp, không mất bài.
+            if (response.status === 401 || response.status === 403) {
+                throw new Error('Phiên đăng nhập đã hết hạn. ✅ Bài làm của bạn ĐÃ ĐƯỢC LƯU TẠM trên máy — hãy ĐĂNG NHẬP LẠI rồi mở lại bài thi này để nộp (bài làm sẽ tự khôi phục, không mất).');
+            }
             if (!response.ok) throw new Error(savedResult.error || 'Không thể lưu kết quả VSTEP.');
             const saved = savedResult.result || true;
             if (!saved) throw new Error('Không thể lưu kết quả. Vui lòng kiểm tra đăng nhập hoặc báo admin.');
