@@ -62,9 +62,10 @@
     }
 
     function resolveDisplayBand(result, metadata = {}) {
-        // Bài Key Listening/Reading không hiển thị band điểm (CEFR).
+        // Key Listening/Reading + BTVN + VSTEP không hiển thị band CEFR (không phải
+        // 1 bài thi kỹ năng đầy đủ nên band CEFR sẽ sai lệch, gây hiểu nhầm).
         const kind = String(metadata?.submission_kind || '').toLowerCase();
-        if (kind === 'key_listening' || kind === 'key_reading') {
+        if (kind === 'key_listening' || kind === 'key_reading' || kind === 'homework' || kind === 'vstep_exam') {
             return '—';
         }
         const practiceType = String(result?.practice_type || '').toLowerCase();
@@ -100,6 +101,13 @@
         const kind = String(result?.metadata?.submission_kind || '').toLowerCase();
         if (kind === 'key_listening') return 'Key Listening';
         if (kind === 'key_reading') return 'Key Reading';
+        // BTVN Lớp Học: gắn nhãn riêng + kèm kỹ năng để không bị nhầm là bài luyện Aptis.
+        if (kind === 'homework') {
+            const skill = String(result?.practice_type || '').toLowerCase();
+            const skillLabel = { reading: 'Reading', listening: 'Listening', writing: 'Writing', speaking: 'Speaking' }[skill];
+            return skillLabel ? `BTVN · ${skillLabel}` : 'BTVN';
+        }
+        if (kind === 'vstep_exam') return 'VSTEP';
         const practiceType = result?.practice_type;
         return practiceType
             ? practiceType.charAt(0).toUpperCase() + practiceType.slice(1)
@@ -370,7 +378,7 @@
         const query = new URLSearchParams({ limit: '150' });
         // Key Listening/Reading lưu practice_type là listening/reading nhưng có
         // submission_kind riêng -> lọc qua submissionKind thay vì type.
-        if (selectedType.startsWith('key_')) {
+        if (selectedType.startsWith('key_') || selectedType === 'homework') {
             query.set('submissionKind', selectedType);
         } else if (selectedType) {
             query.set('type', selectedType);

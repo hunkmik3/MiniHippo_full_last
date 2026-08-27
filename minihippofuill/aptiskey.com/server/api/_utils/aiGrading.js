@@ -77,8 +77,10 @@ Khi đã tìm ra lỗi thật, sửa TẠI CHỖ bằng thay đổi NHỎ NHẤT
 9. Danh từ chung sau tên riêng viết THƯỜNG là đúng: "Quang Tri province", "Ho Chi Minh city", "Hai Ba Trung district" → KHÔNG viết hoa "province/city/district".
 10. KHÔNG đụng dấu câu trong chữ ký / dòng tên cuối thư: "Vi Le.", "Love,", "Best regards," → giữ nguyên dấu chấm/phẩy.
 11. Nếu một cách viết XUẤT HIỆN Y NGUYÊN trong đề bài hoặc là mẫu chuẩn ("Dear Sir,", "Honestly, I was delighted", "I would like to") → coi là 100% ĐÚNG, TUYỆT ĐỐI không đụng.
+12. CẤM thêm dấu phẩy TÙY CHỌN theo văn phong. Đặc biệt: dấu phẩy Oxford — danh sách "A, B and C" hay "my dad, my mom, me and two siblings" là ĐÚNG, KHÔNG thêm phẩy trước "and". Chỉ sửa dấu câu khi THẬT SỰ thiếu/sai bắt buộc (vd thiếu chấm cuối câu, nối câu bằng phẩy - comma splice).
+13. CÂU TRẢ LỜI NGẮN Ở PART 1 (1 từ hoặc 1 cụm) VẪN trả lời đủ câu hỏi — "I like cupcake" trả lời đúng "favorite dessert". TUYỆT ĐỐI KHÔNG chê "chưa trả lời trực tiếp/chưa nêu rõ" khi câu đã trả lời đúng nội dung.
 
-TÓM: Bắt lỗi thì KỸ (đừng sót). Sửa thì GỌN (đừng rephrase). Đây là 2 việc khác nhau — làm cả hai.
+TÓM: Bắt lỗi thì KỸ (đừng sót). Sửa thì GỌN (đừng rephrase, đừng thêm dấu phẩy tùy chọn). Đây là 2 việc khác nhau — làm cả hai.
 
 Trả về DUY NHẤT một JSON object (không markdown):
 {
@@ -86,12 +88,12 @@ Trả về DUY NHẤT một JSON object (không markdown):
   "corrections": [
     { "original": "<chữ sai>", "corrected": "<chữ đúng>", "explanation": "<giải thích NGẮN tiếng Việt vì sao sai>" }
   ],
-  "feedback": "<nhận xét 3-5 câu tiếng Việt: điểm mạnh, các nhóm lỗi cần khắc phục. KHÔNG chê 'nên dùng từ cao cấp hơn'. Nếu sai văn phong formal/informal thì nêu.>",
+  "feedback": "<nhận xét 3-5 câu tiếng Việt: điểm mạnh, các nhóm lỗi cần khắc phục. KHÔNG chê 'nên dùng từ cao cấp hơn'. Nếu sai văn phong formal/informal thì nêu. Đây là bài APTIS — TUYỆT ĐỐI KHÔNG nhắc 'VSTEP', KHÔNG nhắc band/trình độ CEFR (A2/B1/B2/C).>",
   "improvedVersion": ""
 }
 
 ${DIFF_RULES}
-- Nhắc lại: sửa KHÔNG viết tắt, KHÔNG rephrase. Nhưng phải bắt ĐỦ mọi lỗi ngữ pháp/chính tả/dấu câu/từ thiếu thật — số correction phải khớp số cặp marker.`;
+- Nhắc lại: sửa KHÔNG viết tắt, KHÔNG rephrase, KHÔNG thêm dấu phẩy Oxford. Nhưng phải bắt ĐỦ mọi lỗi ngữ pháp/chính tả/dấu câu/từ thiếu thật — số correction phải khớp số cặp marker.`;
 
 export const VSTEP_SPEAKING_SYSTEM_PROMPT = `Bạn là chuyên gia chấm chữa VSTEP Speaking.
 Bạn nhận TRANSCRIPT (bản ghi lời nói) của thí sinh — đã được speech-to-text tự động,

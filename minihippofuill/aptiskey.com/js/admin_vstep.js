@@ -1510,8 +1510,71 @@
             updateOverview();
             renderSetList();
             renderAssignmentOptions();
+            populateCombinedSelects();
         } catch (error) {
             refs.setList.innerHTML = `<div class="text-danger small">${escapeHtml(error.message)}</div>`;
+        }
+    }
+
+    // ===== BỘ ĐỀ TỔNG HỢP: ghép 4 bộ per-skill thành 1 đề hoàn chỉnh =====
+    function setsForSkill(skill) {
+        return (state.sets || []).filter(s => {
+            const sk = String(s?.data?.vstep_practice_skill || '').toLowerCase();
+            return sk === skill && !s?.data?.combined_refs; // loại chính các bộ tổng hợp
+        });
+    }
+    function populateCombinedSelects() {
+        const map = { reading: 'vstep-combined-reading', listening: 'vstep-combined-listening', writing: 'vstep-combined-writing', speaking: 'vstep-combined-speaking' };
+        Object.entries(map).forEach(([skill, id]) => {
+            const sel = document.getElementById(id);
+            if (!sel) return;
+            const cur = sel.value;
+            const opts = setsForSkill(skill)
+                .map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.title || s.id)}</option>`)
+                .join('');
+            sel.innerHTML = `<option value="">— Chọn bộ ${skill} —</option>` + opts;
+            if (cur) sel.value = cur;
+        });
+    }
+    async function createCombinedSet() {
+        const alertEl = document.getElementById('vstep-combined-alert');
+        const setAlert = (msg, type) => { if (alertEl) { alertEl.className = `small mt-2 text-${type}`; alertEl.textContent = msg; } };
+        const title = (document.getElementById('vstep-combined-title')?.value || '').trim();
+        const refs4 = {
+            reading: document.getElementById('vstep-combined-reading')?.value || '',
+            listening: document.getElementById('vstep-combined-listening')?.value || '',
+            writing: document.getElementById('vstep-combined-writing')?.value || '',
+            speaking: document.getElementById('vstep-combined-speaking')?.value || ''
+        };
+        if (!title) return setAlert('Nhập tên bộ đề tổng hợp.', 'warning');
+        const missing = Object.entries(refs4).filter(([, v]) => !v).map(([k]) => k);
+        if (missing.length) return setAlert('Chưa chọn đủ 4 kỹ năng (thiếu: ' + missing.join(', ') + ').', 'warning');
+        const btn = document.getElementById('vstep-combined-create-btn');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Đang tạo...'; }
+        try {
+            await fetchJson('/api/vstep/contents/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title,
+                    flow: 'practice',
+                    status: 'published',
+                    duration_minutes: 177,
+                    data: {
+                        __practice_type: 'vstep', vstep_module: true,
+                        vstep_flow: 'practice', vstep_content_kind: 'mock_test',
+                        vstep_practice_skill: 'full_test', status: 'published',
+                        vstep_is_combined: true, combined_refs: refs4
+                    }
+                })
+            });
+            setAlert('Đã tạo bộ đề tổng hợp "' + title + '". Học viên sẽ thấy ở mục Bộ đề tổng hợp (full test).', 'success');
+            const t = document.getElementById('vstep-combined-title'); if (t) t.value = '';
+            await loadSets();
+        } catch (error) {
+            setAlert('Lỗi: ' + error.message, 'danger');
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-plus-circle me-1"></i>Tạo bộ đề tổng hợp'; }
         }
     }
 
@@ -3608,6 +3671,7 @@
         $('newVstepSetBtn')?.addEventListener('click', () => showContentFlow(state.currentFlow || 'practice'));
         $('resetVstepFormBtn')?.addEventListener('click', resetForm);
         $('refreshVstepSetsBtn')?.addEventListener('click', loadSets);
+        $('vstep-combined-create-btn')?.addEventListener('click', createCombinedSet);
         $('refreshVstepUsersBtn')?.addEventListener('click', loadUsers);
         $('refreshVstepResourcesBtn')?.addEventListener('click', loadResources);
         $('refreshVstepClassesBtn')?.addEventListener('click', loadClasses);

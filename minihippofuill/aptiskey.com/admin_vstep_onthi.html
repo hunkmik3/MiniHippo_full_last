@@ -502,6 +502,32 @@
             </button>
           </div>
 
+          <!-- BỘ ĐỀ TỔNG HỢP: ghép 4 bộ per-skill thành 1 đề hoàn chỉnh 4 kỹ năng -->
+          <div class="vstep-panel" id="vstep-combined-creator" style="margin-bottom:14px;">
+            <div class="vstep-panel-header">
+              <div>
+                <strong><i class="bi bi-collection me-1"></i>Bộ đề tổng hợp (ghép 4 kỹ năng)</strong>
+                <div class="vstep-help">Chọn 1 bộ mỗi kỹ năng → ghép thành 1 đề hoàn chỉnh (Listening + Reading + Writing + Speaking). Học viên thi liền cả 4 kỹ năng, nộp 1 lần.</div>
+              </div>
+            </div>
+            <div class="vstep-panel-body">
+              <div class="row g-2">
+                <div class="col-12">
+                  <label class="form-label mb-1">Tên bộ đề tổng hợp</label>
+                  <input class="form-control" id="vstep-combined-title" placeholder="VD: Bộ đề hoàn chỉnh 1">
+                </div>
+                <div class="col-md-3"><label class="form-label mb-1"><i class="bi bi-book me-1"></i>Reading</label><select class="form-select" id="vstep-combined-reading"></select></div>
+                <div class="col-md-3"><label class="form-label mb-1"><i class="bi bi-headphones me-1"></i>Listening</label><select class="form-select" id="vstep-combined-listening"></select></div>
+                <div class="col-md-3"><label class="form-label mb-1"><i class="bi bi-pencil-square me-1"></i>Writing</label><select class="form-select" id="vstep-combined-writing"></select></div>
+                <div class="col-md-3"><label class="form-label mb-1"><i class="bi bi-mic me-1"></i>Speaking</label><select class="form-select" id="vstep-combined-speaking"></select></div>
+              </div>
+              <div id="vstep-combined-alert" class="small mt-2"></div>
+              <button type="button" class="btn btn-primary btn-sm mt-2" id="vstep-combined-create-btn">
+                <i class="bi bi-plus-circle me-1"></i>Tạo bộ đề tổng hợp
+              </button>
+            </div>
+          </div>
+
           <div class="vstep-admin-layout">
             <aside class="vstep-panel vstep-content-index">
               <div class="vstep-panel-header vstep-panel-header-row">
