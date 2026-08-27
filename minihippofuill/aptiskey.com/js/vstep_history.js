@@ -133,9 +133,14 @@
                     <td>${statusBadge(result)}</td>
                     <td>${escapeHtml(formatDuration(result.duration_seconds))}</td>
                     <td>
-                        <button type="button" class="btn btn-sm btn-outline-primary vstep-history-view-btn" data-result-id="${escapeHtml(result.id)}">
-                            <i class="bi bi-eye me-1"></i>Xem
-                        </button>
+                        <div class="d-flex flex-wrap gap-1">
+                            <button type="button" class="btn btn-sm btn-outline-primary vstep-history-view-btn" data-result-id="${escapeHtml(result.id)}">
+                                <i class="bi bi-eye me-1"></i>Xem
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-success vstep-history-review-btn" data-result-id="${escapeHtml(result.id)}">
+                                <i class="bi bi-layout-text-window me-1"></i>Coi lại đề
+                            </button>
+                        </div>
                     </td>
                 </tr>
             `;
@@ -143,6 +148,9 @@
 
         refs.body.querySelectorAll('.vstep-history-view-btn').forEach(btn => {
             btn.addEventListener('click', () => showDetail(btn.dataset.resultId));
+        });
+        refs.body.querySelectorAll('.vstep-history-review-btn').forEach(btn => {
+            btn.addEventListener('click', () => openFullReview(btn.dataset.resultId));
         });
     }
 
@@ -259,6 +267,246 @@
             </div>
         `;
         }).join('');
+    }
+
+    // ===================================================================
+    // COI LẠI FULL GIAO DIỆN — render lại đề đúng bố cục bài thi (đoạn văn
+    // Reading + đủ options A/B/C/D + audio Listening) và tô đáp án:
+    //   xanh = đáp án đúng · đỏ = HV chọn sai · badge Đúng/Sai/Chưa trả lời.
+    // Nguồn: SET gốc qua get.js (đã gộp bộ tổng hợp) + md.answers (nhãn HV chọn).
+    // Tự chứa, KHÔNG đụng engine thi (vstep_exam.js) để tránh vỡ luồng thi thật.
+    // ===================================================================
+    function reviewRichText(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/__([^_]+)__/g, '<u>$1</u>')
+            .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>')
+            .replace(/\r?\n/g, '<br>');
+    }
+
+    // getQuestionId của vstep_exam: question.id || `${skill}-part${idx+1}-q${i+1}`.
+    function reviewQid(skill, partIndex, question, index) {
+        return question.id || `${skill}-part${partIndex + 1}-q${index + 1}`;
+    }
+
+    // PHẢI khớp filterMeaningfulParts của vstep_exam: khi nộp, partIndex (→ qid)
+    // được tính TRÊN mảng parts đã lọc bỏ part trống + slice theo max. Không lọc
+    // giống hệt → lệch index → không tra được đáp án HV đã chọn.
+    function reviewFilterParts(parts, skill, maxSlice) {
+        if (!Array.isArray(parts) || !parts.length) return [];
+        return parts.slice(0, maxSlice).filter(part => {
+            if (!part || typeof part !== 'object') return false;
+            if (skill === 'listening') {
+                return Boolean(part.audioUrl) || (Array.isArray(part.questions) && part.questions.length > 0);
+            }
+            if (skill === 'reading') {
+                return Boolean(part.passage && String(part.passage).trim()
+                    && !String(part.passage).startsWith('Reading Part'))
+                    || (Array.isArray(part.questions) && part.questions.length > 0);
+            }
+            if (skill === 'writing') {
+                const prompt = String(part.prompt || '').trim();
+                return prompt.length > 0 && !prompt.startsWith('Writing Part');
+            }
+            if (skill === 'speaking') {
+                const prompt = String(part.prompt || '').trim();
+                return prompt.length > 0 && !prompt.startsWith('Speaking Part');
+            }
+            return true;
+        });
+    }
+
+    function reviewNormalizeData(set) {
+        const data = (set && set.data) || {};
+        return {
+            listening: { parts: reviewFilterParts(data.listening?.parts, 'listening', 3) },
+            reading: { parts: reviewFilterParts(data.reading?.parts, 'reading', 4) },
+            writing: { parts: reviewFilterParts(data.writing?.parts, 'writing', 2) },
+            speaking: { parts: reviewFilterParts(data.speaking?.parts, 'speaking', 3) }
+        };
+    }
+
+    function reviewAudioHtml(url) {
+        const safe = String(url || '').trim();
+        if (!safe) return '';
+        return `<audio controls preload="none" src="${escapeHtml(safe)}" style="width:100%;max-width:420px;margin:.4rem 0;"></audio>`;
+    }
+
+    // Render câu hỏi trắc nghiệm (listening/reading) đã tô đáp án.
+    function reviewMcqQuestions(skill, parts, answers) {
+        let counter = 0;
+        return (parts || []).map((part, partIndex) => {
+            const questions = part.questions || [];
+            const passage = skill === 'reading' ? (part.passage || part.text || part.content || '') : '';
+            if (!questions.length && !passage) { return ''; }
+            const startNo = counter + 1;
+            const endNo = counter + questions.length;
+            const rangeLabel = questions.length
+                ? (startNo === endNo ? `Question ${startNo}` : `Questions ${startNo}-${endNo}`)
+                : '';
+            const hasPerQAudio = questions.some(q => q.audioUrl);
+            const partAudio = skill === 'listening' && !hasPerQAudio ? reviewAudioHtml(part.audioUrl) : '';
+            const qHtml = questions.map((question, qi) => {
+                counter += 1;
+                const number = counter;
+                const id = reviewQid(skill, partIndex, question, qi);
+                const correct = question.answer || '';
+                const userAnswer = (answers && answers[skill] && answers[skill][id]) || '';
+                const answered = Boolean(userAnswer);
+                const isCorrect = answered && userAnswer === correct;
+                const qAudio = (skill === 'listening' && question.audioUrl) ? reviewAudioHtml(question.audioUrl) : '';
+                const options = (question.options || []).map(opt => {
+                    const isCorrectOpt = opt.label === correct;
+                    const isUserPick = opt.label === userAnswer;
+                    let style = 'display:block;padding:.4rem .6rem;border:1px solid #dee2e6;border-radius:.4rem;margin:.25rem 0;';
+                    let tag = '';
+                    if (isCorrectOpt) { style += 'background:#e8f6ee;border-color:#198754;'; tag = ' <span class="badge bg-success ms-1">Đáp án đúng</span>'; }
+                    if (isUserPick && !isCorrectOpt) { style += 'background:#fbeaec;border-color:#dc3545;'; tag = ' <span class="badge bg-danger ms-1">Bạn chọn</span>'; }
+                    if (isUserPick && isCorrectOpt) { tag = ' <span class="badge bg-success ms-1"><i class="bi bi-check-lg"></i> Bạn chọn (đúng)</span>'; }
+                    return `<span style="${style}"><strong>${escapeHtml(opt.label)}.</strong> ${escapeHtml(opt.text)}${tag}</span>`;
+                }).join('');
+                const statusBadge = !answered
+                    ? '<span class="badge bg-secondary">Chưa trả lời</span>'
+                    : isCorrect
+                        ? '<span class="badge bg-success"><i class="bi bi-check-lg"></i> Đúng</span>'
+                        : '<span class="badge bg-danger"><i class="bi bi-x-lg"></i> Sai</span>';
+                const titlePrefix = skill === 'listening' ? `Question ${number}:` : `${number}.`;
+                return `
+                    <div style="margin-bottom:1rem;padding:.75rem;border:1px solid #eee;border-radius:.5rem;background:#fff;">
+                        <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+                            <div class="fw-semibold">${escapeHtml(titlePrefix)} ${reviewRichText(question.prompt)}</div>
+                            <div class="flex-shrink-0">${statusBadge}</div>
+                        </div>
+                        ${qAudio}
+                        ${options}
+                        ${question.explanation ? `<div class="mt-2 p-2 rounded" style="background:#fff8e6;color:#664d03;font-size:.9rem;"><i class="bi bi-lightbulb me-1"></i>${reviewRichText(question.explanation)}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+            const partTitle = escapeHtml(part.title || `Part ${partIndex + 1}`);
+            const head = `<div class="fw-bold fs-5 mb-2">${partTitle}${rangeLabel ? ` <span class="text-muted fs-6">(${escapeHtml(rangeLabel)})</span>` : ''}</div>`;
+            if (skill === 'reading') {
+                return `
+                    <div style="margin-bottom:1.5rem;">
+                        ${head}
+                        <div class="row g-3">
+                            <div class="col-lg-6"><div class="p-3 rounded" style="background:#fbfbfb;border:1px solid #eee;">${reviewRichText(passage)}</div></div>
+                            <div class="col-lg-6">${qHtml}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            return `
+                <div style="margin-bottom:1.5rem;">
+                    ${head}
+                    ${part.directions ? `<div class="text-muted small mb-2">${reviewRichText(part.directions)}</div>` : ''}
+                    ${partAudio}
+                    ${qHtml}
+                </div>
+            `;
+        }).join('');
+    }
+
+    function reviewWritingHtml(parts, md) {
+        const answersArr = Array.isArray(md.writing_answers) ? md.writing_answers : [];
+        const fromAnswers = (md.answers && md.answers.writing) || {};
+        return (parts || []).map((part, i) => {
+            const key = `part${i + 1}`;
+            const answer = (answersArr[i] && answersArr[i].answer) || fromAnswers[key] || '';
+            return `
+                <div style="margin-bottom:1.5rem;">
+                    <div class="fw-bold fs-5 mb-2">${escapeHtml(part.title || `Writing Part ${i + 1}`)}</div>
+                    <div class="p-3 rounded mb-2" style="background:#fbfbfb;border:1px solid #eee;">${reviewRichText(part.prompt || '')}</div>
+                    <div class="fw-semibold small text-muted mb-1">Bài làm của bạn:</div>
+                    <div class="p-3 rounded" style="background:#fff;border:1px solid #dee2e6;white-space:pre-wrap;">${escapeHtml(answer || '(trống)')}</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function reviewSpeakingHtml(parts, md) {
+        const rec = md.speaking_answers || {};
+        return (parts || []).map((part, i) => {
+            const entry = rec[`part${i + 1}`] || rec[String(i + 1)] || null;
+            const url = entry && entry.recordingUrl;
+            return `
+                <div style="margin-bottom:1.5rem;">
+                    <div class="fw-bold fs-5 mb-2">${escapeHtml(part.title || `Speaking Part ${i + 1}`)}</div>
+                    <div class="p-3 rounded mb-2" style="background:#fbfbfb;border:1px solid #eee;">${reviewRichText(part.prompt || '')}</div>
+                    ${url ? reviewAudioHtml(url) : '<div class="small text-muted">Không có file ghi âm</div>'}
+                </div>
+            `;
+        }).join('');
+    }
+
+    function buildFullReviewHtml(set, result) {
+        const data = reviewNormalizeData(set);
+        const md = result.metadata || {};
+        const answers = md.answers && typeof md.answers === 'object' ? md.answers : {};
+        const sections = [];
+        if (data.listening.parts.some(p => (p.questions || []).length)) {
+            sections.push('<h4 class="text-primary mb-3"><i class="bi bi-headphones me-2"></i>Listening</h4>' + reviewMcqQuestions('listening', data.listening.parts, answers));
+        }
+        if (data.reading.parts.some(p => (p.questions || []).length || (p.passage && String(p.passage).trim()))) {
+            sections.push('<h4 class="text-primary mb-3"><i class="bi bi-book me-2"></i>Reading</h4>' + reviewMcqQuestions('reading', data.reading.parts, answers));
+        }
+        if (data.writing.parts.length) {
+            sections.push('<h4 class="text-primary mb-3"><i class="bi bi-pencil-square me-2"></i>Writing</h4>' + reviewWritingHtml(data.writing.parts, md));
+        }
+        if (data.speaking.parts.length) {
+            sections.push('<h4 class="text-primary mb-3"><i class="bi bi-mic me-2"></i>Speaking</h4>' + reviewSpeakingHtml(data.speaking.parts, md));
+        }
+        if (!sections.length) return '<div class="alert alert-warning">Không tải được nội dung đề để coi lại.</div>';
+        return sections.join('<hr class="my-4">');
+    }
+
+    async function openFullReview(id) {
+        const result = state.results.find(r => String(r.id) === String(id));
+        if (!result) return;
+        const md = result.metadata || {};
+        const reviewSetId = md.vstep_set_id;
+        const overlay = document.createElement('div');
+        overlay.className = 'vstep-review-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:20000;background:rgba(0,0,0,.5);display:flex;justify-content:center;';
+        overlay.innerHTML = `
+            <div style="background:#f5f6f8;width:100%;max-width:1100px;height:100%;display:flex;flex-direction:column;box-shadow:0 0 40px rgba(0,0,0,.3);">
+                <div style="flex:0 0 auto;display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.75rem 1rem;background:#fff;border-bottom:1px solid #dee2e6;">
+                    <div class="text-truncate">
+                        <strong><i class="bi bi-eye me-1"></i>Coi lại bài làm</strong>
+                        <span class="text-muted small ms-2">${escapeHtml(result.content_title || md.vstep_set_title || '')}</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                        <span class="d-none d-md-inline small text-muted"><span class="badge bg-success">&nbsp;</span> đáp án đúng · <span class="badge bg-danger">&nbsp;</span> bạn chọn sai</span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-review-close><i class="bi bi-x-lg me-1"></i>Đóng</button>
+                    </div>
+                </div>
+                <div style="flex:1 1 auto;overflow:auto;padding:1.25rem;" data-review-body>
+                    <div class="text-center py-5"><span class="spinner-border"></span><div class="mt-2 text-muted">Đang tải đề để coi lại...</div></div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        document.body.style.overflow = 'hidden';
+        const close = () => { overlay.remove(); document.body.style.overflow = ''; document.removeEventListener('keydown', onKey); };
+        const onKey = (e) => { if (e.key === 'Escape') close(); };
+        overlay.querySelector('[data-review-close]').addEventListener('click', close);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+        document.addEventListener('keydown', onKey);
+        const body = overlay.querySelector('[data-review-body]');
+        if (!reviewSetId) {
+            body.innerHTML = '<div class="alert alert-warning">Bài nộp này không lưu mã đề nên không thể coi lại full giao diện. Bạn vẫn xem được bảng đối chiếu đáp án ở nút "Xem".</div>';
+            return;
+        }
+        try {
+            const resp = await fetch(`/api/vstep/contents/get?id=${encodeURIComponent(reviewSetId)}`, { headers: authorizedHeaders() });
+            const dt = await resp.json().catch(() => ({}));
+            if (!resp.ok) throw new Error(dt.error || 'Không tải được đề.');
+            const set = dt.set || dt.content;
+            body.innerHTML = buildFullReviewHtml(set, result);
+        } catch (err) {
+            body.innerHTML = `<div class="alert alert-danger">Không tải được đề để coi lại: ${escapeHtml(err.message)}</div>`;
+        }
     }
 
     function showDetail(id) {

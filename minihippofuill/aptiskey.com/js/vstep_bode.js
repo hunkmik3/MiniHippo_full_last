@@ -55,6 +55,12 @@
 
 	    function cacheSet(set) {
 	        if (!set || !set.id) return;
+	        // KHÔNG cache bộ đề tổng hợp: bản list chưa gộp 4 kỹ năng, cache lại sẽ
+	        // khiến trang thi hiển thị rỗng. Trang thi sẽ gọi get.js để gộp.
+	        if (set.data && set.data.combined_refs) {
+	            try { sessionStorage.setItem('vstep_last_set_id', set.id); } catch (_) {}
+	            return;
+	        }
 	        try {
 	            sessionStorage.setItem('vstep_last_set_id', set.id);
 	            sessionStorage.setItem(`practice_set_cache_vstep_${set.id}`, JSON.stringify(set));
@@ -310,7 +316,12 @@
 	            }
 	            renderDashboard(allSets, results);
 	            const sets = allSets
-	                .filter(set => !set.data?.vstep_practice_skill || set.data.vstep_practice_skill === 'full_test')
+	                .filter(set => {
+                    // Trang Bộ đề tổng hợp (full_test) CHỈ hiện bộ admin ghép (combined_refs);
+                    // ẩn các đề mock_test demo/seed cũ cho đỡ rối.
+                    if (/full_test/i.test(window.location.pathname || '')) return Boolean(set.data && set.data.combined_refs);
+                    return !set.data?.vstep_practice_skill || set.data.vstep_practice_skill === 'full_test';
+                })
 	                .sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'vi', { numeric: true }));
 	            renderSets(sets);
 	        } catch (error) {

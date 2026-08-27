@@ -365,7 +365,10 @@
             cached = null;
         }
 
-        if (cached && cached.id === setId) {
+        // Bộ đề TỔNG HỢP (data.combined_refs) chỉ chứa tham chiếu — bản cache từ
+        // trang danh sách CHƯA được gộp 4 kỹ năng. Phải gọi get.js để backend gộp,
+        // nếu không sẽ báo "chưa có nội dung". → bỏ cache với bộ tổng hợp.
+        if (cached && cached.id === setId && !cached.data?.combined_refs) {
             state.set = cached;
         } else {
             const assignmentQuery = assignmentId ? `&assignment=${encodeURIComponent(assignmentId)}` : '';

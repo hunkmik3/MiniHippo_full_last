@@ -1511,6 +1511,7 @@
             renderSetList();
             renderAssignmentOptions();
             populateCombinedSelects();
+            renderCombinedList();
         } catch (error) {
             refs.setList.innerHTML = `<div class="text-danger small">${escapeHtml(error.message)}</div>`;
         }
@@ -1536,6 +1537,42 @@
             if (cur) sel.value = cur;
         });
     }
+    function renderCombinedList() {
+        const el = document.getElementById('vstep-combined-list');
+        if (!el) return;
+        const combined = (state.sets || []).filter(s => s?.data?.combined_refs);
+        if (!combined.length) {
+            el.innerHTML = '<div class="text-secondary small">Chưa có bộ đề tổng hợp nào. Tạo ở khung phía trên.</div>';
+            return;
+        }
+        const titleById = new Map((state.sets || []).map(s => [s.id, s.title || s.id]));
+        const skillRow = (icon, label, id) =>
+            `<div class="small text-secondary"><i class="bi ${icon} me-1"></i>${label}: ${id ? escapeHtml(titleById.get(id) || '(đã xoá)') : '<span class="text-danger">chưa chọn</span>'}</div>`;
+        el.innerHTML = combined.map(s => {
+            const r = s.data.combined_refs || {};
+            const status = s.status || s.data?.status || 'draft';
+            return `
+                <div class="border rounded p-2 mb-2 d-flex justify-content-between align-items-start gap-2">
+                    <div>
+                        <strong>${escapeHtml(s.title || s.id)}</strong>
+                        <span class="badge bg-${status === 'published' ? 'success' : 'secondary'} ms-1">${escapeHtml(status)}</span>
+                        <div class="mt-1">
+                            ${skillRow('bi-book', 'Reading', r.reading)}
+                            ${skillRow('bi-headphones', 'Listening', r.listening)}
+                            ${skillRow('bi-pencil-square', 'Writing', r.writing)}
+                            ${skillRow('bi-mic', 'Speaking', r.speaking)}
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-danger vstep-combined-delete-btn" data-id="${escapeHtml(s.id)}" data-title="${escapeHtml(s.title || '')}" title="Xoá">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>`;
+        }).join('');
+        el.querySelectorAll('.vstep-combined-delete-btn').forEach(btn => {
+            btn.addEventListener('click', () => deleteContentSet(btn.dataset.id, btn.dataset.title));
+        });
+    }
+
     async function createCombinedSet() {
         const alertEl = document.getElementById('vstep-combined-alert');
         const setAlert = (msg, type) => { if (alertEl) { alertEl.className = `small mt-2 text-${type}`; alertEl.textContent = msg; } };
@@ -3672,6 +3709,7 @@
         $('resetVstepFormBtn')?.addEventListener('click', resetForm);
         $('refreshVstepSetsBtn')?.addEventListener('click', loadSets);
         $('vstep-combined-create-btn')?.addEventListener('click', createCombinedSet);
+        $('vstep-combined-refresh-btn')?.addEventListener('click', loadSets);
         $('refreshVstepUsersBtn')?.addEventListener('click', loadUsers);
         $('refreshVstepResourcesBtn')?.addEventListener('click', loadResources);
         $('refreshVstepClassesBtn')?.addEventListener('click', loadClasses);
