@@ -1967,19 +1967,30 @@ async function submitClassForm() {
         return;
     }
 
-    // Generate sessions data
-    const sessions = generateSessionsPreview(schedule, firstDate, startTime, numSessions);
-    const sessionsData = sessions.map(s => ({
-        number: s.number,
-        date: formatDateInputValue(s.date),
-        deadline: s.deadline.toISOString(),
-        day_name: s.dayName
-    }));
-
     const editId = document.getElementById('class-form-panel').dataset.editId;
 
     // Giữ mã lớp cũ khi sửa; sinh mã mới khi tạo lớp.
     const existingCls = editId ? lopHocState.classes.find((c) => c.id === editId) : null;
+
+    // Generate sessions data
+    const sessions = generateSessionsPreview(schedule, firstDate, startTime, numSessions);
+    // GIỮ deadline đã chỉnh tay: khi SỬA lớp, nếu buổi cũ cùng số + cùng NGÀY
+    // (lịch không dời vị trí buổi này) thì giữ nguyên deadline cũ thay vì tính lại
+    // theo lịch → không xoá mất deadline admin đã chỉnh. Đổi lịch/ngày đầu → ngày
+    // buổi đổi → tính lại bình thường.
+    const existingSessions = Array.isArray(existingCls?.data?.sessions) ? existingCls.data.sessions : [];
+    const sessionsData = sessions.map(s => {
+        const dateStr = formatDateInputValue(s.date);
+        const prev = existingSessions.find(p => String(p.number) === String(s.number));
+        const keepDeadline = prev && prev.date === dateStr && prev.deadline;
+        return {
+            number: s.number,
+            date: dateStr,
+            deadline: keepDeadline ? prev.deadline : s.deadline.toISOString(),
+            day_name: s.dayName,
+            ...(keepDeadline && prev.deadline_custom ? { deadline_custom: true } : {})
+        };
+    });
     const classCode = getClassCode(existingCls)
         || generateClassCode(new Set(lopHocState.classes.map(getClassCode).filter(Boolean)));
 
@@ -2151,11 +2162,15 @@ async function saveDeadline() {
     const cls = lopHocState.classes.find(c => c.id === classId);
     if (!cls) return;
 
-    // Update session deadline in data
-    const session = cls.data.sessions.find(s => s.number === parseInt(sessionNum));
+    // Update session deadline in data. So khớp bằng String phòng dữ liệu cũ lưu
+    // number dạng chuỗi.
+    const session = cls.data.sessions.find(s => String(s.number) === String(sessionNum));
     if (!session) return;
 
     session.deadline = new Date(`${date}T${time}:00`).toISOString();
+    // Đánh dấu override thủ công → khi lưu/sửa lớp (submitClassForm) sẽ GIỮ deadline
+    // này thay vì tính lại theo lịch.
+    session.deadline_custom = true;
 
     try {
         await apiCall(`/api/practice_sets/update?id=${classId}`, {
@@ -2166,8 +2181,10 @@ async function saveDeadline() {
         });
 
         bootstrap.Modal.getInstance(document.getElementById('editDeadlineModal')).hide();
+        // Tải lại từ server rồi render lại → ô hiển thị = đúng dữ liệu đã lưu
+        // (không render từ bộ nhớ, tránh nhìn nhầm "đã lưu" khi thực ra chưa).
+        await loadClasses();
         loadHomeworkSessions();
-        loadClasses();
     } catch (err) {
         alert('Lỗi cập nhật: ' + err.message);
     }
