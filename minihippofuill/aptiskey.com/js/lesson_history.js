@@ -144,6 +144,39 @@
         }).join('');
     }
 
+    // Chi tiết BTVN Lớp Học: buoi_hoc.js lưu sẵn bảng câu trả lời ở
+    // metadata.result_rows_html (chuỗi <tr> 4 cột) + total_correct/total_questions.
+    // Admin đã hiển thị phần này (buildHomeworkResultDetailHtml); học viên trước
+    // đây KHÔNG render field này nên modal chi tiết BTVN trống trơn.
+    function buildHomeworkDetailHtml(result, metadata = {}) {
+        const kind = String(metadata.submission_kind || '').toLowerCase();
+        const rowsHtml = String(metadata.result_rows_html || '').trim();
+        const hasCounts = Number.isFinite(Number(metadata.total_questions));
+        if (kind !== 'homework' && !rowsHtml) return '';
+        if (!rowsHtml && !hasCounts) return '';
+
+        const totalScore = Number.isFinite(Number(result?.total_score))
+            ? Number(result.total_score)
+            : Number(metadata.total_correct || 0);
+        const maxScore = Number.isFinite(Number(result?.max_score))
+            ? Number(result.max_score)
+            : Number(metadata.total_questions || 0);
+
+        return `
+            <div class="mb-2">
+                <span class="badge bg-light text-dark border">Điểm: <strong>${escapeHtml(totalScore)}/${escapeHtml(maxScore)}</strong></span>
+            </div>
+            ${rowsHtml ? `
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered table-striped align-middle mb-0" style="font-size:0.85rem;">
+                        <thead><tr><th>Câu</th><th>Nội dung</th><th>Bạn chọn</th><th>Đáp án</th></tr></thead>
+                        <tbody>${rowsHtml}</tbody>
+                    </table>
+                </div>
+            ` : '<div class="text-muted small">Bài nộp cũ chỉ lưu điểm, chưa lưu bảng câu trả lời chi tiết.</div>'}
+        `;
+    }
+
     function getAiUsageInfo(metadata = {}) {
         const rawProbability = Number(metadata.ai_usage_probability);
         const probability = Number.isFinite(rawProbability)
@@ -683,13 +716,18 @@
             const gradedAt = metadata.admin_graded_at ? `\n\nCập nhật: ${formatDateTime(metadata.admin_graded_at)}` : '';
             adminNoteEl.textContent = `${note}${gradedAt}`;
         }
-        // Chi tiết bài làm Key Listening/Reading (đáp án từng câu).
+        // Chi tiết bài làm: Key Listening/Reading dùng key_review (đáp án từng câu),
+        // còn BTVN Lớp Học dùng result_rows_html → trước đây HV mở ra trống.
         const keyReviewWrapEl = document.getElementById('history-detail-key-review-wrap');
         const keyReviewEl = document.getElementById('history-detail-key-review');
         const keyReview = Array.isArray(metadata.key_review) ? metadata.key_review : null;
+        const homeworkDetailHtml = buildHomeworkDetailHtml(result, metadata);
         if (keyReview && keyReview.length) {
             if (keyReviewWrapEl) keyReviewWrapEl.style.display = 'block';
             if (keyReviewEl) keyReviewEl.innerHTML = renderKeyReviewDetail(keyReview);
+        } else if (homeworkDetailHtml) {
+            if (keyReviewWrapEl) keyReviewWrapEl.style.display = 'block';
+            if (keyReviewEl) keyReviewEl.innerHTML = homeworkDetailHtml;
         } else {
             if (keyReviewWrapEl) keyReviewWrapEl.style.display = 'none';
             if (keyReviewEl) keyReviewEl.innerHTML = '';
