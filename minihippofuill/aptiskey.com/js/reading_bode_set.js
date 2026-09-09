@@ -77,6 +77,9 @@
             question2: [],
             question3: []
         },
+        // Part 2 chỉ được dựng 1 lần: render lại sẽ shuffle mới và xoá thứ tự
+        // học viên đã sắp.
+        part2Rendered: false,
         part4ShuffledQuestions: []
     };
     let hasRendered = false;
@@ -161,8 +164,12 @@
         refs.backButton.disabled = state.currentStep === 1;
         refs.nextButton.textContent = state.currentStep === state.totalSteps ? 'Nộp bài' : 'Next';
         
-        // Re-render Part 2 with new shuffle each time it's shown
-        if (currentSection.key === 'part2' && state.data?.data?.part2) {
+        // Part 2 (sắp xếp câu) chỉ dựng MỘT lần. Trước đây render lại mỗi lần hiện
+        // section -> renderOrderingQuestion shuffle mới và dựng lại toàn bộ card,
+        // nên học viên sắp xong, sang part khác rồi bấm Back là mất sạch thứ tự đã
+        // sắp (và bài chấm theo DOM nên cũng mất điểm). Các part khác chỉ ẩn/hiện
+        // bằng class nên vẫn giữ nguyên lựa chọn.
+        if (currentSection.key === 'part2' && state.data?.data?.part2 && !state.part2Rendered) {
             renderPart2(state.data.data.part2);
         }
     }
@@ -459,6 +466,8 @@
             question2: hasQuestion2 && question2Data ? [...question2Data.sentences] : [],
             question3: hasQuestion3 && question3Data ? [...question3Data.sentences] : []
         };
+        // Đánh dấu đã dựng để showStep không render lại (giữ thứ tự HV đã sắp).
+        state.part2Rendered = true;
 
         const feedback = document.getElementById('part2-feedback');
         checkHandlers.part2 = () => {
