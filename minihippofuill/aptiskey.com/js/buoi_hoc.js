@@ -1045,6 +1045,11 @@ function submitHomeworkResultIfNeeded(totalCorrect = 0, totalQuestions = 0, deta
       await ensureAllSpeakingRecordingsUploaded();
 
       const speakingAnswers = buildSpeakingAnswersForSubmit();
+      // Buổi HỖN HỢP (speaking + writing): phần writing đã có bản ghi riêng qua
+      // submitWritingForGrading, ở đây chỉ tạo THÊM bản ghi speaking. Chỉ nộp khi
+      // HV thực sự có ghi âm/ghi chú — nếu rỗng thì session_type vẫn là 'mixed',
+      // server sẽ fallback thành 'writing' và sinh ra bản ghi writing trùng.
+      if (detail?.speakingOnly && !speakingAnswers.length) return false;
       if (speakingAnswers.length) {
         payload.metadata = {
           ...payload.metadata,
@@ -5234,6 +5239,13 @@ function renderResultsPage() {
 
   // Pure writing or mixed speaking+writing session
   if (hasWriting) {
+    // Buổi HỖN HỢP (vừa speaking vừa writing): renderWritingResults() chỉ nộp
+    // phần writing (qua triggerAIGrading -> submitWritingForGrading), nên trước
+    // đây phần speaking KHÔNG bao giờ được nộp -> lịch sử bài học chỉ thấy
+    // writing, mất toàn bộ ghi âm speaking của buổi đó.
+    if (hasSpeaking) {
+      submitHomeworkResultIfNeeded(totalCorrect, totalQ, { resultRowsHtml: rows, speakingOnly: true });
+    }
     return renderWritingResults();
   }
 
