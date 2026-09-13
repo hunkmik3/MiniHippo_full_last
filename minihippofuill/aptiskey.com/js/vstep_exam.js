@@ -104,6 +104,10 @@
         },
         savedParts: {},
         audioPlayed: {},
+        // Đếm số lần HV rời khỏi tab/màn hình làm bài (chuyển tab, minimize).
+        // Trước đây chỉ cảnh báo chứ không đếm nên bảng tiến độ ôn thi không có
+        // dữ liệu cho cột "Thoát ra khỏi tab".
+        tabExitCount: 0,
         skillRemainingBySkill: {},
         speakingStarted: false,
         speakingFinished: false,
@@ -331,6 +335,7 @@
                 state.savedParts = saved.savedParts || {};
                 state.audioPlayed = saved.audioPlayed || {};
                 state.startedAt = saved.startedAt || Date.now();
+                state.tabExitCount = Number(saved.tabExitCount) || 0;
             }
         } catch (error) {
             console.warn('Không thể khôi phục bài làm VSTEP:', error);
@@ -346,6 +351,7 @@
                 answers: state.answers,
                 savedParts: state.savedParts,
                 audioPlayed: state.audioPlayed,
+                tabExitCount: state.tabExitCount,
                 updatedAt: new Date().toISOString()
             }));
         } catch (error) {
@@ -1766,6 +1772,9 @@
                     || null,
                 submitted_at: new Date().toISOString(),
                 proctor_photo: state.proctorPhoto || null,
+                // Số lần rời khỏi tab khi đang làm bài → cột "Thoát ra khỏi tab"
+                // ở bảng tiến độ ôn thi.
+                tab_exit_count: Number(state.tabExitCount) || 0,
                 answers: state.answers,
                 listening_details: listening.details,
                 reading_details: reading.details,
@@ -1876,6 +1885,12 @@
         document.addEventListener('visibilitychange', () => {
             const inExam = refs.exam && !refs.exam.classList.contains('vstep-hidden');
             if (!inExam || state.submitted) return;
+            // Đếm ngay lúc tab bị ẩn (mới là hành vi "thoát ra khỏi tab"); đếm lúc
+            // quay lại sẽ bỏ sót trường hợp HV không quay lại trước khi nộp.
+            if (document.visibilityState === 'hidden') {
+                state.tabExitCount += 1;
+                persistAttempt();
+            }
             if (document.visibilityState === 'visible' && !document.fullscreenElement) {
                 showWarning('Bạn đã rời khỏi màn hình làm bài. Vui lòng không chuyển tab trong khi thi.', {
                     duration: 15000,

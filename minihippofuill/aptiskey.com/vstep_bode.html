@@ -79,7 +79,7 @@
             <li class="nav-item">
               <a href="vstep_full_test.html" class="nav-link">
                 <i class="nav-icon bi bi-collection"></i>
-                <p>Bộ đề tổng hợp</p>
+                <p>FULL TEST</p>
               </a>
             </li>
             <li class="nav-item">
@@ -88,40 +88,40 @@
                 <p>Lịch sử làm bài</p>
               </a>
             </li>
-            <li class="nav-item menu-open">
-              <a href="#" class="nav-link">
-                <i class="nav-icon bi bi-book"></i>
-                <p>Học Reading <i class="nav-arrow bi bi-chevron-right"></i></p>
-              </a>
-              <ul class="nav nav-treeview">
-                <li class="nav-item"><a href="vstep_skill?skill=reading&mode=set" class="nav-link"><i class="nav-icon bi bi-stack"></i><p>Học theo bộ đề</p></a></li>
-              </ul>
-            </li>
-            <li class="nav-item menu-open">
-              <a href="#" class="nav-link">
+            <li class="nav-item">
+              <a href="#" class="nav-link" data-nav-skill-toggle="listening">
                 <i class="nav-icon bi bi-headphones"></i>
-                <p>Học Listening <i class="nav-arrow bi bi-chevron-right"></i></p>
+                <p>Bộ đề LISTENING <i class="nav-arrow bi bi-chevron-right"></i></p>
               </a>
-              <ul class="nav nav-treeview">
-                <li class="nav-item"><a href="vstep_skill?skill=listening&mode=set" class="nav-link"><i class="nav-icon bi bi-stack"></i><p>Học theo bộ đề</p></a></li>
+              <ul class="nav nav-treeview" id="navSetsListening">
+                <li class="nav-item"><a href="vstep_skill?skill=listening&mode=set" class="nav-link"><i class="nav-icon bi bi-stack"></i><p>Tất cả bộ đề</p></a></li>
               </ul>
             </li>
-            <li class="nav-item menu-open">
-              <a href="#" class="nav-link">
+            <li class="nav-item">
+              <a href="#" class="nav-link" data-nav-skill-toggle="reading">
+                <i class="nav-icon bi bi-book"></i>
+                <p>Bộ đề READING <i class="nav-arrow bi bi-chevron-right"></i></p>
+              </a>
+              <ul class="nav nav-treeview" id="navSetsReading">
+                <li class="nav-item"><a href="vstep_skill?skill=reading&mode=set" class="nav-link"><i class="nav-icon bi bi-stack"></i><p>Tất cả bộ đề</p></a></li>
+              </ul>
+            </li>
+            <li class="nav-item">
+              <a href="#" class="nav-link" data-nav-skill-toggle="writing">
                 <i class="nav-icon bi bi-pencil-square"></i>
-                <p>Học Writing <i class="nav-arrow bi bi-chevron-right"></i></p>
+                <p>Bộ đề WRITING <i class="nav-arrow bi bi-chevron-right"></i></p>
               </a>
-              <ul class="nav nav-treeview">
-                <li class="nav-item"><a href="vstep_skill?skill=writing&mode=set" class="nav-link"><i class="nav-icon bi bi-stack"></i><p>Học theo bộ đề</p></a></li>
+              <ul class="nav nav-treeview" id="navSetsWriting">
+                <li class="nav-item"><a href="vstep_skill?skill=writing&mode=set" class="nav-link"><i class="nav-icon bi bi-stack"></i><p>Tất cả bộ đề</p></a></li>
               </ul>
             </li>
-            <li class="nav-item menu-open">
-              <a href="#" class="nav-link">
+            <li class="nav-item">
+              <a href="#" class="nav-link" data-nav-skill-toggle="speaking">
                 <i class="nav-icon bi bi-mic"></i>
-                <p>Học Speaking <i class="nav-arrow bi bi-chevron-right"></i></p>
+                <p>Bộ đề SPEAKING <i class="nav-arrow bi bi-chevron-right"></i></p>
               </a>
-              <ul class="nav nav-treeview">
-                <li class="nav-item"><a href="vstep_skill?skill=speaking&mode=set" class="nav-link"><i class="nav-icon bi bi-stack"></i><p>Học theo bộ đề</p></a></li>
+              <ul class="nav nav-treeview" id="navSetsSpeaking">
+                <li class="nav-item"><a href="vstep_skill?skill=speaking&mode=set" class="nav-link"><i class="nav-icon bi bi-stack"></i><p>Tất cả bộ đề</p></a></li>
               </ul>
             </li>
             <li class="nav-item">
@@ -157,45 +157,62 @@
         <div class="container-fluid">
           <div id="content-wrapper" class="d-flex flex-column">
             <section class="container my-3 vstep-practice-options">
-              <div class="vstep-practice-hero mb-4">
-                <div>
-                  <div class="text-uppercase fw-bold small text-primary mb-1">Mini Hippo / VSTEP</div>
-                  <h1 class="mb-2">VSTEP Practice Options</h1>
-                  <p class="text-secondary mb-0">Chọn kỹ năng để luyện theo bộ đề.</p>
-                </div>
-	              </div>
-
-	              <section class="vstep-onthi-dashboard mb-4" aria-label="Tổng hợp ôn thi VSTEP">
-	                <div class="vstep-onthi-dashboard-head">
-	                  <div>
-	                    <div class="text-uppercase fw-bold small text-primary mb-1">Lớp ôn thi</div>
-	                    <h2 class="h4 mb-1">Bảng tiến độ của bạn</h2>
-	                    <p class="text-secondary mb-0" id="vstepPracticeAccessState">Đang tải tiến độ, deadline và điểm đã nộp...</p>
+	              <section class="vstep-onthi-dashboard mb-4" aria-label="Tiến độ ôn thi VSTEP">
+	                <div class="vstep-onthi-head">
+	                  <div class="vstep-onthi-heading">
+	                    <h1 class="vstep-onthi-title">VSTEP EXAM PREPARATION PROGRESS</h1>
+	                    <p class="vstep-onthi-disclaimer mb-0">
+	                      Website chỉ phục vụ ôn luyện, mô phỏng giao diện thi.<br>
+	                      Trung Tâm Mini Hippo không phải đơn vị tổ chức thi hay cấp chứng chỉ chính thức.
+	                    </p>
 	                  </div>
-	                  <button type="button" class="btn btn-outline-primary fw-semibold" id="reloadVstepListBtn">
-	                    <i class="bi bi-arrow-clockwise me-1"></i> Tải lại
-	                  </button>
+	                  <div class="vstep-onthi-head-actions">
+	                    <a href="vstep_lessons.html" class="btn btn-outline-primary fw-semibold vstep-switch-link" id="vstepSwitchToLessons" style="display:none;">
+	                      <i class="bi bi-arrow-left-right me-1"></i> Sang Học tập VSTEP
+	                    </a>
+	                    <button type="button" class="btn btn-outline-primary fw-semibold" id="reloadVstepListBtn">
+	                      <i class="bi bi-arrow-clockwise me-1"></i> Tải lại
+	                    </button>
+	                  </div>
 	                </div>
-	                <div class="vstep-onthi-metrics" id="vstepPracticeSummaryGrid">
-	                  <div><strong>0</strong><span>Đề đang mở</span></div>
-	                  <div><strong>0</strong><span>Đã hoàn thành</span></div>
-	                  <div><strong>0</strong><span>Gần deadline</span></div>
+
+	                <div class="vstep-progress-wrap">
+	                  <div class="vstep-progress-head">
+	                    <span class="vstep-progress-badge" id="vstepProgressBadge">0%</span>
+	                    <span class="vstep-progress-label">Thanh tiến độ ôn thi</span>
+	                    <span class="vstep-progress-count" id="vstepProgressCount">0/0 bài</span>
+	                  </div>
+	                  <div class="vstep-progress-track" id="vstepProgressTrack"></div>
 	                </div>
+
+	                <p class="text-secondary small mb-3" id="vstepPracticeAccessState">Đang tải tiến độ, deadline và điểm đã nộp...</p>
+
+	                <div class="vstep-onthi-band vstep-onthi-band-lr">
+	                  <i class="bi bi-headphones"></i><span>LISTENING &amp; READING</span>
+	                </div>
+	                <div class="vstep-onthi-stats" id="vstepStatsLR"></div>
+
+	                <div class="vstep-onthi-band vstep-onthi-band-sw">
+	                  <i class="bi bi-pencil-square"></i><span>SPEAKING &amp; WRITING</span>
+	                </div>
+	                <div class="vstep-onthi-stats" id="vstepStatsSW"></div>
+
 	                <div class="table-responsive vstep-onthi-result-shell">
-	                  <table class="table align-middle mb-0">
+	                  <table class="table vstep-onthi-table align-middle mb-0">
 	                    <thead>
 	                      <tr>
-	                        <th>Bài</th>
-	                        <th>Nhóm</th>
-	                        <th>Deadline</th>
-	                        <th>Trạng thái</th>
-	                        <th>Điểm</th>
-	                        <th></th>
+	                        <th>STT</th>
+	                        <th>ĐỀ (tên bài)</th>
+	                        <th>DEADLINE</th>
+	                        <th>TRẠNG THÁI</th>
+	                        <th>ĐIỂM</th>
+	                        <th>THOÁT RA KHỎI TAB</th>
+	                        <th>BẮT ĐẦU</th>
 	                      </tr>
 	                    </thead>
 	                    <tbody id="vstepPracticeResultBody">
 	                      <tr>
-	                        <td colspan="6" class="text-center text-secondary py-3">Đang tải dữ liệu ôn thi...</td>
+	                        <td colspan="7" class="text-center text-secondary py-3">Đang tải dữ liệu ôn thi...</td>
 	                      </tr>
 	                    </tbody>
 	                  </table>

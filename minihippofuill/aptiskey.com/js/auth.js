@@ -148,7 +148,8 @@ function moduleForUser(user) {
     const course = resolveUserCourse(user);
     if (course === 'vstep') {
         // VSTEP có 2 sub-module → trả về landing tương ứng.
-        return resolveVstepSubProgram(user) === 'vstep_onthi' ? 'vstep_onthi' : 'vstep_lophoc';
+        // Có cả hai khu → mặc định vào Ôn thi, trong trang có nút chuyển sang Học tập.
+        return resolveVstepSubProgram(user) !== 'vstep_lophoc' ? 'vstep_onthi' : 'vstep_lophoc';
     }
     if (course === 'lớp học') return 'lop_hoc';
     return 'aptis';
@@ -159,10 +160,21 @@ function moduleForUser(user) {
 // 'vstep_lophoc' (mặc định) → chỉ truy cập Học tập VSTEP (vstep_lessons)
 // HV cũ có learning_program='vstep'/null → mặc định 'vstep_lophoc' để
 // không cắt quyền đột ngột; admin có thể đổi qua bulk-import.
+// Tài khoản được cấp CẢ HAI khu (ôn thi + học tập): learning_program ghi kèm cả
+// 2 tên, vd 'vstep_onthi+vstep_lophoc' hoặc 'vstep_onthi,vstep_lophoc'.
+// Admin gán qua cột learningProgram khi import CSV. HV cũ giữ nguyên 1 khu.
+function vstepHasBothPrograms(user) {
+    const raw = String(
+        (user && (user.learningProgram || user.learning_program)) || ''
+    ).trim().toLowerCase();
+    return raw.includes('vstep_onthi') && raw.includes('vstep_lophoc');
+}
+
 function resolveVstepSubProgram(user) {
     const raw = String(
         (user && (user.learningProgram || user.learning_program)) || ''
     ).trim().toLowerCase();
+    if (vstepHasBothPrograms(user)) return 'vstep_both';
     if (raw === 'vstep_onthi') return 'vstep_onthi';
     return 'vstep_lophoc';
 }
@@ -653,6 +665,8 @@ window.buildDeviceHeaders = buildDeviceHeaders;
 window.submitPracticeResult = submitPracticeResult;
 window.resolveMiniHippoCourse = resolveUserCourse;
 window.moduleForMiniHippoUser = moduleForUser;
+// Trang Ôn thi / Học tập dùng để quyết định có hiện nút chuyển khu hay không.
+window.vstepHasBothPrograms = vstepHasBothPrograms;
 window.consumePostLoginRedirect = function consumePostLoginRedirect() {
     try {
         const url = localStorage.getItem('post_login_redirect');

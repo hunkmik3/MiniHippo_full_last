@@ -20,8 +20,21 @@
 	        reload: document.getElementById('reloadVstepListBtn'),
 	        dashboardState: document.getElementById('vstepPracticeAccessState'),
 	        summaryGrid: document.getElementById('vstepPracticeSummaryGrid'),
-	        resultBody: document.getElementById('vstepPracticeResultBody')
+	        resultBody: document.getElementById('vstepPracticeResultBody'),
+	        progressBadge: document.getElementById('vstepProgressBadge'),
+	        progressCount: document.getElementById('vstepProgressCount'),
+	        progressTrack: document.getElementById('vstepProgressTrack'),
+	        statsLR: document.getElementById('vstepStatsLR'),
+	        statsSW: document.getElementById('vstepStatsSW'),
+	        switchLessons: document.getElementById('vstepSwitchToLessons')
 	    };
+
+	    // Ngưỡng ĐẠT theo yêu cầu trung tâm: Listening đúng >= 14 câu, Reading >= 16 câu.
+	    // Dưới ngưỡng => tính vào "CHƯA ĐẠT" và điểm hiển thị màu đỏ.
+	    // LƯU Ý: thang điểm thực tế đang là Listening /35 và Reading /40.
+	    // Muốn đổi sang quy đổi theo tỉ lệ thì chỉ cần sửa 2 số dưới đây.
+	    const PASS_MIN_CORRECT = { listening: 14, reading: 16 };
+	    const PROGRESS_SEGMENTS = 10;
 
     function escapeHtml(value) {
         return String(value || '')
@@ -168,61 +181,170 @@
 	        return `/vstep_exam?set=${encodeURIComponent(set.id)}`;
 	    }
 
+	    function skillOf(set) {
+	        return String(contentSkill(set) || '').toLowerCase();
+	    }
+
+	    // S&W chấm tay (max_score = 0) → chỉ hiện "đã nộp", không có ngưỡng đạt.
+	    function isManualScored(set, result) {
+	        const skill = skillOf(set);
+	        if (skill === 'writing' || skill === 'speaking') return true;
+	        return Boolean(result) && !Number(result.max_score || 0);
+	    }
+
+	    // Chưa đạt: chỉ áp dụng cho Listening/Reading đã làm và đúng dưới ngưỡng.
+	    function isBelowPass(set, result) {
+	        if (!result || isManualScored(set, result)) return false;
+	        const min = PASS_MIN_CORRECT[skillOf(set)];
+	        if (!min) return false;
+	        return Number(result.total_score || 0) < min;
+	    }
+
+	    function tabExitText(result) {
+	        const count = Number(result?.metadata?.tab_exit_count);
+	        if (!result || !Number.isFinite(count)) return '-';
+	        return count > 0 ? `${count} lần` : '0 lần';
+	    }
+
+	    function renderProgress(doneCount, totalCount) {
+	        const percent = totalCount ? Math.round((doneCount / totalCount) * 100) : 0;
+	        if (refs.progressBadge) refs.progressBadge.textContent = `${percent}%`;
+	        if (refs.progressCount) refs.progressCount.textContent = `${doneCount}/${totalCount} bài`;
+	        if (refs.progressTrack) {
+	            const filled = Math.round((percent / 100) * PROGRESS_SEGMENTS);
+	            refs.progressTrack.innerHTML = Array.from({ length: PROGRESS_SEGMENTS })
+	                .map((_, i) => `<span class="vstep-progress-cell${i < filled ? ' is-filled' : ''}"></span>`)
+	                .join('');
+	        }
+	    }
+
+	    function statCard(label, value, danger) {
+	        return `<div class="vstep-stat-card"><span class="vstep-stat-label">${escapeHtml(label)}</span>` +
+	            `<strong class="vstep-stat-value${danger ? ' is-danger' : ''}">${escapeHtml(String(value))}</strong>` +
+	            `<span class="vstep-stat-unit">đề</span></div>`;
+	    }
+
+	    function renderStats(rows) {
+	        const pick = track => rows.filter(row => row.track === track);
+	        const lr = pick('lr');
+	        const sw = pick('sw');
+	        if (refs.statsLR) {
+	            refs.statsLR.innerHTML = [
+	                statCard('TỔNG BÀI', lr.length, false),
+	                statCard('CHƯA LÀM', lr.filter(r => !r.done).length, false),
+	                statCard('CHƯA ĐẠT', lr.filter(r => r.belowPass).length, true),
+	                statCard('TRỄ DEADLINE', lr.filter(r => r.overdue).length, true)
+	            ].join('');
+	        }
+	        if (refs.statsSW) {
+	            refs.statsSW.innerHTML = [
+	                statCard('TỔNG BÀI', sw.length, false),
+	                statCard('CHƯA LÀM', sw.filter(r => !r.done).length, false),
+	                statCard('TRỄ DEADLINE', sw.filter(r => r.overdue).length, true)
+	            ].join('');
+	        }
+	    }
+
+	    // Sổ danh sách bộ đề theo từng kỹ năng ở sidebar (mũi tên bấm để sổ).
+	    function renderSidebarSets(sets) {
+	        ['listening', 'reading', 'writing', 'speaking'].forEach(skill => {
+	            const holder = document.getElementById(`navSets${skill.charAt(0).toUpperCase()}${skill.slice(1)}`);
+	            if (!holder) return;
+	            const items = sortPracticeSets(sets.filter(set => skillOf(set) === skill));
+	            const all = `<li class="nav-item"><a href="vstep_skill?skill=${skill}&mode=set" class="nav-link"><i class="nav-icon bi bi-stack"></i><p>Tất cả bộ đề</p></a></li>`;
+	            holder.innerHTML = all + items.map(set => `
+	                <li class="nav-item">
+	                    <a href="${escapeHtml(examUrl(set))}" class="nav-link vstep-nav-set" data-id="${escapeHtml(set.id)}">
+	                        <i class="nav-icon bi bi-dot"></i><p>${escapeHtml(set.title || copy.fallback)}</p>
+	                    </a>
+	                </li>
+	            `).join('');
+	            holder.querySelectorAll('.vstep-nav-set').forEach(link => {
+	                link.addEventListener('click', event => {
+	                    const set = sets.find(item => item.id === link.dataset.id);
+	                    if (!set?.id) return;
+	                    event.preventDefault();
+	                    cacheSet(set);
+	                    window.location.href = link.getAttribute('href');
+	                });
+	            });
+	        });
+	    }
+
 	    function renderDashboard(sets, results) {
 	        if (!refs.resultBody) return;
 	        const ordered = sortPracticeSets(sets);
 	        const resultMap = latestResultMap(results);
-	        const openCount = ordered.filter(set => accessStatus(set).open).length;
-	        const doneCount = ordered.filter(set => resultMap.has(set.id)).length;
-	        const dueSoonCount = ordered.filter(set => dueStatus(set, resultMap.has(set.id)).dueSoon).length;
 
-	        if (refs.summaryGrid) {
-	            refs.summaryGrid.innerHTML = `
-	                <div><strong>${openCount}</strong><span>Đề đang mở</span></div>
-	                <div><strong>${doneCount}</strong><span>Đã hoàn thành</span></div>
-	                <div><strong>${dueSoonCount}</strong><span>Gần deadline</span></div>
-	            `;
-	        }
+	        const rows = ordered.map(set => {
+	            const meta = onthiMeta(set);
+	            const result = resultMap.get(set.id) || null;
+	            const done = Boolean(result);
+	            return {
+	                set,
+	                meta,
+	                result,
+	                done,
+	                track: deriveTrack(set),
+	                access: accessStatus(set),
+	                overdue: dueStatus(set, done).overdue,
+	                dueSoon: dueStatus(set, done).dueSoon,
+	                belowPass: isBelowPass(set, result)
+	            };
+	        });
 
-	        if (!ordered.length) {
-	            refs.resultBody.innerHTML = '<tr><td colspan="6" class="text-center text-secondary py-3">Chưa có đề ôn thi published.</td></tr>';
+	        const doneCount = rows.filter(row => row.done).length;
+	        renderProgress(doneCount, rows.length);
+	        renderStats(rows);
+	        renderSidebarSets(sets);
+
+	        if (!rows.length) {
+	            refs.resultBody.innerHTML = '<tr><td colspan="7" class="text-center text-secondary py-3">Chưa có đề ôn thi published.</td></tr>';
 	            setDashboardState('Chưa có lịch ôn thi đang được cấu hình.');
 	            return;
 	        }
 
-	        setDashboardState(dueSoonCount
-	            ? `Có ${dueSoonCount} bài sắp hết deadline, bạn nên hoàn thành trong hôm nay.`
-	            : 'Theo dõi điểm, deadline và trạng thái hoàn thành của từng bài ôn thi.');
+	        const overdueCount = rows.filter(row => row.overdue).length;
+	        setDashboardState(overdueCount
+	            ? `Bạn đang có ${overdueCount} bài trễ deadline.`
+	            : 'Theo dõi tiến độ, deadline và điểm của từng bài ôn thi.');
 
-	        refs.resultBody.innerHTML = ordered.map(set => {
-	            const meta = onthiMeta(set);
-	            const result = resultMap.get(set.id);
-	            const done = Boolean(result);
-	            const access = accessStatus(set);
-	            const due = dueStatus(set, done);
-	            const track = deriveTrack(set);
-	            const label = `${trackLabel(track)}${meta.order ? ` ${meta.order}` : ''}`;
-	            const statusClass = done ? 'success' : due.overdue ? 'danger' : due.dueSoon ? 'warning' : access.open ? 'primary' : 'secondary';
-	            const statusText = done ? 'Đã làm' : due.overdue ? 'Quá hạn' : due.dueSoon ? 'Sắp hết hạn' : access.label;
+	        refs.resultBody.innerHTML = rows.map((row, index) => {
+	            const { set, meta, result, done, access, overdue } = row;
+	            const statusHtml = overdue
+	                ? '<span class="vstep-cell-danger">Trễ Deadline</span>'
+	                : done ? 'Đã làm' : '<span class="text-secondary">Chưa làm</span>';
+
+	            let scoreHtml = '<span class="text-secondary">-</span>';
+	            if (done) {
+	                if (isManualScored(set, result)) {
+	                    scoreHtml = 'đã nộp';
+	                } else {
+	                    const text = `${Number(result.total_score || 0)}/${Number(result.max_score || 0)}`;
+	                    scoreHtml = row.belowPass
+	                        ? `<span class="vstep-cell-danger">${escapeHtml(text)}</span>`
+	                        : escapeHtml(text);
+	                }
+	            }
+
 	            const action = access.open
-	                ? `<a class="btn btn-sm btn-primary vstep-dashboard-start" href="${escapeHtml(examUrl(set))}" data-id="${escapeHtml(set.id)}">${done ? 'Làm lại' : 'Làm bài'}</a>`
+	                ? `<a class="vstep-start-link" href="${escapeHtml(examUrl(set))}" data-id="${escapeHtml(set.id)}">${done ? 'Làm lại' : 'Làm bài'}</a>`
 	                : `<span class="text-secondary small">${escapeHtml(access.label)}</span>`;
+
 	            return `
 	                <tr>
-	                    <td>
-	                        <div class="fw-bold">${escapeHtml(set.title || copy.fallback)}</div>
-	                        <div class="small text-secondary">${escapeHtml(set.description || '')}</div>
-	                    </td>
-	                    <td><span class="vstep-dashboard-chip">${escapeHtml(label)}</span></td>
+	                    <td>${Number(meta.order) || index + 1}</td>
+	                    <td class="vstep-cell-title">${escapeHtml(set.title || copy.fallback)}</td>
 	                    <td>${escapeHtml(formatDateTime(meta.deadlineAt || meta.accessUntil))}</td>
-	                    <td><span class="badge text-bg-${statusClass}">${escapeHtml(statusText)}</span></td>
-	                    <td>${escapeHtml(scoreText(result))}</td>
-	                    <td class="text-end">${action}</td>
+	                    <td>${statusHtml}</td>
+	                    <td>${scoreHtml}</td>
+	                    <td>${escapeHtml(tabExitText(result))}</td>
+	                    <td>${action}</td>
 	                </tr>
 	            `;
 	        }).join('');
 
-	        refs.resultBody.querySelectorAll('.vstep-dashboard-start').forEach(link => {
+	        refs.resultBody.querySelectorAll('.vstep-start-link').forEach(link => {
 	            link.addEventListener('click', event => {
 	                const set = ordered.find(item => item.id === link.dataset.id);
 	                if (!set?.id) return;
@@ -333,8 +455,20 @@
 	        }
 	    }
 
+    // Nút chuyển sang khu Học tập VSTEP: CHỈ hiện với tài khoản được cấp cả hai
+    // khu. HV chỉ có ôn thi vẫn không thấy (đúng phân quyền hiện tại, không nới
+    // quyền cho ai).
+    function setupSwitchLink() {
+        if (!refs.switchLessons) return;
+        const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+        const canBoth = typeof window.vstepHasBothPrograms === 'function'
+            && window.vstepHasBothPrograms(user);
+        refs.switchLessons.style.display = canBoth ? '' : 'none';
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         refs.reload?.addEventListener('click', loadSets);
+        setupSwitchLink();
         loadSets();
     });
 })();
