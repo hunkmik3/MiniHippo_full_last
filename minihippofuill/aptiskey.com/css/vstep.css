@@ -2966,3 +2966,94 @@ ins.vstep-ai-ins {
     text-align: left;
   }
 }
+
+/* ===================================================================
+   Trang chủ ôn thi VSTEP — bảng tiến độ theo mẫu trung tâm gửi:
+   tiêu đề + thanh tiến độ chia ô, 2 dải LISTENING & READING /
+   SPEAKING & WRITING kèm thẻ thống kê, bảng chi tiết 7 cột.
+   =================================================================== */
+.vstep-onthi-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+.vstep-onthi-title {
+  font-size: clamp(1.25rem, 2.4vw, 1.9rem);
+  font-weight: 800;
+  letter-spacing: .02em;
+  margin: 0 0 .35rem;
+  color: #12307a;
+}
+.vstep-onthi-disclaimer {
+  font-size: .9rem;
+  font-weight: 600;
+  color: #2851b5;
+  line-height: 1.5;
+}
+.vstep-onthi-head-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+
+/* Thanh tiến độ chia ô */
+.vstep-progress-wrap { margin-bottom: 1.25rem; }
+.vstep-progress-head {
+  display: flex; align-items: center; gap: .6rem; margin-bottom: .4rem; flex-wrap: wrap;
+}
+.vstep-progress-badge {
+  background: #1b3faa; color: #fff; font-weight: 800; font-size: .85rem;
+  padding: .2rem .55rem; border-radius: .35rem;
+}
+.vstep-progress-label { font-weight: 600; color: #334155; }
+.vstep-progress-count { margin-left: auto; font-size: .85rem; color: #64748b; }
+.vstep-progress-track {
+  display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px;
+  border: 2px solid #0f172a; border-radius: .35rem; padding: 4px; background: #fff;
+}
+.vstep-progress-cell { height: 26px; border-radius: 3px; background: #dbe4ff; }
+.vstep-progress-cell.is-filled { background: #1b3faa; }
+
+/* Dải tiêu đề nhóm kỹ năng */
+.vstep-onthi-band {
+  display: inline-flex; align-items: center; gap: .6rem;
+  background: #1b3faa; color: #fff; font-weight: 800; letter-spacing: .04em;
+  padding: .5rem 1.4rem; border-radius: 999px; margin: 1.25rem 0 .85rem;
+}
+.vstep-onthi-band i { font-size: 1.1rem; }
+.vstep-onthi-band-lr { background: #7f9ae8; }
+
+/* Thẻ thống kê */
+.vstep-onthi-stats {
+  display: grid; gap: .85rem; margin-bottom: .5rem;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.vstep-stat-card {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: .15rem; text-align: center; padding: .9rem .6rem;
+  border: 2px solid #1b3faa; border-radius: 1rem; background: #fff;
+}
+.vstep-stat-label { font-size: .78rem; font-weight: 800; color: #12307a; letter-spacing: .03em; }
+.vstep-stat-value { font-size: 1.6rem; font-weight: 800; color: #1b3faa; line-height: 1.1; }
+.vstep-stat-value.is-danger { color: #dc2626; }
+.vstep-stat-unit { font-size: .72rem; color: #64748b; }
+
+/* Bảng chi tiết */
+.vstep-onthi-table thead th {
+  background: #eaf0ff; color: #12307a; font-weight: 800; font-size: .8rem;
+  letter-spacing: .02em; white-space: nowrap; border-color: #1b3faa !important;
+}
+.vstep-onthi-table td, .vstep-onthi-table th { border-color: #c7d4f5 !important; }
+.vstep-onthi-table td { font-size: .9rem; }
+.vstep-cell-title { font-weight: 600; }
+.vstep-cell-danger { color: #dc2626; font-weight: 700; }
+.vstep-start-link { color: #1b3faa; font-weight: 700; text-decoration: none; }
+.vstep-start-link:hover { text-decoration: underline; }
+
+@media (prefers-color-scheme: dark) {
+  .vstep-onthi-title { color: #dbe4ff; }
+  .vstep-onthi-disclaimer { color: #9db4f0; }
+  .vstep-progress-track { background: transparent; border-color: #64748b; }
+  .vstep-stat-card { background: transparent; }
+  .vstep-stat-label { color: #dbe4ff; }
+  .vstep-onthi-table thead th { background: #1e293b; color: #dbe4ff; }
+}
