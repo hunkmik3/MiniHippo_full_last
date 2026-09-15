@@ -45,27 +45,27 @@
   "rewrites": [
     {
       "source": "/api/ask",
-      "destination": "/minihippofuill/aptiskey.com/api/misc.js?action=ask"
+      "destination": "/api/misc?action=ask"
     },
     {
       "source": "/api/upload-audio",
-      "destination": "/minihippofuill/aptiskey.com/api/misc.js?action=upload-audio"
+      "destination": "/api/misc?action=upload-audio"
     },
     {
       "source": "/api/upload-speaking-recording",
-      "destination": "/minihippofuill/aptiskey.com/api/misc.js?action=upload-speaking-recording"
+      "destination": "/api/misc?action=upload-speaking-recording"
     },
     {
       "source": "/api/github-media",
-      "destination": "/minihippofuill/aptiskey.com/api/misc.js?action=github-media"
+      "destination": "/api/misc?action=github-media"
     },
     {
       "source": "/api/upload-lesson",
-      "destination": "/minihippofuill/aptiskey.com/api/misc.js?action=upload-lesson"
+      "destination": "/api/misc?action=upload-lesson"
     },
     {
       "source": "/api/visitor-count",
-      "destination": "/minihippofuill/aptiskey.com/api/misc.js?action=visitor-count"
+      "destination": "/api/misc?action=visitor-count"
     },
     {
       "source": "/api/auth/:action",
