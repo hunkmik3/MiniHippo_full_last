@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Bài học thử Aptis — mã nhúng cho web bán khoá</title>
+  <link rel="icon" href="images/favicon.ico" type="image/x-icon">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    body { background: #f6f8fc; }
+    .snippet {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: .8rem; background: #0f172a; color: #e2e8f0;
+      padding: .75rem; border-radius: .5rem; white-space: pre-wrap; word-break: break-all;
+    }
+    .skill-badge { text-transform: uppercase; letter-spacing: .04em; font-size: .7rem; }
+  </style>
+</head>
+
+<body>
+  <div class="container py-4" style="max-width: 960px;">
+    <h1 class="h4 fw-bold mb-1">Bài học thử Aptis — mã nhúng</h1>
+    <p class="text-secondary">
+      Trang nội bộ để xem thử và lấy mã nhúng iframe gửi cho dev web bán khoá.
+      Bài học thử dùng đúng giao diện trang thi thật, không cần đăng nhập và
+      <strong>không lưu kết quả</strong> về hệ thống.
+    </p>
+
+    <div class="card mb-4">
+      <div class="card-body">
+        <label class="form-label fw-semibold">API key demo (DEMO_API_KEY)</label>
+        <div class="input-group">
+          <input type="text" class="form-control" id="demoKey" placeholder="dán key vào đây">
+          <button class="btn btn-primary" id="loadBtn"><i class="bi bi-arrow-repeat me-1"></i>Tải danh sách</button>
+        </div>
+        <div class="form-text">Có thể mở sẵn bằng <code>demo.html?key=&lt;KEY&gt;</code></div>
+      </div>
+    </div>
+
+    <div id="state" class="alert alert-info">Nhập API key rồi bấm “Tải danh sách”.</div>
+    <div id="list" class="row g-3"></div>
+  </div>
+
+  <script>
+    (function () {
+      var params = new URLSearchParams(location.search);
+      var keyInput = document.getElementById('demoKey');
+      var stateEl = document.getElementById('state');
+      var listEl = document.getElementById('list');
+      keyInput.value = params.get('key') || '';
+
+      // Mỗi kỹ năng mở bằng đúng trang thi tương ứng (tái dùng engine thật).
+      var PAGE_BY_SKILL = {
+        reading: 'reading_bode_set.html',
+        listening: 'listening_bode_set.html',
+        speaking: 'speaking_question.html'
+      };
+
+      function esc(v) {
+        return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+
+      function demoUrl(set, key) {
+        var page = PAGE_BY_SKILL[set.skill];
+        if (!page) return '';
+        return location.origin + '/' + page +
+          '?demo=1&set=' + encodeURIComponent(set.id) + '&key=' + encodeURIComponent(key);
+      }
+
+      function card(set, key) {
+        var url = demoUrl(set, key);
+        if (!url) {
+          return '<div class="col-12"><div class="alert alert-warning mb-0">' +
+            'Kỹ năng <strong>' + esc(set.skill) + '</strong> (' + esc(set.title) + ') chưa có trang demo tương ứng.' +
+            '</div></div>';
+        }
+        var iframe = '<iframe src="' + url + '" width="100%" height="900" style="border:0" allow="microphone"></iframe>';
+        return '' +
+          '<div class="col-12"><div class="card"><div class="card-body">' +
+            '<div class="d-flex justify-content-between align-items-start gap-2 mb-2">' +
+              '<div>' +
+                '<span class="badge bg-primary skill-badge">' + esc(set.skill) + '</span>' +
+                '<div class="fw-bold mt-1">' + esc(set.title) + '</div>' +
+                '<div class="small text-secondary">' + esc(set.durationMinutes || '-') + ' phút · id ' + esc(set.id) + '</div>' +
+              '</div>' +
+              '<a class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener" href="' + url + '">' +
+                '<i class="bi bi-box-arrow-up-right me-1"></i>Xem thử</a>' +
+            '</div>' +
+            '<label class="form-label small fw-semibold mb-1">Mã nhúng gửi dev:</label>' +
+            '<div class="snippet">' + esc(iframe) + '</div>' +
+          '</div></div></div>';
+      }
+
+      async function load() {
+        var key = keyInput.value.trim();
+        if (!key) { stateEl.className = 'alert alert-warning'; stateEl.textContent = 'Chưa nhập API key.'; return; }
+        stateEl.className = 'alert alert-info';
+        stateEl.textContent = 'Đang tải...';
+        listEl.innerHTML = '';
+        try {
+          var res = await fetch('/api/demo/sets?key=' + encodeURIComponent(key));
+          var data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Không tải được danh sách.');
+          var sets = data.sets || [];
+          if (!sets.length) {
+            stateEl.className = 'alert alert-warning';
+            stateEl.textContent = 'Chưa có bài học thử nào. Cấu hình biến DEMO_SET_IDS trên Vercel.';
+            return;
+          }
+          stateEl.className = 'alert alert-success';
+          stateEl.textContent = 'Có ' + sets.length + ' bài học thử.';
+          listEl.innerHTML = sets.map(function (s) { return card(s, key); }).join('');
+        } catch (err) {
+          stateEl.className = 'alert alert-danger';
+          stateEl.textContent = err.message;
+        }
+      }
+
+      document.getElementById('loadBtn').addEventListener('click', load);
+      if (keyInput.value) load();
+    })();
+  </script>
+</body>
+
+</html>

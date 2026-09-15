@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mini Hippo — Mẫu Listening (học thử)</title>
+  <link rel="stylesheet" href="assets/mh-demo.css">
+</head>
+
+<body class="mh">
+  <div class="mh-wrap">
+
+    <header class="mh-head">
+      <div class="mh-eyebrow">Mini Hippo · Aptis</div>
+      <h1 class="mh-title">Listening — học thử</h1>
+      <p class="mh-sub">Nghe audio rồi chọn đáp án đúng. Làm xong bấm nộp để xem điểm.</p>
+    </header>
+
+    <div class="mh-note">
+      Đang chạy bằng <strong>dữ liệu mẫu</strong>. Thêm
+      <code>?live=1&amp;base=https://minihippo.edu.vn&amp;key=API_KEY</code>
+      vào URL để lấy dữ liệu thật realtime.
+    </div>
+    <div id="mh-error" class="mh-error mh-hidden"></div>
+
+    <!-- ============ MÀN 1: DANH SÁCH BÀI ============ -->
+    <section id="view-list">
+      <div id="list-grid" class="mh-grid"></div>
+    </section>
+
+    <!-- ============ MÀN 2: LÀM BÀI ============ -->
+    <section id="view-practice" class="mh-hidden">
+      <div class="mh-panel">
+        <div class="mh-progress" id="practice-meta"></div>
+        <h2 class="mh-title" id="practice-title" style="font-size:1.2rem;"></h2>
+      </div>
+      <div class="mh-panel" id="practice-questions"></div>
+      <div class="mh-actions">
+        <button class="mh-btn" id="submit-btn">Nộp bài</button>
+        <button class="mh-btn mh-btn-ghost" id="back-btn">Quay lại danh sách</button>
+      </div>
+    </section>
+
+    <!-- ============ MÀN 3: KẾT QUẢ ============ -->
+    <section id="view-result" class="mh-hidden">
+      <div class="mh-score">
+        <div>Kết quả của bạn</div>
+        <div class="mh-score-value" id="result-score">0/0</div>
+        <div class="mh-sub" id="result-note"></div>
+      </div>
+      <div class="mh-panel" id="result-review"></div>
+      <div class="mh-actions">
+        <button class="mh-btn" id="retry-btn">Làm lại</button>
+        <button class="mh-btn mh-btn-ghost" id="home-btn">Về danh sách</button>
+      </div>
+    </section>
+
+  </div>
+
+  <script src="assets/mh-demo.js"></script>
+  <script>
+    /* ===== DỮ LIỆU MẪU — khớp shape API part 'listening_1_13' ==========
+       mỗi câu: { heading, audioUrl, question, options[], correctAnswer, transcript }
+       ================================================================== */
+    var SAMPLE = [{
+      id: 'sample-listening-1',
+      title: 'LISTENING ĐỀ MẪU — Question 1-3',
+      meta: 'Nghe và chọn đáp án · 3 câu',
+      questions: [
+        { heading: 'Question 1', audioUrl: '', question: 'What is the teleshop number?', options: ['201030', '201032', '301030'], correctAnswer: '201030' },
+        { heading: 'Question 2', audioUrl: '', question: 'What colour is the bag?', options: ['Black', 'White', 'Pink'], correctAnswer: 'Black' },
+        { heading: 'Question 3', audioUrl: '', question: 'Where did she leave the keys?', options: ['The window', 'Living room', 'Kitchen'], correctAnswer: 'Kitchen' }
+      ]
+    }];
+
+    // Audio trong dữ liệu thật có thể là đường dẫn tương đối -> ghép base.
+    function audioSrc(url) {
+      if (!url) return '';
+      if (/^https?:\/\//i.test(url)) return url;
+      return (MH.config.baseUrl || '') + '/' + String(url).replace(/^\/+/, '');
+    }
+
+    var state = { lessons: [], current: null, answers: [] };
+
+    function renderList() {
+      var grid = document.getElementById('list-grid');
+      grid.innerHTML = state.lessons.map(function (l, i) {
+        return '<button class="mh-card" data-i="' + i + '">' +
+          '<span class="mh-tag">Listening</span>' +
+          '<span class="mh-card-title">' + MH.esc(l.title) + '</span>' +
+          '<span class="mh-card-meta">' + MH.esc(l.meta || '') + '</span>' +
+          '</button>';
+      }).join('');
+      grid.querySelectorAll('.mh-card').forEach(function (btn) {
+        btn.addEventListener('click', function () { startPractice(Number(btn.dataset.i)); });
+      });
+    }
+
+    function startPractice(index) {
+      state.current = state.lessons[index];
+      state.answers = new Array(state.current.questions.length);
+
+      document.getElementById('practice-title').textContent = state.current.title;
+      document.getElementById('practice-meta').textContent = state.current.meta || '';
+
+      document.getElementById('practice-questions').innerHTML =
+        state.current.questions.map(function (q, qi) {
+          var src = audioSrc(q.audioUrl);
+          var audio = src
+            ? '<audio class="mh-audio" controls preload="none" src="' + MH.esc(src) + '"></audio>'
+            : '<div class="mh-card-meta">(bản mẫu không kèm audio)</div>';
+          var opts = (q.options || []).map(function (opt) {
+            return '<label class="mh-opt">' +
+              '<input type="radio" name="q' + qi + '" value="' + MH.esc(opt) + '">' +
+              '<span>' + MH.esc(opt) + '</span></label>';
+          }).join('');
+          return '<div class="mh-q">' +
+            '<div class="mh-q-text">' + (qi + 1) + '. ' + MH.esc(q.question || q.heading || '') + '</div>' +
+            audio + opts + '</div>';
+        }).join('');
+
+      document.getElementById('practice-questions')
+        .querySelectorAll('input[type="radio"]').forEach(function (input) {
+          input.addEventListener('change', function () {
+            state.answers[Number(input.name.slice(1))] = input.value;
+          });
+        });
+
+      MH.show('view-practice');
+    }
+
+    function submit() {
+      var result = MH.score(state.current.questions, state.answers);
+      document.getElementById('result-score').textContent = result.correct + '/' + result.total;
+      document.getElementById('result-note').textContent =
+        result.correct === result.total ? 'Tuyệt vời, đúng hết!' : 'Xem lại các câu sai bên dưới.';
+
+      document.getElementById('result-review').innerHTML = result.details.map(function (d) {
+        return '<div class="mh-review-row' + (d.ok ? '' : ' is-wrong') + '">' +
+          '<strong>Câu ' + (d.index + 1) + '.</strong> ' + MH.esc(d.question.question || '') +
+          '<br>Bạn chọn: <strong>' + MH.esc(d.userAnswer || '(chưa chọn)') + '</strong>' +
+          ' · Đáp án: <strong>' + MH.esc(d.expected) + '</strong>' +
+          (d.question.transcript ? '<br><em>Transcript:</em> ' + MH.esc(d.question.transcript) : '') +
+          '</div>';
+      }).join('');
+
+      MH.show('view-result');
+    }
+
+    document.getElementById('submit-btn').addEventListener('click', submit);
+    document.getElementById('back-btn').addEventListener('click', function () { MH.show('view-list'); });
+    document.getElementById('home-btn').addEventListener('click', function () { MH.show('view-list'); });
+    document.getElementById('retry-btn').addEventListener('click', function () {
+      startPractice(state.lessons.indexOf(state.current));
+    });
+
+    async function boot() {
+      if (!MH.config.live) { state.lessons = SAMPLE; renderList(); return; }
+      try {
+        MH.clearError();
+        // Listening "học theo câu hỏi": part 'listening_1_13' cho dạng MCQ + audio.
+        var listed = await MH.listLessons('listening_1_13');
+        var items = [];
+        for (var i = 0; i < listed.lessons.length; i++) {
+          var meta = listed.lessons[i];
+          var full = await MH.getLesson(meta.id);
+          Object.keys(full.data).forEach(function (varName) {
+            var value = full.data[varName];
+            if (!Array.isArray(value) || !value.length) return;
+            if (!value[0] || !value[0].options || !value[0].correctAnswer) return;
+            // Cắt 10 câu đầu cho bản học thử.
+            items.push({
+              id: meta.id + ':' + varName,
+              title: meta.title,
+              meta: Math.min(value.length, 10) + ' câu',
+              questions: value.slice(0, 10)
+            });
+          });
+        }
+        if (!items.length) throw new Error('Không có dữ liệu bài Listening.');
+        state.lessons = items;
+        renderList();
+      } catch (err) {
+        MH.error(err.message + ' — đang hiển thị dữ liệu mẫu.');
+        state.lessons = SAMPLE;
+        renderList();
+      }
+    }
+
+    boot();
+  </script>
+</body>
+
+</html>

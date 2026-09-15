@@ -42,6 +42,10 @@
       "use": "@vercel/node"
     },
     {
+      "src": "minihippofuill/aptiskey.com/api/demo/[action].js",
+      "use": "@vercel/node"
+    },
+    {
       "src": "minihippofuill/aptiskey.com/api/users/[action].js",
       "use": "@vercel/node"
     },
@@ -98,6 +102,10 @@
     {
       "source": "/api/practice_sets/:action",
       "destination": "/minihippofuill/aptiskey.com/api/practice_sets/[action].js?action=:action"
+    },
+    {
+      "source": "/api/demo/:action",
+      "destination": "/minihippofuill/aptiskey.com/api/demo/[action].js"
     },
     {
       "source": "/api/users/:action",

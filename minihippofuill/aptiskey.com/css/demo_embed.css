@@ -1,0 +1,53 @@
+/* ===================================================================
+   Chế độ DEMO (bài học thử nhúng iframe trên web bán khoá).
+   Chỉ có tác dụng khi js/demo_embed.js gắn class .mh-demo-embed vào body
+   (tức là có ?demo=1). Học viên thật KHÔNG bị ảnh hưởng.
+   =================================================================== */
+body.mh-demo-embed .app-header,
+body.mh-demo-embed .app-sidebar,
+body.mh-demo-embed .app-footer,
+body.mh-demo-embed .app-content-header,
+body.mh-demo-embed nav.navbar,
+body.mh-demo-embed footer,
+body.mh-demo-embed .sidebar-brand,
+body.mh-demo-embed [data-lte-toggle="sidebar"] {
+  display: none !important;
+}
+
+/* Bỏ chừa chỗ cho sidebar/header đã ẩn */
+body.mh-demo-embed .app-wrapper,
+body.mh-demo-embed .app-main {
+  margin: 0 !important;
+  padding-top: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+body.mh-demo-embed {
+  background: #fff !important;
+  overflow-x: hidden;
+}
+
+/* Dải nhắc đây là bài học thử + nút kêu gọi đăng ký */
+.mh-demo-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .75rem;
+  justify-content: center;
+  padding: .6rem 1rem;
+  background: linear-gradient(135deg, #0ea5e9, #1d4ed8);
+  color: #fff;
+  font-weight: 600;
+  font-size: .95rem;
+}
+.mh-demo-banner .mh-demo-cta {
+  background: #fff;
+  color: #1d4ed8;
+  font-weight: 700;
+  padding: .3rem .9rem;
+  border-radius: 999px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.mh-demo-banner .mh-demo-cta:hover { background: #e8f0ff; }

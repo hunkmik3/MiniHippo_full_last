@@ -2,6 +2,9 @@
 <html lang="en">
 
 <head>
+  <!-- BẢN XUẤT giao diện thật Aptis (Writing) — Mini Hippo.
+       Sinh tự động bằng tools/build_demo_export.mjs, ĐỪNG sửa tay.
+       Cấu hình domain + API key trong js/mh-demo-config.js -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mini Hippo - Writing Practice</title>
@@ -111,7 +114,8 @@
 
                 try {
                     // Try to load the requested lesson
-                    const scriptUrl = `js/writing/${encodeURIComponent(lessonId)}.js?v=${encodeURIComponent(lessonId)}`;
+                    const mhBase = (window.MiniHippoDemo && window.MiniHippoDemo.base) || "";
+                    const scriptUrl = `${mhBase}/js/writing/${encodeURIComponent(lessonId)}.js?v=${encodeURIComponent(lessonId)}`;
                     loadScript(scriptUrl, { requestedLesson: lessonId, allowFallback: false });
                 } catch (error) {
                     console.error('Error loading lesson:', error);
@@ -930,10 +934,9 @@
     </div>
 
     <script src="js/home.js"></script>
-    <script src="js/auth.js"></script>
+    <script src="js/mh-demo-config.js"></script>
     <script src="js/demo_embed.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="js/copy_paste_guard.js"></script>
 </body>
 
 </html>

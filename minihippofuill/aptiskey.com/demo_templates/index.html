@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Mini Hippo — Giao diện mẫu Aptis học thử</title>
+  <link rel="stylesheet" href="assets/mh-demo.css">
+</head>
+
+<body class="mh">
+  <div class="mh-wrap">
+
+    <header class="mh-head">
+      <div class="mh-eyebrow">Mini Hippo · Aptis</div>
+      <h1 class="mh-title">Giao diện mẫu — bài học thử</h1>
+      <p class="mh-sub">
+        Bộ giao diện tĩnh bấm được cho 4 kỹ năng, mỗi kỹ năng gồm 3 màn:
+        danh sách bài → làm bài → kết quả.
+      </p>
+    </header>
+
+    <div class="mh-panel">
+      <h2 style="font-size:1rem;margin:0 0 10px;">Bật dữ liệu thật (tuỳ chọn)</h2>
+      <div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">
+        <label>
+          <div class="mh-card-meta">Domain Mini Hippo</div>
+          <input class="mh-input" id="base" placeholder="https://minihippo.edu.vn">
+        </label>
+        <label>
+          <div class="mh-card-meta">API key</div>
+          <input class="mh-input" id="key" placeholder="DEMO_API_KEY">
+        </label>
+      </div>
+      <p class="mh-card-meta" style="margin:10px 0 0;">
+        Để trống = mở bằng dữ liệu mẫu nhúng sẵn (không cần mạng).
+      </p>
+    </div>
+
+    <div class="mh-grid" id="grid"></div>
+
+  </div>
+
+  <script src="assets/mh-demo.js"></script>
+  <script>
+    var SKILLS = [
+      { file: 'reading.html', name: 'Reading', desc: 'Trắc nghiệm điền từ · chấm điểm ngay' },
+      { file: 'listening.html', name: 'Listening', desc: 'Nghe audio + trắc nghiệm · chấm điểm ngay' },
+      { file: 'writing.html', name: 'Writing', desc: 'Viết bài + đếm số từ' },
+      { file: 'speaking.html', name: 'Speaking', desc: 'Ghi âm bằng micro + nghe lại' }
+    ];
+
+    var baseInput = document.getElementById('base');
+    var keyInput = document.getElementById('key');
+    baseInput.value = MH.config.baseUrl || '';
+    keyInput.value = MH.config.apiKey || '';
+
+    function link(file) {
+      var base = baseInput.value.trim();
+      var key = keyInput.value.trim();
+      if (!base || !key) return file;
+      return file + '?live=1&base=' + encodeURIComponent(base) + '&key=' + encodeURIComponent(key);
+    }
+
+    function render() {
+      document.getElementById('grid').innerHTML = SKILLS.map(function (s) {
+        return '<a class="mh-card" style="text-decoration:none" href="' + MH.esc(link(s.file)) + '">' +
+          '<span class="mh-tag">' + MH.esc(s.name) + '</span>' +
+          '<span class="mh-card-title">Mẫu ' + MH.esc(s.name) + '</span>' +
+          '<span class="mh-card-meta">' + MH.esc(s.desc) + '</span>' +
+          '</a>';
+      }).join('');
+    }
+
+    baseInput.addEventListener('input', render);
+    keyInput.addEventListener('input', render);
+    render();
+  </script>
+</body>
+
+</html>

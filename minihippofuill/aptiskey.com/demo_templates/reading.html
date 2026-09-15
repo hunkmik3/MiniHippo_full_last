@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mini Hippo — Mẫu Reading (học thử)</title>
+  <link rel="stylesheet" href="assets/mh-demo.css">
+</head>
+
+<body class="mh">
+  <div class="mh-wrap">
+
+    <header class="mh-head">
+      <div class="mh-eyebrow">Mini Hippo · Aptis</div>
+      <h1 class="mh-title">Reading — học thử</h1>
+      <p class="mh-sub">Chọn một bài để bắt đầu. Làm xong bấm nộp để xem điểm và đáp án.</p>
+    </header>
+
+    <div class="mh-note">
+      Đang chạy bằng <strong>dữ liệu mẫu</strong>. Thêm
+      <code>?live=1&amp;base=https://minihippo.edu.vn&amp;key=API_KEY</code>
+      vào URL để lấy dữ liệu thật realtime.
+    </div>
+    <div id="mh-error" class="mh-error mh-hidden"></div>
+
+    <!-- ============ MÀN 1: DANH SÁCH BÀI ============ -->
+    <section id="view-list">
+      <div id="list-grid" class="mh-grid"></div>
+    </section>
+
+    <!-- ============ MÀN 2: LÀM BÀI ============ -->
+    <section id="view-practice" class="mh-hidden">
+      <div class="mh-panel">
+        <div class="mh-progress" id="practice-meta"></div>
+        <h2 class="mh-title" id="practice-title" style="font-size:1.2rem;"></h2>
+        <div id="practice-passage"></div>
+      </div>
+      <div class="mh-panel" id="practice-questions"></div>
+      <div class="mh-actions">
+        <button class="mh-btn" id="submit-btn">Nộp bài</button>
+        <button class="mh-btn mh-btn-ghost" id="back-btn">Quay lại danh sách</button>
+      </div>
+    </section>
+
+    <!-- ============ MÀN 3: KẾT QUẢ ============ -->
+    <section id="view-result" class="mh-hidden">
+      <div class="mh-score">
+        <div>Kết quả của bạn</div>
+        <div class="mh-score-value" id="result-score">0/0</div>
+        <div class="mh-sub" id="result-note"></div>
+      </div>
+      <div class="mh-panel" id="result-review"></div>
+      <div class="mh-actions">
+        <button class="mh-btn" id="retry-btn">Làm lại</button>
+        <button class="mh-btn mh-btn-ghost" id="home-btn">Về danh sách</button>
+      </div>
+    </section>
+
+  </div>
+
+  <script src="assets/mh-demo.js"></script>
+  <script>
+    /* ===== DỮ LIỆU MẪU (thay bằng API khi ?live=1) =====================
+       Shape này khớp đúng dữ liệu API trả về cho Reading part 1:
+       mỗi câu gồm questionStart / answerOptions / questionEnd / correctAnswer
+       ================================================================== */
+    var SAMPLE = [{
+      id: 'sample-reading-1',
+      title: 'READING ĐỀ MẪU — Part 1',
+      meta: 'Điền từ vào chỗ trống · 5 câu',
+      passage: 'Chọn từ đúng để hoàn thành mỗi câu bên dưới.',
+      questions: [
+        { questionStart: 'I imagine you don’t want to', answerOptions: ['miss', 'love', 'remember'], questionEnd: 'this.', correctAnswer: 'miss' },
+        { questionStart: 'I can', answerOptions: ['hold', 'miss', 'meet'], questionEnd: 'you at your place then.', correctAnswer: 'meet' },
+        { questionStart: 'Can you be', answerOptions: ['sleepy', 'early', 'quick'], questionEnd: 'tomorrow morning?', correctAnswer: 'early' },
+        { questionStart: 'She has', answerOptions: ['been', 'being', 'be'], questionEnd: 'working here since 2020.', correctAnswer: 'been' },
+        { questionStart: 'We should', answerOptions: ['leave', 'left', 'leaving'], questionEnd: 'before it rains.', correctAnswer: 'leave' }
+      ]
+    }];
+
+    var state = { lessons: [], current: null, answers: [] };
+
+    /* ---------- MÀN 1: danh sách ---------- */
+    function renderList() {
+      var grid = document.getElementById('list-grid');
+      grid.innerHTML = state.lessons.map(function (l, i) {
+        return '<button class="mh-card" data-i="' + i + '">' +
+          '<span class="mh-tag">Reading</span>' +
+          '<span class="mh-card-title">' + MH.esc(l.title) + '</span>' +
+          '<span class="mh-card-meta">' + MH.esc(l.meta || '') + '</span>' +
+          '</button>';
+      }).join('');
+      grid.querySelectorAll('.mh-card').forEach(function (btn) {
+        btn.addEventListener('click', function () { startPractice(Number(btn.dataset.i)); });
+      });
+    }
+
+    /* ---------- MÀN 2: làm bài ---------- */
+    function startPractice(index) {
+      state.current = state.lessons[index];
+      state.answers = new Array(state.current.questions.length);
+
+      document.getElementById('practice-title').textContent = state.current.title;
+      document.getElementById('practice-meta').textContent = state.current.meta || '';
+      document.getElementById('practice-passage').innerHTML = state.current.passage
+        ? '<div class="mh-passage">' + MH.esc(state.current.passage) + '</div>' : '';
+
+      document.getElementById('practice-questions').innerHTML =
+        state.current.questions.map(function (q, qi) {
+          var opts = (q.answerOptions || q.options || []).map(function (opt) {
+            return '<label class="mh-opt">' +
+              '<input type="radio" name="q' + qi + '" value="' + MH.esc(opt) + '">' +
+              '<span>' + MH.esc(opt) + '</span></label>';
+          }).join('');
+          var text = q.questionStart
+            ? MH.esc(q.questionStart) + ' <strong>______</strong> ' + MH.esc(q.questionEnd || '')
+            : MH.esc(q.question || '');
+          return '<div class="mh-q"><div class="mh-q-text">' + (qi + 1) + '. ' + text + '</div>' + opts + '</div>';
+        }).join('');
+
+      document.getElementById('practice-questions')
+        .querySelectorAll('input[type="radio"]').forEach(function (input) {
+          input.addEventListener('change', function () {
+            state.answers[Number(input.name.slice(1))] = input.value;
+          });
+        });
+
+      MH.show('view-practice');
+    }
+
+    /* ---------- MÀN 3: kết quả ---------- */
+    function submit() {
+      var result = MH.score(state.current.questions, state.answers);
+      document.getElementById('result-score').textContent = result.correct + '/' + result.total;
+      document.getElementById('result-note').textContent =
+        result.correct === result.total ? 'Tuyệt vời, đúng hết!' : 'Xem lại các câu sai bên dưới.';
+
+      document.getElementById('result-review').innerHTML = result.details.map(function (d) {
+        var q = d.question;
+        var text = q.questionStart
+          ? MH.esc(q.questionStart) + ' ______ ' + MH.esc(q.questionEnd || '')
+          : MH.esc(q.question || '');
+        return '<div class="mh-review-row' + (d.ok ? '' : ' is-wrong') + '">' +
+          '<strong>Câu ' + (d.index + 1) + '.</strong> ' + text +
+          '<br>Bạn chọn: <strong>' + MH.esc(d.userAnswer || '(chưa chọn)') + '</strong>' +
+          ' · Đáp án: <strong>' + MH.esc(d.expected) + '</strong>' +
+          '</div>';
+      }).join('');
+
+      MH.show('view-result');
+    }
+
+    document.getElementById('submit-btn').addEventListener('click', submit);
+    document.getElementById('back-btn').addEventListener('click', function () { MH.show('view-list'); });
+    document.getElementById('home-btn').addEventListener('click', function () { MH.show('view-list'); });
+    document.getElementById('retry-btn').addEventListener('click', function () {
+      startPractice(state.lessons.indexOf(state.current));
+    });
+
+    /* ---------- Nạp dữ liệu ---------- */
+    async function boot() {
+      if (!MH.config.live) { state.lessons = SAMPLE; renderList(); return; }
+      try {
+        MH.clearError();
+        // Reading "học theo câu hỏi": part '1' | '2' | '4' | '5'
+        var listed = await MH.listLessons('1');
+        var items = [];
+        for (var i = 0; i < listed.lessons.length; i++) {
+          var meta = listed.lessons[i];
+          var full = await MH.getLesson(meta.id);
+          // API trả về nhiều bộ câu hỏi: questions1_1, questions1_2, ...
+          Object.keys(full.data).forEach(function (varName) {
+            var value = full.data[varName];
+            if (!Array.isArray(value) || !value.length) return;
+            if (!value[0] || !(value[0].answerOptions || value[0].options)) return;
+            items.push({
+              id: meta.id + ':' + varName,
+              title: meta.title + ' — ' + varName,
+              meta: value.length + ' câu',
+              passage: 'Chọn từ đúng để hoàn thành mỗi câu bên dưới.',
+              questions: value
+            });
+          });
+        }
+        if (!items.length) throw new Error('Không có dữ liệu bài Reading.');
+        state.lessons = items;
+        renderList();
+      } catch (err) {
+        MH.error(err.message + ' — đang hiển thị dữ liệu mẫu.');
+        state.lessons = SAMPLE;
+        renderList();
+      }
+    }
+
+    boot();
+  </script>
+</body>
+
+</html>
