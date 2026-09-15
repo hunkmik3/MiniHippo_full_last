@@ -9,11 +9,11 @@
 // phải nằm NGOÀI thư mục api/ vì Vercel quét api/ để sinh function -> để lại
 // đó thì vẫn bị tính suất và build fail.
 
-import ask from '../../server/api/misc/ask.js';
-import uploadAudio from '../../server/api/misc/upload-audio.js';
-import uploadSpeakingRecording from '../../server/api/misc/upload-speaking-recording.js';
-import uploadLesson from '../../server/api/misc/upload-lesson.js';
-import visitorCount from '../../server/api/misc/visitor-count.js';
+import ask from '../server/api/misc/ask.js';
+import uploadAudio from '../server/api/misc/upload-audio.js';
+import uploadSpeakingRecording from '../server/api/misc/upload-speaking-recording.js';
+import uploadLesson from '../server/api/misc/upload-lesson.js';
+import visitorCount from '../server/api/misc/visitor-count.js';
 
 const handlers = {
   'ask': ask,
