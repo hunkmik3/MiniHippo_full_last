@@ -2,7 +2,23 @@
   "version": 2,
   "builds": [
     {
-      "src": "minihippofuill/aptiskey.com/api/misc.js",
+      "src": "minihippofuill/aptiskey.com/api/ask.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "minihippofuill/aptiskey.com/api/upload-audio.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "minihippofuill/aptiskey.com/api/upload-speaking-recording.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "minihippofuill/aptiskey.com/api/upload-lesson.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "minihippofuill/aptiskey.com/api/visitor-count.js",
       "use": "@vercel/node"
     },
     {
@@ -26,10 +42,6 @@
       "use": "@vercel/node"
     },
     {
-      "src": "minihippofuill/aptiskey.com/api/demo/[action].js",
-      "use": "@vercel/node"
-    },
-    {
       "src": "minihippofuill/aptiskey.com/api/users/[action].js",
       "use": "@vercel/node"
     },
@@ -45,27 +57,27 @@
   "rewrites": [
     {
       "source": "/api/ask",
-      "destination": "/api/misc?action=ask"
+      "destination": "/minihippofuill/aptiskey.com/api/ask.js"
     },
     {
       "source": "/api/upload-audio",
-      "destination": "/api/misc?action=upload-audio"
+      "destination": "/minihippofuill/aptiskey.com/api/upload-audio.js"
     },
     {
       "source": "/api/upload-speaking-recording",
-      "destination": "/api/misc?action=upload-speaking-recording"
+      "destination": "/minihippofuill/aptiskey.com/api/upload-speaking-recording.js"
     },
     {
       "source": "/api/github-media",
-      "destination": "/api/misc?action=github-media"
+      "destination": "/minihippofuill/aptiskey.com/api/upload-audio.js?action=github-media"
     },
     {
       "source": "/api/upload-lesson",
-      "destination": "/api/misc?action=upload-lesson"
+      "destination": "/minihippofuill/aptiskey.com/api/upload-lesson.js"
     },
     {
       "source": "/api/visitor-count",
-      "destination": "/api/misc?action=visitor-count"
+      "destination": "/minihippofuill/aptiskey.com/api/visitor-count.js"
     },
     {
       "source": "/api/auth/:action",
@@ -86,10 +98,6 @@
     {
       "source": "/api/practice_sets/:action",
       "destination": "/minihippofuill/aptiskey.com/api/practice_sets/[action].js?action=:action"
-    },
-    {
-      "source": "/api/demo/:action",
-      "destination": "/minihippofuill/aptiskey.com/api/demo/[action].js?action=:action"
     },
     {
       "source": "/api/users/:action",

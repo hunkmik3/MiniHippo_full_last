@@ -4,7 +4,14 @@ import getScript from '../../server/api/lessons/get-script.js';
 import get from '../../server/api/lessons/get.js';
 import list from '../../server/api/lessons/list.js';
 
+// Endpoint HỌC THỬ gắn nhờ vào dispatcher này để không tốn thêm 1 suất
+// Serverless Function (Hobby plan giới hạn 12).
+import demoLesson from '../../server/api/demo/lesson.js';
+import demoLessons from '../../server/api/demo/lessons.js';
+
 const handlers = {
+  'demo-lesson': demoLesson,
+  'demo-lessons': demoLessons,
   delete: remove,
   'get-script-url': getScriptUrl,
   'get-script': getScript,
