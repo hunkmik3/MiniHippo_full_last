@@ -15,18 +15,20 @@ loadEnvFile(path.join(ROOT_DIR, '.env.local'));
 const moduleCache = new Map();
 
 const directApiRoutes = {
-  '/api/ask': 'api/ask.js',
-  '/api/ask.js': 'api/ask.js',
-  '/api/upload-audio': 'api/upload-audio.js',
-  '/api/upload-audio.js': 'api/upload-audio.js',
-  '/api/upload-speaking-recording': 'api/upload-speaking-recording.js',
-  '/api/upload-speaking-recording.js': 'api/upload-speaking-recording.js',
-  '/api/upload-lesson': 'api/upload-lesson.js',
-  '/api/upload-lesson.js': 'api/upload-lesson.js',
-  '/api/visitor-count': 'api/visitor-count.js',
-  '/api/visitor-count.js': 'api/visitor-count.js',
-  '/api/github-media': 'api/upload-audio.js',
-  '/api/github-media.js': 'api/upload-audio.js'
+  // Các endpoint lẻ đã gộp vào api/misc/[action].js (Hobby plan giới hạn 12
+  // serverless function). Map ở đây để local chạy giống production.
+  '/api/ask': 'api/misc/[action].js?action=ask',
+  '/api/ask.js': 'api/misc/[action].js?action=ask',
+  '/api/upload-audio': 'api/misc/[action].js?action=upload-audio',
+  '/api/upload-audio.js': 'api/misc/[action].js?action=upload-audio',
+  '/api/upload-speaking-recording': 'api/misc/[action].js?action=upload-speaking-recording',
+  '/api/upload-speaking-recording.js': 'api/misc/[action].js?action=upload-speaking-recording',
+  '/api/upload-lesson': 'api/misc/[action].js?action=upload-lesson',
+  '/api/upload-lesson.js': 'api/misc/[action].js?action=upload-lesson',
+  '/api/visitor-count': 'api/misc/[action].js?action=visitor-count',
+  '/api/visitor-count.js': 'api/misc/[action].js?action=visitor-count',
+  '/api/github-media': 'api/misc/[action].js?action=github-media',
+  '/api/github-media.js': 'api/misc/[action].js?action=github-media'
 };
 
 const dynamicApiRoutes = [
@@ -153,7 +155,15 @@ async function handleApi(req, res, url) {
   let handler = null;
 
   if (directApiRoutes[pathname]) {
-    handler = await importHandler(directApiRoutes[pathname]);
+    // Giá trị có thể kèm query mặc định, vd 'api/misc/[action].js?action=ask'
+    // (các endpoint lẻ đã gộp vào 1 dispatcher). Tách ra rồi nạp đúng module.
+    const [modulePath, defaults] = String(directApiRoutes[pathname]).split('?');
+    if (defaults) {
+      new URLSearchParams(defaults).forEach((value, key) => {
+        query[key] = query[key] || value;
+      });
+    }
+    handler = await importHandler(modulePath);
   } else {
     for (const route of dynamicApiRoutes) {
       const match = pathname.match(route.regex);
