@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "minihippofuill/aptiskey.com/api/misc/[action].js",
+      "src": "minihippofuill/aptiskey.com/api/misc.js",
       "use": "@vercel/node"
     },
     {
@@ -45,27 +45,27 @@
   "rewrites": [
     {
       "source": "/api/ask",
-      "destination": "/minihippofuill/aptiskey.com/api/misc/[action].js?action=ask"
+      "destination": "/minihippofuill/aptiskey.com/api/misc.js?action=ask"
     },
     {
       "source": "/api/upload-audio",
-      "destination": "/minihippofuill/aptiskey.com/api/misc/[action].js?action=upload-audio"
+      "destination": "/minihippofuill/aptiskey.com/api/misc.js?action=upload-audio"
     },
     {
       "source": "/api/upload-speaking-recording",
-      "destination": "/minihippofuill/aptiskey.com/api/misc/[action].js?action=upload-speaking-recording"
+      "destination": "/minihippofuill/aptiskey.com/api/misc.js?action=upload-speaking-recording"
     },
     {
       "source": "/api/github-media",
-      "destination": "/minihippofuill/aptiskey.com/api/misc/[action].js?action=github-media"
+      "destination": "/minihippofuill/aptiskey.com/api/misc.js?action=github-media"
     },
     {
       "source": "/api/upload-lesson",
-      "destination": "/minihippofuill/aptiskey.com/api/misc/[action].js?action=upload-lesson"
+      "destination": "/minihippofuill/aptiskey.com/api/misc.js?action=upload-lesson"
     },
     {
       "source": "/api/visitor-count",
-      "destination": "/minihippofuill/aptiskey.com/api/misc/[action].js?action=visitor-count"
+      "destination": "/minihippofuill/aptiskey.com/api/misc.js?action=visitor-count"
     },
     {
       "source": "/api/auth/:action",
