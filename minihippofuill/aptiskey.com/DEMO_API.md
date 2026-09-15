@@ -34,7 +34,7 @@ Tham số:
 | Tham số | Bắt buộc | Ý nghĩa |
 |---|---|---|
 | `demo` | ✅ | Luôn để `1` để bật chế độ học thử |
-| `set` | ✅ (trừ Writing) | Id bộ đề, lấy từ API `/api/demo/sets` |
+| `set` | ✅ (trừ Writing) | Id bộ đề, lấy từ API `/api/practice_sets/demo-sets` |
 | `lesson` | ✅ (Writing) | Tên file bài học writing |
 | `key` | ✅ | `DEMO_API_KEY` |
 | `cta` | — | Link đăng ký hiện ở màn hình kết quả |
@@ -59,7 +59,7 @@ Xác thực: gắn API key theo **một trong hai cách**
 
 Chỉ hỗ trợ `GET`. Có CORS (`Access-Control-Allow-Origin`) cho các domain được cấu hình trong `DEMO_ALLOWED_ORIGINS`.
 
-### GET `/api/demo/sets`
+### GET `/api/practice_sets/demo-sets`
 
 Danh sách bài học thử. Không kèm nội dung đề, không kèm đáp án.
 
@@ -79,7 +79,7 @@ Query tuỳ chọn: `skill=reading|listening|writing|speaking`
 }
 ```
 
-### GET `/api/demo/set?id=<SET_ID>`
+### GET `/api/practice_sets/demo-set?id=<SET_ID>`
 
 Nội dung đầy đủ của 1 bài học thử (gồm câu hỏi và đáp án, để chấm tại chỗ).
 
@@ -97,7 +97,7 @@ Nội dung đầy đủ của 1 bài học thử (gồm câu hỏi và đáp án
 }
 ```
 
-### GET `/api/demo/lessons`
+### GET `/api/lessons/demo-lessons`
 
 Danh sách bài **"học theo câu hỏi"** (Reading / Listening / Writing).
 
@@ -110,7 +110,7 @@ Query tuỳ chọn `part`:
 { "lessons": [ { "id": "...", "part": "1", "title": "READING ĐỀ 4", "topic": null, "numSets": 18 } ] }
 ```
 
-### GET `/api/demo/lesson?id=<LESSON_ID>`
+### GET `/api/lessons/demo-lesson?id=<LESSON_ID>`
 
 Nội dung bài "học theo câu hỏi", **đã chuyển sang JSON**.
 

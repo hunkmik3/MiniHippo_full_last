@@ -102,7 +102,7 @@
         stateEl.textContent = 'Đang tải...';
         listEl.innerHTML = '';
         try {
-          var res = await fetch('/api/demo/sets?key=' + encodeURIComponent(key));
+          var res = await fetch('/api/practice_sets/demo-sets?key=' + encodeURIComponent(key));
           var data = await res.json();
           if (!res.ok) throw new Error(data.error || 'Không tải được danh sách.');
           var sets = data.sets || [];

@@ -15,20 +15,18 @@ loadEnvFile(path.join(ROOT_DIR, '.env.local'));
 const moduleCache = new Map();
 
 const directApiRoutes = {
-  // Các endpoint lẻ đã gộp vào api/misc.js (Hobby plan giới hạn 12
-  // serverless function). Map ở đây để local chạy giống production.
-  '/api/ask': 'api/misc.js?action=ask',
-  '/api/ask.js': 'api/misc.js?action=ask',
-  '/api/upload-audio': 'api/misc.js?action=upload-audio',
-  '/api/upload-audio.js': 'api/misc.js?action=upload-audio',
-  '/api/upload-speaking-recording': 'api/misc.js?action=upload-speaking-recording',
-  '/api/upload-speaking-recording.js': 'api/misc.js?action=upload-speaking-recording',
-  '/api/upload-lesson': 'api/misc.js?action=upload-lesson',
-  '/api/upload-lesson.js': 'api/misc.js?action=upload-lesson',
-  '/api/visitor-count': 'api/misc.js?action=visitor-count',
-  '/api/visitor-count.js': 'api/misc.js?action=visitor-count',
-  '/api/github-media': 'api/misc.js?action=github-media',
-  '/api/github-media.js': 'api/misc.js?action=github-media'
+  '/api/ask': 'api/ask.js',
+  '/api/ask.js': 'api/ask.js',
+  '/api/upload-audio': 'api/upload-audio.js',
+  '/api/upload-audio.js': 'api/upload-audio.js',
+  '/api/upload-speaking-recording': 'api/upload-speaking-recording.js',
+  '/api/upload-speaking-recording.js': 'api/upload-speaking-recording.js',
+  '/api/upload-lesson': 'api/upload-lesson.js',
+  '/api/upload-lesson.js': 'api/upload-lesson.js',
+  '/api/visitor-count': 'api/visitor-count.js',
+  '/api/visitor-count.js': 'api/visitor-count.js',
+  '/api/github-media': 'api/upload-audio.js',
+  '/api/github-media.js': 'api/upload-audio.js'
 };
 
 const dynamicApiRoutes = [
@@ -37,7 +35,6 @@ const dynamicApiRoutes = [
   { regex: /^\/api\/lessons\/([^/]+)\/?$/, modulePath: 'api/lessons/[action].js', param: 'action' },
   { regex: /^\/api\/practice_results\/([^/]+)\/?$/, modulePath: 'api/practice_results/[action].js', param: 'action' },
   { regex: /^\/api\/practice_sets\/([^/]+)\/?$/, modulePath: 'api/practice_sets/[action].js', param: 'action' },
-  { regex: /^\/api\/demo\/([^/]+)\/?$/, modulePath: 'api/demo/[action].js', param: 'action' },
   { regex: /^\/api\/users\/([^/]+)\/?$/, modulePath: 'api/users/[action].js', param: 'action' },
   { regex: /^\/api\/vstep\/([^/]+)\/([^/]+)\/?$/, modulePath: 'api/vstep/[resource]/[action].js', params: ['resource', 'action'] }
 ];

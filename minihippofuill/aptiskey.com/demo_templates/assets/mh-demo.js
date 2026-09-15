@@ -38,14 +38,14 @@ window.MH = (function () {
 
   /* ---------- API bộ đề (Reading / Listening / Speaking) ---------- */
   // skill: 'reading' | 'listening' | 'speaking'
-  function listSets(skill) { return get('/api/demo/sets', { skill: skill }); }
-  function getSet(id) { return get('/api/demo/set', { id: id }); }
+  function listSets(skill) { return get('/api/practice_sets/demo-sets', { skill: skill }); }
+  function getSet(id) { return get('/api/practice_sets/demo-set', { id: id }); }
 
   /* ---------- API học theo câu hỏi (Reading / Listening / Writing) ---------- */
   // part: '1','2','4','5' | 'listening_1_13','listening_14','listening_15',
   //       'listening_16_17' | 'writing'
-  function listLessons(part) { return get('/api/demo/lessons', { part: part }); }
-  function getLesson(id) { return get('/api/demo/lesson', { id: id }); }
+  function listLessons(part) { return get('/api/lessons/demo-lessons', { part: part }); }
+  function getLesson(id) { return get('/api/lessons/demo-lesson', { id: id }); }
 
   /* ---------- Tiện ích hiển thị ---------- */
   function esc(v) {

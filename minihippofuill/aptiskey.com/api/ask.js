@@ -1,5 +1,5 @@
-import parseBody from '../../../api/_utils/parseBody.js';
-import { generateAIText, hasConfiguredAIProvider } from '../_utils/ai.js';
+import parseBody from './_utils/parseBody.js';
+import { generateAIText, hasConfiguredAIProvider } from '../server/api/_utils/ai.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

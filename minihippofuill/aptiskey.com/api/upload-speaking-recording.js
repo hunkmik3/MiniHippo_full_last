@@ -1,7 +1,7 @@
-import { parseJsonBody } from '../../../api/_utils/parseBody.js';
-import { putGithubContent } from '../../../api/_utils/supabase.js';
-import { isR2Configured, putR2Object } from '../../../api/_utils/r2.js';
-import { verifyUserRequest } from '../../../api/_utils/auth.js';
+import { parseJsonBody } from './_utils/parseBody.js';
+import { putGithubContent } from './_utils/supabase.js';
+import { isR2Configured, putR2Object } from './_utils/r2.js';
+import { verifyUserRequest } from './_utils/auth.js';
 
 const MAX_AUDIO_BYTES = 12 * 1024 * 1024; // 12MB
 

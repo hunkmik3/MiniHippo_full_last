@@ -5,7 +5,7 @@
 //
 // Khi bật:
 //   - KHÔNG yêu cầu đăng nhập
-//   - Lấy đề qua /api/demo/set (chỉ các bộ đề trong allowlist DEMO_SET_IDS)
+//   - Lấy đề qua /api/practice_sets/demo-set (chỉ các bộ đề trong allowlist DEMO_SET_IDS)
 //   - Chấm tại chỗ trên trình duyệt, KHÔNG gửi/ghi kết quả về hệ thống
 //   - Ẩn header/sidebar/footer để nhúng iframe cho gọn
 //
@@ -36,7 +36,7 @@
         },
         // URL lấy nội dung đề cho chế độ demo.
         setUrl: function (setId) {
-            return base + '/api/demo/set?id=' + encodeURIComponent(setId) +
+            return base + '/api/practice_sets/demo-set?id=' + encodeURIComponent(setId) +
                 '&key=' + encodeURIComponent(key);
         },
         // Link đăng ký hiển thị ở màn hình kết quả (web bán khoá truyền vào).
