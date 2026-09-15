@@ -1,0 +1,180 @@
+/* Writing layout styles */
+
+/* Container styles */
+.question-container {
+    background-color: #fff;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+/* Header styles matching other modules */
+.header {
+    background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%) !important;
+    border-bottom: none;
+    padding: 15px;
+    color: #ffffff !important;
+}
+
+.header *, .header a, .header span, .header i, .header div {
+    color: #ffffff !important;
+}
+
+.header a:hover {
+    color: #e0e7ff !important;
+    opacity: 0.9;
+}
+
+/* Timer styles */
+.countdown, #countdownTimer {
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    color: #1e293b !important;
+    font-weight: 700 !important;
+    font-size: 1.5rem !important;
+    padding: 0.5rem 1.25rem;
+    border-radius: 0.75rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+    display: inline-block;
+    border: 2px solid #ffffff;
+}
+
+.time-remaining-label {
+    color: #ffffff !important;
+    font-weight: 600;
+    margin-right: 0.75rem;
+}
+
+#question_step {
+    background: rgba(255, 255, 255, 0.15);
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #ffffff !important;
+    font-weight: 600;
+}
+
+/* Form controls */
+.form-label {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.form-control {
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 10px;
+}
+
+.form-control:focus {
+    border-color: #3498db;
+    box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+}
+
+textarea.form-control {
+    resize: vertical;
+    min-height: 100px;
+}
+
+/* Word count */
+.word-count {
+    font-size: 0.85rem;
+    color: #6c757d;
+    text-align: right;
+    margin-top: 5px;
+}
+
+/* Navigation buttons (Footer) */
+.footer {
+    background-color: #dae6f1;
+    padding: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    z-index: 999;
+}
+
+.footer .btn {
+    font-weight: bold;
+    padding: 10px 20px;
+    font-size: 16px;
+}
+
+.footer .btn-back {
+    background-color: #f1c40f;
+    border: none;
+    color: #000;
+}
+
+.footer .btn-next {
+    background-color: #2ecc71;
+    border: none;
+    color: #fff;
+}
+
+.btn-check-all {
+    background-color: #3498db;
+    color: white;
+    border: none;
+}
+
+.footer .btn:hover {
+    opacity: 0.9;
+}
+
+/* Modal styles */
+.modal-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.modal-title {
+    color: #333;
+    font-weight: 600;
+}
+
+#modal-body-ai pre {
+    white-space: pre-wrap;
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 5px;
+    border: 1px solid #e9ecef;
+}
+
+/* Hidden by default */
+.d-none {
+    display: none !important;
+}
+
+/* Page spacing */
+body {
+    background-color: #f4f6f9;
+    padding-bottom: 80px; /* Space for footer */
+}
+
+.container.py-5 {
+    padding-top: 2rem !important;
+}
+
+h1[id^="topic-title"] {
+    font-size: 1.75rem;
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+h6[id^="description"] {
+    font-size: 1.1rem;
+    color: #555;
+    margin-bottom: 2rem;
+    line-height: 1.5;
+    background: #e9ecef;
+    padding: 15px;
+    border-radius: 5px;
+    border-left: 5px solid #3498db;
+}

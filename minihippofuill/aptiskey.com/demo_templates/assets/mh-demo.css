@@ -1,0 +1,136 @@
+/* ===================================================================
+   Giao diện mẫu Mini Hippo — Aptis học thử
+   CSS thuần, KHÔNG phụ thuộc framework nào. Đổi màu ở phần :root là đủ
+   để khớp với web bán khoá.
+   =================================================================== */
+:root {
+  --mh-primary: #1d4ed8;
+  --mh-primary-dark: #12307a;
+  --mh-primary-soft: #eaf0ff;
+  --mh-ok: #16a34a;
+  --mh-bad: #dc2626;
+  --mh-text: #0f172a;
+  --mh-muted: #64748b;
+  --mh-border: #dbe4f0;
+  --mh-bg: #f6f8fc;
+  --mh-radius: 14px;
+}
+
+* { box-sizing: border-box; }
+
+.mh {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--mh-text);
+  background: var(--mh-bg);
+  margin: 0;
+  padding: 24px 16px;
+  line-height: 1.55;
+}
+
+.mh-wrap { max-width: 920px; margin: 0 auto; }
+
+/* ---------- Header ---------- */
+.mh-head { margin-bottom: 20px; }
+.mh-eyebrow {
+  text-transform: uppercase; letter-spacing: .08em;
+  font-size: .72rem; font-weight: 800; color: var(--mh-primary);
+}
+.mh-title { font-size: 1.6rem; font-weight: 800; margin: 4px 0 6px; }
+.mh-sub { color: var(--mh-muted); margin: 0; }
+
+/* ---------- Thẻ bài / danh sách ---------- */
+.mh-grid {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+.mh-card {
+  background: #fff; border: 1px solid var(--mh-border);
+  border-radius: var(--mh-radius); padding: 16px;
+  display: flex; flex-direction: column; gap: 8px;
+  text-align: left; cursor: pointer; width: 100%;
+  font: inherit; color: inherit;
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+.mh-card:hover {
+  transform: translateY(-2px); border-color: var(--mh-primary);
+  box-shadow: 0 10px 24px rgba(29, 78, 216, .12);
+}
+.mh-card-title { font-weight: 700; }
+.mh-card-meta { font-size: .85rem; color: var(--mh-muted); }
+.mh-tag {
+  align-self: flex-start; font-size: .68rem; font-weight: 800;
+  letter-spacing: .05em; text-transform: uppercase;
+  background: var(--mh-primary-soft); color: var(--mh-primary-dark);
+  padding: 3px 10px; border-radius: 999px;
+}
+
+/* ---------- Khối làm bài ---------- */
+.mh-panel {
+  background: #fff; border: 1px solid var(--mh-border);
+  border-radius: var(--mh-radius); padding: 20px; margin-bottom: 16px;
+}
+.mh-passage {
+  background: #fbfcfe; border: 1px solid var(--mh-border);
+  border-radius: 10px; padding: 16px; white-space: pre-wrap;
+}
+.mh-q { margin-bottom: 18px; }
+.mh-q-text { font-weight: 600; margin-bottom: 8px; }
+
+.mh-opt {
+  display: flex; align-items: flex-start; gap: 10px;
+  border: 1px solid var(--mh-border); border-radius: 10px;
+  padding: 10px 12px; margin-bottom: 8px; cursor: pointer;
+  background: #fff; transition: border-color .12s ease, background .12s ease;
+}
+.mh-opt:hover { border-color: var(--mh-primary); }
+.mh-opt input { margin-top: 4px; }
+.mh-opt.is-correct { border-color: var(--mh-ok); background: #f0fdf4; }
+.mh-opt.is-wrong { border-color: var(--mh-bad); background: #fef2f2; }
+
+textarea.mh-input, input.mh-input {
+  width: 100%; border: 1px solid var(--mh-border); border-radius: 10px;
+  padding: 10px 12px; font: inherit; resize: vertical;
+}
+textarea.mh-input { min-height: 150px; }
+.mh-input:focus { outline: 2px solid var(--mh-primary); border-color: transparent; }
+
+/* ---------- Nút ---------- */
+.mh-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.mh-btn {
+  border: 0; border-radius: 999px; padding: 10px 22px;
+  font: inherit; font-weight: 700; cursor: pointer;
+  background: var(--mh-primary); color: #fff;
+}
+.mh-btn:hover { background: var(--mh-primary-dark); }
+.mh-btn[disabled] { opacity: .5; cursor: not-allowed; }
+.mh-btn-ghost {
+  background: #fff; color: var(--mh-primary);
+  border: 1px solid var(--mh-border);
+}
+.mh-btn-ghost:hover { background: var(--mh-primary-soft); }
+
+/* ---------- Kết quả ---------- */
+.mh-score {
+  text-align: center; padding: 24px;
+  background: #fff; border: 1px solid var(--mh-border);
+  border-radius: var(--mh-radius);
+}
+.mh-score-value { font-size: 2.4rem; font-weight: 800; color: var(--mh-primary); }
+.mh-review-row {
+  border-left: 4px solid var(--mh-ok); background: #f0fdf4;
+  border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; font-size: .92rem;
+}
+.mh-review-row.is-wrong { border-left-color: var(--mh-bad); background: #fef2f2; }
+
+/* ---------- Tiện ích ---------- */
+.mh-note {
+  background: #fff8e6; color: #664d03; border-radius: 10px;
+  padding: 10px 14px; font-size: .9rem; margin-bottom: 16px;
+}
+.mh-error {
+  background: #fef2f2; color: var(--mh-bad); border-radius: 10px;
+  padding: 10px 14px; font-size: .9rem;
+}
+.mh-hidden { display: none !important; }
+.mh-audio { width: 100%; max-width: 420px; margin: 8px 0; }
+.mh-progress { font-size: .85rem; color: var(--mh-muted); margin-bottom: 10px; }

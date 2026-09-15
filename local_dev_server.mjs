@@ -35,6 +35,7 @@ const dynamicApiRoutes = [
   { regex: /^\/api\/lessons\/([^/]+)\/?$/, modulePath: 'api/lessons/[action].js', param: 'action' },
   { regex: /^\/api\/practice_results\/([^/]+)\/?$/, modulePath: 'api/practice_results/[action].js', param: 'action' },
   { regex: /^\/api\/practice_sets\/([^/]+)\/?$/, modulePath: 'api/practice_sets/[action].js', param: 'action' },
+  { regex: /^\/api\/demo\/([^/]+)\/?$/, modulePath: 'api/demo/[action].js', param: 'action' },
   { regex: /^\/api\/users\/([^/]+)\/?$/, modulePath: 'api/users/[action].js', param: 'action' },
   { regex: /^\/api\/vstep\/([^/]+)\/([^/]+)\/?$/, modulePath: 'api/vstep/[resource]/[action].js', params: ['resource', 'action'] }
 ];

@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mini Hippo — Mẫu Speaking (học thử)</title>
+  <link rel="stylesheet" href="assets/mh-demo.css">
+</head>
+
+<body class="mh">
+  <div class="mh-wrap">
+
+    <header class="mh-head">
+      <div class="mh-eyebrow">Mini Hippo · Aptis</div>
+      <h1 class="mh-title">Speaking — học thử</h1>
+      <p class="mh-sub">Đọc câu hỏi, bấm ghi âm và nghe lại phần trả lời của mình.</p>
+    </header>
+
+    <div class="mh-note">
+      Đang chạy bằng <strong>dữ liệu mẫu</strong>. Thêm
+      <code>?live=1&amp;base=https://minihippo.edu.vn&amp;key=API_KEY</code>
+      vào URL để lấy dữ liệu thật realtime.
+      <br>Ghi âm chỉ lưu <strong>tạm trên trình duyệt</strong>, không gửi về máy chủ.
+    </div>
+    <div id="mh-error" class="mh-error mh-hidden"></div>
+
+    <!-- ============ MÀN 1: DANH SÁCH BÀI ============ -->
+    <section id="view-list">
+      <div id="list-grid" class="mh-grid"></div>
+    </section>
+
+    <!-- ============ MÀN 2: LÀM BÀI ============ -->
+    <section id="view-practice" class="mh-hidden">
+      <div class="mh-panel">
+        <div class="mh-progress" id="practice-meta"></div>
+        <h2 class="mh-title" id="practice-title" style="font-size:1.2rem;"></h2>
+        <div id="practice-intro"></div>
+      </div>
+      <div class="mh-panel" id="practice-questions"></div>
+      <div class="mh-actions">
+        <button class="mh-btn" id="submit-btn">Hoàn thành</button>
+        <button class="mh-btn mh-btn-ghost" id="back-btn">Quay lại danh sách</button>
+      </div>
+    </section>
+
+    <!-- ============ MÀN 3: KẾT QUẢ ============ -->
+    <section id="view-result" class="mh-hidden">
+      <div class="mh-score">
+        <div>Bạn đã hoàn thành</div>
+        <div class="mh-score-value" id="result-score">0/0</div>
+        <div class="mh-sub">Đăng ký khoá học để được giáo viên chấm phần nói chi tiết.</div>
+      </div>
+      <div class="mh-panel" id="result-review"></div>
+      <div class="mh-actions">
+        <button class="mh-btn" id="retry-btn">Làm lại</button>
+        <button class="mh-btn mh-btn-ghost" id="home-btn">Về danh sách</button>
+      </div>
+    </section>
+
+  </div>
+
+  <script src="assets/mh-demo.js"></script>
+  <script>
+    /* ===== DỮ LIỆU MẪU — khớp shape API bộ đề Speaking =================
+       set.data = { part1: { introText, questions:[{prompt, audioUrl}] }, part2: {...} }
+       ================================================================== */
+    var SAMPLE = [{
+      id: 'sample-speaking-1',
+      title: 'SPEAKING ĐỀ MẪU — Part 1',
+      meta: '3 câu · 30 giây mỗi câu',
+      introText: "Part One. In this part, I'm going to ask you three short questions about yourself and your interests.",
+      questions: [
+        { prompt: 'Tell me about your friends' },
+        { prompt: 'What do you like doing at the weekend?' },
+        { prompt: 'Tell me about a place you enjoy visiting' }
+      ]
+    }];
+
+    var state = { lessons: [], current: null, recordings: {} };
+
+    function renderList() {
+      var grid = document.getElementById('list-grid');
+      grid.innerHTML = state.lessons.map(function (l, i) {
+        return '<button class="mh-card" data-i="' + i + '">' +
+          '<span class="mh-tag">Speaking</span>' +
+          '<span class="mh-card-title">' + MH.esc(l.title) + '</span>' +
+          '<span class="mh-card-meta">' + MH.esc(l.meta || '') + '</span>' +
+          '</button>';
+      }).join('');
+      grid.querySelectorAll('.mh-card').forEach(function (btn) {
+        btn.addEventListener('click', function () { startPractice(Number(btn.dataset.i)); });
+      });
+    }
+
+    function startPractice(index) {
+      state.current = state.lessons[index];
+      state.recordings = {};
+
+      document.getElementById('practice-title').textContent = state.current.title;
+      document.getElementById('practice-meta').textContent = state.current.meta || '';
+      document.getElementById('practice-intro').innerHTML = state.current.introText
+        ? '<div class="mh-passage">' + MH.esc(state.current.introText) + '</div>' : '';
+
+      document.getElementById('practice-questions').innerHTML =
+        state.current.questions.map(function (q, qi) {
+          return '<div class="mh-q">' +
+            '<div class="mh-q-text">' + (qi + 1) + '. ' + MH.esc(q.prompt || '') + '</div>' +
+            '<div class="mh-actions">' +
+              '<button class="mh-btn mh-btn-ghost" data-rec="' + qi + '">● Ghi âm</button>' +
+              '<span class="mh-card-meta" data-status="' + qi + '">chưa ghi âm</span>' +
+            '</div>' +
+            '<div data-player="' + qi + '"></div>' +
+            '</div>';
+        }).join('');
+
+      document.getElementById('practice-questions')
+        .querySelectorAll('[data-rec]').forEach(function (btn) {
+          btn.addEventListener('click', function () { toggleRecord(Number(btn.dataset.rec), btn); });
+        });
+
+      MH.show('view-practice');
+    }
+
+    /* ---------- Ghi âm bằng MediaRecorder (chỉ lưu tạm trên máy) ---------- */
+    var activeRecorder = null;
+
+    async function toggleRecord(index, btn) {
+      var status = document.querySelector('[data-status="' + index + '"]');
+
+      if (activeRecorder && activeRecorder.index === index) {
+        activeRecorder.recorder.stop();
+        return;
+      }
+      if (activeRecorder) {
+        activeRecorder.recorder.stop();
+      }
+
+      if (!navigator.mediaDevices || !window.MediaRecorder) {
+        MH.error('Trình duyệt không hỗ trợ ghi âm.');
+        return;
+      }
+
+      try {
+        var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        var recorder = new MediaRecorder(stream);
+        var chunks = [];
+
+        recorder.addEventListener('dataavailable', function (e) {
+          if (e.data && e.data.size) chunks.push(e.data);
+        });
+        recorder.addEventListener('stop', function () {
+          stream.getTracks().forEach(function (t) { t.stop(); });
+          var blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+          var url = URL.createObjectURL(blob);
+          state.recordings[index] = url;
+          var holder = document.querySelector('[data-player="' + index + '"]');
+          if (holder) holder.innerHTML = '<audio class="mh-audio" controls src="' + url + '"></audio>';
+          if (status) status.textContent = 'đã ghi âm';
+          btn.textContent = '● Ghi lại';
+          activeRecorder = null;
+        });
+
+        recorder.start();
+        activeRecorder = { index: index, recorder: recorder };
+        btn.textContent = '■ Dừng';
+        if (status) status.textContent = 'đang ghi...';
+        MH.clearError();
+      } catch (err) {
+        MH.error('Không truy cập được micro: ' + err.message);
+      }
+    }
+
+    function submit() {
+      var done = Object.keys(state.recordings).length;
+      var total = state.current.questions.length;
+      document.getElementById('result-score').textContent = done + '/' + total;
+
+      document.getElementById('result-review').innerHTML =
+        state.current.questions.map(function (q, i) {
+          var url = state.recordings[i];
+          return '<div class="mh-q">' +
+            '<div class="mh-q-text">' + (i + 1) + '. ' + MH.esc(q.prompt || '') + '</div>' +
+            (url
+              ? '<audio class="mh-audio" controls src="' + url + '"></audio>'
+              : '<div class="mh-card-meta">(chưa ghi âm)</div>') +
+            '</div>';
+        }).join('');
+
+      MH.show('view-result');
+    }
+
+    document.getElementById('submit-btn').addEventListener('click', submit);
+    document.getElementById('back-btn').addEventListener('click', function () { MH.show('view-list'); });
+    document.getElementById('home-btn').addEventListener('click', function () { MH.show('view-list'); });
+    document.getElementById('retry-btn').addEventListener('click', function () {
+      startPractice(state.lessons.indexOf(state.current));
+    });
+
+    async function boot() {
+      if (!MH.config.live) { state.lessons = SAMPLE; renderList(); return; }
+      try {
+        MH.clearError();
+        // Speaking dùng BỘ ĐỀ (practice_sets), không phải bảng lessons.
+        var listed = await MH.listSets('speaking');
+        var items = [];
+        for (var i = 0; i < listed.sets.length; i++) {
+          var meta = listed.sets[i];
+          var full = await MH.getSet(meta.id);
+          var data = (full.set && full.set.data) || {};
+          ['part1', 'part2', 'part3', 'part4'].forEach(function (partKey) {
+            var part = data[partKey];
+            if (!part) return;
+            var questions = Array.isArray(part.questions) ? part.questions : [];
+            if (!questions.length) return;
+            items.push({
+              id: meta.id + ':' + partKey,
+              title: meta.title + ' — ' + partKey.replace('part', 'Part '),
+              meta: questions.length + ' câu',
+              introText: part.introText || '',
+              questions: questions
+            });
+          });
+        }
+        if (!items.length) throw new Error('Không có dữ liệu bài Speaking.');
+        state.lessons = items;
+        renderList();
+      } catch (err) {
+        MH.error(err.message + ' — đang hiển thị dữ liệu mẫu.');
+        state.lessons = SAMPLE;
+        renderList();
+      }
+    }
+
+    boot();
+  </script>
+</body>
+
+</html>
