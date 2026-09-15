@@ -5,13 +5,15 @@
 // upload-lesson, visitor-count) là 1 function riêng -> chiếm 5 suất. Gộp lại
 // còn 1 suất, dành chỗ cho các nhóm API khác.
 //
-// Các file handler vẫn giữ nguyên vị trí và nội dung; file này chỉ định tuyến.
+// Các handler đã chuyển sang server/api/misc/ (nội dung giữ nguyên). Bắt buộc
+// phải nằm NGOÀI thư mục api/ vì Vercel quét api/ để sinh function -> để lại
+// đó thì vẫn bị tính suất và build fail.
 
-import ask from '../ask.js';
-import uploadAudio from '../upload-audio.js';
-import uploadSpeakingRecording from '../upload-speaking-recording.js';
-import uploadLesson from '../upload-lesson.js';
-import visitorCount from '../visitor-count.js';
+import ask from '../../server/api/misc/ask.js';
+import uploadAudio from '../../server/api/misc/upload-audio.js';
+import uploadSpeakingRecording from '../../server/api/misc/upload-speaking-recording.js';
+import uploadLesson from '../../server/api/misc/upload-lesson.js';
+import visitorCount from '../../server/api/misc/visitor-count.js';
 
 const handlers = {
   'ask': ask,
