@@ -1,5 +1,5 @@
-import parseBody from './_utils/parseBody.js';
-import { buildGithubHeaders, putGithubContent } from './_utils/supabase.js';
+import parseBody from '../../../api/_utils/parseBody.js';
+import { buildGithubHeaders, putGithubContent } from '../../../api/_utils/supabase.js';
 import {
   createR2PutUploadUrl,
   deleteR2Objects,
@@ -7,8 +7,8 @@ import {
   isR2Configured,
   normalizeR2Key,
   putR2Object
-} from './_utils/r2.js';
-import { verifyAdminRequest, verifyUserRequest } from './_utils/auth.js';
+} from '../../../api/_utils/r2.js';
+import { verifyAdminRequest, verifyUserRequest } from '../../../api/_utils/auth.js';
 
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024; // 50MB
 const MAX_CHUNK_UPLOAD_BYTES = 3 * 1024 * 1024; // Keep JSON payload below Vercel's 4.5MB cap.

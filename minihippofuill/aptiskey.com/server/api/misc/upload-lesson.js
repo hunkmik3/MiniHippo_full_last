@@ -1,12 +1,12 @@
-import parseBody from './_utils/parseBody.js';
+import parseBody from '../../../api/_utils/parseBody.js';
 import fs from 'fs';
 import path from 'path';
-import { verifyAdminRequest } from './_utils/auth.js';
+import { verifyAdminRequest } from '../../../api/_utils/auth.js';
 import {
   insertInto,
   updateTable,
   putGithubContent
-} from './_utils/supabase.js';
+} from '../../../api/_utils/supabase.js';
 
 const GITHUB_SITE_PREFIX = 'minihippofuill/aptiskey.com/';
 
