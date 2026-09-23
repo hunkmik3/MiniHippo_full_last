@@ -58,7 +58,7 @@ async function supabaseFetch(path, options = {}) {
 
 export async function selectFrom(
   table,
-  { filters = [], order, limit, single, columns = '*' } = {}
+  { filters = [], order, limit, offset, single, columns = '*' } = {}
 ) {
   const params = [];
   filters.forEach(({ column, operator = 'eq', value }) => {
@@ -66,10 +66,15 @@ export async function selectFrom(
   });
   params.push(`select=${columns}`);
   if (order) {
-    params.push(`order=${order.column}.${order.asc === false ? 'desc' : 'asc'}`);
+    // order: { column, asc } hoặc mảng nhiều cột (cột sau phân định khi cột trước trùng).
+    const orders = Array.isArray(order) ? order : [order];
+    params.push(`order=${orders.map((o) => `${o.column}.${o.asc === false ? 'desc' : 'asc'}`).join(',')}`);
   }
   if (limit) {
     params.push(`limit=${limit}`);
+  }
+  if (offset) {
+    params.push(`offset=${offset}`);
   }
   if (single) {
     params.push('limit=1');
@@ -83,6 +88,20 @@ export async function selectFrom(
     return Array.isArray(data) ? data[0] : data;
   }
   return data;
+}
+
+// Supabase trả tối đa 1000 dòng/lần → đọc hết bảng theo từng trang.
+// order phải có cột duy nhất (vd id) để các trang không chồng/sót dòng.
+const SELECT_ALL_PAGE_SIZE = 1000;
+export async function selectAll(table, options = {}) {
+  const rows = [];
+  for (let offset = 0; ; offset += SELECT_ALL_PAGE_SIZE) {
+    const page = await selectFrom(table, { ...options, limit: SELECT_ALL_PAGE_SIZE, offset });
+    if (!Array.isArray(page)) break;
+    rows.push(...page);
+    if (page.length < SELECT_ALL_PAGE_SIZE) break;
+  }
+  return rows;
 }
 
 export async function insertInto(table, payload) {

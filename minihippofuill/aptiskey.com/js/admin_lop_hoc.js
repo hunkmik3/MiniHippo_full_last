@@ -2269,8 +2269,10 @@ function submissionGroupKey(userId, classId, session) {
 }
 
 // Đọc lớp + buổi từ 1 bản ghi practice_results.
+// Ưu tiên metadata.class_id: bài Key có set_id là mã bộ đề Key, không phải mã lớp
+// (bài BTVN thì 2 giá trị luôn trùng nhau).
 function submissionClassId(r) {
-    return String(r?.set_id || r?.metadata?.class_id || '');
+    return String(r?.metadata?.class_id || r?.set_id || '');
 }
 function submissionSession(r) {
     const s = parseInt(r?.metadata?.session_number ?? r?.metadata?.session);
@@ -2281,8 +2283,43 @@ function classTitleById(classId) {
     return cls?.title || '';
 }
 
+// Supabase trả tối đa 1000 dòng/lần → tải lần lượt từng trang tới khi hết.
+// Chỉ lấy bản rút gọn (fields=summary) cho bảng; mở chi tiết thì dùng fetchFullResults.
+const RESULTS_PAGE_SIZE = 1000;
+async function fetchAllPracticeResults(params) {
+    const byId = new Map();
+    for (let page = 0; page < 100; page += 1) {
+        const qs = new URLSearchParams({
+            ...params,
+            fields: 'summary',
+            limit: String(RESULTS_PAGE_SIZE),
+            offset: String(page * RESULTS_PAGE_SIZE)
+        });
+        const data = await apiCall(`/api/practice_results/list?${qs.toString()}`);
+        const rows = Array.isArray(data?.results) ? data.results : [];
+        // Có bài mới nộp giữa 2 trang thì dòng cuối trang trước bị đẩy sang trang sau → bỏ trùng.
+        rows.forEach((r) => { if (r?.id && !byId.has(r.id)) byId.set(r.id, r); });
+        if (rows.length < RESULTS_PAGE_SIZE) break;
+    }
+    return Array.from(byId.values());
+}
+
+// Bản đầy đủ (câu trả lời, ghi âm, bảng đáp án...) của các bài đang ở dạng rút gọn → Map id → bài.
+async function fetchFullResults(rows) {
+    const ids = [...new Set(rows.filter((r) => r?._summary && r.id).map((r) => r.id))];
+    if (!ids.length) return new Map();
+    const data = await apiCall(`/api/practice_results/list?ids=${ids.map(encodeURIComponent).join(',')}`);
+    return new Map((Array.isArray(data?.results) ? data.results : []).map((r) => [r.id, r]));
+}
+
+// Đổi bộ lọc liên tục → chỉ lần tải mới nhất được vẽ ra (lần cũ về sau bị bỏ qua).
+let submissionsLoadSeq = 0;
+let keyResultsLoadSeq = 0;
+let submissionDetailSeq = 0;
+
 // Mặc định hiển thị TOÀN BỘ data (mọi lớp/buổi). 2 dropdown lớp + buổi chỉ để LỌC.
 async function loadSubmissions() {
+    const loadSeq = ++submissionsLoadSeq;
     const classId = String(document.getElementById('sub-class-select')?.value || '').trim();
     const sessionNum = String(document.getElementById('sub-session-select')?.value || '').trim();
     const tbody = document.getElementById('submission-table-body');
@@ -2304,13 +2341,17 @@ async function loadSubmissions() {
     }
 
     try {
-        // Lấy toàn bộ bài BTVN (mọi lớp/buổi) qua marker submission_kind=homework,
-        // không giới hạn theo lớp/buổi ở server — lọc phía client theo dropdown.
-        const data = await apiCall('/api/practice_results/list?submissionKind=homework&limit=1000');
-        const results = data.results || data || [];
-
-        // Nạp map Key (mọi lớp/buổi) một lần để gộp cạnh BTVN.
-        await loadSubmissionKeyMap();
+        // Lấy bài BTVN qua marker submission_kind=homework, tải hết theo từng trang.
+        // Có chọn lớp thì lọc lớp ngay ở server (nhẹ hơn nhiều); buổi lọc phía client.
+        // Kèm map Key của cùng phạm vi lớp để gộp cạnh BTVN.
+        const params = { submissionKind: 'homework' };
+        if (classId) params.classId = classId;
+        const [results, keyMap] = await Promise.all([
+            fetchAllPracticeResults(params),
+            loadSubmissionKeyMap(classId)
+        ]);
+        if (loadSeq !== submissionsLoadSeq) return; // đã đổi bộ lọc, có lần tải mới hơn
+        lopHocState.submissionKeyByGroup = keyMap;
 
         const sessionNumInt = sessionNum ? parseInt(sessionNum, 10) : null;
         const rawSubmissions = results.filter(r => {
@@ -2361,36 +2402,38 @@ async function loadSubmissions() {
         lopHocState.submissions = merged;
         renderSubmissions();
     } catch (err) {
+        if (loadSeq !== submissionsLoadSeq) return;
         console.error('Load submissions error:', err);
         lopHocState.submissions = [];
         lopHocState.submissionKeyByGroup = {};
         renderSubmissions();
+        // Báo lỗi rõ thay vì "chưa có học viên nào nộp bài" (dễ hiểu nhầm là không ai nộp).
+        if (empty) {
+            empty.innerHTML = `<i class="bi bi-exclamation-triangle d-block text-danger"></i>
+                <p class="mb-0 text-danger">Không tải được danh sách nộp bài: ${esc(err?.message || 'Lỗi không xác định')}</p>`;
+        }
     }
 }
 
-// Nạp toàn bộ kết quả Key → map theo (user·lớp·buổi) để gộp cạnh BTVN đúng buổi.
-async function loadSubmissionKeyMap() {
-    lopHocState.submissionKeyByGroup = {};
+// Nạp kết quả Key (của 1 lớp, hoặc mọi lớp) → map theo (user·lớp·buổi) để gộp cạnh BTVN đúng buổi.
+async function loadSubmissionKeyMap(classId = '') {
+    const map = {};
     try {
-        let rows = [];
-        for (const kind of ['key_listening', 'key_reading']) {
-            const data = await apiCall(`/api/practice_results/list?submissionKind=${kind}&limit=1000`);
-            rows = rows.concat(data.results || data || []);
-        }
-        rows
+        const lists = await Promise.all(['key_listening', 'key_reading'].map((kind) =>
+            fetchAllPracticeResults(classId ? { submissionKind: kind, classId } : { submissionKind: kind })));
+        lists.flat()
             .sort((a, b) => new Date(b.submitted_at || 0).getTime() - new Date(a.submitted_at || 0).getTime())
             .forEach((r) => {
                 if (!r.user_id) return;
                 const session = submissionSession(r);
                 if (session == null) return; // Key nộp từ sidebar (không gắn buổi) không gộp vào bảng buổi.
                 const gk = submissionGroupKey(r.user_id, submissionClassId(r), session);
-                if (!lopHocState.submissionKeyByGroup[gk]) {
-                    lopHocState.submissionKeyByGroup[gk] = r;
-                }
+                if (!map[gk]) map[gk] = r;
             });
     } catch (err) {
         console.warn('Load submission key map failed:', err);
     }
+    return map;
 }
 
 // Text hiển thị Key khớp đúng buổi của 1 dòng BTVN.
@@ -2528,6 +2571,7 @@ async function loadKeyResults() {
     const table = document.getElementById('kr-table');
     const empty = document.getElementById('kr-empty');
     if (!tbody) return;
+    const loadSeq = ++keyResultsLoadSeq;
 
     const classId = String(document.getElementById('kr-class-select')?.value || '').trim();
     const bandFilter = document.getElementById('kr-band-select')?.value || '';
@@ -2543,20 +2587,22 @@ async function loadKeyResults() {
         try { await loadStudents(); } catch (_) { /* ignore */ }
     }
 
+    // Lọc lớp ở client (không lọc ở server) vì bài thiếu metadata.class_id vẫn được
+    // tính theo lớp đang gán của học viên.
     const kinds = kindFilter ? [kindFilter] : ['key_listening', 'key_reading'];
     let rows = [];
     try {
-        for (const kind of kinds) {
-            const data = await apiCall(`/api/practice_results/list?submissionKind=${encodeURIComponent(kind)}&limit=1000`);
-            rows = rows.concat(data.results || data || []);
-        }
+        const lists = await Promise.all(kinds.map((kind) => fetchAllPracticeResults({ submissionKind: kind })));
+        rows = lists.flat();
     } catch (err) {
+        if (loadSeq !== keyResultsLoadSeq) return;
         console.error('Load key results error:', err);
         tbody.innerHTML = `<tr><td colspan="11" class="text-center text-danger py-3">Không tải được kết quả Key.</td></tr>`;
         const summary = document.getElementById('kr-summary');
         if (summary) summary.style.display = 'none';
         return;
     }
+    if (loadSeq !== keyResultsLoadSeq) return; // đã đổi bộ lọc, có lần tải mới hơn
 
     const sessionFilter = String(document.getElementById('kr-session-select')?.value || '').trim();
     const enriched = rows.map((r) => {
@@ -2646,10 +2692,18 @@ function renderKeyResults(rows) {
     setText('kr-reading', readingCount);
 }
 
-function openKeyResultDetail(resultId) {
+const SUBMISSION_DETAIL_LOADING_HTML = `<div class="text-center text-muted py-4">
+    <i class="spinner-border spinner-border-sm me-2"></i>Đang tải chi tiết bài nộp...</div>`;
+
+function submissionDetailErrorHtml(err) {
+    return `<div class="text-danger py-3">Không tải được chi tiết bài nộp: ${esc(err?.message || 'Lỗi không xác định')}</div>`;
+}
+
+async function openKeyResultDetail(resultId) {
     const row = (lopHocState.keyResults || []).find(x => String(x.result?.id || '') === String(resultId));
     if (!row) return;
-    const r = row.result;
+    const detailSeq = ++submissionDetailSeq;
+    const r = row.result; // bản rút gọn: đủ cho các chip thông tin, nội dung bài tải sau
     const md = r.metadata || {};
     const kind = String(md.submission_kind || '').toLowerCase();
     const typeLabel = kind === 'key_listening' ? 'Key Listening' : (kind === 'key_reading' ? 'Key Reading' : 'Key');
@@ -2682,11 +2736,22 @@ function openKeyResultDetail(resultId) {
     }
 
     const contentEl = document.getElementById('submission-detail-content');
-    if (contentEl) contentEl.innerHTML = buildKeyResultDetailHtml(r);
+    if (contentEl) contentEl.innerHTML = r._summary ? SUBMISSION_DETAIL_LOADING_HTML : buildKeyResultDetailHtml(r);
 
     const modalEl = document.getElementById('submissionDetailModal');
     if (modalEl && window.bootstrap) {
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    if (!r._summary || !contentEl) return;
+    try {
+        const full = await fetchFullResults([r]);
+        if (detailSeq !== submissionDetailSeq) return; // đã mở bài khác
+        contentEl.innerHTML = buildKeyResultDetailHtml(full.get(r.id) || r);
+    } catch (err) {
+        if (detailSeq !== submissionDetailSeq) return;
+        console.error('Load key result detail error:', err);
+        contentEl.innerHTML = submissionDetailErrorHtml(err);
     }
 }
 
@@ -2946,7 +3011,8 @@ function buildHomeworkResultDetailHtml(homeworkRow) {
 }
 
 // Mở modal theo index dòng (mỗi dòng = 1 buổi của 1 HV, nên không dùng user_id).
-function openSubmissionDetailByIndex(idx) {
+// Bảng chỉ giữ bản rút gọn → mở modal với thông tin chung trước, rồi tải bản đầy đủ.
+async function openSubmissionDetailByIndex(idx) {
     const target = (lopHocState.submissions || [])[idx];
     if (!target) return;
 
@@ -2956,13 +3022,31 @@ function openSubmissionDetailByIndex(idx) {
     const contentEl = document.getElementById('submission-detail-content');
     const modalEl = document.getElementById('submissionDetailModal');
     if (!titleEl || !metaEl || !contentEl || !modalEl) return;
+    const detailSeq = ++submissionDetailSeq;
 
-    const writingRow = target?._detailRows?.writing || (isWritingSubmissionRecord(target) ? target : null);
-    const speakingRow = target?._detailRows?.speaking || (isSpeakingSubmissionRecord(target) ? target : null);
-    const homeworkRow = target?._detailRows?.homework || (hasHomeworkResultDetailRecord(target) ? target : null);
+    const writingSummary = target?._detailRows?.writing || (isWritingSubmissionRecord(target) ? target : null);
+    const speakingSummary = target?._detailRows?.speaking || (isSpeakingSubmissionRecord(target) ? target : null);
+    const homeworkSummary = target?._detailRows?.homework || (hasHomeworkResultDetailRecord(target) ? target : null);
+    const gk = submissionGroupKey(target.user_id, submissionClassId(target), submissionSession(target));
+    const keySummary = (lopHocState.submissionKeyByGroup || {})[gk];
 
     titleEl.textContent = `Chi tiết bài nộp - ${user?.full_name || user?.account_code || target.user_id || ''}`;
     metaEl.innerHTML = buildSubmissionMetaChips(target, user);
+    contentEl.innerHTML = SUBMISSION_DETAIL_LOADING_HTML;
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+
+    let full;
+    try {
+        full = await fetchFullResults([writingSummary, speakingSummary, homeworkSummary, keySummary].filter(Boolean));
+    } catch (err) {
+        if (detailSeq !== submissionDetailSeq) return;
+        console.error('Load submission detail error:', err);
+        contentEl.innerHTML = submissionDetailErrorHtml(err);
+        return;
+    }
+    if (detailSeq !== submissionDetailSeq) return; // đã mở bài khác
+    const [writingRow, speakingRow, homeworkRow, keyRow] = [writingSummary, speakingSummary, homeworkSummary, keySummary]
+        .map((row) => (row && full.get(row.id)) || row || null);
 
     const sections = [];
     // 1) Phần BTVN
@@ -2974,8 +3058,6 @@ function openSubmissionDetailByIndex(idx) {
     sections.push(`<h5 class="mb-2"><i class="bi bi-journal-text me-1"></i>Bài tập về nhà (BTVN)</h5>${btvnParts.join('')}`);
 
     // 2) Phần Key của đúng buổi (nếu có)
-    const gk = submissionGroupKey(target.user_id, submissionClassId(target), submissionSession(target));
-    const keyRow = (lopHocState.submissionKeyByGroup || {})[gk];
     if (keyRow) {
         const kind = String(keyRow.metadata?.submission_kind || '').toLowerCase();
         const kindLabel = kind === 'key_listening' ? 'Key Listening' : (kind === 'key_reading' ? 'Key Reading' : 'Key');
@@ -2991,9 +3073,6 @@ function openSubmissionDetailByIndex(idx) {
     }
 
     contentEl.innerHTML = sections.join('<hr class="my-3">');
-
-    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-    modal.show();
 }
 
 function exportSubmissionsCSV() {
