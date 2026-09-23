@@ -6,21 +6,14 @@
 //
 //   kỹ năng -> chế độ học (câu hỏi / bộ đề) -> nhóm (Part 1, Part 2 & 3...) -> bài
 //
-// Trả về DANH SÁCH ĐẦY ĐỦ nhưng CHỈ METADATA (id, tên, số bộ...). Không kèm nội
-// dung đề, không kèm đáp án. Bài nào mở cho học thử thì có demoAvailable=true và
-// detailUrl để lấy nội dung; bài còn lại chỉ để hiển thị (khoá, mời đăng ký).
+// Catalog chỉ chứa METADATA (id, tên, số bộ...) để dựng menu cho nhẹ. Mỗi bài có
+// detailUrl -> gọi tiếp để lấy NỘI DUNG ĐẦY ĐỦ của bài đó.
 //
 // Chỉ chọn cột nhẹ, KHÔNG lấy cột `data` (chứa nguyên đề thi) để tiết kiệm băng
 // thông Supabase.
 
 import { selectFrom } from '../_utils/supabase.js';
-import {
-  demoGuard,
-  demoAllowedSetIds,
-  demoAllowedLessonIds,
-  cached,
-  byTitle
-} from './_shared.js';
+import { demoGuard, cached, byTitle, logicalSetType } from './_shared.js';
 
 // Cấu trúc bám đúng menu + nhãn cột đang hiển thị trên Mini Hippo
 // (reading_question.html, listening_question.html, *_bode.html).
@@ -99,12 +92,6 @@ const CATALOG = [
   }
 ];
 
-// Loại logic giống practice_sets/list: ưu tiên marker trong data, rồi mới tới cột type.
-function logicalType(row) {
-  const marker = String(row?.logical || '').trim().toLowerCase();
-  return marker || String(row?.type || '').toLowerCase();
-}
-
 async function loadSources() {
   const [lessons, sets] = await Promise.all([
     selectFrom('lessons', {
@@ -123,29 +110,25 @@ async function loadSources() {
   };
 }
 
-function lessonItem(row, allowed) {
-  const open = allowed.has(String(row.id));
+function lessonItem(row) {
   return {
     id: row.id,
     title: row.title,
     topic: row.topic || null,
     numSets: row.num_sets || null,
     source: 'lesson',
-    demoAvailable: open,
-    detailUrl: open ? `/api/lessons/demo-lesson?id=${row.id}` : null
+    detailUrl: `/api/lessons/demo-lesson?id=${row.id}`
   };
 }
 
-function setItem(row, allowed) {
-  const open = allowed.has(String(row.id));
+function setItem(row) {
   return {
     id: row.id,
     title: row.title,
     description: row.description || '',
     durationMinutes: row.duration_minutes || null,
     source: 'set',
-    demoAvailable: open,
-    detailUrl: open ? `/api/practice_sets/demo-set?id=${row.id}` : null
+    detailUrl: `/api/practice_sets/demo-set?id=${row.id}`
   };
 }
 
@@ -156,8 +139,6 @@ export default async function handler(req, res) {
 
   try {
     const { lessons, sets } = await cached('aptis-catalog', 60 * 1000, loadSources);
-    const allowedSets = new Set(demoAllowedSetIds());
-    const allowedLessons = new Set(demoAllowedLessonIds());
 
     const skills = CATALOG
       .filter((skill) => !skillFilter || skill.skill === skillFilter)
@@ -173,16 +154,15 @@ export default async function handler(req, res) {
             const items = group.source === 'lesson'
               ? lessons
                 .filter((row) => String(row.part) === group.part)
-                .map((row) => lessonItem(row, allowedLessons))
+                .map(lessonItem)
               : sets
-                .filter((row) => logicalType(row) === group.type)
-                .map((row) => setItem(row, allowedSets))
+                .filter((row) => logicalSetType(row) === group.type)
+                .map(setItem)
                 .sort(byTitle);
             return {
               key: group.key,
               label: group.label,
               count: items.length,
-              demoCount: items.filter((item) => item.demoAvailable).length,
               items
             };
           })

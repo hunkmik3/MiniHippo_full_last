@@ -1,71 +1,37 @@
-# Bài học thử Aptis — tài liệu cho dev web bán khoá
+# API nội dung bài học Mini Hippo — tài liệu cho dev web bán khoá
 
-Tài liệu bàn giao cho dev tích hợp bài học thử (Aptis) vào web bán khoá học.
-
-Có 2 cách dùng, **nên dùng cách 1**:
-
-1. **Nhúng iframe** — dùng luôn giao diện trang thi thật của Mini Hippo. Nhanh nhất, không phụ thuộc stack, tự động cập nhật khi Mini Hippo sửa đề/giao diện.
-2. **Gọi API lấy dữ liệu** — nếu muốn tự dựng giao diện riêng.
-
-Bài học thử **không cần đăng nhập** và **không lưu kết quả** về hệ thống: chấm và hiển thị điểm ngay trên trình duyệt.
-
----
-
-## 1. Nhúng iframe (khuyến nghị)
-
-```html
-<iframe
-  src="https://minihippo.edu.vn/reading_bode_set.html?demo=1&set=<SET_ID>&key=<DEMO_API_KEY>"
-  width="100%" height="900" style="border:0"
-  allow="microphone"></iframe>
-```
-
-Trang theo từng kỹ năng:
-
-| Kỹ năng | Trang nhúng |
-|---|---|
-| Reading | `reading_bode_set.html` |
-| Listening | `listening_bode_set.html` |
-| Speaking | `speaking_question.html` |
-| Writing | `writing_question.html` (dùng `lesson=<tên file>` thay cho `set=`) |
-
-Tham số:
-
-| Tham số | Bắt buộc | Ý nghĩa |
-|---|---|---|
-| `demo` | ✅ | Luôn để `1` để bật chế độ học thử |
-| `set` | ✅ (trừ Writing) | Id bộ đề, lấy từ API `/api/practice_sets/demo-sets` |
-| `lesson` | ✅ (Writing) | Tên file bài học writing |
-| `key` | ✅ | `DEMO_API_KEY` |
-| `cta` | — | Link đăng ký hiện ở màn hình kết quả |
-| `ctaLabel` | — | Chữ trên nút đăng ký (mặc định “Đăng ký học thật”) |
-
-Lưu ý:
-- `allow="microphone"` **bắt buộc** với Speaking (bài nói cần ghi âm).
-- Chế độ demo tự ẩn header/sidebar/footer nên iframe chỉ hiển thị phần làm bài.
-- Nên để `height` từ 900px trở lên; đề Reading/Listening khá dài.
-
-**Lấy nhanh mã nhúng:** mở `https://minihippo.edu.vn/demo.html?key=<DEMO_API_KEY>` — trang này liệt kê các bài học thử kèm nút xem thử và mã nhúng copy được.
-
----
-
-## 2. API lấy dữ liệu
+API chỉ đọc, dùng để lấy **toàn bộ nội dung bài học** Aptis và VSTEP (câu hỏi,
+đoạn văn, lựa chọn, audio, hình ảnh, đáp án) và dựng lại trên web bán khoá.
 
 Base URL: `https://minihippo.edu.vn`
 
-Xác thực: gắn API key theo **một trong hai cách**
-- Header: `X-Demo-Key: <DEMO_API_KEY>`
-- Hoặc query: `?key=<DEMO_API_KEY>`
+## Xác thực
 
-Chỉ hỗ trợ `GET`. Có CORS (`Access-Control-Allow-Origin`) cho các domain được cấu hình trong `DEMO_ALLOWED_ORIGINS`.
+Mọi request cần API key, gắn theo **một trong hai cách**:
 
-### ⭐ GET `/api/lessons/demo-catalog` — cây nội dung Aptis (NÊN DÙNG)
+- Header: `X-Demo-Key: <API_KEY>` *(khuyến nghị)*
+- Query: `?key=<API_KEY>`
 
-**Một lần gọi trả về đủ cả cây** đã nhóm sẵn giống menu Mini Hippo — không cần
-gọi riêng từng part.
+Chỉ hỗ trợ `GET`.
+
+> 🔒 **Nên gọi API từ backend của bạn**, không gọi thẳng từ trình duyệt. API key
+> mở được toàn bộ ngân hàng đề — nếu đặt ở frontend, ai mở DevTools cũng lấy được
+> key và tải hết. Gọi từ server thì key được giữ kín.
+
+## Cách dùng: 2 bước
+
+1. Gọi **catalog** → có cả cây bài học đã nhóm sẵn (chỉ metadata, rất nhẹ).
+2. Với bài cần hiển thị → gọi **`detailUrl`** của bài đó để lấy nội dung đầy đủ.
+
+---
+
+## 1. Aptis
+
+### ⭐ GET `/api/lessons/demo-catalog`
+
+**Một lần gọi có đủ cả cây**, nhóm giống hệt menu Mini Hippo:
 
 ```
-kỹ năng → chế độ học → nhóm (part) → bài
 Reading   → Học theo câu hỏi → Part 1 · Part 2 & 3 · Part 4 · Part 5
           → Học theo bộ đề   → Bộ đề Reading
 Listening → Học theo câu hỏi → Question 1-13 · 14 · 15 · 16 & 17
@@ -79,115 +45,104 @@ Query tuỳ chọn: `skill=reading|listening|writing|speaking` (bỏ trống = c
 ```json
 {
   "skills": [{
-    "skill": "reading", "label": "Reading",
+    "skill": "reading",
+    "label": "Reading",
     "modes": [{
-      "mode": "by_question", "label": "Học theo câu hỏi",
+      "mode": "by_question",
+      "label": "Học theo câu hỏi",
       "groups": [{
-        "key": "1", "label": "Part 1", "count": 1, "demoCount": 1,
+        "key": "1",
+        "label": "Part 1",
+        "count": 1,
         "items": [{
-          "id": "78935751-…", "title": "READING ĐỀ 4 - Question 1",
-          "source": "lesson", "demoAvailable": true,
+          "id": "78935751-…",
+          "title": "READING ĐỀ 4 - Question 1",
+          "topic": null,
+          "numSets": 18,
+          "source": "lesson",
           "detailUrl": "/api/lessons/demo-lesson?id=78935751-…"
         }]
       }]
     }]
-  }]
+  }],
+  "generatedAt": "2026-09-23T10:00:00.000Z"
 }
 ```
 
-- Trả **toàn bộ danh sách** nhưng **chỉ metadata** (tên, số bộ…) — không kèm đề, không kèm đáp án.
-- `demoAvailable: true` → bài mở cho học thử, gọi `detailUrl` (thêm `&key=`) để lấy nội dung.
-- `demoAvailable: false` → chỉ hiển thị, gợi ý hiện dạng **khoá / mời đăng ký**.
-- Dữ liệu cache 60 giây phía server → sửa đề trên Mini Hippo, tối đa 1 phút sau là thấy.
+Mỗi bài có `source`:
+- `lesson` → chi tiết ở `/api/lessons/demo-lesson`
+- `set` → chi tiết ở `/api/practice_sets/demo-set`
 
-### GET `/api/practice_sets/demo-sets`
+Cứ gọi thẳng `detailUrl` là đúng, không cần phân biệt.
 
-Danh sách bài học thử. Không kèm nội dung đề, không kèm đáp án.
+### GET `/api/lessons/demo-lesson?id=<ID>`
 
-Query tuỳ chọn: `skill=reading|listening|writing|speaking`
+Nội dung 1 bài "học theo câu hỏi" (Reading/Listening) hoặc 1 bộ đề Writing.
+
+Nội dung loại này vốn lưu trên Mini Hippo dưới dạng **file JavaScript**, mỗi part
+một cấu trúc riêng. Endpoint đã **chuyển sẵn sang JSON**.
 
 ```json
 {
-  "sets": [
-    {
-      "id": "a47ea4a8-d9db-4a60-9e13-5b66e624fe03",
-      "title": "READING ĐỀ 18",
-      "description": "",
-      "skill": "reading",
-      "durationMinutes": 35
-    }
-  ]
+  "lesson": { "id": "…", "part": "1", "title": "READING ĐỀ 4 - Question 1", "numSets": 18 },
+  "data": {
+    "questions1_1": [{
+      "questionStart": "I imagine you don’t want to",
+      "answerOptions": ["miss", "love", "remember"],
+      "questionEnd": "this.",
+      "correctAnswer": "miss"
+    }]
+  },
+  "variables": ["questions1_1", "questions1_2", "…"]
 }
 ```
 
-### GET `/api/practice_sets/demo-set?id=<SET_ID>`
+⚠️ **Mỗi part có cấu trúc khác nhau** — đây là định dạng gốc của Mini Hippo:
 
-Nội dung đầy đủ của 1 bài học thử (gồm câu hỏi và đáp án, để chấm tại chỗ).
+| Part | Biến dữ liệu chính |
+|---|---|
+| Reading 1 | `questions1_1`, `questions1_2`… (mảng câu) |
+| Reading 2 & 3 | `question2Content_1`… |
+| Reading 4 | `question4Text_1`, `question4Content_1`, `correctAnswersQuestion4_1`… |
+| Reading 5 | `options_1`, `paragraph_question5_1`… |
+| Listening 1-13 | `listeningQuestions1` (mảng câu) |
+| Listening 14 | `question14Data_1`… |
+| Listening 15 | `question15Data_1`… |
+| Listening 16 & 17 | `question16Data` |
+| Writing | `key_id`, `club_name`, `questions1`, `questions2`… |
+
+Trường `variables` liệt kê đúng các biến có trong bài.
+
+### GET `/api/practice_sets/demo-set?id=<ID>`
+
+Nội dung 1 bộ đề Reading / Listening / Speaking — nguyên định dạng trang thi
+Mini Hippo đang dùng.
 
 ```json
 {
   "set": {
-    "id": "...",
+    "id": "…",
     "title": "READING ĐỀ 18",
-    "type": "reading",
     "duration_minutes": 35,
     "data": { "part1": {}, "part2": {}, "part4": {}, "part5": {} }
   },
-  "skill": "reading",
-  "demo": true
+  "skill": "reading"
 }
 ```
 
-### GET `/api/lessons/demo-lessons`
+### Danh sách phẳng (không nhóm) — tuỳ chọn
 
-Danh sách bài **"học theo câu hỏi"** (Reading / Listening / Writing).
-
-Query tuỳ chọn `part`:
-- Reading: `1`, `2`, `4`, `5`
-- Listening: `listening_1_13`, `listening_14`, `listening_15`, `listening_16_17`
-- Writing: `writing`
-
-```json
-{ "lessons": [ { "id": "...", "part": "1", "title": "READING ĐỀ 4", "topic": null, "numSets": 18 } ] }
-```
-
-### GET `/api/lessons/demo-lesson?id=<LESSON_ID>`
-
-Nội dung bài "học theo câu hỏi", **đã chuyển sang JSON**.
-
-Bài loại này vốn lưu trên GitHub dưới dạng file JavaScript (mỗi part một cấu trúc
-khác nhau). Endpoint này chạy file đó trong sandbox rồi bóc ra dữ liệu thuần, nên
-bên ngoài dùng như JSON bình thường.
-
-```json
-{
-  "lesson": { "id": "...", "part": "1", "title": "READING ĐỀ 4", "numSets": 18 },
-  "data": {
-    "questions1_1": [
-      { "questionStart": "I imagine you don’t want to",
-        "answerOptions": ["miss", "love", "remember"],
-        "questionEnd": "this.",
-        "correctAnswer": "miss" }
-    ]
-  },
-  "variables": ["questions1_1", "questions1_2"],
-  "demo": true
-}
-```
-
-> ⚠️ Mỗi part có cấu trúc riêng (`questions1_1`, `question2Content_1`, `question4Text_1`,
-> `options_1`, `question15Data_1`, `listeningQuestions1`, `key_id`/`club_name`...).
-> Trường `variables` liệt kê đúng các biến có trong bài để dò.
+Nếu không cần cây nhóm sẵn:
+- `GET /api/lessons/demo-lessons?part=1` — bài "học theo câu hỏi" + Writing
+- `GET /api/practice_sets/demo-sets?skill=reading` — bộ đề
 
 ---
 
-## 2c. API VSTEP
+## 2. VSTEP
 
-Cùng API key, cùng cách xác thực như Aptis.
+### ⭐ GET `/api/vstep/demo/catalog`
 
-### ⭐ GET `/api/vstep/demo/catalog` — cây nội dung ôn thi VSTEP
-
-Nhóm đúng như sidebar khu Ôn thi VSTEP:
+Nhóm giống sidebar khu Ôn thi VSTEP:
 
 ```
 Full Test (bộ đề tổng hợp 4 kỹ năng) → Listening → Reading → Writing → Speaking
@@ -198,81 +153,81 @@ Query tuỳ chọn: `skill=full_test|listening|reading|writing|speaking`.
 ```json
 {
   "groups": [{
-    "key": "full_test", "label": "Full Test (bộ đề tổng hợp)",
-    "count": 9, "demoCount": 1,
+    "key": "full_test",
+    "label": "Full Test (bộ đề tổng hợp)",
+    "count": 9,
     "items": [{
-      "id": "45a5a6c4-…", "title": "FULL BÀI THI 9",
-      "durationMinutes": null, "combined": true,
+      "id": "45a5a6c4-…",
+      "title": "FULL BÀI THI 9",
+      "combined": true,
+      "durationMinutes": null,
       "track": null, "order": null, "deadlineAt": null,
-      "demoAvailable": true,
       "detailUrl": "/api/vstep/demo/content?id=45a5a6c4-…"
     }]
   }]
 }
 ```
 
-Chỉ lấy nội dung **khu Ôn thi đã xuất bản**. Khu Học tập (bài giao theo lớp) không đưa ra ngoài.
+Chỉ gồm nội dung **khu Ôn thi đã xuất bản** — đúng những gì học viên Mini Hippo
+đang thấy.
 
-### GET `/api/vstep/demo/content?id=<CONTENT_ID>`
+### GET `/api/vstep/demo/content?id=<ID>`
 
-Nội dung đầy đủ 1 bộ đề (câu hỏi + đáp án). **Bộ đề tổng hợp được gộp sẵn đủ 4 kỹ năng.**
+Nội dung đầy đủ 1 bộ đề. **Bộ đề tổng hợp được gộp sẵn đủ 4 kỹ năng.**
 
 ```json
 {
   "content": {
-    "id": "…", "title": "FULL BÀI THI 9",
+    "id": "…",
+    "title": "FULL BÀI THI 9",
     "data": {
-      "listening": { "parts": [ … ] },
-      "reading":   { "parts": [ … ] },
-      "writing":   { "parts": [ … ] },
-      "speaking":  { "parts": [ … ] },
+      "listening": { "parts": [] },
+      "reading":   { "parts": [] },
+      "writing":   { "parts": [] },
+      "speaking":  { "parts": [] },
       "durations": { "listening": 45, "reading": 60, "writing": 60, "speaking": 12 }
     }
-  },
-  "demo": true
+  }
 }
 ```
 
-Chỉ mở cho bộ đề nằm trong `DEMO_VSTEP_IDS`, id khác trả `403`.
-
 ---
 
-## 2b. Cấu hình allowlist bài học
+## 3. Lưu ý khi dựng giao diện
 
-| Biến | Ý nghĩa |
-|---|---|
-| `DEMO_LESSON_IDS` | Allowlist id bài "học theo câu hỏi" (bảng `lessons`) |
-| `DEMO_VSTEP_IDS` | Allowlist id bộ đề VSTEP (bảng `vstep_contents`) |
+- **Audio / hình ảnh**: phần lớn là URL đầy đủ (GitHub hoặc Cloudflare R2), dùng
+  thẳng được. Một số ít là đường dẫn tương đối (vd `audio/question1_13/audio_q1.mp3`)
+  → ghép với Base URL: `https://minihippo.edu.vn/audio/question1_13/audio_q1.mp3`
+- Có vài bài Listening đang **thiếu file audio ngay trên Mini Hippo** (bên Mini
+  Hippo đang xử lý). URL audio của các bài này trả `404` — nên hiển thị dạng "chưa
+  có audio" thay vì để trình phát lỗi.
+- Dữ liệu được **cache phía server**: catalog 1 phút, nội dung bài 5 phút. Sửa đề
+  trên Mini Hippo thì tối đa vài phút sau API mới trả bản mới.
+- Muốn giao diện **giống hệt** trang thi Mini Hippo thì xem bộ file `demo_export/`
+  (copy nguyên HTML/CSS/JS trang thi thật).
 
-### Mã lỗi
+## 4. Mã lỗi
 
 | Mã | Ý nghĩa |
 |---|---|
+| `400` | Thiếu tham số `id` |
 | `401` | Thiếu hoặc sai API key |
-| `403` | Domain không nằm trong allowlist, **hoặc** bộ đề không mở cho học thử |
-| `404` | Không tìm thấy bộ đề |
-| `503` | Máy chủ chưa cấu hình `DEMO_API_KEY` |
+| `403` | Domain gọi từ trình duyệt không nằm trong danh sách cho phép |
+| `404` | Không tìm thấy bài học |
+| `502` | Tạm thời không tải được nội dung bài từ kho lưu trữ, thử lại sau |
+| `503` | Máy chủ chưa cấu hình API key |
 
 ---
 
-## 3. Cấu hình phía Mini Hippo (Vercel → Environment Variables)
+## Phía Mini Hippo (Vercel → Environment Variables)
 
-| Biến | Ví dụ | Ý nghĩa |
-|---|---|---|
-| `DEMO_API_KEY` | `a1b2c3...` | Key cấp cho dev web bán khoá |
-| `DEMO_SET_IDS` | `id1,id2,id3` | **Allowlist** bộ đề (`practice_sets`) mở cho học thử |
-| `DEMO_LESSON_IDS` | `id1,id2` | **Allowlist** bài "học theo câu hỏi" (`lessons`) |
-| `DEMO_VSTEP_IDS` | `id1,id2` | **Allowlist** bộ đề VSTEP (`vstep_contents`) |
-| `DEMO_ALLOWED_ORIGINS` | `https://khoahoc.example.com` | Domain được phép gọi API (để trống = chỉ chặn bằng key) |
+| Biến | Ý nghĩa |
+|---|---|
+| `DEMO_API_KEY` | API key cấp cho dev web bán khoá |
+| `DEMO_ALLOWED_ORIGINS` | Domain được gọi API từ trình duyệt, cách nhau dấu phẩy (để trống = chỉ chặn bằng key) |
 
-Đổi biến xong cần **redeploy** để có hiệu lực.
+Đổi biến xong cần **Redeploy** mới có hiệu lực.
 
----
-
-## 4. Những điểm đã chốt về bảo mật
-
-- **Chỉ các bộ đề trong `DEMO_SET_IDS`** mới lấy được. Id ngoài danh sách bị trả `403` và **không hề truy vấn database**.
-- API demo **chỉ đọc**, không có endpoint ghi.
-- Bài học thử **không gọi AI chấm bài** (`/api/ask` bị chặn ở chế độ demo) để tránh phát sinh chi phí AI và bị lạm dụng trên trang công khai. Người dùng thấy lời mời đăng ký thay cho nhận xét AI.
-- API key đặt ở frontend nên **có thể bị lộ** — đây là rào chống gọi bừa, không phải bảo mật tuyệt đối. Thiệt hại tối đa nếu lộ key chỉ giới hạn trong mấy bộ đề demo.
-- Do chấm tại chỗ trên trình duyệt nên **đáp án nằm trong dữ liệu trả về** (xem được ở tab Network). Vì vậy chỉ đưa đề demo vào `DEMO_SET_IDS`, **tuyệt đối không đưa đề thi thật của học viên**.
+API chỉ trả **nội dung bài học**. Dữ liệu nội bộ nằm cùng bảng (lớp học, lịch buổi
+học, nội dung buổi Lớp Học, bộ Key, bài nháp, khu Học tập VSTEP) bị chặn — gọi vào
+sẽ nhận `404`.
