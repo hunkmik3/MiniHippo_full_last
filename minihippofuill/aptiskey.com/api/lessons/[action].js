@@ -8,8 +8,11 @@ import list from '../../server/api/lessons/list.js';
 // Serverless Function (Hobby plan giới hạn 12).
 import demoLesson from '../../server/api/demo/lesson.js';
 import demoLessons from '../../server/api/demo/lessons.js';
+import demoCatalog from '../../server/api/demo/catalog.js';
 
 const handlers = {
+  // Cây nội dung Aptis đã nhóm sẵn (kỹ năng -> chế độ -> part -> bài), 1 lần gọi.
+  'demo-catalog': demoCatalog,
   'demo-lesson': demoLesson,
   'demo-lessons': demoLessons,
   delete: remove,

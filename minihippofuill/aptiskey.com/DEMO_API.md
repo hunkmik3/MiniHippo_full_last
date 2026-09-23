@@ -51,13 +51,54 @@ Lưu ý:
 
 ## 2. API lấy dữ liệu
 
-Base URL: `https://minihippo.edu.vn/api/demo`
+Base URL: `https://minihippo.edu.vn`
 
 Xác thực: gắn API key theo **một trong hai cách**
 - Header: `X-Demo-Key: <DEMO_API_KEY>`
 - Hoặc query: `?key=<DEMO_API_KEY>`
 
 Chỉ hỗ trợ `GET`. Có CORS (`Access-Control-Allow-Origin`) cho các domain được cấu hình trong `DEMO_ALLOWED_ORIGINS`.
+
+### ⭐ GET `/api/lessons/demo-catalog` — cây nội dung Aptis (NÊN DÙNG)
+
+**Một lần gọi trả về đủ cả cây** đã nhóm sẵn giống menu Mini Hippo — không cần
+gọi riêng từng part.
+
+```
+kỹ năng → chế độ học → nhóm (part) → bài
+Reading   → Học theo câu hỏi → Part 1 · Part 2 & 3 · Part 4 · Part 5
+          → Học theo bộ đề   → Bộ đề Reading
+Listening → Học theo câu hỏi → Question 1-13 · 14 · 15 · 16 & 17
+          → Học theo bộ đề   → Bộ đề Listening
+Writing   → Học theo bộ đề
+Speaking  → Học theo câu hỏi · Học theo bộ đề
+```
+
+Query tuỳ chọn: `skill=reading|listening|writing|speaking` (bỏ trống = cả 4).
+
+```json
+{
+  "skills": [{
+    "skill": "reading", "label": "Reading",
+    "modes": [{
+      "mode": "by_question", "label": "Học theo câu hỏi",
+      "groups": [{
+        "key": "1", "label": "Part 1", "count": 1, "demoCount": 1,
+        "items": [{
+          "id": "78935751-…", "title": "READING ĐỀ 4 - Question 1",
+          "source": "lesson", "demoAvailable": true,
+          "detailUrl": "/api/lessons/demo-lesson?id=78935751-…"
+        }]
+      }]
+    }]
+  }]
+}
+```
+
+- Trả **toàn bộ danh sách** nhưng **chỉ metadata** (tên, số bộ…) — không kèm đề, không kèm đáp án.
+- `demoAvailable: true` → bài mở cho học thử, gọi `detailUrl` (thêm `&key=`) để lấy nội dung.
+- `demoAvailable: false` → chỉ hiển thị, gợi ý hiện dạng **khoá / mời đăng ký**.
+- Dữ liệu cache 60 giây phía server → sửa đề trên Mini Hippo, tối đa 1 phút sau là thấy.
 
 ### GET `/api/practice_sets/demo-sets`
 
@@ -140,11 +181,68 @@ bên ngoài dùng như JSON bình thường.
 
 ---
 
+## 2c. API VSTEP
+
+Cùng API key, cùng cách xác thực như Aptis.
+
+### ⭐ GET `/api/vstep/demo/catalog` — cây nội dung ôn thi VSTEP
+
+Nhóm đúng như sidebar khu Ôn thi VSTEP:
+
+```
+Full Test (bộ đề tổng hợp 4 kỹ năng) → Listening → Reading → Writing → Speaking
+```
+
+Query tuỳ chọn: `skill=full_test|listening|reading|writing|speaking`.
+
+```json
+{
+  "groups": [{
+    "key": "full_test", "label": "Full Test (bộ đề tổng hợp)",
+    "count": 9, "demoCount": 1,
+    "items": [{
+      "id": "45a5a6c4-…", "title": "FULL BÀI THI 9",
+      "durationMinutes": null, "combined": true,
+      "track": null, "order": null, "deadlineAt": null,
+      "demoAvailable": true,
+      "detailUrl": "/api/vstep/demo/content?id=45a5a6c4-…"
+    }]
+  }]
+}
+```
+
+Chỉ lấy nội dung **khu Ôn thi đã xuất bản**. Khu Học tập (bài giao theo lớp) không đưa ra ngoài.
+
+### GET `/api/vstep/demo/content?id=<CONTENT_ID>`
+
+Nội dung đầy đủ 1 bộ đề (câu hỏi + đáp án). **Bộ đề tổng hợp được gộp sẵn đủ 4 kỹ năng.**
+
+```json
+{
+  "content": {
+    "id": "…", "title": "FULL BÀI THI 9",
+    "data": {
+      "listening": { "parts": [ … ] },
+      "reading":   { "parts": [ … ] },
+      "writing":   { "parts": [ … ] },
+      "speaking":  { "parts": [ … ] },
+      "durations": { "listening": 45, "reading": 60, "writing": 60, "speaking": 12 }
+    }
+  },
+  "demo": true
+}
+```
+
+Chỉ mở cho bộ đề nằm trong `DEMO_VSTEP_IDS`, id khác trả `403`.
+
+---
+
 ## 2b. Cấu hình allowlist bài học
 
 | Biến | Ý nghĩa |
 |---|---|
 | `DEMO_LESSON_IDS` | Allowlist id bài "học theo câu hỏi" (bảng `lessons`) |
+| `DEMO_VSTEP_IDS` | Allowlist id bộ đề VSTEP (bảng `vstep_contents`) |
 
 ### Mã lỗi
 
@@ -164,6 +262,7 @@ bên ngoài dùng như JSON bình thường.
 | `DEMO_API_KEY` | `a1b2c3...` | Key cấp cho dev web bán khoá |
 | `DEMO_SET_IDS` | `id1,id2,id3` | **Allowlist** bộ đề (`practice_sets`) mở cho học thử |
 | `DEMO_LESSON_IDS` | `id1,id2` | **Allowlist** bài "học theo câu hỏi" (`lessons`) |
+| `DEMO_VSTEP_IDS` | `id1,id2` | **Allowlist** bộ đề VSTEP (`vstep_contents`) |
 | `DEMO_ALLOWED_ORIGINS` | `https://khoahoc.example.com` | Domain được phép gọi API (để trống = chỉ chặn bằng key) |
 
 Đổi biến xong cần **redeploy** để có hiệu lực.
