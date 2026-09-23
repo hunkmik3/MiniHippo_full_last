@@ -1,5 +1,5 @@
 import { verifyAdminRequest } from '../_utils/auth.js';
-import { selectFrom } from '../_utils/supabase.js';
+import { selectAll } from '../_utils/supabase.js';
 
 const CLASSROOM_COURSES = new Set(['lớp học', 'lớp ôn thi', 'lop hoc', 'lop on thi']);
 
@@ -50,14 +50,16 @@ export default async function handler(req, res) {
     const group =
       typeof req.query.group === 'string' ? req.query.group.trim().toLowerCase() : 'all';
 
-    const users = await selectFrom('users', {
-      order: { column: 'created_at', asc: false }
+    // Đọc hết theo từng trang: quá 1000 dòng thì Supabase cắt bớt (mất các tài khoản cũ nhất).
+    const users = await selectAll('users', {
+      order: [{ column: 'created_at', asc: false }, { column: 'id', asc: false }]
     });
 
     let deviceCounts = {};
     try {
-      const deviceRows = await selectFrom('user_devices', {
-        columns: 'user_id,status'
+      const deviceRows = await selectAll('user_devices', {
+        columns: 'user_id,status',
+        order: { column: 'id', asc: true }
       });
       if (Array.isArray(deviceRows)) {
         deviceCounts = deviceRows.reduce((acc, device) => {
