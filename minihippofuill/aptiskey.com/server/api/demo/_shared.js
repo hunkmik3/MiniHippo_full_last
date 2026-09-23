@@ -39,6 +39,39 @@ export function isDemoLessonAllowed(id) {
   return demoAllowedLessonIds().includes(String(id || '').trim());
 }
 
+// Allowlist riêng cho VSTEP (bảng vstep_contents).
+export function demoAllowedVstepIds() {
+  return parseList(process.env.DEMO_VSTEP_IDS);
+}
+
+export function isDemoVstepAllowed(id) {
+  return demoAllowedVstepIds().includes(String(id || '').trim());
+}
+
+// Cache ngắn hạn trong bộ nhớ của instance serverless. Endpoint catalog được web
+// bán khoá gọi mỗi lần có khách vào trang -> không cache thì mỗi lượt xem là 1
+// lần đọc DB (Supabase free đã 2 lần bị khoá vì hết băng thông).
+// Chỉ cache DỮ LIỆU, và chỉ gọi sau khi demoGuard đã kiểm tra key -> không lộ
+// dữ liệu cho request không có key.
+const memoStore = new Map();
+
+export async function cached(cacheKey, ttlMs, loader) {
+  const now = Date.now();
+  const hit = memoStore.get(cacheKey);
+  if (hit && hit.expiresAt > now) return hit.value;
+  const value = await loader();
+  memoStore.set(cacheKey, { value, expiresAt: now + ttlMs });
+  return value;
+}
+
+// So sánh tiêu đề giống UI Mini Hippo: "ĐỀ 2" đứng trước "ĐỀ 10".
+export function byTitle(a, b) {
+  return String(a?.title || '').localeCompare(String(b?.title || ''), 'vi', {
+    numeric: true,
+    sensitivity: 'base'
+  });
+}
+
 function applyCors(req, res) {
   const allowedOrigins = parseList(process.env.DEMO_ALLOWED_ORIGINS);
   const origin = String(req.headers?.origin || '');

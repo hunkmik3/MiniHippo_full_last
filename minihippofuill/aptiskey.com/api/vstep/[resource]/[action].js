@@ -26,12 +26,19 @@ import listStudents from '../../../server/api/vstep/students/list.js';
 import bulkImportStudents from '../../../server/api/vstep/students/bulk-import.js';
 import updateStudent from '../../../server/api/vstep/students/update.js';
 import deleteStudent from '../../../server/api/vstep/students/delete.js';
+// API HỌC THỬ VSTEP cho web bán khoá (chỉ đọc, chặn bằng API key).
+import demoVstepCatalog from '../../../server/api/demo/vstep_catalog.js';
+import demoVstepContent from '../../../server/api/demo/vstep_content.js';
 
 // Chấm AI (Grok reasoning + Whisper) có thể mất 60-120s/bài → nới maxDuration.
 // Cần Vercel Pro để >60s; Hobby cap 60s.
 export const config = { maxDuration: 300 };
 
 const handlers = {
+  demo: {
+    catalog: demoVstepCatalog,
+    content: demoVstepContent
+  },
   ai: {
     'grade-writing': gradeWriting,
     grade_writing: gradeWriting,
