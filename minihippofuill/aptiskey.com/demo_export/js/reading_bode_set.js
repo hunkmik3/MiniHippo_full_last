@@ -185,7 +185,7 @@
         refs.nextButton.addEventListener('click', () => {
             if (state.completed) {
                 // Khi đã hoàn thành bài và bấm "The end" -> quay về trang nguồn
-                window.location.href = returnPage;
+                window.MiniHippoDemo.exit(returnPage);
                 return;
             }
 

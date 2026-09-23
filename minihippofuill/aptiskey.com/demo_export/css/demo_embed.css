@@ -3,12 +3,12 @@
    Chỉ có tác dụng khi js/demo_embed.js gắn class .mh-demo-embed vào body
    (tức là có ?demo=1). Học viên thật KHÔNG bị ảnh hưởng.
    =================================================================== */
+/* Chỉ ẩn khung AdminLTE của Mini Hippo. KHÔNG ẩn thẻ <footer>/<nav> chung chung:
+   trang thi VSTEP để nút "TIẾP TỤC"/"LƯU BÀI" trong <footer class="vstep-exam-footer">. */
 body.mh-demo-embed .app-header,
 body.mh-demo-embed .app-sidebar,
 body.mh-demo-embed .app-footer,
 body.mh-demo-embed .app-content-header,
-body.mh-demo-embed nav.navbar,
-body.mh-demo-embed footer,
 body.mh-demo-embed .sidebar-brand,
 body.mh-demo-embed [data-lte-toggle="sidebar"] {
   display: none !important;

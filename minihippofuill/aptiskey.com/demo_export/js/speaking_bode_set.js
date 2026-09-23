@@ -1232,7 +1232,7 @@
                 new bootstrap.Modal(modalEl).show();
             } else {
                 alert('Nộp bài thành công.');
-                window.location.href = 'lesson_history.html';
+                window.MiniHippoDemo.exit('lesson_history.html');
             }
         } catch (error) {
             alert(error.message || 'Không thể nộp bài. Vui lòng thử lại.');

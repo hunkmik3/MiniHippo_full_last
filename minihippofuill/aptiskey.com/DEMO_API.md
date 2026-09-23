@@ -3,7 +3,8 @@
 API chỉ đọc, dùng để lấy **toàn bộ nội dung bài học** Aptis và VSTEP (câu hỏi,
 đoạn văn, lựa chọn, audio, hình ảnh, đáp án) và dựng lại trên web bán khoá.
 
-Base URL: `https://minihippo.edu.vn`
+Base URL: `https://www.minihippo.edu.vn` *(có `www` — domain không `www` tự chuyển hướng, trình duyệt sẽ chặn
+khi gọi kèm header `X-Demo-Key`)*
 
 ## Xác thực
 
@@ -21,7 +22,10 @@ Chỉ hỗ trợ `GET`.
 ## Cách dùng: 2 bước
 
 1. Gọi **catalog** → có cả cây bài học đã nhóm sẵn (chỉ metadata, rất nhẹ).
-2. Với bài cần hiển thị → gọi **`detailUrl`** của bài đó để lấy nội dung đầy đủ.
+2. Với bài cần hiển thị, chọn 1 trong 2 cách:
+   - **Dùng giao diện thật của Mini Hippo** (bộ `demo_export/`, nhúng iframe) → dùng
+     **`embedUrl`** của bài, xem mục 3.
+   - **Tự dựng giao diện** → gọi **`detailUrl`** để lấy nội dung đầy đủ dạng JSON.
 
 ---
 
@@ -60,7 +64,8 @@ Query tuỳ chọn: `skill=reading|listening|writing|speaking` (bỏ trống = c
           "topic": null,
           "numSets": 18,
           "source": "lesson",
-          "detailUrl": "/api/lessons/demo-lesson?id=78935751-…"
+          "detailUrl": "/api/lessons/demo-lesson?id=78935751-…",
+          "embedUrl": "reading_part1.html?lesson=78935751-…"
         }]
       }]
     }]
@@ -74,6 +79,9 @@ Mỗi bài có `source`:
 - `set` → chi tiết ở `/api/practice_sets/demo-set`
 
 Cứ gọi thẳng `detailUrl` là đúng, không cần phân biệt.
+
+`embedUrl` = trang giao diện thật tương ứng trong bộ `demo_export/` (đường dẫn tương
+đối so với thư mục đó), đã kèm sẵn tham số. Mọi bài đều có — kể cả "học theo câu hỏi".
 
 ### GET `/api/lessons/demo-lesson?id=<ID>`
 
@@ -162,7 +170,8 @@ Query tuỳ chọn: `skill=full_test|listening|reading|writing|speaking`.
       "combined": true,
       "durationMinutes": null,
       "track": null, "order": null, "deadlineAt": null,
-      "detailUrl": "/api/vstep/demo/content?id=45a5a6c4-…"
+      "detailUrl": "/api/vstep/demo/content?id=45a5a6c4-…",
+      "embedUrl": "vstep.html?set=45a5a6c4-…"
     }]
   }]
 }
@@ -193,20 +202,42 @@ Nội dung đầy đủ 1 bộ đề. **Bộ đề tổng hợp được gộp s
 
 ---
 
-## 3. Lưu ý khi dựng giao diện
+## 3. Giao diện thật (bộ `demo_export/`)
+
+Bản sao nguyên các trang học/thi đang chạy trên Mini Hippo — **đủ mọi phần**:
+
+| Phần | Trang |
+|---|---|
+| Aptis · Reading học theo câu hỏi | `reading_part1.html` · `reading_part2.html` · `reading_part4.html` · `reading_part5.html` |
+| Aptis · Listening học theo câu hỏi | `listening_q1_13.html` · `listening_q14.html` · `listening_q15.html` · `listening_q16_17.html` |
+| Aptis · Speaking học theo câu hỏi | `speaking_part.html` |
+| Aptis · học theo bộ đề | `reading.html` · `listening.html` · `speaking.html` · `writing.html` |
+| VSTEP · phòng thi (Full Test + từng kỹ năng) | `vstep.html` |
+
+Không cần nhớ bảng này: lấy `embedUrl` của bài trong catalog rồi nhúng:
+
+```html
+<iframe src="/demo_export/{embedUrl}" width="100%" height="900" style="border:0"
+        allow="microphone; camera; fullscreen; autoplay" allowfullscreen></iframe>
+```
+
+Cấu hình (domain + API key) và cách bắt sự kiện "rời bài" xem `demo_export/README.md`.
+Domain của web bán khoá phải nằm trong `DEMO_ALLOWED_ORIGINS` (mục cuối), không thì
+trình duyệt báo lỗi `403`/CORS.
+
+## 4. Lưu ý khi dựng giao diện
 
 - **Audio / hình ảnh**: phần lớn là URL đầy đủ (GitHub hoặc Cloudflare R2), dùng
   thẳng được. Một số ít là đường dẫn tương đối (vd `audio/question1_13/audio_q1.mp3`)
-  → ghép với Base URL: `https://minihippo.edu.vn/audio/question1_13/audio_q1.mp3`
+  → ghép với Base URL: `https://www.minihippo.edu.vn/audio/question1_13/audio_q1.mp3`
 - Có vài bài Listening đang **thiếu file audio ngay trên Mini Hippo** (bên Mini
   Hippo đang xử lý). URL audio của các bài này trả `404` — nên hiển thị dạng "chưa
   có audio" thay vì để trình phát lỗi.
 - Dữ liệu được **cache phía server**: catalog 1 phút, nội dung bài 5 phút. Sửa đề
   trên Mini Hippo thì tối đa vài phút sau API mới trả bản mới.
-- Muốn giao diện **giống hệt** trang thi Mini Hippo thì xem bộ file `demo_export/`
-  (copy nguyên HTML/CSS/JS trang thi thật).
+- Muốn giao diện **giống hệt** trang thi Mini Hippo thì dùng bộ `demo_export/` (mục 3).
 
-## 4. Mã lỗi
+## 5. Mã lỗi
 
 | Mã | Ý nghĩa |
 |---|---|

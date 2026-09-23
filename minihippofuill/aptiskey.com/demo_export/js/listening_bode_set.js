@@ -1319,7 +1319,7 @@
         if (refs.nextButton) {
             refs.nextButton.textContent = 'The end';
             refs.nextButton.onclick = () => {
-                window.location.href = returnPage;
+                window.MiniHippoDemo.exit(returnPage);
             };
         }
         state.completed = true;

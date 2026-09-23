@@ -44,6 +44,16 @@ function byOrderThenTitle(a, b) {
   return oa - ob || byTitle(a, b);
 }
 
+// Mở bằng giao diện thật trong demo_export/ — giống link "Vào thi" của trang ôn thi:
+// bộ 1 kỹ năng thì mở đúng kỹ năng đó, bộ tổng hợp thì thi đủ 4 kỹ năng.
+function embedUrl(row) {
+  const skill = String(row.skill || '').toLowerCase();
+  if (!row.combined && ['listening', 'reading', 'writing', 'speaking'].includes(skill)) {
+    return `vstep.html?set=${row.id}&skill=${skill}&mode=set`;
+  }
+  return `vstep.html?set=${row.id}`;
+}
+
 function toItem(row) {
   const onthi = row.onthi && typeof row.onthi === 'object' ? row.onthi : {};
   return {
@@ -60,7 +70,8 @@ function toItem(row) {
     accessFrom: onthi.accessFrom || null,
     accessUntil: onthi.accessUntil || null,
     deadlineAt: onthi.deadlineAt || null,
-    detailUrl: `/api/vstep/demo/content?id=${row.id}`
+    detailUrl: `/api/vstep/demo/content?id=${row.id}`,
+    embedUrl: embedUrl(row)
   };
 }
 
