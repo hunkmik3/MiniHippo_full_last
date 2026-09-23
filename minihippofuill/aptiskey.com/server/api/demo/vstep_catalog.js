@@ -8,12 +8,12 @@
 // những gì học viên ôn thi đang thấy. Khu "Học tập" (lesson_exam) là bài giao theo
 // lớp nên không đưa ra ngoài.
 //
-// Trả DANH SÁCH ĐẦY ĐỦ nhưng CHỈ METADATA. Nội dung đề + đáp án lấy ở
-// /api/vstep/demo/content và chỉ mở cho bộ đề nằm trong allowlist DEMO_VSTEP_IDS.
+// Catalog chỉ chứa METADATA để dựng menu cho nhẹ. Mỗi bộ đề có detailUrl -> gọi
+// /api/vstep/demo/content để lấy NỘI DUNG ĐẦY ĐỦ.
 // KHÔNG lấy cột `data` (trung bình 13 KB, tối đa 152 KB mỗi dòng).
 
 import { selectFrom } from '../_utils/supabase.js';
-import { demoGuard, demoAllowedVstepIds, cached, byTitle } from './_shared.js';
+import { demoGuard, cached, byTitle } from './_shared.js';
 
 const GROUPS = [
   { key: 'full_test', label: 'Full Test (bộ đề tổng hợp)' },
@@ -44,9 +44,8 @@ function byOrderThenTitle(a, b) {
   return oa - ob || byTitle(a, b);
 }
 
-function toItem(row, allowed) {
+function toItem(row) {
   const onthi = row.onthi && typeof row.onthi === 'object' ? row.onthi : {};
-  const open = allowed.has(String(row.id));
   return {
     id: row.id,
     title: row.title,
@@ -61,8 +60,7 @@ function toItem(row, allowed) {
     accessFrom: onthi.accessFrom || null,
     accessUntil: onthi.accessUntil || null,
     deadlineAt: onthi.deadlineAt || null,
-    demoAvailable: open,
-    detailUrl: open ? `/api/vstep/demo/content?id=${row.id}` : null
+    detailUrl: `/api/vstep/demo/content?id=${row.id}`
   };
 }
 
@@ -73,7 +71,6 @@ export default async function handler(req, res) {
 
   try {
     const rows = await cached('vstep-catalog', 60 * 1000, loadContents);
-    const allowed = new Set(demoAllowedVstepIds());
 
     const groups = GROUPS
       .filter((group) => !skillFilter || group.key === skillFilter)
@@ -86,13 +83,12 @@ export default async function handler(req, res) {
             if (group.key === 'full_test') return Boolean(row.combined);
             return skill === group.key;
           })
-          .map((row) => toItem(row, allowed))
+          .map(toItem)
           .sort(byOrderThenTitle);
         return {
           key: group.key,
           label: group.label,
           count: items.length,
-          demoCount: items.filter((item) => item.demoAvailable).length,
           items
         };
       });

@@ -1,15 +1,16 @@
 // GET /api/vstep/demo/content?id=<content_id>&key=...
 //   → nội dung đầy đủ 1 bộ đề VSTEP (câu hỏi + đáp án) cho bài học thử
 //
-// Chỉ mở cho bộ đề nằm trong allowlist DEMO_VSTEP_IDS. Id ngoài danh sách bị chặn
-// TRƯỚC khi đọc database.
+// Trả được MỌI bộ đề khu Ôn thi đã xuất bản (đúng những gì catalog liệt kê). Bài
+// nháp và khu Học tập (bài giao theo lớp) trả 404 như thể không tồn tại.
+// Kết quả cache 5 phút (bộ tổng hợp phải đọc thêm 4 bộ con).
 //
 // Bộ đề tổng hợp (data.combined_refs) chỉ chứa tham chiếu tới 4 bộ theo kỹ năng;
 // endpoint này gộp sẵn 4 khối kỹ năng vào data giống /api/vstep/contents/get, để
 // bên ngoài nhận về 1 đề hoàn chỉnh.
 
 import { selectFrom } from '../_utils/supabase.js';
-import { demoGuard, isDemoVstepAllowed } from './_shared.js';
+import { demoGuard, isPublicVstepContent, cached, CONTENT_TTL_MS } from './_shared.js';
 
 const SKILLS = ['listening', 'reading', 'writing', 'speaking'];
 
@@ -36,25 +37,26 @@ async function mergeCombined(content) {
   return content;
 }
 
+async function loadContent(id) {
+  const content = await selectFrom('vstep_contents', {
+    filters: [{ column: 'id', value: id }],
+    columns: 'id,title,description,duration_minutes,band,session_number,flow,status,content_kind,data',
+    single: true
+  });
+  if (!content || !isPublicVstepContent(content)) return null;
+  await mergeCombined(content);
+  return content;
+}
+
 export default async function handler(req, res) {
   if (demoGuard(req, res).done) return;
 
   const id = String(req.query?.id || '').trim();
   if (!id) return res.status(400).json({ error: 'Thiếu tham số id' });
 
-  if (!isDemoVstepAllowed(id)) {
-    return res.status(403).json({ error: 'Bộ đề này không mở cho bài học thử.' });
-  }
-
   try {
-    const content = await selectFrom('vstep_contents', {
-      filters: [{ column: 'id', value: id }],
-      columns: 'id,title,description,duration_minutes,band,session_number,flow,content_kind,data',
-      single: true
-    });
+    const content = await cached(`vstep:${id}`, CONTENT_TTL_MS, () => loadContent(id));
     if (!content) return res.status(404).json({ error: 'Không tìm thấy bộ đề VSTEP' });
-
-    await mergeCombined(content);
 
     return res.status(200).json({ content, demo: true });
   } catch (error) {
