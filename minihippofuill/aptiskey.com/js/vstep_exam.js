@@ -1080,24 +1080,71 @@
         });
     }
 
-    async function uploadSpeakingBlob(blob, partIndex, mimeType) {
-        const base64 = await blobToBase64(blob);
-        const extension = extensionFromMime(mimeType);
+    // Vercel chặn request > 4.5MB và base64 phình ~33% → bản ghi dài (Part 3 là 4 phút)
+    // trước đây luôn lỗi "Không thể upload file ghi âm". File lớn gửi theo từng mảnh.
+    const SPEAKING_SINGLE_UPLOAD_MAX_BYTES = 2.5 * 1024 * 1024;
+    const SPEAKING_CHUNK_BYTES = 2 * 1024 * 1024;
+    const SPEAKING_UPLOAD_ATTEMPTS = 3;
+
+    async function postSpeakingUpload(payload, allowRefresh = true) {
         const response = await fetch('/api/upload-speaking-recording', {
             method: 'POST',
             headers: authorizedHeaders({ 'Content-Type': 'application/json' }),
-            body: JSON.stringify({
-                contentBase64: base64,
-                fileName: `vstep_part_${partIndex + 1}.${extension}`,
-                mimeType,
-                speakingSetId: setId,
-                speakingPart: `vstep-part-${partIndex + 1}`,
-                answerKey: `part-${partIndex + 1}`
-            })
+            body: JSON.stringify(payload)
         });
+        // Token hết hạn giữa bài thi dài → làm mới rồi gửi lại 1 lần.
+        if (response.status === 401 && allowRefresh && typeof window.refreshAuthToken === 'function') {
+            let refreshed = null;
+            try { refreshed = await window.refreshAuthToken(); } catch (_) { /* ignore */ }
+            if (refreshed) return postSpeakingUpload(payload, false);
+        }
         const result = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(result.error || result.details || 'Không thể upload file ghi âm.');
+        if (!response.ok) {
+            const error = new Error(result.error || result.details || `Không thể upload file ghi âm (lỗi ${response.status}).`);
+            error.status = response.status;
+            throw error;
+        }
         return result;
+    }
+
+    async function uploadSpeakingBlobOnce(blob, partIndex, mimeType) {
+        const extension = extensionFromMime(mimeType);
+        const meta = {
+            fileName: `vstep_part_${partIndex + 1}.${extension}`,
+            mimeType,
+            speakingSetId: setId,
+            speakingPart: `vstep-part-${partIndex + 1}`,
+            answerKey: `part-${partIndex + 1}`
+        };
+        if (blob.size <= SPEAKING_SINGLE_UPLOAD_MAX_BYTES) {
+            return postSpeakingUpload({ ...meta, contentBase64: await blobToBase64(blob) });
+        }
+        const uploadId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+        const chunkCount = Math.ceil(blob.size / SPEAKING_CHUNK_BYTES);
+        for (let index = 0; index < chunkCount; index += 1) {
+            const chunk = blob.slice(index * SPEAKING_CHUNK_BYTES, (index + 1) * SPEAKING_CHUNK_BYTES);
+            await postSpeakingUpload({ action: 'chunk', uploadId, chunkIndex: index, chunkCount, contentBase64: await blobToBase64(chunk) });
+        }
+        return postSpeakingUpload({ ...meta, action: 'complete', uploadId, chunkCount, sizeBytes: blob.size });
+    }
+
+    async function uploadSpeakingBlob(blob, partIndex, mimeType) {
+        let lastError = null;
+        for (let attempt = 1; attempt <= SPEAKING_UPLOAD_ATTEMPTS; attempt += 1) {
+            try {
+                return await uploadSpeakingBlobOnce(blob, partIndex, mimeType);
+            } catch (error) {
+                lastError = error;
+                // Lỗi dữ liệu (4xx trừ 401/408/429) thì thử lại cũng vậy → dừng luôn.
+                const status = Number(error.status) || 0;
+                if (status >= 400 && status < 500 && ![401, 408, 429].includes(status)) break;
+                if (attempt < SPEAKING_UPLOAD_ATTEMPTS) {
+                    updateSpeakingStatus(`Mạng chập chờn, đang thử lưu lại file ghi âm (lần ${attempt + 1}/${SPEAKING_UPLOAD_ATTEMPTS})...`);
+                    await wait(1500 * attempt);
+                }
+            }
+        }
+        throw lastError || new Error('Không thể upload file ghi âm.');
     }
 
     function startVisualizer(stream) {
@@ -1249,12 +1296,24 @@
         if (overlay) overlay.classList.remove('show');
     }
 
+    // 64kbps đủ rõ cho giọng nói. Mặc định nhiều máy ghi ~128kbps → Part 3 (4 phút)
+    // nặng ~3.9MB, gấp đôi mức cần thiết. Trình duyệt không nhận tuỳ chọn thì ghi mặc định.
+    const SPEAKING_AUDIO_BITS_PER_SECOND = 64000;
+    function createSpeakingRecorder(stream, mimeType) {
+        const options = mimeType ? { mimeType } : {};
+        try {
+            return new MediaRecorder(stream, { ...options, audioBitsPerSecond: SPEAKING_AUDIO_BITS_PER_SECOND });
+        } catch (_) {
+            return new MediaRecorder(stream, mimeType ? options : undefined);
+        }
+    }
+
     async function recordSpeakingPart(part, partIndex) {
         const stream = await ensureMicStream();
         const mimeType = pickMimeType();
         const answerSeconds = getSpeakingAnswerSeconds(part, partIndex);
         state.currentChunks = [];
-        const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+        const recorder = createSpeakingRecorder(stream, mimeType);
         state.recorder = recorder;
 
         recorder.addEventListener('dataavailable', event => {
