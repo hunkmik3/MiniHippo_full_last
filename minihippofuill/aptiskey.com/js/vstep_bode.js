@@ -271,7 +271,8 @@
 	        });
 	    }
 
-	    function renderDashboard(sets, results) {
+	    // onthiGroup: nhóm ôn của HV (null = chưa vào nhóm → thấy mọi bộ đề, không deadline).
+	    function renderDashboard(sets, results, onthiGroup = null) {
 	        if (!refs.resultBody) return;
 	        const ordered = sortPracticeSets(sets);
 	        const resultMap = latestResultMap(results);
@@ -298,16 +299,20 @@
 	        renderStats(rows);
 	        renderSidebarSets(sets);
 
+	        const groupPrefix = onthiGroup?.title ? `Nhóm ôn: ${onthiGroup.title}. ` : '';
 	        if (!rows.length) {
-	            refs.resultBody.innerHTML = '<tr><td colspan="7" class="text-center text-secondary py-3">Chưa có đề ôn thi published.</td></tr>';
-	            setDashboardState('Chưa có lịch ôn thi đang được cấu hình.');
+	            const emptyText = onthiGroup
+	                ? `Nhóm ôn "${escapeHtml(onthiGroup.title || '')}" chưa được giao bộ đề nào. Vui lòng chờ giáo viên giao bài.`
+	                : 'Chưa có đề ôn thi published.';
+	            refs.resultBody.innerHTML = `<tr><td colspan="7" class="text-center text-secondary py-3">${emptyText}</td></tr>`;
+	            setDashboardState(onthiGroup ? `${groupPrefix}Chưa có bộ đề được giao.` : 'Chưa có lịch ôn thi đang được cấu hình.');
 	            return;
 	        }
 
 	        const overdueCount = rows.filter(row => row.overdue).length;
-	        setDashboardState(overdueCount
+	        setDashboardState(groupPrefix + (overdueCount
 	            ? `Bạn đang có ${overdueCount} bài trễ deadline.`
-	            : 'Theo dõi tiến độ, deadline và điểm của từng bài ôn thi.');
+	            : 'Theo dõi tiến độ, deadline và điểm của từng bài ôn thi.'));
 
 	        refs.resultBody.innerHTML = rows.map((row, index) => {
 	            const { set, meta, result, done, access, overdue } = row;
@@ -436,7 +441,7 @@
 	                const resultsPayload = await resultsResponse.json().catch(() => ({}));
 	                if (resultsResponse.ok) results = resultsPayload.results || [];
 	            }
-	            renderDashboard(allSets, results);
+	            renderDashboard(allSets, results, result.onthiGroup || null);
 	            const sets = allSets
 	                .filter(set => {
                     // Trang Bộ đề tổng hợp (full_test) CHỈ hiện bộ admin ghép (combined_refs);

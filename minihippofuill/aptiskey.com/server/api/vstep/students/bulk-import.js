@@ -8,6 +8,7 @@ import {
   normalizeScheduleType,
   defaultNumSessionsForBand
 } from '../_utils.js';
+import { ONTHI_GROUP_KIND } from '../_onthi_groups.js';
 
 function todayLocalYmd() {
   const d = new Date();
@@ -274,7 +275,9 @@ async function attachToClassByName(student, className, scheduleType, band, admin
     klass = await selectFrom('vstep_classes', {
       filters: [
         { column: 'title', value: className, operator: 'ilike' },
-        { column: 'status', value: 'active' }
+        { column: 'status', value: 'active' },
+        // Bỏ qua nhóm ôn (khu Ôn thi) trùng tên — chỉ gom vào lớp khu Học tập.
+        { column: 'schedule->>kind', operator: 'is', value: 'null' }
       ],
       single: true
     }).catch(() => null);
@@ -320,6 +323,64 @@ async function attachToClassByName(student, className, scheduleType, band, admin
   return { classId: klass.id, classTitle: klass.title };
 }
 
+// HV Ôn thi: cột "tên lớp" = tên NHÓM ÔN (tạo mới nếu chưa có). Mỗi HV chỉ ở 1 nhóm
+// ôn → rời nhóm ôn cũ. Không đụng vstep_students.class_id (lớp khu Học tập).
+async function attachToOnthiGroupByName(student, groupName, band, adminId, groupCache) {
+  if (!student?.id || !groupName) return null;
+  const cacheKey = `onthi:${groupName.toLowerCase()}`;
+  let group = groupCache.get(cacheKey);
+  if (!group) {
+    group = await selectFrom('vstep_classes', {
+      filters: [
+        { column: 'title', value: groupName, operator: 'ilike' },
+        { column: 'status', value: 'active' },
+        { column: 'schedule->>kind', value: ONTHI_GROUP_KIND }
+      ],
+      single: true
+    }).catch(() => null);
+    if (!group) {
+      const [created] = await insertInto('vstep_classes', [{
+        title: groupName,
+        band: normalizeBand(band) || 'B1',
+        status: 'active',
+        schedule: { kind: ONTHI_GROUP_KIND },
+        created_by: adminId || null
+      }]);
+      group = created;
+    }
+    if (group) groupCache.set(cacheKey, group);
+  }
+  if (!group?.id) return null;
+
+  const memberships = await selectFrom('vstep_class_students', {
+    columns: 'id,class_id',
+    filters: [{ column: 'student_id', value: student.id }]
+  }).catch(() => []);
+  const otherIds = (memberships || []).map((m) => m.class_id).filter((id) => id !== group.id);
+  if (otherIds.length) {
+    const otherGroups = await selectFrom('vstep_classes', {
+      columns: 'id',
+      filters: [
+        { column: 'id', operator: 'in', value: `(${otherIds.join(',')})` },
+        { column: 'schedule->>kind', value: ONTHI_GROUP_KIND }
+      ]
+    }).catch(() => []);
+    const otherGroupIds = new Set((otherGroups || []).map((g) => g.id));
+    const stale = (memberships || []).filter((m) => otherGroupIds.has(m.class_id)).map((m) => m.id);
+    if (stale.length) {
+      await deleteFrom('vstep_class_students', [{ column: 'id', operator: 'in', value: `(${stale.join(',')})` }]);
+    }
+  }
+  await upsertInto('vstep_class_students', [{
+    class_id: group.id,
+    student_id: student.id,
+    user_id: student.user_id || null,
+    status: 'active',
+    updated_at: new Date().toISOString()
+  }], { onConflict: 'class_id,student_id' });
+  return { classId: group.id, classTitle: group.title, onthiGroup: true };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -356,10 +417,14 @@ export default async function handler(req, res) {
         let classError = null;
         if (className && result?.student?.id) {
           try {
-            classAssigned = await attachToClassByName(
-              result.student, String(className), scheduleType,
-              row.band || row.level, adminCheck.user.id, classCache
-            );
+            classAssigned = result.student.learning_program === 'vstep_onthi'
+              ? await attachToOnthiGroupByName(
+                result.student, String(className), row.band || row.level, adminCheck.user.id, classCache
+              )
+              : await attachToClassByName(
+                result.student, String(className), scheduleType,
+                row.band || row.level, adminCheck.user.id, classCache
+              );
           } catch (err) {
             classError = err?.message || 'Không thể gán lớp';
             console.warn(`bulk-import: gán lớp fail cho row ${index + 1}:`, classError);
