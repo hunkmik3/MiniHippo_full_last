@@ -26,6 +26,10 @@ import listStudents from '../../../server/api/vstep/students/list.js';
 import bulkImportStudents from '../../../server/api/vstep/students/bulk-import.js';
 import updateStudent from '../../../server/api/vstep/students/update.js';
 import deleteStudent from '../../../server/api/vstep/students/delete.js';
+// Nhóm ôn khu Ôn thi: giao bộ đề + deadline theo từng nhóm.
+import {
+  listGroups, saveGroup, deleteGroup, updateMembers, assignContents, unassignContent
+} from '../../../server/api/vstep/groups.js';
 // API HỌC THỬ VSTEP cho web bán khoá (chỉ đọc, chặn bằng API key).
 import demoVstepCatalog from '../../../server/api/demo/vstep_catalog.js';
 import demoVstepContent from '../../../server/api/demo/vstep_content.js';
@@ -58,6 +62,14 @@ const handlers = {
     'sync-assignments': syncClassAssignments,
     sync_assignments: syncClassAssignments,
     update: updateClass
+  },
+  groups: {
+    list: listGroups,
+    save: saveGroup,
+    delete: deleteGroup,
+    members: updateMembers,
+    assign: assignContents,
+    unassign: unassignContent
   },
   contents: {
     create: createContent,

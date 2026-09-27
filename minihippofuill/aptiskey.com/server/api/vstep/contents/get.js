@@ -1,6 +1,7 @@
 import { selectFrom } from '../../_utils/supabase.js';
 import { verifyUserRequest } from '../../_utils/auth.js';
 import { contentToLegacySet, practiceAccessWindowStatus, vstepSchemaErrorResponse } from '../_utils.js';
+import { applyOnthiSchedule, isVisibleForGroup, loadOnthiGroupContext } from '../_onthi_groups.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -16,7 +17,7 @@ export default async function handler(req, res) {
   if (!id) return res.status(400).json({ error: 'Thiếu tham số id' });
 
   try {
-    const content = await selectFrom('vstep_contents', {
+    let content = await selectFrom('vstep_contents', {
       filters: [{ column: 'id', value: id }],
       single: true
     });
@@ -69,6 +70,12 @@ export default async function handler(req, res) {
         return res.status(403).json({ error: 'Tài khoản chưa được cấp quyền vào khu vực Ôn thi VSTEP' });
       }
       if (content.flow === 'practice') {
+        // Lịch mở/deadline lấy theo nhóm ôn của HV (không theo lịch cũ trong bộ đề).
+        const groupContext = await loadOnthiGroupContext(authResult.user.id);
+        if (!isVisibleForGroup(content, groupContext)) {
+          return res.status(403).json({ error: 'Bộ đề này chưa được giao cho nhóm ôn của bạn.' });
+        }
+        content = applyOnthiSchedule(content, groupContext);
         const windowStatus = practiceAccessWindowStatus(content);
         if (!windowStatus.allowed) {
           return res.status(403).json({ error: windowStatus.reason || 'Đề ôn thi chưa nằm trong thời gian truy cập' });

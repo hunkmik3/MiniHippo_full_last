@@ -323,7 +323,8 @@
                     <span>Import học viên Ôn thi từ Excel / CSV</span>
                   </div>
                   <div class="vstep-help mb-2">
-                    Cột hỗ trợ: <code>accountCode, fullName, email, phone, band, startedOn, expiresAt, password, className (tên lớp), scheduleType (246/357)</code>.
+                    Cột hỗ trợ: <code>accountCode, fullName, email, phone, band, startedOn, expiresAt, password, className</code>
+                    — <code>className</code> là <strong>tên nhóm ôn</strong> (chưa có thì tự tạo nhóm).
                     Định dạng <strong>.xlsx / .xls / .csv / .tsv / .txt</strong>. HV import ở đây sẽ thuộc module Ôn thi.
                   </div>
 
@@ -372,6 +373,15 @@
                 </div>
                 <div id="vstepStudentsBulkBar" class="d-none alert alert-warning d-flex flex-wrap align-items-center gap-2 py-2 mb-2">
                   <span class="me-auto small fw-semibold"><i class="bi bi-check2-square me-1"></i>Đã chọn <span id="vstepStudentsBulkCount">0</span> học viên</span>
+                  <select class="form-select form-select-sm" id="vstepStudentsBulkGroup" style="max-width:220px;" title="Chọn nhóm ôn">
+                    <option value="">Chọn nhóm ôn...</option>
+                  </select>
+                  <button type="button" class="btn btn-sm btn-primary" id="vstepStudentsBulkAddGroup">
+                    <i class="bi bi-people me-1"></i>Thêm vào nhóm
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline-primary" id="vstepStudentsBulkRemoveGroup" title="Bỏ các HV đã chọn khỏi nhóm ôn hiện tại của họ">
+                    <i class="bi bi-person-dash me-1"></i>Bỏ khỏi nhóm
+                  </button>
                   <button type="button" class="btn btn-sm btn-outline-secondary" id="vstepStudentsBulkClear">
                     <i class="bi bi-x-circle me-1"></i>Bỏ chọn
                   </button>
@@ -386,6 +396,7 @@
                         <th style="width:36px;"><input type="checkbox" class="form-check-input" id="vstepStudentsSelectAll" title="Chọn tất cả"></th>
                         <th>Mã</th>
                         <th>Học viên</th>
+                        <th>Nhóm ôn</th>
                         <th>Level</th>
                         <th>Trạng thái</th>
                         <th>Email</th>
@@ -396,7 +407,7 @@
                     </thead>
                     <tbody id="vstepUsersTableBody">
                       <tr>
-                        <td colspan="9" class="text-center text-muted py-3">Đang tải học viên...</td>
+                        <td colspan="10" class="text-center text-muted py-3">Đang tải học viên...</td>
                       </tr>
                     </tbody>
                   </table>
@@ -404,6 +415,51 @@
               </div>
             </article>
           </div>
+          <article class="vstep-panel mt-3" id="vstepGroupsPanel">
+            <div class="vstep-panel-header vstep-panel-header-row">
+              <div>
+                <strong><i class="bi bi-people me-1"></i>Nhóm ôn</strong>
+                <div class="vstep-help">Tạo nhóm, thêm học viên rồi giao bộ đề kèm lịch mở + deadline cho từng nhóm.
+                  HV đã vào nhóm chỉ thấy bộ đề của nhóm; HV chưa có nhóm thấy mọi bộ đề (không có deadline). Mỗi HV chỉ ở 1 nhóm.</div>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-primary" id="vstepGroupReloadBtn">
+                <i class="bi bi-arrow-clockwise me-1"></i> Tải lại
+              </button>
+            </div>
+            <div class="vstep-panel-body">
+              <form class="row g-2 align-items-end mb-3" id="vstepGroupCreateForm">
+                <div class="col-12 col-md-6">
+                  <label class="form-label small mb-1" for="vstepGroupTitle">Tên nhóm mới</label>
+                  <input class="form-control" id="vstepGroupTitle" data-no-rich maxlength="120" placeholder="VD: Nhóm thi 15/11 - B1">
+                </div>
+                <div class="col-6 col-md-2">
+                  <label class="form-label small mb-1" for="vstepGroupBand">Level</label>
+                  <select class="form-select" id="vstepGroupBand">
+                    <option value="B1">B1</option>
+                    <option value="B2">B2</option>
+                  </select>
+                </div>
+                <div class="col-6 col-md-4">
+                  <button type="submit" class="btn btn-primary w-100" id="vstepGroupCreateBtn">
+                    <i class="bi bi-plus-circle me-1"></i> Tạo nhóm ôn
+                  </button>
+                </div>
+              </form>
+              <div id="vstepGroupAlert" class="alert alert-info small d-none"></div>
+              <div class="row g-3">
+                <div class="col-12 col-lg-4">
+                  <div class="list-group" id="vstepGroupList">
+                    <div class="list-group-item text-muted small">Đang tải nhóm ôn...</div>
+                  </div>
+                </div>
+                <div class="col-12 col-lg-8">
+                  <div id="vstepGroupDetail" class="border rounded-3 p-3 h-100">
+                    <div class="text-muted small">Chọn hoặc tạo một nhóm ôn.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
         </section>
 
         <section class="vstep-admin-section" id="vstep-resources-panel">
@@ -595,57 +651,24 @@
 
                   <div class="vstep-form-section">
                     <div class="vstep-form-section-title">
-                      <i class="bi bi-calendar2-check"></i>
-                      <span>Lịch thi & deadline ôn thi</span>
+                      <i class="bi bi-diagram-3"></i>
+                      <span>Phân loại đề</span>
                     </div>
                     <div class="row g-3">
-                      <div class="col-md-6 col-xl-2">
+                      <div class="col-md-6 col-xl-3">
                         <label class="form-label" for="vstep-onthi-track">Nhóm đề</label>
                         <select class="form-select" id="vstep-onthi-track">
                           <option value="lr">L&R</option>
                           <option value="sw">S&W</option>
                         </select>
                       </div>
-                      <div class="col-md-6 col-xl-2">
+                      <div class="col-md-6 col-xl-3">
                         <label class="form-label" for="vstep-onthi-order">Thứ tự</label>
                         <input type="number" min="1" class="form-control" id="vstep-onthi-order" placeholder="VD: 1">
                       </div>
-                      <div class="col-md-6 col-xl-2">
-                        <label class="form-label" for="vstep-onthi-exam-date">Ngày thi</label>
-                        <input type="date" class="form-control" id="vstep-onthi-exam-date">
-                      </div>
-                      <div class="col-md-6 col-xl-3">
-                        <label class="form-label" for="vstep-onthi-access-from">Mở từ</label>
-                        <input type="datetime-local" class="form-control" id="vstep-onthi-access-from">
-                      </div>
-                      <div class="col-md-6 col-xl-3">
-                        <label class="form-label" for="vstep-onthi-deadline">Deadline</label>
-                        <input type="datetime-local" class="form-control" id="vstep-onthi-deadline">
-                      </div>
-                      <div class="col-md-6 col-xl-3">
-                        <label class="form-label" for="vstep-onthi-access-until">Đóng truy cập</label>
-                        <input type="datetime-local" class="form-control" id="vstep-onthi-access-until">
-                      </div>
-                      <div class="col-md-6 col-xl-3">
-                        <label class="form-label" for="vstep-onthi-notify-hours">Nhắc trước deadline</label>
-                        <div class="input-group">
-                          <input type="number" min="1" class="form-control" id="vstep-onthi-notify-hours" value="24">
-                          <span class="input-group-text">giờ</span>
-                        </div>
-                      </div>
-                      <div class="col-md-6 col-xl-3 d-flex align-items-end">
-                        <div class="form-check vstep-check-line">
-                          <input class="form-check-input" type="checkbox" id="vstep-onthi-required" checked>
-                          <label class="form-check-label" for="vstep-onthi-required">Bắt buộc hoàn thành</label>
-                        </div>
-                      </div>
-                      <div class="col-md-6 col-xl-3 d-flex align-items-end">
-                        <button type="button" class="btn btn-outline-primary w-100" id="vstep-onthi-autofill-window">
-                          <i class="bi bi-magic me-1"></i> Tự tính 3 tuần
-                        </button>
-                      </div>
                     </div>
-                    <div class="vstep-help mt-2">Nếu nhập ngày thi, hệ thống có thể tự mở trước 21 ngày và đóng cuối ngày thi. Học viên sẽ thấy cảnh báo trước deadline theo số giờ cấu hình.</div>
+                    <div class="vstep-help mt-2">Bộ đề chỉ dùng để tạo đề. Lịch mở bài và deadline giao theo từng
+                      <strong>Nhóm ôn</strong> (mục Học viên → Nhóm ôn).</div>
                   </div>
 
                   <div class="vstep-form-section">
@@ -774,8 +797,8 @@
             <div class="vstep-panel-body">
               <!-- Filter bar — class/band/type/search/refresh/export -->
               <div class="vstep-results-filter-bar mb-3">
-                <select class="form-select form-select-sm" id="vstepResultClassFilter" title="Lọc theo lớp">
-                  <option value="">Tất cả lớp</option>
+                <select class="form-select form-select-sm" id="vstepResultClassFilter" title="Lọc theo nhóm ôn">
+                  <option value="">Tất cả nhóm ôn</option>
                 </select>
                 <select class="form-select form-select-sm" id="vstepResultBandFilter" title="Lọc theo band">
                   <option value="">Tất cả band</option>

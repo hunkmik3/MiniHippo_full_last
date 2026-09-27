@@ -1,6 +1,7 @@
 import { selectFrom } from '../../_utils/supabase.js';
 import { verifyAdminRequest, verifyUserRequest } from '../../_utils/auth.js';
 import { contentToLegacySet, normalizeFlow, vstepSchemaErrorResponse } from '../_utils.js';
+import { applyOnthiSchedule, isVisibleForGroup, loadOnthiGroupContext } from '../_onthi_groups.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -95,6 +96,16 @@ export default async function handler(req, res) {
 
     let normalized = Array.isArray(contents) ? contents : [];
     const adminView = authResult?.user?.role === 'admin';
+    // Ôn thi: HV trong nhóm ôn chỉ thấy bộ đề nhóm được giao (lịch + deadline theo
+    // nhóm); HV chưa có nhóm thấy mọi bộ đề, không có deadline.
+    let onthiGroup = null;
+    if (status === 'published' && flow === 'practice' && !adminView) {
+      const groupContext = await loadOnthiGroupContext(authResult.user.id);
+      onthiGroup = groupContext ? { id: groupContext.group.id, title: groupContext.group.title } : null;
+      normalized = normalized
+        .filter((content) => isVisibleForGroup(content, groupContext))
+        .map((content) => applyOnthiSchedule(content, groupContext));
+    }
     if (status === 'published' && flow === 'lesson_exam' && !adminView) {
       const now = Date.now();
       const assignmentByContent = new Map(
@@ -115,7 +126,8 @@ export default async function handler(req, res) {
     return res.status(200).json({
       contents: normalized,
       sets: normalized.map(contentToLegacySet),
-      adminView
+      adminView,
+      onthiGroup
     });
   } catch (error) {
     const schema = vstepSchemaErrorResponse(error);

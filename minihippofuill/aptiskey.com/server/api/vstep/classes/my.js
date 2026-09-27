@@ -1,6 +1,7 @@
 import { verifyUserRequest } from '../../_utils/auth.js';
 import { selectFrom } from '../../_utils/supabase.js';
 import { vstepSchemaErrorResponse } from '../_utils.js';
+import { isOnthiGroup } from '../_onthi_groups.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -25,7 +26,7 @@ export default async function handler(req, res) {
         adminView: true,
         student: null,
         class: null,
-        classes: Array.isArray(classes) ? classes : [],
+        classes: (Array.isArray(classes) ? classes : []).filter((item) => !isOnthiGroup(item)),
         classmates: Array.isArray(students) ? students.map(item => ({
           id: item.id,
           account_code: item.account_code,

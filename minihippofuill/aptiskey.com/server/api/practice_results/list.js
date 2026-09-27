@@ -33,6 +33,20 @@ const SUMMARY_COLUMNS = [
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_IDS = 50;
+const MAX_SET_IDS = 100;
+
+// "a,b,c" -> mảng id đã trim; null nếu có id không hợp lệ hoặc quá nhiều.
+function parseIdList(value, max) {
+  const list = String(value || '').split(',').map((id) => id.trim()).filter(Boolean);
+  if (!list.length || list.length > max || !list.every((id) => UUID_RE.test(id))) return null;
+  return list;
+}
+
+// Mốc thời gian (ISO) -> ISO chuẩn hoá; null nếu không đọc được.
+function parseInstant(value) {
+  const time = Date.parse(String(value || ''));
+  return Number.isFinite(time) ? new Date(time).toISOString() : null;
+}
 
 function toSummaryRow(row) {
   const result = { _summary: true, metadata: {} };
@@ -69,18 +83,33 @@ export default async function handler(req, res) {
     sessionNumber,
     submissionKind,
     fields,
-    ids
+    ids,
+    setIds,
+    dateFrom,
+    dateTo
   } = req.query || {};
 
   try {
     const filters = [];
     // ids=<uuid>,<uuid>: lấy bản đầy đủ của vài bài cụ thể (mở xem chi tiết).
-    const idList = String(ids || '').split(',').map((id) => id.trim()).filter(Boolean);
+    let idList = [];
     if (ids !== undefined) {
-      if (!idList.length || idList.length > MAX_IDS || !idList.every((id) => UUID_RE.test(id))) {
-        return res.status(400).json({ error: 'Tham số ids không hợp lệ' });
-      }
+      idList = parseIdList(ids, MAX_IDS);
+      if (!idList) return res.status(400).json({ error: 'Tham số ids không hợp lệ' });
       filters.push({ column: 'id', operator: 'in', value: `(${idList.join(',')})` });
+    }
+    // setIds=<uuid>,<uuid>: bài làm của nhiều bộ đề cùng lúc (vd mọi bộ Reading/Listening).
+    if (setIds !== undefined) {
+      const setIdList = parseIdList(setIds, MAX_SET_IDS);
+      if (!setIdList) return res.status(400).json({ error: 'Tham số setIds không hợp lệ' });
+      filters.push({ column: 'set_id', operator: 'in', value: `(${setIdList.join(',')})` });
+    }
+    // Khoảng ngày nộp [dateFrom, dateTo) — client gửi mốc ISO theo giờ Việt Nam.
+    for (const [value, operator, label] of [[dateFrom, 'gte', 'dateFrom'], [dateTo, 'lt', 'dateTo']]) {
+      if (value === undefined || value === '') continue;
+      const instant = parseInstant(value);
+      if (!instant) return res.status(400).json({ error: `Tham số ${label} không hợp lệ` });
+      filters.push({ column: 'submitted_at', operator, value: instant });
     }
     if (userId) {
       filters.push({ column: 'user_id', value: userId });

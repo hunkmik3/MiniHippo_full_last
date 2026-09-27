@@ -149,7 +149,8 @@ function moduleForUser(user) {
     if (course === 'vstep') {
         // VSTEP có 2 sub-module → trả về landing tương ứng.
         // Có cả hai khu → mặc định vào Ôn thi, trong trang có nút chuyển sang Học tập.
-        return resolveVstepSubProgram(user) !== 'vstep_lophoc' ? 'vstep_onthi' : 'vstep_lophoc';
+        // Chỉ vào Học tập khi biết chắc là HV Học tập (giống trang đăng nhập: VSTEP → Ôn thi).
+        return knownVstepSubProgram(user) === 'vstep_lophoc' ? 'vstep_lophoc' : 'vstep_onthi';
     }
     if (course === 'lớp học') return 'lop_hoc';
     return 'aptis';
@@ -168,6 +169,18 @@ function vstepHasBothPrograms(user) {
         (user && (user.learningProgram || user.learning_program)) || ''
     ).trim().toLowerCase();
     return raw.includes('vstep_onthi') && raw.includes('vstep_lophoc');
+}
+
+// Khu VSTEP CHẮC CHẮN của học viên theo learning_program; thiếu/lạ → '' (không đoán).
+// Dùng cho việc chuyển khu: trước đây thiếu thông tin bị coi là "Học tập" nên HV
+// Ôn thi bị đẩy sang vstep_lessons trên một số thiết bị (dùng bản user cũ trên máy).
+function knownVstepSubProgram(user) {
+    const raw = String(
+        (user && (user.learningProgram || user.learning_program)) || ''
+    ).trim().toLowerCase();
+    if (vstepHasBothPrograms(user)) return 'vstep_both';
+    if (raw === 'vstep_onthi' || raw === 'vstep_lophoc') return raw;
+    return '';
 }
 
 function resolveVstepSubProgram(user) {
@@ -206,7 +219,9 @@ function normalizePathname(pathname) {
     return raw || '/';
 }
 
-function enforceCourseRoute(user) {
+// stale = user lấy từ bản lưu trên máy (không xác minh được với server, vd mất mạng):
+// vẫn giữ chặn module lớn, nhưng KHÔNG chuyển giữa khu Ôn thi / Học tập VSTEP.
+function enforceCourseRoute(user, { stale = false } = {}) {
     if (!user) return true;
 
     const course = resolveUserCourse(user);
@@ -239,7 +254,20 @@ function enforceCourseRoute(user) {
         //   vstep_onthi  KHÔNG vào được /vstep_lessons (lớp học)
         //   vstep_lophoc KHÔNG vào được /vstep_bode, /vstep_skill, /vstep_full_test (ôn thi)
         //   Route chung (VSTEP_SHARED_PATHS) — cả 2 đều vào được.
-        const subProgram = resolveVstepSubProgram(user);
+        // Chỉ chuyển khu khi biết chắc HV thuộc khu nào (xem knownVstepSubProgram).
+        const subProgram = stale ? '' : knownVstepSubProgram(user);
+        // Trang chọn khu (vstep_home) chỉ có ý nghĩa với HV có cả 2 khu → HV 1 khu vào
+        // thẳng khu của mình, không thấy lối sang khu kia.
+        if (path === '/vstep_home') {
+            if (subProgram === 'vstep_onthi') {
+                window.location.replace('/vstep_bode.html');
+                return false;
+            }
+            if (subProgram === 'vstep_lophoc') {
+                window.location.replace('/vstep_lessons.html');
+                return false;
+            }
+        }
         if (VSTEP_SHARED_PATHS.has(path)) return true;
         if (subProgram === 'vstep_onthi' && VSTEP_LOPHOC_ONLY_PATHS.has(path)) {
             window.location.replace('/vstep_bode.html');
@@ -323,7 +351,7 @@ async function checkAuth({ allowRefresh = true } = {}) {
         console.error('Auth check error:', error);
         const storedUser = localStorage.getItem('auth_user');
         if (storedUser) {
-            try { enforceCourseRoute(JSON.parse(storedUser)); } catch (_) {}
+            try { enforceCourseRoute(JSON.parse(storedUser), { stale: true }); } catch (_) {}
             return true;
         }
         return false;
@@ -667,6 +695,7 @@ window.resolveMiniHippoCourse = resolveUserCourse;
 window.moduleForMiniHippoUser = moduleForUser;
 // Trang Ôn thi / Học tập dùng để quyết định có hiện nút chuyển khu hay không.
 window.vstepHasBothPrograms = vstepHasBothPrograms;
+window.knownVstepSubProgram = knownVstepSubProgram;
 window.consumePostLoginRedirect = function consumePostLoginRedirect() {
     try {
         const url = localStorage.getItem('post_login_redirect');

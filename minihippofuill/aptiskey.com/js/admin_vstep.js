@@ -19,6 +19,8 @@
         lophoc: { defaultPanel: 'students', forceFlow: 'lesson_exam', allowFlowFilter: false, learningProgram: 'vstep_lophoc' }
     };
     const PAGE = MODE_CONFIG[ADMIN_MODE] || MODE_CONFIG.legacy;
+    // Nhóm ôn chỉ có ở trang admin Ôn thi.
+    const GROUPS_ENABLED = ADMIN_MODE === 'onthi';
     const CONTENT_SKILL_LABELS = {
         full_test: 'Full 4 kỹ năng',
         listening: 'Listening',
@@ -84,6 +86,12 @@
         resources: [],
         classes: [],
         memberships: [],
+        // Nhóm ôn (chỉ trang Ôn thi): nhóm + thành viên + bộ đề đã giao.
+        groups: [],
+        groupMembers: [],
+        groupAssignments: [],
+        activeGroupId: '',
+        groupEditingContentId: '',
         currentContentSkill: DEFAULT_CONTENT_SKILL
     };
 
@@ -217,7 +225,8 @@
             accessUntil: dateTimeValue('vstep-onthi-access-until') || null,
             deadlineAt: dateTimeValue('vstep-onthi-deadline') || null,
             notifyBeforeHours: Number.isFinite(notifyBeforeHours) && notifyBeforeHours > 0 ? Math.round(notifyBeforeHours) : 24,
-            required: isChecked('vstep-onthi-required')
+            // Trang Ôn thi đã bỏ ô này (lịch giao theo nhóm ôn) → mặc định bắt buộc.
+            required: $('vstep-onthi-required') ? isChecked('vstep-onthi-required') : true
         };
     }
 
@@ -1840,8 +1849,9 @@
             if (!visibleIds.has(String(id))) selectedStudentIds.delete(id);
         });
 
+        const userColspan = GROUPS_ENABLED ? 10 : 9;
         if (!users.length) {
-            refs.usersBody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">Chưa có học viên VSTEP.</td></tr>';
+            refs.usersBody.innerHTML = `<tr><td colspan="${userColspan}" class="text-center text-muted py-3">Chưa có học viên VSTEP.</td></tr>`;
             updateBulkBar();
             return;
         }
@@ -1853,6 +1863,7 @@
                 <td><input type="checkbox" class="form-check-input vstep-student-check" value="${id}" ${checked}></td>
                 <td><span class="vstep-code-pill">${escapeHtml(user.account_code || user.username || '-')}</span></td>
                 <td class="fw-semibold">${escapeHtml(user.full_name || '-')}</td>
+                ${GROUPS_ENABLED ? `<td>${groupPill(groupOfStudent(user.id))}</td>` : ''}
                 <td>${escapeHtml(user.band || '-')}</td>
                 <td><span class="vstep-status-pill ${user.practice_access === false ? 'vstep-status-draft' : 'vstep-status-published'}">${user.practice_access === false ? 'Tắt' : 'Bật'}</span></td>
                 <td>${escapeHtml(user.email || '-')}</td>
@@ -2676,14 +2687,427 @@
         return true;
     }
 
+    // ===== NHÓM ÔN (chỉ trang Ôn thi) =====
+    // Admin tạo nhóm, thêm HV, giao bộ đề + lịch mở/deadline cho từng nhóm.
+    // HV trong nhóm chỉ thấy bộ đề nhóm được giao; HV chưa có nhóm thấy mọi bộ đề
+    // (server xử lý ở /api/vstep/contents/list). Mỗi HV chỉ ở 1 nhóm.
+
+    function groupOfStudent(studentId) {
+        const member = state.groupMembers.find(m => String(m.student_id) === String(studentId));
+        return member ? state.groups.find(g => g.id === member.class_id) || null : null;
+    }
+
+    function groupOfUser(userId) {
+        if (!userId) return null;
+        const member = state.groupMembers.find(m => String(m.user_id) === String(userId))
+            || state.groupMembers.find(m => {
+                const student = state.users.find(u => String(u.user_id) === String(userId));
+                return student && String(m.student_id) === String(student.id);
+            });
+        return member ? state.groups.find(g => g.id === member.class_id) || null : null;
+    }
+
+    function groupPill(group) {
+        return group
+            ? `<span class="badge rounded-pill text-bg-light border">${escapeHtml(group.title)}</span>`
+            : '<span class="text-muted small">—</span>';
+    }
+
+    function formatGroupTime(value) {
+        if (!value) return '—';
+        const date = new Date(value);
+        return Number.isFinite(date.getTime())
+            ? date.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+            : '—';
+    }
+
+    function setGroupAlert(message, type = 'info') {
+        const el = $('vstepGroupAlert');
+        if (!el) return;
+        el.className = `alert alert-${type} small${message ? '' : ' d-none'}`;
+        el.textContent = message || '';
+    }
+
+    function groupPracticeSets() {
+        return state.sets.filter(set => flowOfSet(set) === 'practice');
+    }
+
+    function setLabel(set) {
+        const skill = CONTENT_SKILL_LABELS[contentSkillOfSet(set)] || '';
+        const track = String(set?.data?.onthi?.track || '').toLowerCase();
+        return [skill, track === 'sw' ? 'S&W' : (track === 'lr' ? 'L&R' : '')].filter(Boolean).join(' · ');
+    }
+
+    async function loadGroups() {
+        if (!GROUPS_ENABLED) return;
+        try {
+            const tasks = [fetchJson('/api/vstep/groups/list')];
+            if (!state.sets.length) tasks.push(loadSets());
+            const [result] = await Promise.all(tasks);
+            state.groups = result.groups || [];
+            state.groupMembers = result.members || [];
+            state.groupAssignments = result.assignments || [];
+            if (!state.groups.some(g => g.id === state.activeGroupId)) {
+                state.activeGroupId = state.groups[0]?.id || '';
+                state.groupEditingContentId = '';
+            }
+        } catch (error) {
+            setGroupAlert(error.message || 'Không tải được nhóm ôn.', 'danger');
+        }
+        renderGroups();
+        renderGroupBulkOptions();
+        if (refs.usersBody && state.users.length) renderUsers();
+        populateResultClassDropdown();
+    }
+
+    function renderGroupBulkOptions() {
+        const select = $('vstepStudentsBulkGroup');
+        if (!select) return;
+        const current = select.value;
+        select.innerHTML = '<option value="">Chọn nhóm ôn...</option>'
+            + state.groups.map(g => `<option value="${escapeHtml(g.id)}">${escapeHtml(g.title)}</option>`).join('');
+        if (current && state.groups.some(g => g.id === current)) select.value = current;
+    }
+
+    function renderGroups() {
+        const list = $('vstepGroupList');
+        const detail = $('vstepGroupDetail');
+        if (!list || !detail) return;
+        if (!state.groups.length) {
+            list.innerHTML = '<div class="list-group-item text-muted small">Chưa có nhóm ôn nào. Tạo nhóm ở ô bên trên.</div>';
+            detail.innerHTML = '<div class="text-muted small">Chưa có nhóm ôn. HV hiện thấy mọi bộ đề, không có deadline.</div>';
+            return;
+        }
+        list.innerHTML = state.groups.map(group => {
+            const memberCount = state.groupMembers.filter(m => m.class_id === group.id).length;
+            const setCount = state.groupAssignments.filter(a => a.class_id === group.id).length;
+            const active = group.id === state.activeGroupId;
+            return `
+                <button type="button" class="list-group-item list-group-item-action${active ? ' active' : ''}" data-group-select="${escapeHtml(group.id)}">
+                    <div class="fw-semibold">${escapeHtml(group.title)}</div>
+                    <small class="${active ? '' : 'text-secondary'}">${escapeHtml(group.band || 'B1')} · ${memberCount} học viên · ${setCount} bộ đề</small>
+                </button>`;
+        }).join('');
+
+        const group = state.groups.find(g => g.id === state.activeGroupId);
+        if (!group) {
+            detail.innerHTML = '<div class="text-muted small">Chọn một nhóm ôn.</div>';
+            return;
+        }
+        const members = state.groupMembers.filter(m => m.class_id === group.id);
+        const memberIds = new Set(members.map(m => String(m.student_id)));
+        const students = members
+            .map(m => state.users.find(u => String(u.id) === String(m.student_id)))
+            .filter(Boolean)
+            .sort((a, b) => String(a.account_code || '').localeCompare(String(b.account_code || ''), 'vi', { numeric: true }));
+        const assignments = state.groupAssignments.filter(a => a.class_id === group.id);
+        const assignedIds = new Set(assignments.map(a => String(a.content_id)));
+        const setsById = new Map(groupPracticeSets().map(set => [String(set.id), set]));
+        const editing = state.groupEditingContentId ? assignments.find(a => String(a.content_id) === state.groupEditingContentId) : null;
+
+        const memberRows = students.length
+            ? students.map(user => `
+                <tr>
+                    <td><span class="vstep-code-pill">${escapeHtml(user.account_code || user.username || '-')}</span></td>
+                    <td>${escapeHtml(user.full_name || '-')}</td>
+                    <td class="text-end">
+                        <button type="button" class="btn btn-sm btn-outline-danger" data-group-remove-member="${escapeHtml(user.id)}" title="Bỏ khỏi nhóm">
+                            <i class="bi bi-person-dash"></i>
+                        </button>
+                    </td>
+                </tr>`).join('')
+            : '<tr><td colspan="3" class="text-muted small">Chưa có học viên. Thêm ở bên dưới hoặc tick học viên trong bảng rồi bấm "Thêm vào nhóm".</td></tr>';
+
+        const candidates = state.users.filter(u => !memberIds.has(String(u.id)));
+        const candidateList = candidates.map(user => {
+            const current = groupOfStudent(user.id);
+            const hay = [user.account_code, user.username, user.full_name, user.email].join(' ').toLowerCase();
+            return `
+                <label class="d-flex align-items-center gap-2 py-1 border-bottom small" data-group-candidate="${escapeHtml(hay)}">
+                    <input type="checkbox" class="form-check-input m-0" value="${escapeHtml(user.id)}" data-group-add-check>
+                    <span class="vstep-code-pill">${escapeHtml(user.account_code || user.username || '-')}</span>
+                    <span class="flex-grow-1">${escapeHtml(user.full_name || '-')}</span>
+                    ${current ? `<span class="text-warning">đang ở: ${escapeHtml(current.title)}</span>` : ''}
+                </label>`;
+        }).join('') || '<div class="text-muted small">Mọi học viên Ôn thi đều đã ở nhóm này.</div>';
+
+        const assignmentRows = assignments.length
+            ? assignments
+                .map(a => ({ a, set: setsById.get(String(a.content_id)) }))
+                .sort((x, y) => (Date.parse(x.a.due_at || '') || Infinity) - (Date.parse(y.a.due_at || '') || Infinity))
+                .map(({ a, set }) => {
+                    const overdue = a.due_at && Date.parse(a.due_at) < Date.now();
+                    return `
+                    <tr${String(a.content_id) === state.groupEditingContentId ? ' class="table-warning"' : ''}>
+                        <td class="fw-semibold">${escapeHtml(set?.title || 'Bộ đề đã xoá')}</td>
+                        <td class="small text-secondary">${escapeHtml(set ? setLabel(set) : '')}</td>
+                        <td class="small">${escapeHtml(formatGroupTime(a.available_from))}</td>
+                        <td class="small${overdue ? ' text-danger fw-semibold' : ''}">${escapeHtml(formatGroupTime(a.due_at))}</td>
+                        <td class="text-end text-nowrap">
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-group-edit-set="${escapeHtml(a.content_id)}" title="Sửa lịch">
+                                <i class="bi bi-pencil-square"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger" data-group-unassign="${escapeHtml(a.content_id)}" title="Bỏ giao">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </td>
+                    </tr>`;
+                }).join('')
+            : '<tr><td colspan="5" class="text-muted small">Chưa giao bộ đề nào — HV của nhóm sẽ chưa thấy bài.</td></tr>';
+
+        const pickable = groupPracticeSets()
+            .filter(set => !assignedIds.has(String(set.id)) && String(set.data?.status || '') === 'published')
+            .sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'vi', { numeric: true }));
+        const setChecklist = pickable.map(set => `
+            <label class="d-flex align-items-center gap-2 py-1 border-bottom small" data-group-set-candidate="${escapeHtml(String(set.title || '').toLowerCase())}">
+                <input type="checkbox" class="form-check-input m-0" value="${escapeHtml(set.id)}" data-group-set-check>
+                <span class="flex-grow-1">${escapeHtml(set.title || set.id)}</span>
+                <span class="text-secondary">${escapeHtml(setLabel(set))}</span>
+            </label>`).join('') || '<div class="text-muted small">Đã giao hết bộ đề đã xuất bản.</div>';
+
+        const editingSet = editing ? setsById.get(String(editing.content_id)) : null;
+        detail.innerHTML = `
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                <div>
+                    <h5 class="mb-0">${escapeHtml(group.title)}</h5>
+                    <small class="text-secondary">Level ${escapeHtml(group.band || 'B1')} · ${students.length} học viên · ${assignments.length} bộ đề</small>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-group-rename><i class="bi bi-pencil me-1"></i>Đổi tên</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" data-group-delete><i class="bi bi-trash me-1"></i>Xoá nhóm</button>
+                </div>
+            </div>
+            <div class="row g-3">
+                <div class="col-12 col-xl-5">
+                    <h6 class="fw-bold">Học viên trong nhóm</h6>
+                    <div class="table-responsive" style="max-height:280px;overflow-y:auto;">
+                        <table class="table table-sm align-middle mb-2"><tbody>${memberRows}</tbody></table>
+                    </div>
+                    <details class="mt-2">
+                        <summary class="small fw-semibold" style="cursor:pointer;">Thêm học viên vào nhóm</summary>
+                        <input type="search" class="form-control form-control-sm my-2" data-no-rich data-group-add-search placeholder="Tìm mã, tên hoặc email">
+                        <div style="max-height:220px;overflow-y:auto;">${candidateList}</div>
+                        <button type="button" class="btn btn-sm btn-primary mt-2" data-group-add-members>
+                            <i class="bi bi-person-plus me-1"></i>Thêm học viên đã chọn
+                        </button>
+                        <div class="vstep-help mt-1">HV đang ở nhóm khác sẽ được chuyển sang nhóm này.</div>
+                    </details>
+                </div>
+                <div class="col-12 col-xl-7">
+                    <h6 class="fw-bold">Bộ đề đã giao</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-2">
+                            <thead><tr><th>Bộ đề</th><th>Loại</th><th>Mở từ</th><th>Deadline</th><th></th></tr></thead>
+                            <tbody>${assignmentRows}</tbody>
+                        </table>
+                    </div>
+                    <div class="border rounded-3 p-2 mt-2">
+                        <div class="small fw-semibold mb-2">${editingSet
+                            ? `Sửa lịch: ${escapeHtml(editingSet.title)} <a href="#" class="ms-2" data-group-cancel-edit>Huỷ</a>`
+                            : 'Giao bộ đề cho nhóm'}</div>
+                        ${editingSet ? '' : `
+                            <input type="search" class="form-control form-control-sm mb-2" data-no-rich data-group-set-search placeholder="Tìm bộ đề">
+                            <div style="max-height:200px;overflow-y:auto;" class="mb-2">${setChecklist}</div>`}
+                        <div class="row g-2 align-items-end">
+                            <div class="col-6">
+                                <label class="form-label small mb-1" for="vstepGroupFrom">Mở từ</label>
+                                <input type="datetime-local" class="form-control form-control-sm" id="vstepGroupFrom" value="${escapeHtml(editing ? toDateTimeLocalValue(editing.available_from) : '')}">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small mb-1" for="vstepGroupDue">Deadline</label>
+                                <input type="datetime-local" class="form-control form-control-sm" id="vstepGroupDue" value="${escapeHtml(editing ? toDateTimeLocalValue(editing.due_at) : '')}">
+                            </div>
+                        </div>
+                        <div class="vstep-help mt-1">Để trống "Mở từ" = mở ngay. Hết deadline thì bài đóng (giống trước đây).</div>
+                        <button type="button" class="btn btn-sm btn-primary mt-2" data-group-assign>
+                            <i class="bi bi-send-check me-1"></i>${editingSet ? 'Lưu lịch' : 'Giao bộ đề đã chọn'}
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+    }
+
+    async function postGroupApi(action, payload) {
+        return fetchJson(`/api/vstep/groups/${action}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+    }
+
+    async function runGroupAction(task, successMessage) {
+        try {
+            const result = await task();
+            await loadGroups();
+            const message = typeof successMessage === 'function' ? successMessage(result) : successMessage;
+            if (message) setGroupAlert(message, 'success');
+            return result;
+        } catch (error) {
+            setGroupAlert(error.message || 'Thao tác thất bại.', 'danger');
+            return null;
+        }
+    }
+
+    function addStudentsToGroup(groupId, studentIds) {
+        const group = state.groups.find(g => g.id === groupId);
+        return runGroupAction(
+            () => postGroupApi('members', { groupId, studentIds, action: 'add' }),
+            (r) => `Đã thêm ${r?.added || 0} học viên vào "${group?.title || 'nhóm'}"${r?.moved ? ` (${r.moved} HV chuyển từ nhóm khác)` : ''}.`
+        );
+    }
+
+    async function removeStudentsFromTheirGroups(studentIds) {
+        const byGroup = new Map();
+        studentIds.forEach(id => {
+            const group = groupOfStudent(id);
+            if (!group) return;
+            if (!byGroup.has(group.id)) byGroup.set(group.id, []);
+            byGroup.get(group.id).push(id);
+        });
+        if (!byGroup.size) {
+            setGroupAlert('Các học viên đã chọn chưa ở nhóm ôn nào.', 'warning');
+            return;
+        }
+        await runGroupAction(async () => {
+            for (const [groupId, ids] of byGroup) {
+                await postGroupApi('members', { groupId, studentIds: ids, action: 'remove' });
+            }
+        }, `Đã bỏ ${studentIds.length} học viên khỏi nhóm ôn.`);
+    }
+
+    function bindGroupEvents() {
+        if (!GROUPS_ENABLED) return;
+        const panel = $('vstepGroupsPanel');
+        $('vstepGroupReloadBtn')?.addEventListener('click', () => loadGroups());
+        $('vstepGroupCreateForm')?.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const title = getValue('vstepGroupTitle');
+            if (!title) {
+                setGroupAlert('Nhập tên nhóm ôn.', 'warning');
+                return;
+            }
+            const result = await runGroupAction(
+                () => postGroupApi('save', { title, band: getValue('vstepGroupBand') }),
+                `Đã tạo nhóm "${title}".`
+            );
+            if (result?.group?.id) {
+                state.activeGroupId = result.group.id;
+                setValue('vstepGroupTitle', '');
+                renderGroups();
+            }
+        });
+        panel?.addEventListener('input', (event) => {
+            const target = event.target;
+            if (target.matches('[data-group-add-search]')) {
+                const q = target.value.trim().toLowerCase();
+                panel.querySelectorAll('[data-group-candidate]').forEach(el => {
+                    el.classList.toggle('d-none', Boolean(q) && !el.dataset.groupCandidate.includes(q));
+                });
+            }
+            if (target.matches('[data-group-set-search]')) {
+                const q = target.value.trim().toLowerCase();
+                panel.querySelectorAll('[data-group-set-candidate]').forEach(el => {
+                    el.classList.toggle('d-none', Boolean(q) && !el.dataset.groupSetCandidate.includes(q));
+                });
+            }
+        });
+        panel?.addEventListener('click', async (event) => {
+            const el = event.target.closest('button, a');
+            if (!el || !panel.contains(el)) return;
+            const group = state.groups.find(g => g.id === state.activeGroupId);
+            if (el.dataset.groupSelect) {
+                state.activeGroupId = el.dataset.groupSelect;
+                state.groupEditingContentId = '';
+                setGroupAlert('');
+                renderGroups();
+                return;
+            }
+            if (!group) return;
+            if (el.hasAttribute('data-group-rename')) {
+                const title = window.prompt('Tên mới của nhóm ôn:', group.title);
+                if (!title || !title.trim() || title.trim() === group.title) return;
+                await runGroupAction(() => postGroupApi('save', { id: group.id, title: title.trim(), band: group.band, notes: group.notes }), 'Đã đổi tên nhóm.');
+            } else if (el.hasAttribute('data-group-delete')) {
+                const count = state.groupMembers.filter(m => m.class_id === group.id).length;
+                if (!window.confirm(`Xoá nhóm "${group.title}"?\n\n${count} học viên sẽ thành "chưa có nhóm" (thấy mọi bộ đề, không deadline). Kết quả đã nộp vẫn giữ nguyên.`)) return;
+                await runGroupAction(() => postGroupApi('delete', { id: group.id }), `Đã xoá nhóm "${group.title}".`);
+            } else if (el.dataset.groupRemoveMember) {
+                await runGroupAction(
+                    () => postGroupApi('members', { groupId: group.id, studentIds: [el.dataset.groupRemoveMember], action: 'remove' }),
+                    'Đã bỏ học viên khỏi nhóm.'
+                );
+            } else if (el.hasAttribute('data-group-add-members')) {
+                const ids = Array.from(panel.querySelectorAll('[data-group-add-check]:checked')).map(cb => cb.value);
+                if (!ids.length) {
+                    setGroupAlert('Tick chọn học viên cần thêm.', 'warning');
+                    return;
+                }
+                await addStudentsToGroup(group.id, ids);
+            } else if (el.dataset.groupEditSet) {
+                state.groupEditingContentId = el.dataset.groupEditSet;
+                renderGroups();
+            } else if (el.hasAttribute('data-group-cancel-edit')) {
+                event.preventDefault();
+                state.groupEditingContentId = '';
+                renderGroups();
+            } else if (el.dataset.groupUnassign) {
+                const set = groupPracticeSets().find(s => String(s.id) === el.dataset.groupUnassign);
+                if (!window.confirm(`Bỏ giao "${set?.title || 'bộ đề'}" khỏi nhóm "${group.title}"? HV của nhóm sẽ không thấy bộ đề này nữa.`)) return;
+                if (state.groupEditingContentId === el.dataset.groupUnassign) state.groupEditingContentId = '';
+                await runGroupAction(() => postGroupApi('unassign', { groupId: group.id, contentId: el.dataset.groupUnassign }), 'Đã bỏ giao bộ đề.');
+            } else if (el.hasAttribute('data-group-assign')) {
+                const contentIds = state.groupEditingContentId
+                    ? [state.groupEditingContentId]
+                    : Array.from(panel.querySelectorAll('[data-group-set-check]:checked')).map(cb => cb.value);
+                if (!contentIds.length) {
+                    setGroupAlert('Tick chọn bộ đề cần giao.', 'warning');
+                    return;
+                }
+                const availableFrom = dateTimeValue('vstepGroupFrom') || null;
+                const dueAt = dateTimeValue('vstepGroupDue') || null;
+                if (!dueAt && !window.confirm('Chưa nhập deadline. Vẫn giao bộ đề không có deadline?')) return;
+                const editingNow = Boolean(state.groupEditingContentId);
+                const result = await runGroupAction(
+                    () => postGroupApi('assign', { groupId: group.id, contentIds, availableFrom, dueAt }),
+                    (r) => editingNow ? 'Đã lưu lịch bộ đề.' : `Đã giao ${r?.assigned || 0} bộ đề cho nhóm "${group.title}".`
+                );
+                if (result) {
+                    state.groupEditingContentId = '';
+                    renderGroups();
+                }
+            }
+        });
+        $('vstepStudentsBulkAddGroup')?.addEventListener('click', async () => {
+            const groupId = getValue('vstepStudentsBulkGroup');
+            if (!selectedStudentIds.size) return;
+            if (!groupId) {
+                setStudentAlert('Chọn nhóm ôn cần thêm học viên vào.', 'warning');
+                return;
+            }
+            await addStudentsToGroup(groupId, Array.from(selectedStudentIds));
+            const group = state.groups.find(g => g.id === groupId);
+            setStudentAlert(`Đã thêm ${selectedStudentIds.size} học viên vào nhóm "${group?.title || ''}".`, 'success');
+            selectedStudentIds.clear();
+            renderUsers();
+        });
+        $('vstepStudentsBulkRemoveGroup')?.addEventListener('click', async () => {
+            if (!selectedStudentIds.size) return;
+            if (!window.confirm(`Bỏ ${selectedStudentIds.size} học viên đã chọn khỏi nhóm ôn của họ?`)) return;
+            await removeStudentsFromTheirGroups(Array.from(selectedStudentIds));
+            selectedStudentIds.clear();
+            renderUsers();
+        });
+    }
+
     // Fill dropdown lớp cho filter Results panel (trang onthi).
     // Giữ giá trị admin đang chọn để không reset filter sau khi reload.
     function populateResultClassDropdown() {
         const select = refs.resultClassFilter;
         if (!select) return;
         const current = select.value;
-        const options = ['<option value="">Tất cả lớp</option>']
-            .concat((state.classes || []).map(cls =>
+        const source = GROUPS_ENABLED ? state.groups : state.classes;
+        const options = [`<option value="">${GROUPS_ENABLED ? 'Tất cả nhóm ôn' : 'Tất cả lớp'}</option>`]
+            .concat((source || []).map(cls =>
                 `<option value="${escapeHtml(cls.id)}">${escapeHtml(cls.title || cls.id)}</option>`
             ));
         select.innerHTML = options.join('');
@@ -2695,9 +3119,9 @@
         refs.resultsBody.innerHTML = `<tr><td colspan="${initialColspan}" class="text-center text-muted py-3">Đang tải kết quả...</td></tr>`;
         try {
             if (!state.users.length) await loadUsers();
-            // Trang Ôn thi cần list class để populate filter — load nếu chưa có.
-            if (ADMIN_MODE === 'onthi' && refs.resultClassFilter && !state.classes?.length) {
-                try { await loadClasses(); } catch { /* fallback: dropdown trống */ }
+            // Trang Ôn thi lọc kết quả theo nhóm ôn — load nếu chưa có.
+            if (GROUPS_ENABLED && refs.resultClassFilter && !state.groups.length) {
+                try { await loadGroups(); } catch { /* fallback: dropdown trống */ }
             }
             const result = await fetchJson('/api/vstep/results/list?limit=200');
             state.results = (result.results || []).filter(isVstepResult);
@@ -2714,6 +3138,7 @@
     }
 
     function studentClassIdFor(userId) {
+        if (GROUPS_ENABLED) return groupOfUser(userId)?.id || '';
         const map = userMap();
         const user = map[userId];
         return user?.assigned_class_id || user?.class_id || '';
@@ -3000,6 +3425,7 @@
     }
 
     function resultClassTitle(result, user) {
+        if (GROUPS_ENABLED) return groupOfUser(result.user_id)?.title || '-';
         const classId = result.metadata?.vstep_class_id || studentClassIdFor(result.user_id) || user.assigned_class_id || user.class_id || '';
         const match = state.classes.find(item => String(item.id) === String(classId));
         return match?.title || result.metadata?.class_title || '-';
@@ -3691,7 +4117,10 @@
         document.querySelectorAll('[data-vstep-panel]').forEach(button => {
             button.addEventListener('click', () => {
                 showPanel(button.dataset.vstepPanel);
-                if (button.dataset.vstepPanel === 'students') loadUsers();
+                if (button.dataset.vstepPanel === 'students') {
+                    loadUsers();
+                    loadGroups();
+                }
                 if (button.dataset.vstepPanel === 'resources') loadResources();
                 if (button.dataset.vstepPanel === 'classes') {
                     loadClasses();
@@ -3744,6 +4173,7 @@
             deleteStudents(Array.from(selectedStudentIds));
         });
         $('vstepEditStudentSaveBtn')?.addEventListener('click', saveEditStudent);
+        bindGroupEvents();
         document.querySelectorAll('[data-vstep-practice-skill]').forEach(button => {
             button.addEventListener('click', () => setPracticeSkill(button.dataset.vstepPracticeSkill, { resetForm: true }));
         });
