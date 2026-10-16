@@ -38,6 +38,10 @@ export default async function handler(req, res) {
     if (!isAdmin && result.user_id !== authResult.user.id) {
       return res.status(403).json({ error: 'Bạn không có quyền chấm bài này' });
     }
+    // Lớp Học (BTVN) đã tắt AI chấm bài — giáo viên chấm & trả bài.
+    if (!isAdmin && String(result?.metadata?.submission_kind || '').toLowerCase() === 'homework') {
+      return res.status(403).json({ error: 'Bài Lớp Học không dùng AI chấm — giáo viên sẽ chấm và nhận xét.' });
+    }
 
     const speakingAnswers = Array.isArray(result?.metadata?.speaking_answers)
       ? result.metadata.speaking_answers

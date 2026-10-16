@@ -1,7 +1,13 @@
 import { selectFrom } from '../../_utils/supabase.js';
 import { verifyUserRequest } from '../../_utils/auth.js';
 import { contentToLegacySet, practiceAccessWindowStatus, vstepSchemaErrorResponse } from '../_utils.js';
-import { applyOnthiSchedule, isVisibleForGroup, loadOnthiGroupContext } from '../_onthi_groups.js';
+import {
+  applyOnthiSchedule,
+  attachGroupAssignment,
+  isVisibleForGroup,
+  loadLophocGroupContext,
+  loadOnthiGroupContext
+} from '../_onthi_groups.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -81,7 +87,18 @@ export default async function handler(req, res) {
           return res.status(403).json({ error: windowStatus.reason || 'Đề ôn thi chưa nằm trong thời gian truy cập' });
         }
       }
-      if (content.flow === 'lesson_exam') {
+      // Lớp học: bài giao cho nhóm học của HV → mở được khi tới giờ "Mở từ".
+      const lophocContext = content.flow === 'lesson_exam'
+        ? await loadLophocGroupContext(authResult.user.id)
+        : null;
+      const groupAssignment = lophocContext?.byContent?.get(content.id) || null;
+      if (groupAssignment) {
+        const opensAt = Date.parse(groupAssignment.available_from || '');
+        if (Number.isFinite(opensAt) && opensAt > Date.now()) {
+          return res.status(403).json({ error: `Bài học này sẽ mở từ ${new Date(opensAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}.` });
+        }
+        content = attachGroupAssignment(content, lophocContext);
+      } else if (content.flow === 'lesson_exam') {
         const assignmentId = req.query.assignment || req.query.assignmentId || '';
         const filters = [
           { column: 'content_id', value: content.id },

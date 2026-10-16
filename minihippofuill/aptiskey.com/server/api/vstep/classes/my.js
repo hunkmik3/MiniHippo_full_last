@@ -1,7 +1,7 @@
 import { verifyUserRequest } from '../../_utils/auth.js';
 import { selectFrom } from '../../_utils/supabase.js';
 import { vstepSchemaErrorResponse } from '../_utils.js';
-import { isOnthiGroup } from '../_onthi_groups.js';
+import { isStudyGroup, loadLophocGroupContext } from '../_onthi_groups.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -26,7 +26,7 @@ export default async function handler(req, res) {
         adminView: true,
         student: null,
         class: null,
-        classes: (Array.isArray(classes) ? classes : []).filter((item) => !isOnthiGroup(item)),
+        classes: (Array.isArray(classes) ? classes : []).filter((item) => !isStudyGroup(item)),
         classmates: Array.isArray(students) ? students.map(item => ({
           id: item.id,
           account_code: item.account_code,
@@ -40,8 +40,13 @@ export default async function handler(req, res) {
       filters: [{ column: 'user_id', value: authResult.user.id }],
       single: true
     });
+    // Nhóm học (khu Lớp học) của HV, nếu có — trang Học tập hiện bài theo nhóm.
+    const lophocContext = await loadLophocGroupContext(authResult.user.id).catch(() => null);
+    const group = lophocContext
+      ? { id: lophocContext.group.id, title: lophocContext.group.title, band: lophocContext.group.band }
+      : null;
     if (!student?.class_id) {
-      return res.status(200).json({ student, class: null, classmates: [] });
+      return res.status(200).json({ student, class: null, classmates: [], group });
     }
 
     const classInfo = await selectFrom('vstep_classes', {
@@ -63,6 +68,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       student,
+      group,
       class: classInfo || null,
       classmates: classmates.filter(Boolean).map(item => ({
         id: item.id,

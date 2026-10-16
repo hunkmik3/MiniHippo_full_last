@@ -1,7 +1,13 @@
 import { selectFrom } from '../../_utils/supabase.js';
 import { verifyAdminRequest, verifyUserRequest } from '../../_utils/auth.js';
 import { contentToLegacySet, normalizeFlow, vstepSchemaErrorResponse } from '../_utils.js';
-import { applyOnthiSchedule, isVisibleForGroup, loadOnthiGroupContext } from '../_onthi_groups.js';
+import {
+  applyOnthiSchedule,
+  attachGroupAssignment,
+  isVisibleForGroup,
+  loadLophocGroupContext,
+  loadOnthiGroupContext
+} from '../_onthi_groups.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -106,7 +112,18 @@ export default async function handler(req, res) {
         .filter((content) => isVisibleForGroup(content, groupContext))
         .map((content) => applyOnthiSchedule(content, groupContext));
     }
-    if (status === 'published' && flow === 'lesson_exam' && !adminView) {
+    // Lớp học: HV trong nhóm học chỉ thấy bài nhóm được giao (cả bài chưa tới giờ
+    // mở — trang hiện "Chưa mở"). HV chưa có nhóm: giữ luồng lớp/buổi cũ bên dưới.
+    let lophocGroup = null;
+    const lophocContext = status === 'published' && flow === 'lesson_exam' && !adminView
+      ? await loadLophocGroupContext(authResult.user.id)
+      : null;
+    if (lophocContext) {
+      lophocGroup = { id: lophocContext.group.id, title: lophocContext.group.title, band: lophocContext.group.band };
+      normalized = normalized
+        .filter((content) => isVisibleForGroup(content, lophocContext))
+        .map((content) => attachGroupAssignment(content, lophocContext));
+    } else if (status === 'published' && flow === 'lesson_exam' && !adminView) {
       const now = Date.now();
       const assignmentByContent = new Map(
         (Array.isArray(assignments) ? assignments : [])
@@ -127,7 +144,8 @@ export default async function handler(req, res) {
       contents: normalized,
       sets: normalized.map(contentToLegacySet),
       adminView,
-      onthiGroup
+      onthiGroup,
+      lophocGroup
     });
   } catch (error) {
     const schema = vstepSchemaErrorResponse(error);

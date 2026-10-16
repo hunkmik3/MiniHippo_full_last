@@ -8,7 +8,7 @@ import {
   normalizeScheduleType,
   defaultNumSessionsForBand
 } from '../_utils.js';
-import { ONTHI_GROUP_KIND } from '../_onthi_groups.js';
+import { ONTHI_GROUP_KIND, addStudentsToGroup, findStudyGroup } from '../_onthi_groups.js';
 
 function todayLocalYmd() {
   const d = new Date();
@@ -351,33 +351,7 @@ async function attachToOnthiGroupByName(student, groupName, band, adminId, group
     if (group) groupCache.set(cacheKey, group);
   }
   if (!group?.id) return null;
-
-  const memberships = await selectFrom('vstep_class_students', {
-    columns: 'id,class_id',
-    filters: [{ column: 'student_id', value: student.id }]
-  }).catch(() => []);
-  const otherIds = (memberships || []).map((m) => m.class_id).filter((id) => id !== group.id);
-  if (otherIds.length) {
-    const otherGroups = await selectFrom('vstep_classes', {
-      columns: 'id',
-      filters: [
-        { column: 'id', operator: 'in', value: `(${otherIds.join(',')})` },
-        { column: 'schedule->>kind', value: ONTHI_GROUP_KIND }
-      ]
-    }).catch(() => []);
-    const otherGroupIds = new Set((otherGroups || []).map((g) => g.id));
-    const stale = (memberships || []).filter((m) => otherGroupIds.has(m.class_id)).map((m) => m.id);
-    if (stale.length) {
-      await deleteFrom('vstep_class_students', [{ column: 'id', operator: 'in', value: `(${stale.join(',')})` }]);
-    }
-  }
-  await upsertInto('vstep_class_students', [{
-    class_id: group.id,
-    student_id: student.id,
-    user_id: student.user_id || null,
-    status: 'active',
-    updated_at: new Date().toISOString()
-  }], { onConflict: 'class_id,student_id' });
+  await addStudentsToGroup(group, [student]);
   return { classId: group.id, classTitle: group.title, onthiGroup: true };
 }
 
@@ -402,6 +376,10 @@ export default async function handler(req, res) {
     const bodyProgram = String(body?.learningProgram || body?.learning_program || '').trim().toLowerCase();
     const defaultProgram = bodyProgram === 'vstep_onthi' ? 'vstep_onthi' : 'vstep_lophoc';
 
+    // Import thẳng vào 1 nhóm ôn / nhóm học (admin chọn trên trang): mọi dòng vào nhóm này.
+    const targetGroup = body?.groupId ? await findStudyGroup(body.groupId) : null;
+    if (body?.groupId && !targetGroup) return res.status(400).json({ error: 'Không tìm thấy nhóm đã chọn.' });
+
     const batchId = `vstep-import-${Date.now()}`;
     const classCache = new Map();
     const results = [];
@@ -415,7 +393,14 @@ export default async function handler(req, res) {
         const scheduleType = row.scheduleType || row.schedule_type || row.ca_hoc || row.cahoc || row.scheduletype || '';
         let classAssigned = null;
         let classError = null;
-        if (className && result?.student?.id) {
+        if (targetGroup && result?.student?.id) {
+          try {
+            await addStudentsToGroup(targetGroup, [result.student]);
+            classAssigned = { classId: targetGroup.id, classTitle: targetGroup.title, group: true };
+          } catch (err) {
+            classError = err?.message || 'Không thể thêm vào nhóm';
+          }
+        } else if (className && result?.student?.id) {
           try {
             classAssigned = result.student.learning_program === 'vstep_onthi'
               ? await attachToOnthiGroupByName(

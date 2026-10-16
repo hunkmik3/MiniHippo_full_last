@@ -1,15 +1,22 @@
-// API admin cho NHÓM ÔN khu Ôn thi VSTEP (xem _onthi_groups.js).
-//   GET  /api/vstep/groups/list               nhóm + thành viên + bộ đề đã giao
-//   POST /api/vstep/groups/save               { id?, title, band, notes }
+// API admin cho NHÓM ÔN (khu Ôn thi) và NHÓM HỌC (khu Lớp học) VSTEP — xem _onthi_groups.js.
+// program = 'onthi' (mặc định, giao bộ đề) | 'lophoc' (giao bài học).
+//   GET  /api/vstep/groups/list?program=...   nhóm + thành viên + bài đã giao
+//   POST /api/vstep/groups/save               { id?, program, title, band, notes }
 //   POST /api/vstep/groups/delete             { id }
 //   POST /api/vstep/groups/members            { groupId, studentIds, action: 'add'|'remove' }
 //   POST /api/vstep/groups/assign             { groupId, contentIds, availableFrom, dueAt }
 //   POST /api/vstep/groups/unassign           { groupId, contentId }
 import { parseJsonBody } from '../_utils/parseBody.js';
 import { verifyAdminRequest } from '../_utils/auth.js';
-import { deleteFrom, insertInto, selectFrom, updateTable, upsertInto } from '../_utils/supabase.js';
+import { deleteFrom, insertInto, selectFrom, updateTable } from '../_utils/supabase.js';
 import { vstepSchemaErrorResponse } from './_utils.js';
-import { ONTHI_GROUP_KIND } from './_onthi_groups.js';
+import {
+  FLOW_BY_GROUP_KIND,
+  GROUP_KIND_BY_PROGRAM,
+  addStudentsToGroup,
+  findStudyGroup,
+  groupKindOf
+} from './_onthi_groups.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_BATCH = 500;
@@ -52,23 +59,20 @@ async function withAdmin(req, res, method, run) {
   }
 }
 
-async function findGroup(id) {
-  if (!UUID_RE.test(String(id || ''))) return null;
-  return selectFrom('vstep_classes', {
-    filters: [
-      { column: 'id', value: id },
-      { column: 'schedule->>kind', value: ONTHI_GROUP_KIND }
-    ],
-    single: true
-  });
+function kindOfProgram(program) {
+  return GROUP_KIND_BY_PROGRAM[String(program || 'onthi').toLowerCase()] || null;
 }
+
+const findGroup = findStudyGroup;
 
 export async function listGroups(req, res) {
   return withAdmin(req, res, 'GET', async () => {
+    const kind = kindOfProgram(req.query?.program);
+    if (!kind) return badRequest(res, 'program không hợp lệ (onthi | lophoc).');
     const groups = await selectFrom('vstep_classes', {
       columns: 'id,title,band,notes,status,created_at,updated_at',
       filters: [
-        { column: 'schedule->>kind', value: ONTHI_GROUP_KIND },
+        { column: 'schedule->>kind', value: kind },
         { column: 'status', value: 'active' }
       ],
       order: { column: 'created_at', asc: true }
@@ -113,12 +117,14 @@ export async function saveGroup(req, res) {
       return res.status(200).json({ group: updated || { ...group, title, band, notes } });
     }
 
+    const kind = kindOfProgram(body.program);
+    if (!kind) return badRequest(res, 'program không hợp lệ (onthi | lophoc).');
     const [created] = await insertInto('vstep_classes', [{
       title,
       band,
       notes,
       status: 'active',
-      schedule: { kind: ONTHI_GROUP_KIND },
+      schedule: { kind },
       created_by: admin?.id || null
     }]);
     return res.status(200).json({ group: created });
@@ -156,35 +162,7 @@ export async function updateMembers(req, res) {
     });
     const found = Array.isArray(students) ? students : [];
     if (!found.length) return badRequest(res, 'Không tìm thấy học viên.');
-    const foundIds = found.map((s) => s.id);
-
-    // Mỗi học viên chỉ ở 1 nhóm ôn: rời nhóm ôn cũ (lớp khu Học tập giữ nguyên).
-    const current = await selectFrom('vstep_class_students', {
-      columns: 'id,class_id',
-      filters: [inFilter('student_id', foundIds)]
-    });
-    const otherClassIds = [...new Set((current || []).map((m) => m.class_id).filter((id) => id !== group.id))];
-    let moved = 0;
-    if (otherClassIds.length) {
-      const otherGroups = await selectFrom('vstep_classes', {
-        columns: 'id',
-        filters: [inFilter('id', otherClassIds), { column: 'schedule->>kind', value: ONTHI_GROUP_KIND }]
-      });
-      const otherGroupIds = new Set((otherGroups || []).map((g) => g.id));
-      const toRemove = (current || []).filter((m) => otherGroupIds.has(m.class_id)).map((m) => m.id);
-      if (toRemove.length) {
-        await deleteFrom('vstep_class_students', [inFilter('id', toRemove)]);
-        moved = toRemove.length;
-      }
-    }
-
-    await upsertInto('vstep_class_students', found.map((s) => ({
-      class_id: group.id,
-      student_id: s.id,
-      user_id: s.user_id || null,
-      status: 'active',
-      updated_at: new Date().toISOString()
-    })), { onConflict: 'class_id,student_id' });
+    const { moved } = await addStudentsToGroup(group, found);
 
     return res.status(200).json({
       success: true,
@@ -208,12 +186,16 @@ export async function assignContents(req, res) {
       return badRequest(res, '"Mở từ" phải trước deadline.');
     }
 
+    // Nhóm ôn chỉ nhận bộ đề Ôn thi, nhóm học chỉ nhận bài học Lớp học.
+    const flow = FLOW_BY_GROUP_KIND[groupKindOf(group)];
     const contents = await selectFrom('vstep_contents', {
       columns: 'id,flow',
       filters: [inFilter('id', contentIds)]
     });
-    const practiceIds = (contents || []).filter((c) => c.flow === 'practice').map((c) => c.id);
-    if (!practiceIds.length) return badRequest(res, 'Bộ đề không thuộc khu Ôn thi.');
+    const practiceIds = (contents || []).filter((c) => c.flow === flow).map((c) => c.id);
+    if (!practiceIds.length) {
+      return badRequest(res, flow === 'practice' ? 'Bộ đề không thuộc khu Ôn thi.' : 'Bài không thuộc khu Lớp học.');
+    }
 
     const existing = await selectFrom('vstep_assignments', {
       columns: 'id,content_id',

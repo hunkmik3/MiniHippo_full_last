@@ -375,7 +375,8 @@
             const metadata = item.metadata && typeof item.metadata === 'object' ? item.metadata : {};
             const score = resolveDisplayScore(item, metadata);
             const band = resolveDisplayBand(item, metadata);
-            const aiUsage = item.practice_type === 'writing' ? getAiUsageInfo(metadata) : null;
+            const isHomework = String(metadata.submission_kind || '').toLowerCase() === 'homework';
+            const aiUsage = item.practice_type === 'writing' && !isHomework ? getAiUsageInfo(metadata) : null;
             const aiUsageText = aiUsage
                 ? (aiUsage.probability !== null ? `${aiUsage.label} (${aiUsage.probability}%)` : aiUsage.label)
                 : '—';
@@ -688,7 +689,10 @@
         const score = resolveDisplayScore(result, metadata);
         const type = resolveDisplayType(result);
         const band = resolveDisplayBand(result, metadata);
-        const aiUsage = result.practice_type === 'writing' ? getAiUsageInfo(metadata) : null;
+        // Lớp Học (BTVN) đã gỡ AI chấm bài → không hiện AI sửa lỗi / AI usage
+        // (kể cả bài nộp cũ đã có dữ liệu AI); chỉ hiện nhận xét của giáo viên.
+        const isHomework = String(metadata.submission_kind || '').toLowerCase() === 'homework';
+        const aiUsage = result.practice_type === 'writing' && !isHomework ? getAiUsageInfo(metadata) : null;
         const aiUsageText = aiUsage
             ? (aiUsage.probability !== null ? `${aiUsage.label} (${aiUsage.probability}%)` : aiUsage.label)
             : null;
@@ -738,7 +742,7 @@
         const writingAutoSummaryEl = document.getElementById('history-detail-writing-auto-summary');
         const writingAutoEl = document.getElementById('history-detail-writing-auto');
         if (result.practice_type === 'writing') {
-            if (writingAutoWrapEl) writingAutoWrapEl.style.display = 'block';
+            if (writingAutoWrapEl) writingAutoWrapEl.style.display = isHomework ? 'none' : 'block';
             if (writingAutoSummaryEl) {
                 writingAutoSummaryEl.innerHTML = window.WritingAutoFeedback
                     ? window.WritingAutoFeedback.renderOverallSummary(metadata)
@@ -751,7 +755,8 @@
             }
             if (writingFeedbackWrapEl) writingFeedbackWrapEl.style.display = 'block';
             if (writingFeedbackEl) {
-                writingFeedbackEl.innerHTML = renderWritingFeedbackDetail(metadata);
+                const { auto_writing_feedback: _autoFeedback, ...metadataWithoutAi } = metadata;
+                writingFeedbackEl.innerHTML = renderWritingFeedbackDetail(isHomework ? metadataWithoutAi : metadata);
             }
         } else {
             if (writingAutoWrapEl) writingAutoWrapEl.style.display = 'none';
@@ -765,7 +770,7 @@
         const aiWrapEl = document.getElementById('history-detail-ai-wrap');
         const aiEl = document.getElementById('history-detail-ai');
         if (aiWrapEl && aiEl) {
-            const aiHtml = renderAiSection(result, metadata);
+            const aiHtml = isHomework ? '' : renderAiSection(result, metadata);
             aiWrapEl.style.display = aiHtml ? 'block' : 'none';
             aiEl.innerHTML = aiHtml;
             // TỰ ĐỘNG chấm mọi câu chưa chấm khi mở chi tiết (không cần bấm nút).
