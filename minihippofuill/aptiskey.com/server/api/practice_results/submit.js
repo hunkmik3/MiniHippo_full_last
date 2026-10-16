@@ -133,16 +133,40 @@ export default async function handler(req, res) {
       }
     }
 
-    if (normalizedPracticeType === 'writing') {
-      const autoGrade = await autoGradeWritingSubmission({
-        metadata: mergedMetadata || {},
-        setTitle
+    // Client gửi lại cùng 1 lượt nộp (thử lại sau lỗi mạng / bấm "Nộp lại") →
+    // trả bản ghi đã có thay vì tạo bản trùng.
+    const clientSubmissionId = typeof mergedMetadata?.client_submission_id === 'string'
+      ? mergedMetadata.client_submission_id.trim().slice(0, 120)
+      : '';
+    if (clientSubmissionId) {
+      mergedMetadata.client_submission_id = clientSubmissionId;
+      const existing = await selectFrom('practice_results', {
+        columns: 'id,user_id,practice_type,set_id,set_title,submitted_at,metadata',
+        filters: [
+          { column: 'user_id', value: authResult.user.id },
+          { column: 'metadata->>client_submission_id', value: clientSubmissionId }
+        ],
+        limit: 1
       });
+      if (Array.isArray(existing) && existing[0]) {
+        return res.status(200).json({ success: true, duplicate: true, result: existing[0] });
+      }
+    }
 
+    if (normalizedPracticeType === 'writing') {
       // Writing auto-grading only provides correction hints. Official score and
       // band stay pending until admin review.
       numericTotal = 0;
       numericMax = 0;
+    }
+
+    // Lớp Học (BTVN) KHÔNG còn AI sửa lỗi tự động — giáo viên chấm & trả bài.
+    // (Trước đây AI chạy TRƯỚC khi lưu nên AI chậm có thể làm hỏng cả lượt nộp.)
+    if (normalizedPracticeType === 'writing' && !isHomeworkSubmission) {
+      const autoGrade = await autoGradeWritingSubmission({
+        metadata: mergedMetadata || {},
+        setTitle
+      });
 
       if (autoGrade?.metadataPatch && typeof autoGrade.metadataPatch === 'object') {
         mergedMetadata = {

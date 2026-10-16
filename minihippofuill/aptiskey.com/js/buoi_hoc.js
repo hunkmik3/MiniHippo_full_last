@@ -333,7 +333,7 @@ function showSpeakingRecordingIndicator(key, options = {}) {
 
 function getSpeakingRecordingKey(page) {
   const rawKey = String(page?.data?.key || '').trim();
-  const fallbackKey = `sp-${page?.idx ?? currentPage}`;
+  const fallbackKey = `sp-${getRuntimePageAnswerIndex(page)}`;
   if (!rawKey) return fallbackKey;
 
   const speakingTypes = ['speaking-intro', 'speaking-audio-q', 'speaking-q', 'speaking-image'];
@@ -357,6 +357,12 @@ function jsString(value) {
     .replace(/'/g, "\\'")
     .replace(/\r/g, '\\r')
     .replace(/\n/g, '\\n');
+}
+
+// Chuỗi JS đặt trong thuộc tính onclick="...(...)": đáp án có dấu nháy (vd
+// "didn't rain") trước đây làm hỏng câu lệnh → bấm không chọn được.
+function jsAttr(value) {
+  return esc(jsString(value)).replace(/"/g, '&quot;');
 }
 
 function renderSpeakingRecordingControls(key, options = {}) {
@@ -1031,25 +1037,80 @@ function buildSpeakingAnswersForSubmit() {
     .filter(Boolean);
 }
 
+// Mã riêng cho mỗi lượt làm bài (mỗi lần mở trang). Server dùng để bỏ qua bản
+// nộp trùng khi client gửi lại (thử lại sau lỗi mạng, bấm "Nộp lại").
+function makeClientSubmissionId(kind) {
+  const random = (window.crypto && typeof window.crypto.randomUUID === 'function')
+    ? window.crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  return `buoi_hoc-${kind}-${random}`;
+}
+const CLIENT_SUBMISSION_IDS = {
+  homework: makeClientSubmissionId('homework'),
+  writing: makeClientSubmissionId('writing')
+};
+
+// Gửi bài lên /api/practice_results/submit. Trước đây lỗi chỉ ghi console nên HV
+// vẫn thấy điểm mà bài KHÔNG vào lịch sử. Giờ: hết phiên → refresh token / đăng
+// nhập lại tại chỗ; lỗi mạng/server → thử lại; trả { ok, data } hoặc { ok:false, error }.
+async function postPracticeResult(body) {
+  const send = () => fetch('/api/practice_results/submit', {
+    method: 'POST',
+    headers: buildAuthorizedHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(body)
+  });
+  let lastError = 'Không kết nối được máy chủ.';
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (attempt) await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
+    let res;
+    try {
+      if (typeof ensureAuthToken === 'function') await ensureAuthToken();
+      res = await send();
+      if (res.status === 401 && typeof refreshAuthToken === 'function' && await refreshAuthToken()) {
+        res = await send();
+      }
+      if (res.status === 401 && typeof showReLoginModal === 'function'
+        && await showReLoginModal('Phiên đăng nhập đã hết hạn. Đăng nhập lại để lưu bài — bài làm của bạn vẫn được giữ nguyên.')) {
+        res = await send();
+      }
+    } catch (error) {
+      console.warn('Submit practice result network error:', error);
+      lastError = 'Mất kết nối mạng — kiểm tra mạng rồi bấm "Nộp lại".';
+      continue;
+    }
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) return { ok: true, data };
+    lastError = data?.error || `Lỗi máy chủ (HTTP ${res.status})`;
+    // Lỗi nghiệp vụ (quá deadline, không thuộc lớp, hết phiên...) — gửi lại không giúp.
+    if (res.status < 500 && res.status !== 429) break;
+  }
+  return { ok: false, error: lastError };
+}
+
 function submitHomeworkResultIfNeeded(totalCorrect = 0, totalQuestions = 0, detail = {}) {
-  if (PREVIEW_MODE) return Promise.resolve(false);
+  if (PREVIEW_MODE) return Promise.resolve({ ok: true, skipped: true });
   if (HOMEWORK_SUBMISSION_PROMISE) return HOMEWORK_SUBMISSION_PROMISE;
-  if (ACCESS_CONTEXT?.locked) return Promise.resolve(false);
+  if (ACCESS_CONTEXT?.locked) {
+    return Promise.resolve({ ok: false, error: ACCESS_CONTEXT.lockReason || 'Buổi học đang bị khoá.' });
+  }
 
   const payload = buildHomeworkPayload(totalCorrect, totalQuestions, detail);
-  if (!payload) return Promise.resolve(false);
+  if (!payload) {
+    return Promise.resolve({ ok: false, error: 'Không xác định được lớp học của bạn — hãy vào lại buổi học từ trang Lớp Học.' });
+  }
+  payload.metadata.client_submission_id = CLIENT_SUBMISSION_IDS.homework;
 
-  HOMEWORK_SUBMISSION_PROMISE = (async () => {
+  const promise = (async () => {
     try {
       // Đảm bảo tất cả ghi âm đã upload xong trước khi submit homework status
       await ensureAllSpeakingRecordingsUploaded();
 
       const speakingAnswers = buildSpeakingAnswersForSubmit();
       // Buổi HỖN HỢP (speaking + writing): phần writing đã có bản ghi riêng qua
-      // submitWritingForGrading, ở đây chỉ tạo THÊM bản ghi speaking. Chỉ nộp khi
+      // submitWritingHomework, ở đây chỉ tạo THÊM bản ghi speaking. Chỉ nộp khi
       // HV thực sự có ghi âm/ghi chú — nếu rỗng thì session_type vẫn là 'mixed',
       // server sẽ fallback thành 'writing' và sinh ra bản ghi writing trùng.
-      if (detail?.speakingOnly && !speakingAnswers.length) return false;
+      if (detail?.speakingOnly && !speakingAnswers.length) return { ok: true, skipped: true };
       if (speakingAnswers.length) {
         payload.metadata = {
           ...payload.metadata,
@@ -1059,28 +1120,65 @@ function submitHomeworkResultIfNeeded(totalCorrect = 0, totalQuestions = 0, deta
         };
       }
 
-      const token = resolveToken();
-      const response = await fetch('/api/practice_results/submit', {
-        method: 'POST',
-        headers: buildAuthorizedHeaders({
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        }),
-        body: JSON.stringify(payload)
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data?.error || 'Không thể lưu trạng thái nộp bài BTVN');
-      }
-      return true;
+      return await postPracticeResult(payload);
     } catch (error) {
       console.warn('Submit homework status failed:', error);
-      return false;
+      return { ok: false, error: error?.message || 'Không thể lưu bài.' };
     }
   })();
-
-  return HOMEWORK_SUBMISSION_PROMISE;
+  HOMEWORK_SUBMISSION_PROMISE = promise;
+  // Lỗi → bỏ cache để nút "Nộp lại" gửi lại được.
+  promise.then((result) => {
+    if (!result?.ok && HOMEWORK_SUBMISSION_PROMISE === promise) HOMEWORK_SUBMISSION_PROMISE = null;
+  });
+  return promise;
 }
+
+// Ô trạng thái lưu bài trên trang kết quả.
+let HOMEWORK_SAVE_TASKS = null;
+
+function homeworkSaveStatusHtml() {
+  if (PREVIEW_MODE) return '';
+  return `<div id="homeworkSaveStatus" class="mt-2">
+    <span class="badge bg-light text-dark border"><span class="spinner-border spinner-border-sm me-1"></span>Đang lưu bài vào lịch sử bài học...</span>
+  </div>`;
+}
+
+function setHomeworkSaveStatus(state, message = '') {
+  const el = document.getElementById('homeworkSaveStatus');
+  if (!el) return;
+  if (state === 'pending') {
+    el.innerHTML = '<span class="badge bg-light text-dark border"><span class="spinner-border spinner-border-sm me-1"></span>Đang lưu bài vào lịch sử bài học...</span>';
+  } else if (state === 'ok') {
+    el.innerHTML = '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Đã lưu bài vào lịch sử bài học</span>';
+  } else {
+    el.innerHTML = `
+      <div class="alert alert-danger py-2 px-3 mb-0 d-inline-block text-start small">
+        <i class="bi bi-exclamation-triangle-fill me-1"></i><strong>Bài CHƯA được lưu vào lịch sử</strong> — ${esc(message || 'Lỗi không xác định.')}
+        <div class="mt-2"><button type="button" class="btn btn-sm btn-danger" onclick="retryHomeworkSave()"><i class="bi bi-arrow-repeat me-1"></i>Nộp lại</button></div>
+      </div>`;
+  }
+}
+
+// tasks: mảng hàm trả Promise<{ ok, error }>; mỗi hàm tự cache khi đã thành công.
+function runHomeworkSave(tasks) {
+  if (PREVIEW_MODE) return;
+  HOMEWORK_SAVE_TASKS = tasks;
+  setHomeworkSaveStatus('pending');
+  Promise.all(tasks.map((task) => Promise.resolve()
+    .then(task)
+    .catch((error) => ({ ok: false, error: error?.message }))))
+    .then((results) => {
+      const failed = results.find((result) => !result?.ok);
+      if (failed) setHomeworkSaveStatus('error', failed.error);
+      else setHomeworkSaveStatus('ok');
+    });
+}
+
+function retryHomeworkSave() {
+  if (HOMEWORK_SAVE_TASKS) runHomeworkSave(HOMEWORK_SAVE_TASKS);
+}
+window.retryHomeworkSave = retryHomeworkSave;
 
 /* ═══════════════════════════════════════════════════════
    SESSION DATA
@@ -3199,14 +3297,15 @@ function renderPage(pageIndex) {
 function renderGrammarPage(page) {
   const item = page.data;
   const num = page.idx + 1;
+  const ai = getRuntimePageAnswerIndex(page);
   const totalGrammar = pages.filter(p => p.type === 'grammar').length;
   const letters = ['A', 'B', 'C'];
-  const saved = userAnswers['g-' + page.idx] || '';
+  const saved = userAnswers['g-' + ai] || '';
 
   const optionsHtml = item.options.map((opt, oi) => {
     const sel = saved === opt ? 'selected' : '';
     return `
-      <li class="option-item ${sel}" onclick="pickAnswer('g-${page.idx}', '${esc(opt)}', this)">
+      <li class="option-item ${sel}" onclick="pickAnswer('g-${ai}', '${jsAttr(opt)}', this)">
         <span class="option-letter">${letters[oi]}</span>
         <span class="option-text">${esc(opt)}</span>
       </li>`;
@@ -3227,16 +3326,17 @@ function renderGrammarPage(page) {
 function renderListeningQ(page) {
   const item = page.data;
   const num = page.idx + 1;
-  const audioId = 'audio-p1-' + page.idx;
+  const ai = getRuntimePageAnswerIndex(page);
+  const audioId = 'audio-p1-' + ai;
   if (audioPlaysLeft[audioId] === undefined) audioPlaysLeft[audioId] = 2;
   const playsLeft = audioPlaysLeft[audioId];
-  const saved = userAnswers['lq-' + page.idx] || '';
+  const saved = userAnswers['lq-' + ai] || '';
   const letters = ['A', 'B', 'C'];
 
   const optionsHtml = item.options.map((opt, oi) => {
     const sel = saved === opt ? 'selected' : '';
     return `
-      <li class="option-item ${sel}" onclick="pickAnswer('lq-${page.idx}', '${esc(opt)}', this)">
+      <li class="option-item ${sel}" onclick="pickAnswer('lq-${ai}', '${jsAttr(opt)}', this)">
         <span class="option-letter">${letters[oi]}</span>
         <span class="option-text">${esc(opt)}</span>
       </li>`;
@@ -3286,7 +3386,7 @@ function renderListeningTopic(page) {
     const key = `lt-${pageAnswerIndex}-${i}`;
     const saved = userAnswers[key] || '';
     const opts = d.options.map((opt, oi) =>
-      `<option value="${oi}" ${saved == oi ? 'selected' : ''}>${esc(opt)}</option>`
+      `<option value="${oi}" ${saved !== '' && String(saved) === String(oi) ? 'selected' : ''}>${esc(opt)}</option>`
     ).join('');
     return `
       <div class="person-row">
@@ -3326,8 +3426,9 @@ function renderListeningTopic(page) {
 
 function renderListeningOpinion(page) {
   const d = page.data;
-  const audioId = 'audio-opinion-' + page.idx;
-  const transcriptId = 'transcript-opinion-' + page.idx;
+  const ai = getRuntimePageAnswerIndex(page);
+  const audioId = 'audio-opinion-' + ai;
+  const transcriptId = 'transcript-opinion-' + ai;
   if (audioPlaysLeft[audioId] === undefined) audioPlaysLeft[audioId] = 2;
   const playsLeft = audioPlaysLeft[audioId];
   const partTitle = resolvePageDisplayPartLabel(page, page.partLabel || 'Part 1');
@@ -3335,7 +3436,7 @@ function renderListeningOpinion(page) {
   const options = ['Man', 'Woman', 'Both'];
 
   const statementsHtml = d.statements.map((text, si) => {
-    const key = `lop-${page.idx}-${si}`;
+    const key = `lop-${ai}-${si}`;
     const saved = userAnswers[key] || '';
     const opts = options.map(opt => `<option value="${opt}" ${saved === opt ? 'selected' : ''}>${opt}</option>`).join('');
     return `
@@ -3386,20 +3487,21 @@ function renderListeningOpinion(page) {
 
 function renderListeningMcqBatch(page) {
   const d = page.data;
-  const audioId = 'audio-mcq-' + page.idx;
-  const transcriptId = 'transcript-mcq-' + page.idx;
+  const ai = getRuntimePageAnswerIndex(page);
+  const audioId = 'audio-mcq-' + ai;
+  const transcriptId = 'transcript-mcq-' + ai;
   if (audioPlaysLeft[audioId] === undefined) audioPlaysLeft[audioId] = 2;
   const playsLeft = audioPlaysLeft[audioId];
   const partTitle = resolvePageDisplayPartLabel(page, page.partLabel || 'Part 2');
 
   const questionsHtml = d.questions.map((q, qi) => {
-    const key = `lmb-${page.idx}-${qi}`;
+    const key = `lmb-${ai}-${qi}`;
     const letters = ['A', 'B', 'C'];
     const saved = userAnswers[key] || '';
     const optionsHtml = q.options.map((opt, oi) => {
       const sel = saved === opt ? 'selected' : '';
       return `
-        <li class="option-item ${sel}" onclick="pickAnswer('${key}', '${esc(opt)}', this)">
+        <li class="option-item ${sel}" onclick="pickAnswer('${key}', '${jsAttr(opt)}', this)">
           <span class="option-letter">${letters[oi]}</span>
           <span class="option-text">${esc(opt)}</span>
         </li>`;
@@ -3485,9 +3587,10 @@ function renderReadingGap(page) {
   const d = page.data;
   const num = page.idx + 1;
   const title = page.partTitle ? esc(page.partTitle) : `Question ${num} of ${page.totalInPart}`;
+  const ai = getRuntimePageAnswerIndex(page);
 
   const rowsHtml = d.rows.map((r, ri) => {
-    const key = `rg-${page.idx}-${ri}`;
+    const key = `rg-${ai}-${ri}`;
     const saved = userAnswers[key] || '';
     const shuffled = shuffleArr([...r.options]);
     const opts = shuffled.map(o => `<option value="${esc(o)}" ${saved===o?'selected':''}>${esc(o)}</option>`).join('');
@@ -3573,8 +3676,9 @@ function renderReadingOrder(page) {
   const d = page.data;
   const num = page.idx + 1;
   const title = page.partTitle ? esc(page.partTitle) : `Reading Question 2 &amp; 3 (${num}/${page.totalInPart})`;
-  const containerId = `order-container-${page.idx}`;
-  const orderKey = `order-${page.idx}`;
+  const ai = getRuntimePageAnswerIndex(page);
+  const containerId = `order-container-${ai}`;
+  const orderKey = `order-${ai}`;
 
   // First sentence locked, rest shuffled
   const first = d.sentences[0];
@@ -3634,13 +3738,17 @@ function renderReadingMatch(page) {
   const d = page.data;
   const num = page.idx + 1;
   const title = page.partTitle ? esc(page.partTitle) : `Reading Question 4 (${num}/${page.totalInPart})`;
+  // Khoá đáp án theo VỊ TRÍ trang trong buổi: buổi có 2 trang cùng dạng (vd
+  // Part 1 + Part 2 đều là reading-match) có cùng page.idx → trước đây dùng
+  // chung ô đáp án, chọn ở trang này đè lên trang kia.
+  const ai = getRuntimePageAnswerIndex(page);
 
   const parasHtml = Object.entries(d.paragraphs).map(([letter, text]) =>
     `<div class="paragraph-box"><p><strong>${letter}:</strong> ${renderRichText(text)}</p></div>`
   ).join('');
 
   const matchHtml = d.questions.map((q, qi) => {
-    const key = `rm-${page.idx}-${qi}`;
+    const key = `rm-${ai}-${qi}`;
     const saved = userAnswers[key] || '';
     const letters = Object.keys(d.paragraphs);
     const opts = letters.map(l => `<option value="${l}" ${saved===l?'selected':''}>${l}</option>`).join('');
@@ -3677,7 +3785,8 @@ function renderReadingMatch(page) {
 function renderReadingHeading(page) {
   const d = page.data;
   const num = page.idx + 1;
-  const containerId = `heading-paras-${page.idx}`;
+  const ai = getRuntimePageAnswerIndex(page);
+  const containerId = `heading-paras-${ai}`;
   const titleBase = page.partTitle || page.partLabel || page.headerTitle || resolvePageDisplayPartLabel(page, 'Reading Question 5');
 
   // Paragraphs (hidden by default, toggle with button)
@@ -3685,16 +3794,16 @@ function renderReadingHeading(page) {
     `<div class="border rounded-3 p-3 mb-3 bg-white shadow-sm">
       <div class="d-flex flex-column flex-md-row align-items-md-start gap-3">
         <label class="mb-0 fw-semibold" style="min-width:30px;">${pi + 1}.</label>
-        <select class="form-select reading-heading-select" name="rh-${page.idx}-${pi}" data-answer="${d.answers[pi]}"
-                onchange="userAnswers['rh-${page.idx}-${pi}']=this.value;" style="max-width:350px;">
+        <select class="form-select reading-heading-select" name="rh-${ai}-${pi}" data-answer="${d.answers[pi]}"
+                onchange="userAnswers['rh-${ai}-${pi}']=this.value;" style="max-width:350px;">
           <option value="">-- Chọn heading --</option>
           ${d.headings.map((h, hi) => {
-            const saved = userAnswers['rh-' + page.idx + '-' + pi] || '';
-            return `<option value="${hi}" ${saved == hi ? 'selected' : ''}>${esc(h)}</option>`;
+            const saved = userAnswers['rh-' + ai + '-' + pi] || '';
+            return `<option value="${hi}" ${saved !== '' && String(saved) === String(hi) ? 'selected' : ''}>${esc(h)}</option>`;
           }).join('')}
         </select>
       </div>
-      <p class="mb-0 mt-2 text-muted" id="para-text-${page.idx}-${pi}" style="display:none; font-size:0.9rem; line-height:1.7;">${esc(text)}</p>
+      <p class="mb-0 mt-2 text-muted" id="para-text-${ai}-${pi}" style="display:none; font-size:0.9rem; line-height:1.7;">${esc(text)}</p>
     </div>`
   ).join('');
 
@@ -3703,7 +3812,7 @@ function renderReadingHeading(page) {
       <div class="q-number-label">${esc(titleBase)} (${num}/${page.totalInPart})</div>
       <h4 class="mb-3" style="color:#dc2626;"><strong>TOPIC: ${esc(d.topic)}</strong></h4>
       <div class="mb-3">
-        <button class="btn btn-secondary btn-sm" onclick="toggleHeadingParagraphs(${page.idx})">
+        <button class="btn btn-secondary btn-sm" onclick="toggleHeadingParagraphs(${ai})">
           <i class="bi bi-eye me-1"></i>Xem nội dung
         </button>
       </div>
@@ -4118,7 +4227,7 @@ function renderSpeakingImage(page) {
 
       <div class="speaking-answer-area mt-3" style="text-align:left;">
         <label class="form-label fw-bold">Ghi chú câu trả lời (tùy chọn):</label>
-        <textarea class="form-control writing-textarea" name="sp-${page.idx}" rows="3"
+        <textarea class="form-control writing-textarea" name="${esc(recordingKey)}" rows="3"
                   placeholder="Ghi nhanh ý chính..."
                   oninput="userAnswers['${jsString(recordingKey)}']=this.value;">${esc(saved)}</textarea>
       </div>
@@ -4704,15 +4813,30 @@ function renderWritingChat(page) {
 }
 
 /* ═══════════════════════════════════════════════════════
-   WRITING – Submit & AI Auto-grade
+   WRITING – Submit (Lớp Học không còn AI chấm/sửa lỗi — giáo viên chấm & trả bài)
    ═══════════════════════════════════════════════════════ */
 
-async function submitWritingForGrading() {
-  if (!ensureSessionUnlockedOrNotify()) return null;
+let WRITING_SUBMISSION_PROMISE = null;
+
+function submitWritingHomework() {
+  if (PREVIEW_MODE) return Promise.resolve({ ok: true, skipped: true });
+  if (WRITING_SUBMISSION_PROMISE) return WRITING_SUBMISSION_PROMISE;
+  const promise = submitWritingHomeworkOnce();
+  WRITING_SUBMISSION_PROMISE = promise;
+  promise.then((result) => {
+    if (!result?.ok && WRITING_SUBMISSION_PROMISE === promise) WRITING_SUBMISSION_PROMISE = null;
+  });
+  return promise;
+}
+
+async function submitWritingHomeworkOnce() {
+  if (ACCESS_CONTEXT?.locked) {
+    return { ok: false, error: ACCESS_CONTEXT.lockReason || 'Buổi học đang bị khoá.' };
+  }
 
   const sessionKey = `${ACTIVE_BAND}-${SESSION}`;
   const session = ACTIVE_SESSION || SESSIONS[sessionKey];
-  if (!session) return null;
+  if (!session) return { ok: false, error: 'Không tìm thấy dữ liệu buổi học.' };
   const classSet = ACCESS_CONTEXT?.classSet || null;
 
   // Keep structure close to Aptis writing flow: part1/part2/part3/part4.
@@ -4801,32 +4925,22 @@ async function submitWritingForGrading() {
     user_answers: collected,
     total_words: totalWords,
     writing_submitted_at: new Date().toISOString(),
-    homework_submitted_at: new Date().toISOString()
+    homework_submitted_at: new Date().toISOString(),
+    client_submission_id: CLIENT_SUBMISSION_IDS.writing
   };
 
-  try {
-    const res = await fetch('/api/practice_results/submit', {
-      method: 'POST',
-      headers: buildAuthorizedHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({
-        practiceType: 'writing',
-        mode: 'set',
-        setId: classSet?.id || null,
-        setTitle: classSet?.title
-          ? `${classSet.title} - Buổi ${SESSION}`
-          : `Lớp Học ${ACTIVE_BAND} Buổi ${SESSION}`,
-        totalScore: 0,
-        maxScore: 0,
-        durationSeconds: Math.max(0, Math.round(((session.timer || 50) * 60 - timerSeconds))),
-        metadata
-      })
-    });
-    const data = await res.json();
-    return data;
-  } catch (err) {
-    console.error('Writing submit error:', err);
-    return null;
-  }
+  return postPracticeResult({
+    practiceType: 'writing',
+    mode: 'set',
+    setId: classSet?.id || null,
+    setTitle: classSet?.title
+      ? `${classSet.title} - Buổi ${SESSION}`
+      : `Lớp Học ${ACTIVE_BAND} Buổi ${SESSION}`,
+    totalScore: 0,
+    maxScore: 0,
+    durationSeconds: Math.max(0, Math.round(((session.timer || 50) * 60 - timerSeconds))),
+    metadata
+  });
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -5078,14 +5192,14 @@ function renderResultsPage() {
   pages.forEach((pg, i) => {
     if (pg.type === 'grammar') {
       totalQ++;
-      const user = userAnswers['g-' + pg.idx] || '(chưa chọn)';
+      const user = userAnswers['g-' + i] || '(chưa chọn)';
       const ok = user === pg.data.answer;
       if (ok) totalCorrect++;
       rows += `<tr><td>Grammar ${pg.idx+1}</td><td>${esc(pg.data.q)}</td><td class="${ok?'result-correct':'result-incorrect'}">${esc(user)}</td><td class="result-correct">${esc(pg.data.answer)}</td></tr>`;
     }
     else if (pg.type === 'listening-q') {
       totalQ++;
-      const user = userAnswers['lq-' + pg.idx] || '(chưa chọn)';
+      const user = userAnswers['lq-' + i] || '(chưa chọn)';
       const ok = user === pg.data.answer;
       if (ok) totalCorrect++;
       rows += `<tr><td>Listening ${pg.idx+1}</td><td>${esc(pg.data.q)}</td><td class="${ok?'result-correct':'result-incorrect'}">${esc(user)}</td><td class="result-correct">${esc(pg.data.answer)}</td></tr>`;
@@ -5107,7 +5221,7 @@ function renderResultsPage() {
       const options = ['Man', 'Woman', 'Both'];
       pg.data.statements.forEach((text, si) => {
         totalQ++;
-        const key = `lop-${pg.idx}-${si}`;
+        const key = `lop-${i}-${si}`;
         const user = userAnswers[key] || '(chưa chọn)';
         const correct = pg.data.answers[si];
         const ok = user === correct;
@@ -5118,7 +5232,7 @@ function renderResultsPage() {
     else if (pg.type === 'listening-mcq-batch') {
       pg.data.questions.forEach((q, qi) => {
         totalQ++;
-        const key = `lmb-${pg.idx}-${qi}`;
+        const key = `lmb-${i}-${qi}`;
         const user = userAnswers[key] || '(chưa chọn)';
         const correct = q.answer;
         const ok = user === correct;
@@ -5129,7 +5243,7 @@ function renderResultsPage() {
     else if (pg.type === 'reading-gap') {
       pg.data.rows.forEach((r, ri) => {
         totalQ++;
-        const key = `rg-${pg.idx}-${ri}`;
+        const key = `rg-${i}-${ri}`;
         const user = userAnswers[key] || '(chưa chọn)';
         const ok = user === r.answer;
         if (ok) totalCorrect++;
@@ -5138,7 +5252,7 @@ function renderResultsPage() {
     }
     else if (pg.type === 'reading-order') {
       const correct = pg.data.sentences.slice(1); // correct order (without first)
-      const userOrder = userAnswers['order-' + pg.idx] || [];
+      const userOrder = userAnswers['order-' + i] || [];
       correct.forEach((s, si) => {
         totalQ++;
         const userS = userOrder[si] || '(chưa sắp xếp)';
@@ -5150,7 +5264,7 @@ function renderResultsPage() {
     else if (pg.type === 'reading-match') {
       pg.data.questions.forEach((q, qi) => {
         totalQ++;
-        const key = `rm-${pg.idx}-${qi}`;
+        const key = `rm-${i}-${qi}`;
         const user = userAnswers[key] || '(chưa chọn)';
         const ok = user === q.answer;
         if (ok) totalCorrect++;
@@ -5160,7 +5274,7 @@ function renderResultsPage() {
     else if (pg.type === 'reading-heading') {
       pg.data.paragraphs.forEach((text, pi) => {
         totalQ++;
-        const key = `rh-${pg.idx}-${pi}`;
+        const key = `rh-${i}-${pi}`;
         const user = userAnswers[key];
         const correctIdx = pg.data.answers[pi];
         const ok = user == correctIdx;
@@ -5218,13 +5332,14 @@ function renderResultsPage() {
 
   // Pure speaking session
   if (hasSpeaking && !hasWriting) {
-    submitHomeworkResultIfNeeded(totalCorrect, totalQ, { resultRowsHtml: rows });
+    runHomeworkSave([() => submitHomeworkResultIfNeeded(totalCorrect, totalQ, { resultRowsHtml: rows })]);
     return `
       <div class="question-card">
         <div class="card shadow-sm border-0 mb-4">
           <div class="card-body text-center">
             <i class="bi bi-mic fs-2 text-primary mb-2 d-block"></i>
             <h4 class="fw-bold">Hoàn thành Speaking!</h4>
+            ${homeworkSaveStatusHtml()}
           </div>
         </div>
         <h5 class="fw-bold mb-3">Câu hỏi & Ghi chú</h5>
@@ -5239,17 +5354,17 @@ function renderResultsPage() {
 
   // Pure writing or mixed speaking+writing session
   if (hasWriting) {
-    // Buổi HỖN HỢP (vừa speaking vừa writing): renderWritingResults() chỉ nộp
-    // phần writing (qua triggerAIGrading -> submitWritingForGrading), nên trước
-    // đây phần speaking KHÔNG bao giờ được nộp -> lịch sử bài học chỉ thấy
-    // writing, mất toàn bộ ghi âm speaking của buổi đó.
+    // Writing nộp 1 bản ghi riêng. Buổi HỖN HỢP (vừa speaking vừa writing) nộp
+    // THÊM bản ghi speaking — không thì lịch sử bài học mất toàn bộ ghi âm.
+    const tasks = [() => submitWritingHomework()];
     if (hasSpeaking) {
-      submitHomeworkResultIfNeeded(totalCorrect, totalQ, { resultRowsHtml: rows, speakingOnly: true });
+      tasks.push(() => submitHomeworkResultIfNeeded(totalCorrect, totalQ, { resultRowsHtml: rows, speakingOnly: true }));
     }
+    runHomeworkSave(tasks);
     return renderWritingResults();
   }
 
-  submitHomeworkResultIfNeeded(totalCorrect, totalQ, { resultRowsHtml: rows });
+  runHomeworkSave([() => submitHomeworkResultIfNeeded(totalCorrect, totalQ, { resultRowsHtml: rows })]);
 
   return `
     <div class="question-card">
@@ -5257,6 +5372,7 @@ function renderResultsPage() {
         <div class="card-body text-center">
           <p class="text-muted mb-1">Kết quả bài làm</p>
           <h3 class="fw-bold" style="color:#16a34a;">${totalCorrect} / ${totalQ}</h3>
+          ${homeworkSaveStatusHtml()}
         </div>
       </div>
       <div class="table-responsive" style="padding-bottom:60px;">
@@ -5279,7 +5395,6 @@ function renderWritingResults() {
         return `<div class="writing-q-item">
           <label>${renderRichText(q.prompt)}</label>
           <div class="p-2 bg-light border rounded" style="font-size:0.95rem;">${esc(ans)}</div>
-          <div id="ai-fb-${q.key}"></div>
         </div>`;
       }).join('');
       const sectionTitle = pg.headerTitle
@@ -5295,7 +5410,6 @@ function renderWritingResults() {
           <label>${renderRichText(q.prompt)}</label>
           <div class="p-3 bg-light border rounded" style="font-size:0.95rem; white-space:pre-wrap;">${esc(ans)}</div>
           <div class="word-counter">Số từ: ${wc}</div>
-          <div id="ai-fb-${q.key}"></div>
         </div>`;
       }).join('');
       const sectionTitle = pg.headerTitle
@@ -5311,7 +5425,6 @@ function renderWritingResults() {
           <label>${renderRichText(q.prompt)}</label>
           <div class="p-3 bg-light border rounded" style="font-size:0.95rem; white-space:pre-wrap;">${esc(ans)}</div>
           <div class="word-counter">Số từ: ${wc}</div>
-          <div id="ai-fb-${q.key}"></div>
         </div>`;
       }).join('');
       const sectionTitle = pg.headerTitle
@@ -5327,7 +5440,6 @@ function renderWritingResults() {
           <label>${esc(e.label)}</label>
           <div class="p-3 bg-light border rounded" style="font-size:0.95rem; white-space:pre-wrap; line-height:1.7;">${esc(ans)}</div>
           <div class="word-counter">Số từ: ${wc}</div>
-          <div id="ai-fb-${e.key}"></div>
         </div>`;
       }).join('');
       const sectionTitle = pg.headerTitle
@@ -5349,7 +5461,6 @@ function renderWritingResults() {
           <label>${renderRichText(q.prompt)}</label>
           <div class="p-3 bg-light border rounded" style="font-size:0.95rem; white-space:pre-wrap;">${esc(ans)}</div>
           <div class="word-counter">Số từ: ${wc}</div>
-          <div id="ai-fb-${q.key}"></div>
         </div>`);
     }
     if (pg.type === 'writing-followup') {
@@ -5360,7 +5471,6 @@ function renderWritingResults() {
           <label>${renderRichText(q.prompt)}</label>
           <div class="p-3 bg-light border rounded" style="font-size:0.95rem; white-space:pre-wrap;">${esc(ans)}</div>
           <div class="word-counter">Số từ: ${wc}</div>
-          <div id="ai-fb-${q.key}"></div>
         </div>`;
       }).join('');
       const sectionTitle = pg.headerTitle
@@ -5370,203 +5480,19 @@ function renderWritingResults() {
     }
   });
 
-  setTimeout(() => triggerAIGrading(), 300);
-
   return `
     <div class="question-card">
       <div class="card shadow-sm border-0 mb-4">
         <div class="card-body text-center">
           <i class="bi bi-pencil-square fs-2 text-primary mb-2 d-block"></i>
-          <p class="text-muted mb-1">Bài Writing đã nộp</p>
-          <h4 class="fw-bold">Đang sửa lỗi tự động...</h4>
-          <div class="spinner-border spinner-border-sm text-primary mt-2" id="ai-spinner"></div>
-          <div id="ai-status" class="mt-2"></div>
+          <h4 class="fw-bold">Bài Writing của bạn</h4>
+          <p class="text-muted small mb-0">Giáo viên sẽ chấm và nhận xét — xem trong mục Lịch sử bài học.</p>
+          ${homeworkSaveStatusHtml()}
         </div>
       </div>
       ${sections.join('<hr class="my-4">')}
-      <div id="ai-overall-feedback" class="ai-feedback-section" style="padding-bottom:80px;"></div>
+      <div style="padding-bottom:80px;"></div>
     </div>`;
-}
-
-async function triggerAIGrading() {
-  const statusEl = document.getElementById('ai-status');
-  const spinnerEl = document.getElementById('ai-spinner');
-
-  try {
-    const result = await submitWritingForGrading();
-
-    if (spinnerEl) spinnerEl.style.display = 'none';
-
-    if (!result || result.error) {
-      if (statusEl) statusEl.innerHTML = `<span class="badge bg-warning text-dark">AI chưa sẵn sàng – bài đã được lưu</span>`;
-      return;
-    }
-
-    const metadata = result.result?.metadata || result.metadata || {};
-    const autoStatus = metadata.auto_grading_status || '';
-    const feedback = metadata.auto_writing_feedback;
-
-    if (autoStatus === 'completed' && feedback) {
-      if (statusEl) statusEl.innerHTML = `<span class="badge bg-success">Đã sửa lỗi tự động</span>`;
-
-      // Render overall feedback
-      const overallEl = document.getElementById('ai-overall-feedback');
-      if (overallEl && feedback.overall_feedback) {
-        overallEl.innerHTML = `
-          <div class="ai-feedback-card">
-            <h6><i class="bi bi-chat-dots me-1"></i>Nhận xét chung</h6>
-            <p style="font-size:0.9rem; margin:0;">${esc(feedback.overall_feedback)}</p>
-          </div>
-          ${(feedback.common_errors || []).length ? `
-            <div class="ai-feedback-card error-card">
-              <h6><i class="bi bi-exclamation-triangle me-1"></i>Lỗi thường gặp</h6>
-              <ul class="mb-0" style="font-size:0.88rem;">
-                ${feedback.common_errors.map(e => `<li>${esc(e)}</li>`).join('')}
-              </ul>
-            </div>` : ''}`;
-      }
-
-      // Render per-item feedback
-      const submittedResultId = result.result?.id || result.id || null;
-      if (feedback.items) {
-        feedback.items.forEach(item => {
-          const container = document.getElementById('ai-fb-' + item.key);
-          if (!container) return;
-
-          const original = userAnswers[item.key] || '';
-          const corrected = item.corrected_answer || '';
-          const diffHtml = buildSimpleDiff(original, corrected);
-
-          container.innerHTML = `
-            <div class="ai-feedback-card mt-2">
-              <h6><i class="bi bi-magic me-1"></i>AI sửa lỗi</h6>
-              <div style="font-size:0.9rem; line-height:1.7;">${diffHtml}</div>
-              ${item.feedback ? `<p class="text-muted mt-2 mb-0" style="font-size:0.82rem;"><i class="bi bi-info-circle me-1"></i>${esc(item.feedback)}</p>` : ''}
-              ${submittedResultId ? `
-                <div class="mt-2 buoi-hoc-ai-detail-slot" data-result-id="${esc(String(submittedResultId))}" data-key="${esc(item.key)}">
-                  <span class="small text-muted buoi-hoc-ai-status"><span class="spinner-border spinner-border-sm me-1"></span>AI đang chấm chi tiết...</span>
-                  <div class="buoi-hoc-ai-detail"></div>
-                </div>
-              ` : ''}
-            </div>`;
-        });
-        // TỰ ĐỘNG chấm chi tiết Grok cho từng câu (không cần bấm nút).
-        autoRunDetailedAi();
-      }
-    } else {
-      if (statusEl) statusEl.innerHTML = `<span class="badge bg-secondary">Bài đã lưu – sửa lỗi tự động chưa khả dụng</span>`;
-    }
-  } catch (err) {
-    if (spinnerEl) spinnerEl.style.display = 'none';
-    if (statusEl) statusEl.innerHTML = `<span class="badge bg-secondary">Bài đã lưu</span>`;
-    console.error('AI grading error:', err);
-  }
-}
-
-// ===== Chấm AI chi tiết (clone LexiBot): band + criteria + diff + giải thích =====
-function renderBuoiHocAiDiff(diffText) {
-  return esc(diffText)
-    .replace(/\{-([\s\S]*?)-\}/g, '<del style="background:#fde8e8;color:#c0392b;text-decoration:line-through;border-radius:2px;padding:0 2px;">$1</del>')
-    .replace(/\{\+([\s\S]*?)\+\}/g, '<ins style="background:#e6f7ec;color:#1e7e34;text-decoration:underline;border-radius:2px;padding:0 2px;">$1</ins>')
-    .replace(/\r?\n/g, '<br>');
-}
-
-function renderBuoiHocAiGradingBlock(grading) {
-  if (!grading) return '';
-  const correctionsHtml = (grading.corrections || []).length
-    ? `<details class="mt-2"><summary class="small fw-semibold">Danh sách lỗi & giải thích (${grading.corrections.length})</summary>
-        ${grading.corrections.map(c => `
-          <div class="small py-1 border-bottom">
-            <del style="color:#c0392b;">${esc(c.original || '')}</del>
-            → <ins style="color:#1e7e34;text-decoration:underline;">${esc(c.corrected || '')}</ins>
-            ${c.explanation ? `<div class="text-muted">${esc(c.explanation)}</div>` : ''}
-          </div>
-        `).join('')}</details>`
-    : '';
-  const sampleHtml = grading.improvedVersion
-    ? `<details class="mt-2"><summary class="small fw-semibold">Bài mẫu tham khảo</summary>
-        <div class="p-2 bg-white border rounded small mt-1" style="white-space:pre-wrap;">${esc(grading.improvedVersion)}</div></details>`
-    : '';
-  return `
-    <div class="p-2 border rounded mt-2" style="background:#f6f9ff;">
-      <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-        <span class="badge bg-primary"><i class="bi bi-robot me-1"></i>AI sửa lỗi${(grading.corrections || []).length ? ` — ${grading.corrections.length} lỗi` : ''}</span>
-      </div>
-      ${grading.diffText ? `
-        <div class="small fw-semibold mt-1">Bài sửa lỗi (đỏ = sai, xanh = sửa đúng):</div>
-        <div class="p-2 bg-white border rounded small" style="line-height:1.8;">${renderBuoiHocAiDiff(grading.diffText)}</div>
-      ` : ''}
-      ${grading.feedback ? `<div class="small mt-2"><strong>Nhận xét:</strong> ${esc(grading.feedback)}</div>` : ''}
-      ${correctionsHtml}
-      ${sampleHtml}
-    </div>
-  `;
-}
-
-// Tự động chấm chi tiết Grok cho từng slot (tuần tự để tránh dồn request nặng).
-// Kết quả cache metadata nên mở lại không chấm lại.
-async function autoRunDetailedAi() {
-  const slots = Array.from(document.querySelectorAll('.buoi-hoc-ai-detail-slot'));
-  for (const slot of slots) {
-    if (slot.dataset.done) continue;
-    slot.dataset.done = '1';
-    const statusEl = slot.querySelector('.buoi-hoc-ai-status');
-    const detailEl = slot.querySelector('.buoi-hoc-ai-detail');
-    try {
-      const res = await fetch('/api/practice_results/ai-grade-writing', {
-        method: 'POST',
-        headers: buildAuthorizedHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ resultId: slot.dataset.resultId, answerKey: slot.dataset.key })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Không thể chấm AI.');
-      if (statusEl) statusEl.remove();
-      if (detailEl) detailEl.innerHTML = renderBuoiHocAiGradingBlock(data.grading);
-    } catch (err) {
-      if (statusEl) statusEl.innerHTML = `<span class="text-muted">Chưa chấm chi tiết được: ${esc(err.message)}</span>`;
-    }
-  }
-}
-
-function buildSimpleDiff(original, corrected) {
-  if (!original || !corrected) return esc(corrected || original || '');
-  if (original.trim().toLowerCase() === corrected.trim().toLowerCase()) {
-    return `<span style="color:#16a34a;">${esc(corrected)}</span>`;
-  }
-
-  const origWords = original.split(/\s+/).filter(Boolean);
-  const corrWords = corrected.split(/\s+/).filter(Boolean);
-
-  // Simple LCS-based diff
-  const m = origWords.length, n = corrWords.length;
-  const dp = Array.from({length: m+1}, () => Array(n+1).fill(0));
-  for (let i = 1; i <= m; i++)
-    for (let j = 1; j <= n; j++)
-      dp[i][j] = origWords[i-1].toLowerCase() === corrWords[j-1].toLowerCase()
-        ? dp[i-1][j-1] + 1
-        : Math.max(dp[i-1][j], dp[i][j-1]);
-
-  const result = [];
-  let i = m, j = n;
-  const ops = [];
-  while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && origWords[i-1].toLowerCase() === corrWords[j-1].toLowerCase()) {
-      ops.unshift({ type: 'same', text: corrWords[j-1] });
-      i--; j--;
-    } else if (j > 0 && (i === 0 || dp[i][j-1] >= dp[i-1][j])) {
-      ops.unshift({ type: 'ins', text: corrWords[j-1] });
-      j--;
-    } else {
-      ops.unshift({ type: 'del', text: origWords[i-1] });
-      i--;
-    }
-  }
-
-  return ops.map(op => {
-    if (op.type === 'del') return `<span class="ai-diff-del">${esc(op.text)}</span>`;
-    if (op.type === 'ins') return `<span class="ai-diff-ins">${esc(op.text)}</span>`;
-    return esc(op.text);
-  }).join(' ');
 }
 
 /* ═══════════════════════════════════════════════════════
