@@ -2,6 +2,7 @@ import parseBody from '../../_utils/parseBody.js';
 import { verifyUserRequest } from '../../_utils/auth.js';
 import { insertInto, selectFrom, updateTable } from '../../_utils/supabase.js';
 import { normalizeContentKind, normalizeFlow, vstepSchemaErrorResponse } from '../_utils.js';
+import { loadLophocGroupContext } from '../_onthi_groups.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -56,9 +57,18 @@ export default async function handler(req, res) {
     }
 
     let assignment = null;
+    let groupAssignment = null;
+    let lophocGroup = null;
     const assignmentId = body?.assignmentId || body?.assignment_id || null;
     if (flow === 'lesson_exam' && !assignmentId && !adminView) {
-      return res.status(400).json({ error: 'Thiếu thông tin bài được giao VSTEP' });
+      // Bài giao cho nhóm học: không có assignment riêng từng HV, không đóng sau khi
+      // nộp (làm lại được) — nộp sau deadline ghi nhận "trễ".
+      const lophocContext = await loadLophocGroupContext(authResult.user.id);
+      groupAssignment = lophocContext?.byContent?.get(content.id) || null;
+      lophocGroup = lophocContext?.group || null;
+      if (!groupAssignment) {
+        return res.status(400).json({ error: 'Thiếu thông tin bài được giao VSTEP' });
+      }
     }
     if (assignmentId) {
       assignment = await selectFrom('vstep_assignments', {
@@ -87,6 +97,13 @@ export default async function handler(req, res) {
     metadata.vstep_set_id = content.id;
     metadata.vstep_set_title = content.title;
     if (adminView) metadata.admin_preview = true;
+    if (groupAssignment) {
+      const groupDue = groupAssignment.due_at ? new Date(groupAssignment.due_at).getTime() : null;
+      metadata.group_id = lophocGroup?.id || null;
+      metadata.group_title = lophocGroup?.title || null;
+      metadata.assignment_due_at = groupAssignment.due_at || null;
+      metadata.assignment_submitted_overdue = Number.isFinite(groupDue) ? groupDue < Date.now() : false;
+    }
     if (assignment) {
       const dueAt = assignment.due_at ? new Date(assignment.due_at).getTime() : null;
       metadata.assignment_id = assignment.id;

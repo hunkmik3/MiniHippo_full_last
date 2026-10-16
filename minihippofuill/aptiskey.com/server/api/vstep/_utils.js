@@ -76,7 +76,9 @@ export function contentToLegacySet(content) {
     status: content.status,
     band: content.band || null,
     session_number: content.session_number || null,
-    assignment: content.assignment || null
+    assignment: content.assignment || null,
+    // Lịch của nhóm học (khu Lớp học) — xem _onthi_groups.js.
+    group_assignment: content.group_assignment || null
   };
 }
 

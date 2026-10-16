@@ -19,8 +19,13 @@
         lophoc: { defaultPanel: 'students', forceFlow: 'lesson_exam', allowFlowFilter: false, learningProgram: 'vstep_lophoc' }
     };
     const PAGE = MODE_CONFIG[ADMIN_MODE] || MODE_CONFIG.legacy;
-    // Nhóm ôn chỉ có ở trang admin Ôn thi.
-    const GROUPS_ENABLED = ADMIN_MODE === 'onthi';
+    // Nhóm ôn (trang Ôn thi, giao bộ đề) / nhóm học (trang Lớp học, giao bài học).
+    const GROUPS_ENABLED = ADMIN_MODE === 'onthi' || ADMIN_MODE === 'lophoc';
+    const GROUP_PROGRAM = ADMIN_MODE === 'lophoc' ? 'lophoc' : 'onthi';
+    const GROUP_FLOW = GROUP_PROGRAM === 'lophoc' ? 'lesson_exam' : 'practice';
+    const G = GROUP_PROGRAM === 'lophoc'
+        ? { noun: 'nhóm học', item: 'bài học', itemCap: 'Bài học', noGroupHint: 'HV chưa có nhóm học theo lớp/buổi như cũ' }
+        : { noun: 'nhóm ôn', item: 'bộ đề', itemCap: 'Bộ đề', noGroupHint: 'HV thấy mọi bộ đề, không có deadline' };
     const CONTENT_SKILL_LABELS = {
         full_test: 'Full 4 kỹ năng',
         listening: 'Listening',
@@ -2046,10 +2051,13 @@
                     course: 'VSTEP',
                     // Gắn theo trang admin đang đứng: 'vstep_onthi' / 'vstep_lophoc'.
                     // Legacy admin (PAGE.learningProgram null) → mặc định lophoc.
-                    learningProgram: PAGE.learningProgram || 'vstep_lophoc'
+                    learningProgram: PAGE.learningProgram || 'vstep_lophoc',
+                    groupId: GROUPS_ENABLED ? (getValue('vstep-student-group') || undefined) : undefined
                 })
             });
+            const keepGroup = getValue('vstep-student-group');
             refs.studentForm.reset();
+            setValue('vstep-student-group', keepGroup);
             setValue('vstep-student-device-limit', 2);
             setValue('vstep-student-band', 'B1');
             setValue('vstep-student-started', '');
@@ -2057,8 +2065,11 @@
             const practiceAccess = $('vstep-student-practice-access');
             if (practiceAccess) practiceAccess.checked = true;
             const temp = result.temporaryPassword ? ` Mật khẩu tạm: ${result.temporaryPassword}` : '';
-            setStudentAlert(`Đã tạo học viên VSTEP.${temp}`, 'success');
+            const groupNote = result.group ? ` Đã thêm vào ${G.noun} "${result.group.title}".` : '';
+            const groupWarn = result.groupError ? ` Chưa thêm được vào nhóm: ${result.groupError}.` : '';
+            setStudentAlert(`Đã tạo học viên VSTEP.${temp}${groupNote}${groupWarn}`, result.groupError ? 'warning' : 'success');
             await loadUsers();
+            if (GROUPS_ENABLED) await loadGroups();
         } catch (error) {
             setStudentAlert(error.message, 'danger');
         } finally {
@@ -2238,13 +2249,18 @@
                     students,
                     // Default learning_program cho cả batch; mỗi row CSV có
                     // thể override bằng cột learningProgram nếu cần.
-                    learningProgram: PAGE.learningProgram || 'vstep_lophoc'
+                    learningProgram: PAGE.learningProgram || 'vstep_lophoc',
+                    groupId: GROUPS_ENABLED ? (getValue('vstepImportGroup') || undefined) : undefined
                 })
             });
             const failed = Number(result.failed || 0);
             const classCount = Number(result.classAssignedCount || 0);
             let message = `Import xong: tạo mới ${result.created || 0}, cập nhật ${result.updated || 0}, lỗi ${failed}.`;
-            if (classCount) message += ` Đã gán ${classCount} HV vào lớp theo cột tên lớp.`;
+            if (classCount) {
+                message += GROUPS_ENABLED && getValue('vstepImportGroup')
+                    ? ` Đã thêm ${classCount} HV vào ${G.noun}.`
+                    : ` Đã gán ${classCount} HV vào lớp theo cột tên lớp.`;
+            }
             // Hiện chi tiết dòng nào fail + lý do (giúp admin debug ngay).
             if (Array.isArray(result.results)) {
                 const errs = result.results
@@ -2258,6 +2274,7 @@
             }
             setImportAlert(message, failed ? 'warning' : 'success');
             await loadUsers();
+            if (GROUPS_ENABLED) await loadGroups();
         } catch (error) {
             setImportAlert(error.message, 'danger');
         } finally {
@@ -2687,10 +2704,10 @@
         return true;
     }
 
-    // ===== NHÓM ÔN (chỉ trang Ôn thi) =====
-    // Admin tạo nhóm, thêm HV, giao bộ đề + lịch mở/deadline cho từng nhóm.
-    // HV trong nhóm chỉ thấy bộ đề nhóm được giao; HV chưa có nhóm thấy mọi bộ đề
-    // (server xử lý ở /api/vstep/contents/list). Mỗi HV chỉ ở 1 nhóm.
+    // ===== NHÓM ÔN (trang Ôn thi) / NHÓM HỌC (trang Lớp học) =====
+    // Admin tạo nhóm, thêm HV, giao bài + lịch mở/deadline cho từng nhóm.
+    // HV trong nhóm chỉ thấy bài nhóm được giao (server xử lý ở /api/vstep/contents/list).
+    // Mỗi HV chỉ ở 1 nhóm của mỗi khu.
 
     function groupOfStudent(studentId) {
         const member = state.groupMembers.find(m => String(m.student_id) === String(studentId));
@@ -2729,10 +2746,15 @@
     }
 
     function groupPracticeSets() {
-        return state.sets.filter(set => flowOfSet(set) === 'practice');
+        return state.sets.filter(set => flowOfSet(set) === GROUP_FLOW);
     }
 
     function setLabel(set) {
+        if (GROUP_FLOW === 'lesson_exam') {
+            const band = set?.band || set?.data?.vstep_band || '';
+            const session = set?.session_number || set?.data?.vstep_session_number || '';
+            return [band, session ? `Buổi ${session}` : ''].filter(Boolean).join(' · ') || 'Bài học';
+        }
         const skill = CONTENT_SKILL_LABELS[contentSkillOfSet(set)] || '';
         const track = String(set?.data?.onthi?.track || '').toLowerCase();
         return [skill, track === 'sw' ? 'S&W' : (track === 'lr' ? 'L&R' : '')].filter(Boolean).join(' · ');
@@ -2741,7 +2763,7 @@
     async function loadGroups() {
         if (!GROUPS_ENABLED) return;
         try {
-            const tasks = [fetchJson('/api/vstep/groups/list')];
+            const tasks = [fetchJson(`/api/vstep/groups/list?program=${GROUP_PROGRAM}`)];
             if (!state.sets.length) tasks.push(loadSets());
             const [result] = await Promise.all(tasks);
             state.groups = result.groups || [];
@@ -2752,7 +2774,7 @@
                 state.groupEditingContentId = '';
             }
         } catch (error) {
-            setGroupAlert(error.message || 'Không tải được nhóm ôn.', 'danger');
+            setGroupAlert(error.message || `Không tải được ${G.noun}.`, 'danger');
         }
         renderGroups();
         renderGroupBulkOptions();
@@ -2764,9 +2786,18 @@
         const select = $('vstepStudentsBulkGroup');
         if (!select) return;
         const current = select.value;
-        select.innerHTML = '<option value="">Chọn nhóm ôn...</option>'
+        select.innerHTML = `<option value="">Chọn ${G.noun}...</option>`
             + state.groups.map(g => `<option value="${escapeHtml(g.id)}">${escapeHtml(g.title)}</option>`).join('');
         if (current && state.groups.some(g => g.id === current)) select.value = current;
+        // Ô "Nhóm" ở form tạo HV + import: mặc định nhóm đang mở bên khung nhóm.
+        ['vstep-student-group', 'vstepImportGroup'].forEach((id) => {
+            const el = $(id);
+            if (!el) return;
+            const keep = el.value;
+            el.innerHTML = `<option value="">Không thêm vào ${G.noun}</option>`
+                + state.groups.map(g => `<option value="${escapeHtml(g.id)}">${escapeHtml(g.title)}</option>`).join('');
+            el.value = state.groups.some(g => g.id === keep) ? keep : (state.activeGroupId || '');
+        });
     }
 
     function renderGroups() {
@@ -2774,8 +2805,8 @@
         const detail = $('vstepGroupDetail');
         if (!list || !detail) return;
         if (!state.groups.length) {
-            list.innerHTML = '<div class="list-group-item text-muted small">Chưa có nhóm ôn nào. Tạo nhóm ở ô bên trên.</div>';
-            detail.innerHTML = '<div class="text-muted small">Chưa có nhóm ôn. HV hiện thấy mọi bộ đề, không có deadline.</div>';
+            list.innerHTML = `<div class="list-group-item text-muted small">Chưa có ${G.noun} nào. Tạo nhóm ở ô bên trên.</div>`;
+            detail.innerHTML = `<div class="text-muted small">Chưa có ${G.noun}. ${G.noGroupHint}</div>`;
             return;
         }
         list.innerHTML = state.groups.map(group => {
@@ -2785,13 +2816,13 @@
             return `
                 <button type="button" class="list-group-item list-group-item-action${active ? ' active' : ''}" data-group-select="${escapeHtml(group.id)}">
                     <div class="fw-semibold">${escapeHtml(group.title)}</div>
-                    <small class="${active ? '' : 'text-secondary'}">${escapeHtml(group.band || 'B1')} · ${memberCount} học viên · ${setCount} bộ đề</small>
+                    <small class="${active ? '' : 'text-secondary'}">${escapeHtml(group.band || 'B1')} · ${memberCount} học viên · ${setCount} ${G.item}</small>
                 </button>`;
         }).join('');
 
         const group = state.groups.find(g => g.id === state.activeGroupId);
         if (!group) {
-            detail.innerHTML = '<div class="text-muted small">Chọn một nhóm ôn.</div>';
+            detail.innerHTML = `<div class="text-muted small">Chọn một ${G.noun}.</div>`;
             return;
         }
         const members = state.groupMembers.filter(m => m.class_id === group.id);
@@ -2839,7 +2870,7 @@
                     const overdue = a.due_at && Date.parse(a.due_at) < Date.now();
                     return `
                     <tr${String(a.content_id) === state.groupEditingContentId ? ' class="table-warning"' : ''}>
-                        <td class="fw-semibold">${escapeHtml(set?.title || 'Bộ đề đã xoá')}</td>
+                        <td class="fw-semibold">${escapeHtml(set?.title || `${G.itemCap} đã xoá`)}</td>
                         <td class="small text-secondary">${escapeHtml(set ? setLabel(set) : '')}</td>
                         <td class="small">${escapeHtml(formatGroupTime(a.available_from))}</td>
                         <td class="small${overdue ? ' text-danger fw-semibold' : ''}">${escapeHtml(formatGroupTime(a.due_at))}</td>
@@ -2853,7 +2884,7 @@
                         </td>
                     </tr>`;
                 }).join('')
-            : '<tr><td colspan="5" class="text-muted small">Chưa giao bộ đề nào — HV của nhóm sẽ chưa thấy bài.</td></tr>';
+            : `<tr><td colspan="5" class="text-muted small">Chưa giao ${G.item} nào — HV của nhóm sẽ chưa thấy bài.</td></tr>`;
 
         const pickable = groupPracticeSets()
             .filter(set => !assignedIds.has(String(set.id)) && String(set.data?.status || '') === 'published')
@@ -2863,14 +2894,16 @@
                 <input type="checkbox" class="form-check-input m-0" value="${escapeHtml(set.id)}" data-group-set-check>
                 <span class="flex-grow-1">${escapeHtml(set.title || set.id)}</span>
                 <span class="text-secondary">${escapeHtml(setLabel(set))}</span>
-            </label>`).join('') || '<div class="text-muted small">Đã giao hết bộ đề đã xuất bản.</div>';
+            </label>`).join('') || (groupPracticeSets().some(set => String(set.data?.status || '') === 'published')
+                ? `<div class="text-muted small">Đã giao hết ${G.item} đã xuất bản.</div>`
+                : `<div class="text-warning small">Chưa có ${G.item} nào ở trạng thái <strong>published</strong>. Vào mục ${G.itemCap}, chuyển bài sang published rồi quay lại giao.</div>`);
 
         const editingSet = editing ? setsById.get(String(editing.content_id)) : null;
         detail.innerHTML = `
             <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
                 <div>
                     <h5 class="mb-0">${escapeHtml(group.title)}</h5>
-                    <small class="text-secondary">Level ${escapeHtml(group.band || 'B1')} · ${students.length} học viên · ${assignments.length} bộ đề</small>
+                    <small class="text-secondary">Level ${escapeHtml(group.band || 'B1')} · ${students.length} học viên · ${assignments.length} ${G.item}</small>
                 </div>
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-sm btn-outline-secondary" data-group-rename><i class="bi bi-pencil me-1"></i>Đổi tên</button>
@@ -2894,19 +2927,19 @@
                     </details>
                 </div>
                 <div class="col-12 col-xl-7">
-                    <h6 class="fw-bold">Bộ đề đã giao</h6>
+                    <h6 class="fw-bold">${G.itemCap} đã giao</h6>
                     <div class="table-responsive">
                         <table class="table table-sm align-middle mb-2">
-                            <thead><tr><th>Bộ đề</th><th>Loại</th><th>Mở từ</th><th>Deadline</th><th></th></tr></thead>
+                            <thead><tr><th>${G.itemCap}</th><th>Loại</th><th>Mở từ</th><th>Deadline</th><th></th></tr></thead>
                             <tbody>${assignmentRows}</tbody>
                         </table>
                     </div>
                     <div class="border rounded-3 p-2 mt-2">
                         <div class="small fw-semibold mb-2">${editingSet
                             ? `Sửa lịch: ${escapeHtml(editingSet.title)} <a href="#" class="ms-2" data-group-cancel-edit>Huỷ</a>`
-                            : 'Giao bộ đề cho nhóm'}</div>
+                            : `Giao ${G.item} cho nhóm`}</div>
                         ${editingSet ? '' : `
-                            <input type="search" class="form-control form-control-sm mb-2" data-no-rich data-group-set-search placeholder="Tìm bộ đề">
+                            <input type="search" class="form-control form-control-sm mb-2" data-no-rich data-group-set-search placeholder="Tìm ${G.item}">
                             <div style="max-height:200px;overflow-y:auto;" class="mb-2">${setChecklist}</div>`}
                         <div class="row g-2 align-items-end">
                             <div class="col-6">
@@ -2920,7 +2953,7 @@
                         </div>
                         <div class="vstep-help mt-1">Để trống "Mở từ" = mở ngay. Hết deadline thì bài đóng (giống trước đây).</div>
                         <button type="button" class="btn btn-sm btn-primary mt-2" data-group-assign>
-                            <i class="bi bi-send-check me-1"></i>${editingSet ? 'Lưu lịch' : 'Giao bộ đề đã chọn'}
+                            <i class="bi bi-send-check me-1"></i>${editingSet ? 'Lưu lịch' : `Giao ${G.item} đã chọn`}
                         </button>
                     </div>
                 </div>
@@ -2965,14 +2998,14 @@
             byGroup.get(group.id).push(id);
         });
         if (!byGroup.size) {
-            setGroupAlert('Các học viên đã chọn chưa ở nhóm ôn nào.', 'warning');
+            setGroupAlert(`Các học viên đã chọn chưa ở ${G.noun} nào.`, 'warning');
             return;
         }
         await runGroupAction(async () => {
             for (const [groupId, ids] of byGroup) {
                 await postGroupApi('members', { groupId, studentIds: ids, action: 'remove' });
             }
-        }, `Đã bỏ ${studentIds.length} học viên khỏi nhóm ôn.`);
+        }, `Đã bỏ ${studentIds.length} học viên khỏi ${G.noun}.`);
     }
 
     function bindGroupEvents() {
@@ -2983,11 +3016,11 @@
             event.preventDefault();
             const title = getValue('vstepGroupTitle');
             if (!title) {
-                setGroupAlert('Nhập tên nhóm ôn.', 'warning');
+                setGroupAlert(`Nhập tên ${G.noun}.`, 'warning');
                 return;
             }
             const result = await runGroupAction(
-                () => postGroupApi('save', { title, band: getValue('vstepGroupBand') }),
+                () => postGroupApi('save', { program: GROUP_PROGRAM, title, band: getValue('vstepGroupBand') }),
                 `Đã tạo nhóm "${title}".`
             );
             if (result?.group?.id) {
@@ -3019,17 +3052,20 @@
                 state.activeGroupId = el.dataset.groupSelect;
                 state.groupEditingContentId = '';
                 setGroupAlert('');
+                // Tạo / import HV ngay sau đó sẽ vào đúng nhóm đang mở.
+                setValue('vstep-student-group', state.activeGroupId);
+                setValue('vstepImportGroup', state.activeGroupId);
                 renderGroups();
                 return;
             }
             if (!group) return;
             if (el.hasAttribute('data-group-rename')) {
-                const title = window.prompt('Tên mới của nhóm ôn:', group.title);
+                const title = window.prompt(`Tên mới của ${G.noun}:`, group.title);
                 if (!title || !title.trim() || title.trim() === group.title) return;
                 await runGroupAction(() => postGroupApi('save', { id: group.id, title: title.trim(), band: group.band, notes: group.notes }), 'Đã đổi tên nhóm.');
             } else if (el.hasAttribute('data-group-delete')) {
                 const count = state.groupMembers.filter(m => m.class_id === group.id).length;
-                if (!window.confirm(`Xoá nhóm "${group.title}"?\n\n${count} học viên sẽ thành "chưa có nhóm" (thấy mọi bộ đề, không deadline). Kết quả đã nộp vẫn giữ nguyên.`)) return;
+                if (!window.confirm(`Xoá nhóm "${group.title}"?\n\n${count} học viên sẽ thành "chưa có nhóm" (${G.noGroupHint}). Kết quả đã nộp vẫn giữ nguyên.`)) return;
                 await runGroupAction(() => postGroupApi('delete', { id: group.id }), `Đã xoá nhóm "${group.title}".`);
             } else if (el.dataset.groupRemoveMember) {
                 await runGroupAction(
@@ -3052,24 +3088,24 @@
                 renderGroups();
             } else if (el.dataset.groupUnassign) {
                 const set = groupPracticeSets().find(s => String(s.id) === el.dataset.groupUnassign);
-                if (!window.confirm(`Bỏ giao "${set?.title || 'bộ đề'}" khỏi nhóm "${group.title}"? HV của nhóm sẽ không thấy bộ đề này nữa.`)) return;
+                if (!window.confirm(`Bỏ giao "${set?.title || G.item}" khỏi nhóm "${group.title}"? HV của nhóm sẽ không thấy ${G.item} này nữa.`)) return;
                 if (state.groupEditingContentId === el.dataset.groupUnassign) state.groupEditingContentId = '';
-                await runGroupAction(() => postGroupApi('unassign', { groupId: group.id, contentId: el.dataset.groupUnassign }), 'Đã bỏ giao bộ đề.');
+                await runGroupAction(() => postGroupApi('unassign', { groupId: group.id, contentId: el.dataset.groupUnassign }), `Đã bỏ giao ${G.item}.`);
             } else if (el.hasAttribute('data-group-assign')) {
                 const contentIds = state.groupEditingContentId
                     ? [state.groupEditingContentId]
                     : Array.from(panel.querySelectorAll('[data-group-set-check]:checked')).map(cb => cb.value);
                 if (!contentIds.length) {
-                    setGroupAlert('Tick chọn bộ đề cần giao.', 'warning');
+                    setGroupAlert(`Tick chọn ${G.item} cần giao.`, 'warning');
                     return;
                 }
                 const availableFrom = dateTimeValue('vstepGroupFrom') || null;
                 const dueAt = dateTimeValue('vstepGroupDue') || null;
-                if (!dueAt && !window.confirm('Chưa nhập deadline. Vẫn giao bộ đề không có deadline?')) return;
+                if (!dueAt && !window.confirm(`Chưa nhập deadline. Vẫn giao ${G.item} không có deadline?`)) return;
                 const editingNow = Boolean(state.groupEditingContentId);
                 const result = await runGroupAction(
                     () => postGroupApi('assign', { groupId: group.id, contentIds, availableFrom, dueAt }),
-                    (r) => editingNow ? 'Đã lưu lịch bộ đề.' : `Đã giao ${r?.assigned || 0} bộ đề cho nhóm "${group.title}".`
+                    (r) => editingNow ? `Đã lưu lịch ${G.item}.` : `Đã giao ${r?.assigned || 0} ${G.item} cho nhóm "${group.title}".`
                 );
                 if (result) {
                     state.groupEditingContentId = '';
@@ -3081,7 +3117,7 @@
             const groupId = getValue('vstepStudentsBulkGroup');
             if (!selectedStudentIds.size) return;
             if (!groupId) {
-                setStudentAlert('Chọn nhóm ôn cần thêm học viên vào.', 'warning');
+                setStudentAlert(`Chọn ${G.noun} cần thêm học viên vào.`, 'warning');
                 return;
             }
             await addStudentsToGroup(groupId, Array.from(selectedStudentIds));
@@ -3092,7 +3128,7 @@
         });
         $('vstepStudentsBulkRemoveGroup')?.addEventListener('click', async () => {
             if (!selectedStudentIds.size) return;
-            if (!window.confirm(`Bỏ ${selectedStudentIds.size} học viên đã chọn khỏi nhóm ôn của họ?`)) return;
+            if (!window.confirm(`Bỏ ${selectedStudentIds.size} học viên đã chọn khỏi ${G.noun} của họ?`)) return;
             await removeStudentsFromTheirGroups(Array.from(selectedStudentIds));
             selectedStudentIds.clear();
             renderUsers();
@@ -3106,7 +3142,7 @@
         if (!select) return;
         const current = select.value;
         const source = GROUPS_ENABLED ? state.groups : state.classes;
-        const options = [`<option value="">${GROUPS_ENABLED ? 'Tất cả nhóm ôn' : 'Tất cả lớp'}</option>`]
+        const options = [`<option value="">${GROUPS_ENABLED ? `Tất cả ${G.noun}` : 'Tất cả lớp'}</option>`]
             .concat((source || []).map(cls =>
                 `<option value="${escapeHtml(cls.id)}">${escapeHtml(cls.title || cls.id)}</option>`
             ));
@@ -4216,6 +4252,7 @@
 
         await loadUsers();
         await Promise.all([loadSets(), loadResources(), loadClasses()]);
+        if (GROUPS_ENABLED) await loadGroups();
         await loadResults();
 
         // Default panel theo mode (legacy='students', onthi='content', lophoc='students').

@@ -3,6 +3,7 @@ import { verifyAdminRequest } from '../../_utils/auth.js';
 import { callSupabaseAuth, deleteFrom, insertInto, selectFrom, upsertInto } from '../../_utils/supabase.js';
 import { resolveDeviceLimit } from '../../_utils/device.js';
 import { computeVstepExpiresAtDate, vstepSchemaErrorResponse } from '../_utils.js';
+import { addStudentsToGroup, findStudyGroup } from '../_onthi_groups.js';
 
 function todayLocalYmd() {
   const d = new Date();
@@ -175,11 +176,28 @@ export default async function handler(req, res) {
       notes: body?.notes || null
     }]);
 
+    // Tạo thẳng vào nhóm ôn / nhóm học admin đang chọn. Lỗi ở bước này KHÔNG huỷ
+    // tài khoản vừa tạo — chỉ báo lại để admin thêm vào nhóm sau.
+    let group = null;
+    let groupError = null;
+    if (body?.groupId && student?.id) {
+      try {
+        group = await findStudyGroup(body.groupId);
+        if (!group) throw new Error('Không tìm thấy nhóm đã chọn');
+        await addStudentsToGroup(group, [student]);
+      } catch (error) {
+        groupError = error.message || 'Không thể thêm vào nhóm';
+        group = null;
+      }
+    }
+
     return res.status(200).json({
       success: true,
       student,
       user: publicUserPayload,
-      temporaryPassword: generated ? password : null
+      temporaryPassword: generated ? password : null,
+      group: group ? { id: group.id, title: group.title } : null,
+      groupError
     });
   } catch (error) {
     // Rollback DUAL: phải dọn cả public.users (nếu chèn được rồi mới fail

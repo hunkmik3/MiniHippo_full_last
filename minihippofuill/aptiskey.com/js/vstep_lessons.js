@@ -16,6 +16,9 @@
     // Cache giữa loadClassInfo + loadSets để renderSessions có đủ context.
     const state = {
         classRecord: null,
+        // Nhóm học (admin giao bài theo nhóm): có thì hiện danh sách bài của nhóm
+        // thay cho lưới buổi theo lịch lớp.
+        groupRecord: null,
         adminView: false,
         sets: [],
         myResults: []
@@ -154,8 +157,82 @@
         });
     }
 
+    // ===== Chế độ nhóm học: bài nhóm được giao, sắp theo deadline =====
+    function buildGroupCards() {
+        const now = Date.now();
+        return (state.sets || [])
+            .filter(set => set.group_assignment)
+            .map(set => {
+                const ga = set.group_assignment;
+                const opensAt = Date.parse(ga.available_from || '');
+                const locked = Number.isFinite(opensAt) && opensAt > now;
+                const remaining = deadlineRemaining(ga.due_at);
+                const status = locked
+                    ? { key: 'pending', label: 'Chưa mở', tone: 'pending' }
+                    : sessionStatus(set, remaining);
+                return { set, opensAt: ga.available_from, deadline: ga.due_at, remaining, status, locked };
+            })
+            .sort((a, b) => (Date.parse(a.deadline || '') || Infinity) - (Date.parse(b.deadline || '') || Infinity)
+                || String(a.set.title || '').localeCompare(String(b.set.title || ''), 'vi', { numeric: true }));
+    }
+
+    function renderGroupLessons() {
+        const cards = buildGroupCards();
+        if (!cards.length) {
+            refs.grid.innerHTML = '';
+            setState(`Nhóm học "${state.groupRecord?.title || ''}" chưa được giao bài nào. Vui lòng chờ giáo viên giao bài.`, 'warning');
+            return;
+        }
+        const overdue = cards.filter(card => card.status.key === 'overdue').length;
+        setState(overdue ? `Bạn đang có ${overdue} bài trễ deadline.` : '', 'warning');
+        refs.grid.innerHTML = cards.map((card, index) => {
+            const set = card.set;
+            const label = [set.band || set.data?.vstep_band, set.session_number || set.data?.vstep_session_number ? `Buổi ${set.session_number || set.data?.vstep_session_number}` : '']
+                .filter(Boolean).join(' · ');
+            const ctaLabel = card.status.key === 'done' ? 'Xem lại / Làm thêm' : 'Vào học';
+            return `
+                <div class="col-sm-6 col-lg-4 col-xl-3">
+                    <article class="vstep-session-card vstep-session-card-${card.status.tone} h-100">
+                        <div class="vstep-session-head">
+                            <div>
+                                <div class="vstep-session-num">Bài ${index + 1}</div>
+                                <div class="vstep-session-day text-secondary small">${escapeHtml(label)}</div>
+                            </div>
+                            <span class="vstep-session-status vstep-session-status-${card.status.tone}">${escapeHtml(card.status.label)}</span>
+                        </div>
+                        <div class="vstep-session-body">
+                            <h3 class="h6 mb-1">${escapeHtml(set.title || 'Bài học')}</h3>
+                            ${set.description ? `<p class="text-secondary small mb-2">${escapeHtml(set.description)}</p>` : ''}
+                            <div class="vstep-session-meta small text-secondary">
+                                ${card.locked
+                                    ? `<i class="bi bi-lock me-1"></i>Mở lúc ${escapeHtml(formatDateTime(card.opensAt))}`
+                                    : `<i class="bi bi-hourglass-split me-1"></i>${escapeHtml(card.remaining.label)}`}
+                                ${card.deadline ? `<span class="d-block mt-1"><i class="bi bi-calendar2-check me-1"></i>Hạn: ${escapeHtml(formatDateTime(card.deadline))}</span>` : ''}
+                            </div>
+                        </div>
+                        <div class="vstep-session-foot">
+                            ${card.locked
+                                ? '<button type="button" class="btn btn-outline-secondary w-100" disabled><i class="bi bi-lock me-1"></i>Chưa mở</button>'
+                                : `<a class="btn btn-primary w-100 vstep-start-link" href="/vstep_exam?set=${encodeURIComponent(set.id)}" data-set-id="${escapeHtml(set.id)}">${escapeHtml(ctaLabel)}</a>`}
+                        </div>
+                    </article>
+                </div>
+            `;
+        }).join('');
+        refs.grid.querySelectorAll('.vstep-start-link').forEach(link => {
+            link.addEventListener('click', () => {
+                const set = state.sets.find(item => item.id === link.dataset.setId);
+                if (set) cacheSet(set);
+            });
+        });
+    }
+
     function renderSessions() {
         if (!refs.grid) return;
+        if (state.groupRecord && !state.adminView) {
+            renderGroupLessons();
+            return;
+        }
         const cards = buildSessionCards();
         if (!cards.length) {
             refs.grid.innerHTML = '';
@@ -251,6 +328,20 @@
             }
             const classInfo = result.class;
             state.classRecord = classInfo || null;
+            state.groupRecord = result.group || null;
+            if (state.groupRecord) {
+                const group = state.groupRecord;
+                refs.classInfo.innerHTML = `
+                    <article class="vstep-class-summary-card">
+                        <div>
+                            <div class="small text-primary text-uppercase fw-bold">Nhóm học của bạn</div>
+                            <h2 class="h5 mb-1">${escapeHtml(group.title || 'Nhóm học VSTEP')}</h2>
+                            <div class="text-secondary small">Level ${escapeHtml(group.band || 'B1')} · Làm bài theo hạn giáo viên giao cho nhóm.</div>
+                        </div>
+                    </article>
+                `;
+                return;
+            }
             if (!classInfo) {
                 refs.classInfo.innerHTML = '<div class="alert alert-warning mb-0">Tài khoản chưa được gán lớp VSTEP. Liên hệ admin.</div>';
                 return;
@@ -285,6 +376,8 @@
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Không thể tải danh sách buổi học VSTEP.');
             state.sets = (result.sets || []);
+            // contents/list báo HV đang ở nhóm học → hiện bài theo nhóm.
+            if (result.lophocGroup) state.groupRecord = state.groupRecord || result.lophocGroup;
             renderSessions();
         } catch (error) {
             setState(error.message, 'danger');

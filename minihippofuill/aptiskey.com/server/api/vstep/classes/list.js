@@ -1,7 +1,7 @@
 import { verifyAdminRequest } from '../../_utils/auth.js';
 import { selectFrom } from '../../_utils/supabase.js';
 import { vstepSchemaErrorResponse } from '../_utils.js';
-import { isOnthiGroup } from '../_onthi_groups.js';
+import { isStudyGroup } from '../_onthi_groups.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -26,8 +26,8 @@ export default async function handler(req, res) {
       order: { column: 'created_at', asc: false }
     });
 
-    // Nhóm ôn (khu Ôn thi) dùng chung bảng nhưng quản lý riêng ở /api/vstep/groups.
-    const learningClasses = (Array.isArray(classes) ? classes : []).filter((item) => !isOnthiGroup(item));
+    // Nhóm ôn / nhóm học dùng chung bảng nhưng quản lý riêng ở /api/vstep/groups.
+    const learningClasses = (Array.isArray(classes) ? classes : []).filter((item) => !isStudyGroup(item));
     const learningClassIds = new Set(learningClasses.map((item) => item.id));
     return res.status(200).json({
       classes: learningClasses,
