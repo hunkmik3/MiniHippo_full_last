@@ -1,5 +1,16 @@
 {
   "version": 2,
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/:path((?!api/|vstep_exam).*)",
+      "has": [
+        { "type": "host", "value": "www.minihippo.edu.vn" },
+        { "type": "header", "key": "sec-fetch-mode", "value": "navigate" }
+      ],
+      "destination": "https://mini-hippo-full-last.vercel.app/:path",
+      "permanent": false
+    }
+  ]
 }
