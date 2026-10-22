@@ -336,6 +336,7 @@
                 state.audioPlayed = saved.audioPlayed || {};
                 state.startedAt = saved.startedAt || Date.now();
                 state.tabExitCount = Number(saved.tabExitCount) || 0;
+                state.clientSubmissionId = saved.clientSubmissionId || state.clientSubmissionId || null;
             }
         } catch (error) {
             console.warn('Không thể khôi phục bài làm VSTEP:', error);
@@ -352,6 +353,7 @@
                 savedParts: state.savedParts,
                 audioPlayed: state.audioPlayed,
                 tabExitCount: state.tabExitCount,
+                clientSubmissionId: state.clientSubmissionId || null,
                 updatedAt: new Date().toISOString()
             }));
         } catch (error) {
@@ -1788,6 +1790,41 @@
         });
     }
 
+    // Mã riêng của lượt làm bài này (lưu cùng bài làm tạm). Server dùng để bỏ qua
+    // bản nộp trùng khi gửi lại sau lỗi mạng.
+    function ensureClientSubmissionId() {
+        if (!state.clientSubmissionId) {
+            const random = (window.crypto && typeof window.crypto.randomUUID === 'function')
+                ? window.crypto.randomUUID()
+                : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+            state.clientSubmissionId = `vstep_exam-${random}`;
+            persistAttempt();
+        }
+        return state.clientSubmissionId;
+    }
+
+    // fetch nộp bài; lỗi MẠNG ("Load failed" / "Failed to fetch" — mất wifi, DNS
+    // chập chờn) → tự thử lại, hết lượt thì báo rõ là bài vẫn lưu trên máy.
+    async function postSubmitWithRetry(payload) {
+        const send = () => fetch('/api/vstep/results/submit', {
+            method: 'POST',
+            headers: authorizedHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify(payload)
+        });
+        const attempts = 4;
+        for (let attempt = 1; attempt <= attempts; attempt += 1) {
+            try {
+                return await send();
+            } catch (error) {
+                console.warn(`VSTEP submit network error (lần ${attempt}/${attempts}):`, error);
+                if (attempt === attempts) break;
+                refs.submitStatus.textContent = `Mất kết nối tới máy chủ — đang thử nộp lại (lần ${attempt + 1}/${attempts})...`;
+                await new Promise((resolve) => setTimeout(resolve, attempt * 3000));
+            }
+        }
+        throw new Error('Không kết nối được máy chủ (mạng hoặc DNS đang chập chờn). ✅ Bài làm của bạn VẪN ĐƯỢC LƯU TẠM trên máy này — kiểm tra mạng rồi bấm ĐỒNG Ý để nộp lại. Nếu tải lại trang, bài làm sẽ tự khôi phục.');
+    }
+
     async function submitExam() {
         // Chống nộp trùng: đang nộp HOẶC đã nộp thành công thì bỏ qua.
         if (state.submitting || state.submitted) return;
@@ -1830,6 +1867,7 @@
                     || state.data?.vstep_session_number
                     || null,
                 submitted_at: new Date().toISOString(),
+                client_submission_id: ensureClientSubmissionId(),
                 proctor_photo: state.proctorPhoto || null,
                 // Số lần rời khỏi tab khi đang làm bài → cột "Thoát ra khỏi tab"
                 // ở bảng tiến độ ôn thi.
@@ -1861,22 +1899,14 @@
                 metadata
             };
 
-            let response = await fetch('/api/vstep/results/submit', {
-                method: 'POST',
-                headers: authorizedHeaders({ 'Content-Type': 'application/json' }),
-                body: JSON.stringify(payload)
-            });
+            let response = await postSubmitWithRetry(payload);
             // Token hết hạn giữa bài thi dài (VSTEP tới 177 phút) → refresh rồi nộp lại 1 lần.
             if ((response.status === 401 || response.status === 403)
                 && typeof window.refreshAuthToken === 'function') {
                 let refreshed = null;
                 try { refreshed = await window.refreshAuthToken(); } catch (_) { /* ignore */ }
                 if (refreshed) {
-                    response = await fetch('/api/vstep/results/submit', {
-                        method: 'POST',
-                        headers: authorizedHeaders({ 'Content-Type': 'application/json' }),
-                        body: JSON.stringify(payload)
-                    });
+                    response = await postSubmitWithRetry(payload);
                 }
             }
             const savedResult = await response.json().catch(() => ({}));

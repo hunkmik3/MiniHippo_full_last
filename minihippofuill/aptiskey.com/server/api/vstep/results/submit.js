@@ -21,6 +21,25 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Thiếu id nội dung VSTEP' });
     }
 
+    // Client gửi lại CÙNG 1 lượt nộp (mất mạng giữa chừng rồi thử lại) → trả bản
+    // đã lưu, không tạo bản trùng (và không bị chặn vì assignment đã đóng sau lần đầu).
+    const clientSubmissionId = typeof body?.metadata?.client_submission_id === 'string'
+      ? body.metadata.client_submission_id.trim().slice(0, 120)
+      : '';
+    if (clientSubmissionId) {
+      const existing = await selectFrom('vstep_results', {
+        columns: 'id,content_id,total_score,max_score,created_at',
+        filters: [
+          { column: 'user_id', value: authResult.user.id },
+          { column: 'metadata->>client_submission_id', value: clientSubmissionId }
+        ],
+        limit: 1
+      });
+      if (Array.isArray(existing) && existing[0]) {
+        return res.status(200).json({ success: true, duplicate: true, result: existing[0] });
+      }
+    }
+
     const content = await selectFrom('vstep_contents', {
       filters: [{ column: 'id', value: contentId }],
       single: true
@@ -96,6 +115,8 @@ export default async function handler(req, res) {
     metadata.vstep_content_id = content.id;
     metadata.vstep_set_id = content.id;
     metadata.vstep_set_title = content.title;
+    if (clientSubmissionId) metadata.client_submission_id = clientSubmissionId;
+    else delete metadata.client_submission_id;
     if (adminView) metadata.admin_preview = true;
     if (groupAssignment) {
       const groupDue = groupAssignment.due_at ? new Date(groupAssignment.due_at).getTime() : null;
