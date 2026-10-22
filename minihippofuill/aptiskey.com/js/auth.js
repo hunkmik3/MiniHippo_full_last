@@ -473,7 +473,9 @@ async function refreshAuthToken() {
 
         const result = await response.json().catch(() => ({}));
         if (!response.ok || !result?.token) {
-            clearAuth();
+            // Chỉ đăng xuất khi server TỪ CHỐI refresh token (hết hạn / thu hồi /
+            // tài khoản khoá). Lỗi server (5xx...) → giữ phiên để lần sau thử lại.
+            if ([400, 401, 403].includes(response.status)) clearAuth();
             return null;
         }
 
@@ -487,8 +489,9 @@ async function refreshAuthToken() {
 
         return result.token;
     } catch (error) {
+        // Lỗi MẠNG (mất wifi, DNS chập chờn...) → KHÔNG đăng xuất. Trước đây xoá
+        // token ở đây nên HV đang làm bài thi bị văng phiên chỉ vì mạng chập 1 lúc.
         console.error('Refresh token error:', error);
-        clearAuth();
         return null;
     }
 }
@@ -627,8 +630,9 @@ function startTokenRefreshTimer() {
         }
         try {
             const newToken = await refreshAuthToken();
-            if (!newToken) {
-                // Refresh fail (refresh token cũng hết hạn) → dừng timer.
+            if (!newToken && !localStorage.getItem('auth_refresh_token')) {
+                // Refresh token bị từ chối (đã đăng xuất) → dừng timer.
+                // Lỗi mạng tạm thời thì giữ timer để lần sau thử lại.
                 // Route guard / 401 retry sẽ redirect login khi cần.
                 stopTokenRefreshTimer();
             }
