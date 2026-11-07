@@ -587,7 +587,7 @@ async function loadHomeworkClasses() {
 async function loadSessionKeyMap() {
   lopHocRuntime.sessionKeyMap = {};
   try {
-    const data = await apiGet('/api/practice_sets/list?type=session_content');
+    const data = await apiGet('/api/practice_sets/list?type=session_content&fields=session_meta');
     const sets = Array.isArray(data?.sets) ? data.sets : [];
     sets.forEach((set) => {
       const d = set?.data || {};

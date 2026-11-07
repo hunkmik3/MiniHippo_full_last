@@ -58,12 +58,14 @@ async function supabaseFetch(path, options = {}) {
 
 export async function selectFrom(
   table,
-  { filters = [], order, limit, offset, single, columns = '*' } = {}
+  { filters = [], or, order, limit, offset, single, columns = '*' } = {}
 ) {
   const params = [];
   filters.forEach(({ column, operator = 'eq', value }) => {
     params.push(`${encodeURIComponent(column)}=${operator}.${encodeURIComponent(value)}`);
   });
+  // or: điều kiện "hoặc" kiểu PostgREST, vd '(type.eq.a,and(x.is.null,y.eq.b))'.
+  if (or) params.push(`or=${encodeURIComponent(or)}`);
   params.push(`select=${columns}`);
   if (order) {
     // order: { column, asc } hoặc mảng nhiều cột (cột sau phân định khi cột trước trùng).
