@@ -17,7 +17,16 @@
 
 import { selectFrom, fetchGithubContent } from '../_utils/supabase.js';
 import { demoGuard, isAptisLessonPart, cached, CONTENT_TTL_MS } from './_shared.js';
-import { extractLessonData } from '../_utils/lessonData.js';
+
+// lessonData.js chạy file bài trong sandbox node:vm — Cloudflare không cho chạy
+// code động. Trên Cloudflare dùng dữ liệu đã bóc sẵn lúc deploy
+// (globalThis.__MINIHIPPO_LESSON_DATA__, xem tools/build_cloudflare.mjs); chạy
+// bằng Node thì nạp lessonData.js lúc cần (tên biến → bộ đóng gói không kéo vào).
+async function extractLessonDataLazy(source) {
+  const modulePath = '../_utils/lessonData.js';
+  const { extractLessonData } = await import(modulePath);
+  return extractLessonData(source);
+}
 
 const GITHUB_SITE_PREFIX = 'minihippofuill/aptiskey.com/';
 
@@ -81,11 +90,19 @@ async function loadLessonSource(id) {
 const NOT_FOUND = { status: 404, body: { error: 'Không tìm thấy bài học' } };
 
 // Trả { status, body } để cache được cả kết quả lỗi "không tìm thấy" lẫn thành công.
-async function buildJson(id) {
+export async function buildLessonJson(id) {
+  const precomputed = globalThis.__MINIHIPPO_LESSON_DATA__;
+  if (precomputed) {
+    return precomputed[id] || {
+      status: 404,
+      body: { error: 'Không tìm thấy bài học (bài mới thêm sẽ có dữ liệu JSON sau lần deploy kế tiếp; format=source vẫn dùng được).' }
+    };
+  }
+
   const loaded = await cached(`lesson-src:${id}`, CONTENT_TTL_MS, () => loadLessonSource(id));
   if (!loaded) return NOT_FOUND;
 
-  const extracted = extractLessonData(loaded.source);
+  const extracted = await extractLessonDataLazy(loaded.source);
   if (!extracted.variables.length) {
     return {
       status: 422,
@@ -132,7 +149,7 @@ export default async function handler(req, res) {
   try {
     const result = format === 'source'
       ? await buildSource(id)
-      : await cached(`lesson:${id}`, CONTENT_TTL_MS, () => buildJson(id));
+      : await cached(`lesson:${id}`, CONTENT_TTL_MS, () => buildLessonJson(id));
     return res.status(result.status).json(result.body);
   } catch (error) {
     console.error('demo lesson error:', error);
