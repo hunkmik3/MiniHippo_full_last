@@ -220,7 +220,9 @@ export function buildGithubHeaders() {
   }
   return {
     Authorization: `token ${token}`,
-    Accept: 'application/vnd.github.v3+json'
+    Accept: 'application/vnd.github.v3+json',
+    // GitHub API bắt buộc User-Agent (Node tự gửi, Cloudflare Workers thì không → 403).
+    'User-Agent': 'MiniHippo'
   };
 }
 
