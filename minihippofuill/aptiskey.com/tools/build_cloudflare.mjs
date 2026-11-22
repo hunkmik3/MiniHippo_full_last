@@ -54,6 +54,16 @@ for (const entry of fs.readdirSync(appTmp)) {
 }
 const countFiles = (dir) => fs.readdirSync(dir, { withFileTypes: true })
   .reduce((n, d) => n + (d.isDirectory() ? countFiles(path.join(dir, d.name)) : 1), 0);
+// Không có 404.html thì Pages coi là web 1 trang (SPA) và trả index.html (200) cho mọi
+// đường dẫn lạ — khác Vercel (404). Tạo trang 404 đơn giản nếu dự án chưa có.
+if (!fs.existsSync(path.join(dist, '404.html'))) {
+  fs.writeFileSync(path.join(dist, '404.html'), `<!doctype html><html lang="vi"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Không tìm thấy trang · Mini Hippo</title>
+<style>body{font-family:system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;background:#f8fafc;color:#1e293b}
+main{text-align:center;padding:24px}a{color:#2563eb}</style></head>
+<body><main><h1>404</h1><p>Không tìm thấy trang này.</p><p><a href="/">Về trang chủ Mini Hippo</a></p></main></body></html>
+`);
+}
 staticCount = countFiles(dist);
 log(`✓ dist/: ${staticCount} file tĩnh`);
 
