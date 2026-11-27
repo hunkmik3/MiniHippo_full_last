@@ -19,6 +19,11 @@
             ? requestedPartZeroBased
             : 0;
     const focusedSkillPractice = Boolean(requestedSkill);
+    // Nộp xong quay về đúng khu: bài Lớp học → Tiến độ học tập, bài Ôn thi → trang chủ ôn thi.
+    function vstepHomeUrl() {
+        const flow = state?.data?.vstep_flow || state?.set?.flow || state?.set?.data?.vstep_flow || '';
+        return flow === 'lesson_exam' ? '/vstep_lessons.html' : '/vstep_bode.html';
+    }
     const singlePartPractice = false;
     // Nút "Bỏ qua chờ" Speaking dành cho admin debug: bật theo QUYỀN ADMIN
     // (hoạt động ở mọi môi trường, kể cả production), kèm ?debug=1 làm cửa hậu cho dev.
@@ -376,7 +381,8 @@
         // Bộ đề TỔNG HỢP (data.combined_refs) chỉ chứa tham chiếu — bản cache từ
         // trang danh sách CHƯA được gộp 4 kỹ năng. Phải gọi get.js để backend gộp,
         // nếu không sẽ báo "chưa có nội dung". → bỏ cache với bộ tổng hợp.
-        if (cached && cached.id === setId && !cached.data?.combined_refs) {
+        // Bản tóm tắt từ trang danh sách (summary) không có câu hỏi → luôn gọi get.js.
+        if (cached && cached.id === setId && !cached.data?.combined_refs && !cached.summary) {
             state.set = cached;
         } else {
             const assignmentQuery = assignmentId ? `&assignment=${encodeURIComponent(assignmentId)}` : '';
@@ -1770,7 +1776,7 @@
         document.body.appendChild(overlay);
         overlay.querySelector('#vstepReviewCloseBtn')?.addEventListener('click', () => overlay.remove());
         overlay.querySelector('#vstepReviewHomeBtn')?.addEventListener('click', () => {
-            window.location.href = '/vstep_bode.html';
+            window.location.href = vstepHomeUrl();
         });
     }
 
@@ -2014,7 +2020,7 @@
         document.getElementById('cancelSubmitBtn').addEventListener('click', () => {
             // Sau khi đã nộp bài, nút này đưa thí sinh quay về trang chủ VSTEP.
             if (state.submitted) {
-                window.location.href = '/vstep_bode.html';
+                window.location.href = vstepHomeUrl();
                 return;
             }
             hideModal(refs.submitModal);

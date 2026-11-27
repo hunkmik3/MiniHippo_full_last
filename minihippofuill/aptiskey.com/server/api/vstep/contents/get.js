@@ -4,6 +4,7 @@ import { contentToLegacySet, practiceAccessWindowStatus, vstepSchemaErrorRespons
 import {
   applyOnthiSchedule,
   attachGroupAssignment,
+  groupAssignmentWindow,
   isVisibleForGroup,
   loadLophocGroupContext,
   loadOnthiGroupContext
@@ -93,9 +94,13 @@ export default async function handler(req, res) {
         : null;
       const groupAssignment = lophocContext?.byContent?.get(content.id) || null;
       if (groupAssignment) {
-        const opensAt = Date.parse(groupAssignment.available_from || '');
-        if (Number.isFinite(opensAt) && opensAt > Date.now()) {
-          return res.status(403).json({ error: `Bài học này sẽ mở từ ${new Date(opensAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}.` });
+        const win = groupAssignmentWindow(groupAssignment);
+        const viTime = (time) => new Date(time).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+        if (win.notOpenYet) {
+          return res.status(403).json({ error: `Bài học này sẽ mở từ ${viTime(win.opensAt)}.` });
+        }
+        if (win.closed) {
+          return res.status(403).json({ error: `Bài học này đã đóng từ ${viTime(win.closeAt)}.` });
         }
         content = attachGroupAssignment(content, lophocContext);
       } else if (content.flow === 'lesson_exam') {

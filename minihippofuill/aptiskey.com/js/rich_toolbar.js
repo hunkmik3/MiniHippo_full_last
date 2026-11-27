@@ -127,7 +127,9 @@
     var isSingle = field.tagName === 'INPUT';
     var html = normalizeHtml(editable.innerHTML, isSingle);
     if (html === '<br>' || html === '\n') html = '';
+    field._richSyncing = true;   // ghi từ editor → field: không vẽ lại editor (giữ con trỏ)
     field.value = html;
+    field._richSyncing = false;
     editable.setAttribute('data-empty', html ? '0' : '1');
     field.dispatchEvent(new Event('input', { bubbles: true }));
     field.dispatchEvent(new Event('change', { bubbles: true }));
@@ -156,6 +158,30 @@
     return /answer|correct|option|đáp\s*án|dap[-_\s]?an|man\/woman/.test(hay);
   }
 
+  // Vẽ lại vùng soạn thảo theo giá trị hiện tại của field gốc.
+  function renderFromField(field, editable) {
+    var value = String(field.value || '');
+    editable.innerHTML = value.replace(/\n/g, '<br>');
+    editable.setAttribute('data-empty', value ? '0' : '1');
+  }
+
+  // Code trang (vd admin VSTEP "Đang sửa: ...") gán field.value = ... bằng JS. Trước
+  // đây vùng soạn thảo KHÔNG cập nhật → admin thấy ô Tên bộ đề trống dù dữ liệu vẫn
+  // còn trong field ẩn. Chặn setter của riêng field này để vẽ lại editor mỗi lần gán.
+  function watchProgrammaticValue(field, editable) {
+    var desc = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), 'value');
+    if (!desc || !desc.get || !desc.set) return;
+    Object.defineProperty(field, 'value', {
+      configurable: true,
+      enumerable: desc.enumerable,
+      get: function () { return desc.get.call(this); },
+      set: function (v) {
+        desc.set.call(this, v);
+        if (!this._richSyncing) renderFromField(this, editable);
+      }
+    });
+  }
+
   function attach(field) {
     if (!isEditable(field)) return;
     if (field.dataset.richAttached === '1') return;
@@ -177,6 +203,7 @@
 
     field.style.display = 'none';
     field.parentNode.insertBefore(editable, field);
+    watchProgrammaticValue(field, editable);
 
     editable.addEventListener('focus', function () {
       // Nếu field được nạp dữ liệu sau khi gắn (trang tải async) mà editor đang
@@ -222,6 +249,16 @@
     injectStyleOnce();
     buildToolbar();
     scan(document);
+    // form.reset() đặt lại field gốc mà không qua setter → vẽ lại các editor trong form.
+    document.addEventListener('reset', function (event) {
+      var form = event.target;
+      setTimeout(function () {
+        var list = form.querySelectorAll ? form.querySelectorAll('.rich-editable') : [];
+        for (var i = 0; i < list.length; i++) {
+          if (list[i]._field) renderFromField(list[i]._field, list[i]);
+        }
+      }, 0);
+    }, true);
     if (window.MutationObserver) {
       var obs = new MutationObserver(function (mutations) {
         for (var m = 0; m < mutations.length; m++) {

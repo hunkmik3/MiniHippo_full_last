@@ -252,7 +252,7 @@
             <div class="vstep-panel-header vstep-panel-header-row">
               <div>
                 <strong><i class="bi bi-people me-1"></i>Nhóm ôn</strong>
-                <div class="vstep-help">HV đã vào nhóm chỉ thấy bộ đề của nhóm; HV chưa có nhóm thấy mọi bộ đề (không có deadline). Mỗi HV chỉ ở 1 nhóm. Thứ tự: <strong>1.</strong> tạo nhóm → <strong>2.</strong> thêm học viên vào nhóm (tạo mới / import Excel ở khung bên dưới, chọn sẵn nhóm; hoặc chọn HV có sẵn trong nhóm) → <strong>3.</strong> giao bộ đề kèm Mở từ + Deadline.</div>
+                <div class="vstep-help">HV đã vào nhóm chỉ thấy bộ đề của nhóm; HV chưa có nhóm thấy mọi bộ đề (không có deadline). Mỗi HV chỉ ở 1 nhóm. Thứ tự: <strong>1.</strong> tạo nhóm → <strong>2.</strong> thêm học viên vào nhóm (tạo mới / import Excel ở khung bên dưới, chọn sẵn nhóm; hoặc chọn HV có sẵn trong nhóm) → <strong>3.</strong> giao bộ đề kèm Mở từ + Deadline (+ Mở đến nếu cho làm trễ). Tick nhiều bộ đề đã giao để sửa lịch cùng lúc.</div>
               </div>
               <button type="button" class="btn btn-sm btn-outline-primary" id="vstepGroupReloadBtn">
                 <i class="bi bi-arrow-clockwise me-1"></i> Tải lại
@@ -582,7 +582,7 @@
               <div class="vstep-panel-header vstep-panel-header-row">
                 <div>
                   <strong id="vstepSetListTitle">Reading - Học theo bộ đề</strong>
-                  <div class="vstep-help" id="vstepSetListHelp">Bài published sẽ hiện ở trang Reading theo bộ đề của học viên.</div>
+                  <div class="vstep-help" id="vstepSetListHelp">Giao bộ đề cho nhóm ở mục Học viên → Nhóm ôn; HV trong nhóm thấy bộ đề được giao.</div>
                 </div>
                 <button type="button" class="btn btn-sm btn-outline-primary" id="refreshVstepSetsBtn" aria-label="Tải lại bộ đề">
                   <i class="bi bi-arrow-clockwise"></i>
@@ -593,11 +593,7 @@
                   <i class="bi bi-search"></i>
                   <input type="search" class="form-control" id="vstepSetSearch" placeholder="Tìm bộ đề Ôn thi">
                 </div>
-                <div class="vstep-module-stats mb-3">
-                  <div><strong id="vstepStatTotal">0</strong><span>Tổng</span></div>
-                  <div><strong id="vstepStatPublished">0</strong><span>Published</span></div>
-                  <div><strong id="vstepStatDraft">0</strong><span>Draft</span></div>
-                </div>
+                <div class="small text-secondary mb-2"><strong id="vstepStatTotal">0</strong> bộ đề</div>
                 <div id="vstepSetList" class="vstep-set-list">
                   <div class="text-secondary small">Đang tải dữ liệu...</div>
                 </div>
@@ -654,13 +650,6 @@
                       </div>
                       <!-- vstep-content-kind cố định 'mock_test' cho Ôn thi. -->
                       <input type="hidden" id="vstep-content-kind" value="mock_test">
-                      <div class="col-md-4 col-xl-2">
-                        <label class="form-label fw-semibold" for="vstep-status">Trạng thái</label>
-                        <select class="form-select" id="vstep-status">
-                          <option value="draft">draft</option>
-                          <option value="published">published</option>
-                        </select>
-                      </div>
                     </div>
                   </div>
 

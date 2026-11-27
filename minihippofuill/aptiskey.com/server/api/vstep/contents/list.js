@@ -1,6 +1,12 @@
 import { selectFrom } from '../../_utils/supabase.js';
 import { verifyAdminRequest, verifyUserRequest } from '../../_utils/auth.js';
-import { contentToLegacySet, normalizeFlow, vstepSchemaErrorResponse } from '../_utils.js';
+import {
+  SUMMARY_COLUMNS,
+  contentToLegacySet,
+  normalizeFlow,
+  summaryRowToContent,
+  vstepSchemaErrorResponse
+} from '../_utils.js';
 import {
   applyOnthiSchedule,
   attachGroupAssignment,
@@ -18,6 +24,8 @@ export default async function handler(req, res) {
     ? normalizeFlow(req.query.flow)
     : '';
   const status = typeof req.query.status === 'string' ? req.query.status.trim().toLowerCase() : '';
+  // view=summary: bỏ câu hỏi/passage (chỉ giữ thông tin cho danh sách + số câu).
+  const summaryView = req.query.view === 'summary';
 
   try {
     let authResult = null;
@@ -91,31 +99,39 @@ export default async function handler(req, res) {
       }
     }
 
+    const adminView = authResult?.user?.role === 'admin';
+    // HV trong nhóm thấy bài nhóm được giao BẤT KỂ trạng thái draft/published (giao
+    // theo nhóm thay cho xuất bản) → lọc status sau khi biết HV có nhóm hay không.
+    const studentView = status === 'published' && !adminView;
     const filters = [];
     if (flow) filters.push({ column: 'flow', value: flow });
-    if (status) filters.push({ column: 'status', value: status });
+    if (status && !studentView) filters.push({ column: 'status', value: status });
 
     const contents = await selectFrom('vstep_contents', {
+      columns: summaryView ? SUMMARY_COLUMNS : '*',
       filters,
       order: { column: 'created_at', asc: false }
     });
 
-    let normalized = Array.isArray(contents) ? contents : [];
-    const adminView = authResult?.user?.role === 'admin';
+    let normalized = (Array.isArray(contents) ? contents : [])
+      .map((row) => (summaryView ? summaryRowToContent(row) : row));
+    const publishedOnly = (list) => list.filter((content) => content.status === 'published');
     // Ôn thi: HV trong nhóm ôn chỉ thấy bộ đề nhóm được giao (lịch + deadline theo
-    // nhóm); HV chưa có nhóm thấy mọi bộ đề, không có deadline.
+    // nhóm); HV chưa có nhóm thấy mọi bộ đề published, không có deadline.
     let onthiGroup = null;
-    if (status === 'published' && flow === 'practice' && !adminView) {
+    if (studentView && flow === 'practice') {
       const groupContext = await loadOnthiGroupContext(authResult.user.id);
       onthiGroup = groupContext ? { id: groupContext.group.id, title: groupContext.group.title } : null;
-      normalized = normalized
+      normalized = (groupContext ? normalized : publishedOnly(normalized))
         .filter((content) => isVisibleForGroup(content, groupContext))
         .map((content) => applyOnthiSchedule(content, groupContext));
+    } else if (studentView && flow !== 'lesson_exam') {
+      normalized = publishedOnly(normalized);
     }
     // Lớp học: HV trong nhóm học chỉ thấy bài nhóm được giao (cả bài chưa tới giờ
     // mở — trang hiện "Chưa mở"). HV chưa có nhóm: giữ luồng lớp/buổi cũ bên dưới.
     let lophocGroup = null;
-    const lophocContext = status === 'published' && flow === 'lesson_exam' && !adminView
+    const lophocContext = studentView && flow === 'lesson_exam'
       ? await loadLophocGroupContext(authResult.user.id)
       : null;
     if (lophocContext) {
@@ -123,7 +139,7 @@ export default async function handler(req, res) {
       normalized = normalized
         .filter((content) => isVisibleForGroup(content, lophocContext))
         .map((content) => attachGroupAssignment(content, lophocContext));
-    } else if (status === 'published' && flow === 'lesson_exam' && !adminView) {
+    } else if (studentView && flow === 'lesson_exam') {
       const now = Date.now();
       const assignmentByContent = new Map(
         (Array.isArray(assignments) ? assignments : [])
@@ -133,7 +149,7 @@ export default async function handler(req, res) {
           })
           .map(item => [item.content_id, item])
       );
-      normalized = normalized
+      normalized = publishedOnly(normalized)
         .filter(content => assignmentByContent.has(content.id))
         .map(content => ({
           ...content,
@@ -141,7 +157,6 @@ export default async function handler(req, res) {
         }));
     }
     return res.status(200).json({
-      contents: normalized,
       sets: normalized.map(contentToLegacySet),
       adminView,
       onthiGroup,

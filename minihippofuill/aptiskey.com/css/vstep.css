@@ -3049,11 +3049,5 @@ ins.vstep-ai-ins {
 .vstep-start-link { color: #1b3faa; font-weight: 700; text-decoration: none; }
 .vstep-start-link:hover { text-decoration: underline; }
 
-@media (prefers-color-scheme: dark) {
-  .vstep-onthi-title { color: #dbe4ff; }
-  .vstep-onthi-disclaimer { color: #9db4f0; }
-  .vstep-progress-track { background: transparent; border-color: #64748b; }
-  .vstep-stat-card { background: transparent; }
-  .vstep-stat-label { color: #dbe4ff; }
-  .vstep-onthi-table thead th { background: #1e293b; color: #dbe4ff; }
-}
+/* Khung tiến độ luôn nền trắng (.vstep-onthi-dashboard) → KHÔNG đổi chữ sang màu sáng
+   khi máy bật chế độ tối (trước đây tiêu đề + nhãn TỔNG BÀI/CHƯA LÀM gần như vô hình). */

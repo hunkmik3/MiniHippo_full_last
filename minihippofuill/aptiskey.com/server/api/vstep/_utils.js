@@ -52,6 +52,51 @@ export function normalizeStatus(value) {
   return 'draft';
 }
 
+// Số câu/part mỗi kỹ năng — lưu sẵn vào data.__counts khi lưu bộ đề để danh sách
+// (bản tóm tắt, không kèm câu hỏi) vẫn hiện được "Reading 40 câu".
+export const SKILL_KEYS = ['listening', 'reading', 'writing', 'speaking'];
+export function countContentQuestions(data = {}) {
+  const parts = (skill) => (Array.isArray(data?.[skill]?.parts) ? data[skill].parts : []);
+  const questions = (skill) => parts(skill)
+    .reduce((total, part) => total + (Array.isArray(part?.questions) ? part.questions.length : 0), 0);
+  return {
+    listening: questions('listening'),
+    reading: questions('reading'),
+    writing: parts('writing').length,
+    speaking: parts('speaking').length,
+    parts: Object.fromEntries(SKILL_KEYS.map((skill) => [skill, parts(skill).length]))
+  };
+}
+
+// Cột + các khoá nhẹ trong data dùng cho danh sách tóm tắt (?view=summary).
+// Không kéo câu hỏi/passage → nhẹ hơn hàng chục lần (đỡ egress Supabase + tải nhanh).
+const SUMMARY_DATA_KEYS = [
+  'status', 'onthi', 'durations', 'vstep_flow', 'vstep_content_kind', 'vstep_practice_skill',
+  'vstep_band', 'vstep_session_number', 'combined_refs', 'vstep_is_combined', '__counts', 'lesson_order'
+];
+export const SUMMARY_COLUMNS = [
+  'id', 'title', 'description', 'flow', 'content_kind', 'status', 'band', 'session_number',
+  'duration_minutes', 'created_at', 'updated_at',
+  ...SUMMARY_DATA_KEYS.map((key) => `d_${key.replace(/^__/, '')}:data->${key}`)
+].join(',');
+
+// Hàng select theo SUMMARY_COLUMNS → dạng content bình thường (data chỉ có khoá nhẹ).
+export function summaryRowToContent(row) {
+  const data = {};
+  SUMMARY_DATA_KEYS.forEach((key) => {
+    const value = row[`d_${key.replace(/^__/, '')}`];
+    if (value !== null && value !== undefined) data[key] = value;
+  });
+  // Bộ đề cũ chưa ghi rõ kỹ năng: suy ra từ số câu (chỉ 1 kỹ năng có nội dung).
+  if (!data.vstep_practice_skill && data.__counts) {
+    const filled = SKILL_KEYS.filter((skill) => Number(data.__counts[skill]) > 0);
+    if (filled.length === 1) data.vstep_practice_skill = filled[0];
+  }
+  const content = { ...row, data, summary: true };
+  Object.keys(content).forEach((key) => { if (key.startsWith('d_')) delete content[key]; });
+  return content;
+}
+
 export function contentToLegacySet(content) {
   if (!content) return null;
   const data = content.data && typeof content.data === 'object' ? { ...content.data } : {};
@@ -78,7 +123,9 @@ export function contentToLegacySet(content) {
     session_number: content.session_number || null,
     assignment: content.assignment || null,
     // Lịch của nhóm học (khu Lớp học) — xem _onthi_groups.js.
-    group_assignment: content.group_assignment || null
+    group_assignment: content.group_assignment || null,
+    // true = bản tóm tắt (không có câu hỏi) → trang thi/admin phải gọi contents/get.
+    summary: Boolean(content.summary)
   };
 }
 
@@ -99,16 +146,17 @@ export function practiceAccessWindowStatus(content, nowMs = Date.now()) {
   const meta = getPracticeOnthiMeta(content);
   const accessFrom = parseTime(meta.accessFrom);
   const accessUntil = parseTime(meta.accessUntil || meta.deadlineAt);
+  const viTime = (time) => new Date(time).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
   if (accessFrom && nowMs < accessFrom) {
     return {
       allowed: false,
-      reason: `Đề ôn thi này sẽ mở từ ${new Date(accessFrom).toLocaleString('vi-VN')}.`
+      reason: `Đề ôn thi này sẽ mở từ ${viTime(accessFrom)}.`
     };
   }
   if (accessUntil && nowMs > accessUntil) {
     return {
       allowed: false,
-      reason: `Đề ôn thi này đã đóng truy cập từ ${new Date(accessUntil).toLocaleString('vi-VN')}.`
+      reason: `Đề ôn thi này đã đóng truy cập từ ${viTime(accessUntil)}.`
     };
   }
   return { allowed: true };
@@ -280,6 +328,7 @@ export function legacyPayloadToContentPayload(body = {}, adminUser = null) {
   const sessionNumber = Number.isFinite(sessionRaw) && sessionRaw > 0 ? Math.floor(sessionRaw) : null;
   if (band) data.vstep_band = band;
   if (sessionNumber) data.vstep_session_number = sessionNumber;
+  data.__counts = countContentQuestions(data);
 
   return {
     flow,

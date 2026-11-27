@@ -82,7 +82,8 @@
         const data = set?.data || {};
         const explicit = String(data.vstep_practice_skill || '').toLowerCase();
         if (allowedSkills.includes(explicit) || explicit === 'full_test') return explicit;
-        const filledSkills = allowedSkills.filter(item => Array.isArray(data?.[item]?.parts) && data[item].parts.length);
+        const filledSkills = allowedSkills.filter(item => (Array.isArray(data?.[item]?.parts) && data[item].parts.length)
+            || Number(data.__counts?.parts?.[item]) > 0);
         return filledSkills.length === 1 ? filledSkills[0] : 'full_test';
     }
 
@@ -93,6 +94,19 @@
     function countQuestions(parts) {
         if (skill === 'writing' || skill === 'speaking') return parts.length;
         return parts.reduce((sum, part) => sum + (Array.isArray(part.questions) ? part.questions.length : 0), 0);
+    }
+
+    // Danh sách dạng tóm tắt (view=summary) không kèm câu hỏi → dùng số đếm sẵn data.__counts.
+    function partCountOf(set) {
+        const counts = set?.data?.__counts;
+        if (set?.summary && counts) return Number(counts.parts?.[skill] ?? counts[skill]) || 0;
+        return getParts(set).length;
+    }
+
+    function questionCountOf(set) {
+        const counts = set?.data?.__counts;
+        if (set?.summary && counts) return Number(counts[skill]) || 0;
+        return countQuestions(getParts(set));
     }
 
     function totalDuration(set) {
@@ -107,7 +121,8 @@
             if (set.assignment?.id) {
                 sessionStorage.setItem('vstep_last_assignment_id', set.assignment.id);
             }
-            sessionStorage.setItem(`practice_set_cache_vstep_${set.id}`, JSON.stringify(set));
+            // Bản tóm tắt không có câu hỏi → không cache, trang thi tự gọi get.js.
+            if (!set.summary) sessionStorage.setItem(`practice_set_cache_vstep_${set.id}`, JSON.stringify(set));
         } catch (error) {
             console.warn('Không thể cache đề VSTEP:', error);
         }
@@ -136,8 +151,8 @@
     function renderSetMode(sets) {
         const meta = skillMeta[skill];
         refs.grid.innerHTML = sets.map(set => {
-            const parts = getParts(set);
-            const questionCount = countQuestions(parts);
+            const partCount = partCountOf(set);
+            const questionCount = questionCountOf(set);
             const dateText = formatDate(set.created_at);
             return `
                 <div class="col-sm-6 col-xl-4">
@@ -149,7 +164,7 @@
                         <h3>${escapeHtml(set.title || 'VSTEP practice set')}</h3>
                         <p>${escapeHtml(set.description || `Bài luyện ${meta.label} VSTEP theo bộ đề.`)}</p>
                         <div class="vstep-skill-library-card-meta">
-                            <span><i class="bi bi-list-check"></i>${parts.length} part</span>
+                            <span><i class="bi bi-list-check"></i>${partCount} part</span>
                             <span><i class="bi bi-question-circle"></i>${questionCount} câu/task</span>
                             <span><i class="bi bi-clock"></i>${totalDuration(set) || '-'} phút</span>
                             ${dateText ? `<span><i class="bi bi-calendar3"></i>${escapeHtml(dateText)}</span>` : ''}
@@ -176,9 +191,11 @@
     }
 
     function render(sets) {
-        const usableSets = sets.filter(set => isCurrentSkillSet(set) && getParts(set).length);
-        const totalParts = usableSets.reduce((sum, set) => sum + getParts(set).length, 0);
-        const totalQuestions = usableSets.reduce((sum, set) => sum + countQuestions(getParts(set)), 0);
+        // Bộ đề cũ chưa có số đếm sẵn (chưa chạy SQL cập nhật) vẫn hiện — chỉ thiếu số câu.
+        const usableSets = sets.filter(set => isCurrentSkillSet(set)
+            && (partCountOf(set) || (set.summary && !set.data?.__counts)));
+        const totalParts = usableSets.reduce((sum, set) => sum + partCountOf(set), 0);
+        const totalQuestions = usableSets.reduce((sum, set) => sum + questionCountOf(set), 0);
         refs.setCount.textContent = String(usableSets.length);
         refs.partCount.textContent = String(totalParts);
         refs.questionCount.textContent = String(totalQuestions);
@@ -198,7 +215,7 @@
         setState(`Đang tải ${skillMeta[skill].label} VSTEP...`, 'info');
         refs.grid.innerHTML = '';
         try {
-            const response = await fetch('/api/vstep/contents/list?flow=practice&status=published', {
+            const response = await fetch('/api/vstep/contents/list?flow=practice&status=published&view=summary', {
                 headers: authorizedHeaders()
             });
             const result = await response.json().catch(() => ({}));

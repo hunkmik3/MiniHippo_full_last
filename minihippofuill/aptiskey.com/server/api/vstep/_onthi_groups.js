@@ -8,14 +8,17 @@
 //   vstep_classes        schedule = { kind: 'onthi_group' | 'lophoc_group' }
 //   vstep_class_students thành viên (mỗi học viên chỉ ở 1 nhóm trong mỗi khu)
 //   vstep_assignments    class_id = nhóm, content_id = bài, KHÔNG gắn học viên;
-//                        available_from = mở từ, due_at = deadline
+//                        available_from = mở từ, due_at = deadline,
+//                        close_at = mở đến (cho làm tiếp sau deadline — "trễ deadline")
 // (Cột schedule_type có CHECK chỉ nhận 246/357 nên không dùng làm dấu được.)
 //
 // Quy tắc cho học viên:
 //   Ôn thi   — có nhóm: chỉ thấy bộ đề nhóm được giao, lịch theo nhóm;
-//              chưa nhóm: thấy mọi bộ đề, không có deadline.
+//              chưa nhóm: thấy mọi bộ đề published, không có deadline.
+//              Đóng đề: tới "mở đến" (close_at); để trống = đóng khi hết deadline.
 //   Lớp học  — có nhóm: chỉ thấy bài nhóm được giao (làm lại được, nộp sau
-//              deadline ghi nhận "trễ"); chưa nhóm: giữ luồng lớp/buổi cũ.
+//              deadline ghi nhận "trễ"); đóng khi tới "mở đến" (để trống = không đóng).
+//              Chưa nhóm: giữ luồng lớp/buổi cũ.
 // ===================================================================
 import { deleteFrom, selectFrom, upsertInto } from '../_utils/supabase.js';
 
@@ -41,6 +44,51 @@ export function isStudyGroup(row) {
 
 function inFilter(column, ids) {
   return { column, operator: 'in', value: `(${ids.join(',')})` };
+}
+
+// Cột close_at cần chạy SUPABASE_VSTEP_CLOSE_AT.sql. Chưa chạy SQL thì vẫn đọc
+// được lịch (không có "mở đến") thay vì làm hỏng cả trang của học viên.
+const ASSIGNMENT_BASE_COLUMNS = 'id,class_id,content_id,available_from,due_at,status';
+let closeAtColumnMissing = false;
+
+export function isMissingCloseAtError(error) {
+  const code = String(error?.details?.code || '');
+  const message = String(error?.details?.message || error?.message || '');
+  return (code === '42703' || code === 'PGRST204') && message.includes('close_at');
+}
+
+export async function selectGroupAssignments(options = {}) {
+  if (!closeAtColumnMissing) {
+    try {
+      return await selectFrom('vstep_assignments', { ...options, columns: `${ASSIGNMENT_BASE_COLUMNS},close_at` });
+    } catch (error) {
+      if (!isMissingCloseAtError(error)) throw error;
+      closeAtColumnMissing = true;
+    }
+  }
+  return selectFrom('vstep_assignments', { ...options, columns: ASSIGNMENT_BASE_COLUMNS });
+}
+
+function toTime(value) {
+  const time = Date.parse(value || '');
+  return Number.isFinite(time) ? time : null;
+}
+
+// Trạng thái lịch của 1 bài giao cho nhóm tại thời điểm now.
+//   closeAtDeadline: Ôn thi = true (không có "mở đến" thì hết deadline là đóng),
+//                    Lớp học = false (không có "mở đến" thì không đóng).
+export function groupAssignmentWindow(assignment, { now = Date.now(), closeAtDeadline = false } = {}) {
+  const opensAt = toTime(assignment?.available_from);
+  const dueAt = toTime(assignment?.due_at);
+  const closeAt = toTime(assignment?.close_at) ?? (closeAtDeadline ? dueAt : null);
+  return {
+    notOpenYet: opensAt !== null && now < opensAt,
+    overdue: dueAt !== null && now > dueAt,
+    closed: closeAt !== null && now > closeAt,
+    opensAt,
+    dueAt,
+    closeAt
+  };
 }
 
 // Trường lịch trong data.onthi bị thay bằng lịch của nhóm ôn.
@@ -71,8 +119,7 @@ export async function loadGroupContext(userId, kind) {
   const group = (Array.isArray(groups) ? groups : [])[0];
   if (!group) return null;
 
-  const assignments = await selectFrom('vstep_assignments', {
-    columns: 'id,content_id,available_from,due_at,status',
+  const assignments = await selectGroupAssignments({
     filters: [
       { column: 'class_id', value: group.id },
       { column: 'status', value: 'active' }
@@ -91,7 +138,7 @@ export function loadLophocGroupContext(userId) {
 }
 
 // Ôn thi: bản sao content với data.onthi mang lịch của học viên này (không sửa gốc).
-// Deadline đóng bài giống trước đây: không có "đóng truy cập" riêng → đóng khi hết deadline.
+// accessUntil = "mở đến" của nhóm; để trống → practiceAccessWindowStatus đóng khi hết deadline.
 export function applyOnthiSchedule(content, groupContext) {
   if (!content || content.flow !== 'practice') return content;
   const data = content.data && typeof content.data === 'object' ? content.data : {};
@@ -101,6 +148,7 @@ export function applyOnthiSchedule(content, groupContext) {
   if (assignment) {
     onthi.accessFrom = assignment.available_from || null;
     onthi.deadlineAt = assignment.due_at || null;
+    onthi.accessUntil = assignment.close_at || null;
     onthi.groupId = groupContext.group.id;
     onthi.groupTitle = groupContext.group.title || '';
   }
@@ -118,6 +166,7 @@ export function attachGroupAssignment(content, groupContext) {
     group_assignment: {
       available_from: assignment.available_from || null,
       due_at: assignment.due_at || null,
+      close_at: assignment.close_at || null,
       group_id: groupContext.group.id,
       group_title: groupContext.group.title || ''
     }

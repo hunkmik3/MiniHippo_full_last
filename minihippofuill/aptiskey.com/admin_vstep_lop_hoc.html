@@ -10,49 +10,157 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link rel="stylesheet" href="css/vstep.css">
   <style>
-    /* Grid 18/24 buổi học cho 1 lớp — render bởi admin_vstep_class_lessons.js. */
-    .vstep-session-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 12px;
-    }
-    .vstep-session-card {
-      text-align: left;
-      background: #fff;
-      border: 1px solid #d8e2f0;
-      border-radius: 10px;
-      padding: 14px;
-      cursor: pointer;
-      transition: border-color .12s, box-shadow .12s, transform .12s;
+    /* ===== Results panel — port từ admin_lop_hoc.html (submission detail modal) =====
+       Dùng cho modal "Chi tiết bài nộp Ôn thi VSTEP" + bảng kết quả 12 cột. */
+    .vstep-results-filter-bar {
       display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .vstep-session-card:hover {
-      border-color: #1f5fc8;
-      box-shadow: 0 6px 14px rgba(31, 95, 200, 0.12);
-      transform: translateY(-1px);
-    }
-    .vstep-session-head {
-      display: flex;
-      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.5rem;
       align-items: center;
     }
-    .vstep-session-head strong { color: #1f3a68; }
-    .vstep-session-meta {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      font-size: 0.86rem;
-      color: #5a6b8a;
+    .vstep-results-filter-bar > * { min-width: 0; }
+    .vstep-results-filter-bar .form-select-sm,
+    .vstep-results-filter-bar .form-control-sm {
+      max-width: 180px;
     }
-    .vstep-session-meta i { color: #1f5fc8; margin-right: 4px; }
-    .vstep-session-action {
-      font-size: 0.86rem;
+
+    .vstep-results-table-shell {
+      overflow-x: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.5rem;
+    }
+    .vstep-results-table-shell table {
+      min-width: 1200px;
+      margin: 0;
+    }
+    .vstep-results-table-shell th {
+      background: #f8fafc;
+      color: #1f3a68;
       font-weight: 600;
-      color: #1f5fc8;
-      margin-top: 4px;
+      font-size: 0.8rem;
+      white-space: nowrap;
     }
+    .vstep-results-table-shell td { font-size: 0.85rem; vertical-align: middle; }
+
+    .vstep-results-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+    .vstep-results-summary .chip {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 999px;
+      padding: 0.3rem 0.85rem;
+      font-size: 0.82rem;
+      color: #1e293b;
+    }
+    .vstep-results-summary .chip strong { color: #1f5fc8; margin-right: 0.3rem; }
+
+    .vstep-results-empty {
+      text-align: center;
+      color: #64748b;
+      padding: 2rem 1rem;
+      font-size: 0.95rem;
+    }
+    .vstep-results-empty i { font-size: 2rem; display: block; margin-bottom: 0.5rem; color: #94a3b8; }
+
+    /* Badge B1/B2 + Writing/Speaking — port từ Lớp Học */
+    .vstep-badge-band {
+      padding: 0.18rem 0.5rem;
+      border-radius: 0.35rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+      display: inline-block;
+    }
+    .vstep-badge-band-b1 { background: #fef3c7; color: #92400e; }
+    .vstep-badge-band-b2 { background: #d1fae5; color: #065f46; }
+
+    .vstep-badge-type {
+      display: inline-block;
+      padding: 0.18rem 0.5rem;
+      border-radius: 0.35rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+      margin-right: 0.25rem;
+      margin-bottom: 0.15rem;
+    }
+    .vstep-badge-writing { background: #dbeafe; color: #1e40af; }
+    .vstep-badge-speaking { background: #fce7f3; color: #9d174d; }
+    .vstep-badge-vstep { background: #e0e7ff; color: #3730a3; }
+
+    /* Modal chi tiết — copy từ submission-detail-* của admin_lop_hoc.html */
+    .submission-detail-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .submission-detail-chip {
+      border: 1px solid #e2e8f0;
+      border-radius: 0.6rem;
+      background: #f8fafc;
+      padding: 0.6rem 0.75rem;
+    }
+    .submission-detail-chip .label {
+      display: block;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #64748b;
+      font-weight: 700;
+      margin-bottom: 0.2rem;
+    }
+    .submission-detail-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 0.75rem;
+      background: #fff;
+      padding: 0.85rem;
+      margin-bottom: 0.75rem;
+    }
+    .submission-detail-card .prompt {
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+      font-size: 0.85rem;
+    }
+    .submission-detail-card .answer {
+      white-space: pre-wrap;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.5rem;
+      padding: 0.6rem 0.7rem;
+      font-size: 0.84rem;
+      line-height: 1.5;
+    }
+    .submission-detail-card .corrected {
+      white-space: pre-wrap;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 0.5rem;
+      padding: 0.55rem 0.7rem;
+      margin-top: 0.55rem;
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
+    .submission-detail-section-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin: 0.6rem 0 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      color: #1f3a68;
+    }
+
+    .vstep-modal-grading {
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      border-radius: 0.6rem;
+      padding: 0.85rem;
+      margin-top: 0.5rem;
+    }
+    .vstep-modal-grading label { font-weight: 600; color: #075985; font-size: 0.85rem; }
   </style>
 </head>
 
@@ -76,13 +184,9 @@
           <i class="bi bi-folder2-open"></i>
           <span>Kho tài nguyên</span>
         </button>
-        <button type="button" class="vstep-admin-tab" data-vstep-panel="classes">
-          <i class="bi bi-calendar2-week"></i>
-          <span>Lớp 246/357</span>
-        </button>
         <button type="button" class="vstep-admin-tab" data-vstep-flow="lesson_exam">
-          <i class="bi bi-clipboard2-pulse"></i>
-          <span>Bài học / buổi</span>
+          <i class="bi bi-journal-text"></i>
+          <span>Bài học</span>
         </button>
         <button type="button" class="vstep-admin-tab" data-vstep-panel="results">
           <i class="bi bi-bar-chart-line"></i>
@@ -108,7 +212,7 @@
         <div>
           <div class="vstep-admin-eyebrow">Admin Workspace / VSTEP / Lớp Học</div>
           <h1>Quản lý Lớp Học VSTEP</h1>
-          <p>Học viên, lớp 246/357, bài học theo buổi và deadline tự động.</p>
+          <p>Học viên, nhóm học và bài học theo 4 kỹ năng Reading / Listening / Writing / Speaking.</p>
         </div>
         <div class="vstep-admin-header-actions">
           <button type="button" class="btn btn-primary" id="newVstepSetBtn">
@@ -129,7 +233,7 @@
           <span class="vstep-metric-icon vstep-metric-lesson"><i class="bi bi-clipboard2-pulse"></i></span>
           <div>
             <strong id="vstepOverviewLessons">0</strong>
-            <small>Bài học / buổi</small>
+            <small>Bài học</small>
           </div>
         </div>
         <div class="vstep-admin-metric">
@@ -147,7 +251,7 @@
             <div class="vstep-panel-header vstep-panel-header-row">
               <div>
                 <strong><i class="bi bi-people me-1"></i>Nhóm học</strong>
-                <div class="vstep-help">HV đã vào nhóm học chỉ thấy bài học nhóm được giao, kèm deadline; nộp sau deadline vẫn ghi nhận nhưng đánh dấu trễ. HV chưa có nhóm học theo lớp/buổi như cũ. Mỗi HV chỉ ở 1 nhóm. Thứ tự: <strong>1.</strong> tạo nhóm → <strong>2.</strong> thêm học viên vào nhóm (tạo mới / import Excel ở khung bên dưới, chọn sẵn nhóm; hoặc chọn HV có sẵn trong nhóm) → <strong>3.</strong> giao bài học kèm Mở từ + Deadline.</div>
+                <div class="vstep-help">HV trong nhóm học thấy các bài nhóm được giao, kèm deadline; sau deadline vẫn làm được (đánh dấu trễ) tới "Mở đến". HV chưa có nhóm sẽ chưa thấy bài nào. Mỗi HV chỉ ở 1 nhóm. Thứ tự: <strong>1.</strong> tạo nhóm → <strong>2.</strong> thêm học viên vào nhóm (tạo mới / import Excel ở khung bên dưới, chọn sẵn nhóm; hoặc chọn HV có sẵn trong nhóm) → <strong>3.</strong> giao bài học kèm Mở từ + Deadline (+ Mở đến nếu cho làm trễ). Tick nhiều bài học đã giao để sửa lịch cùng lúc.</div>
               </div>
               <button type="button" class="btn btn-sm btn-outline-primary" id="vstepGroupReloadBtn">
                 <i class="bi bi-arrow-clockwise me-1"></i> Tải lại
@@ -457,213 +561,32 @@
           </div>
         </section>
 
-        <section class="vstep-admin-section" id="vstep-classes-panel">
-          <div class="vstep-admin-grid">
-            <article class="vstep-panel">
-              <div class="vstep-panel-header">
-                <div>
-                  <strong>Lớp học VSTEP</strong>
-                  <div class="vstep-help">B1=18 buổi, B2=24 buổi; lịch 246 hoặc 357; truy cập 6 tháng từ ngày khai giảng.</div>
-                </div>
-              </div>
-              <div class="vstep-panel-body">
-                <form id="vstepClassForm" class="vstep-builder-grid">
-                  <div id="vstepClassAlert" class="alert alert-info small mb-0">Tạo lớp trước, sau đó giao bài theo lớp hoặc học viên.</div>
-                  <div>
-                    <label class="form-label fw-semibold" for="vstep-class-title">Tên lớp</label>
-                    <input class="form-control" id="vstep-class-title" placeholder="VD: VSTEP B1 tối 2-4-6">
-                  </div>
-                  <div class="row g-3">
-                    <div class="col-md-4">
-                      <label class="form-label" for="vstep-class-band">Level</label>
-                      <select class="form-select" id="vstep-class-band">
-                        <option value="B1">B1</option>
-                        <option value="B2">B2</option>
-                      </select>
-                    </div>
-                    <div class="col-md-8">
-                      <label class="form-label" for="vstep-class-teacher">Giáo viên</label>
-                      <input class="form-control" id="vstep-class-teacher" placeholder="Tên giáo viên">
-                    </div>
-                  </div>
-                  <div class="row g-3">
-                    <div class="col-md-6">
-                      <label class="form-label" for="vstep-class-starts">Ngày khai giảng</label>
-                      <input type="datetime-local" class="form-control" id="vstep-class-starts">
-                      <div class="vstep-help mt-1">Phải rơi vào lịch 246 hoặc 357 đã chọn.</div>
-                    </div>
-                    <div class="col-md-6">
-                      <label class="form-label" for="vstep-class-ends">Ngày kết thúc (auto)</label>
-                      <input type="datetime-local" class="form-control" id="vstep-class-ends">
-                      <div class="vstep-help mt-1">Tự tính = ngày khai giảng + 6 tháng. Để trống để tự tính.</div>
-                    </div>
-                  </div>
-                  <div class="row g-3">
-                    <div class="col-md-4">
-                      <label class="form-label" for="vstep-class-schedule-type">Lịch học</label>
-                      <select class="form-select" id="vstep-class-schedule-type">
-                        <option value="246">246 (Thứ 2/4/6)</option>
-                        <option value="357">357 (Thứ 3/5/7)</option>
-                      </select>
-                    </div>
-                    <div class="col-md-4">
-                      <label class="form-label" for="vstep-class-start-time">Giờ học</label>
-                      <input type="time" class="form-control" id="vstep-class-start-time" value="18:00">
-                    </div>
-                    <div class="col-md-4">
-                      <label class="form-label" for="vstep-class-num-sessions">Số buổi</label>
-                      <input type="number" min="1" max="60" class="form-control" id="vstep-class-num-sessions" placeholder="B1=18, B2=24">
-                      <div class="vstep-help mt-1">Để trống để dùng mặc định theo band.</div>
-                    </div>
-                  </div>
-                  <div>
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                      <label class="form-label mb-0">Lịch buổi & deadline (preview)</label>
-                      <button type="button" class="btn btn-sm btn-outline-secondary" id="vstep-class-preview-btn">
-                        <i class="bi bi-arrow-clockwise me-1"></i> Tính lại
-                      </button>
-                    </div>
-                    <div id="vstep-class-sessions-preview" class="border rounded p-2 small bg-light" style="max-height:220px;overflow:auto;">
-                      <div class="text-secondary">Nhập ngày khai giảng để xem 18/24 buổi và deadline tự tính.</div>
-                    </div>
-                    <div class="vstep-help mt-1">Deadline = giờ bắt đầu buổi kế tiếp. Buổi cuối deadline = +2 ngày so với ngày học.</div>
-                  </div>
-                  <div>
-                    <label class="form-label">Ngày nghỉ</label>
-                    <div class="d-flex gap-2 mb-2">
-                      <input type="date" class="form-control form-control-sm" id="vstep-class-holiday-add-input" style="max-width:180px;">
-                      <button type="button" class="btn btn-sm btn-outline-primary" id="vstep-class-holiday-add-btn">
-                        <i class="bi bi-plus-circle me-1"></i>Thêm ngày nghỉ
-                      </button>
-                    </div>
-                    <div id="vstep-class-holidays-list" class="border rounded p-2 bg-light" style="min-height:42px;">
-                      <div class="text-secondary small">Chưa có ngày nghỉ. Bỏ tick để xóa.</div>
-                    </div>
-                    <!-- Hidden: admin_vstep.js đọc qua parseJsonField('vstep-class-holidays', []). -->
-                    <textarea class="d-none" id="vstep-class-holidays">[]</textarea>
-                  </div>
-                  <div>
-                    <label class="form-label">Học viên trong lớp</label>
-                    <input type="search" class="form-control form-control-sm mb-2" id="vstep-class-students-search" placeholder="Tìm học viên theo mã / tên / email">
-                    <div id="vstep-class-students-list" class="border rounded p-2 bg-light" style="max-height:240px;overflow:auto;">
-                      <div class="text-secondary small">Đang tải học viên...</div>
-                    </div>
-                    <div class="vstep-help mt-1">Tick để gán học viên vào lớp. Có thể tick nhiều.</div>
-                    <!-- Hidden: admin_vstep.js đọc qua selectedValues('vstep-class-students'). Module
-                         admin_vstep_class_lessons.js sync option.selected khi tick checkbox. -->
-                    <select class="d-none" id="vstep-class-students" multiple></select>
-                  </div>
-                  <button type="submit" class="btn btn-primary" id="saveVstepClassBtn">
-                    <i class="bi bi-calendar-plus me-1"></i> Tạo lớp
-                  </button>
-                </form>
-              </div>
-            </article>
-
-            <div class="vstep-builder-grid">
-              <article class="vstep-panel">
-                <div class="vstep-panel-header vstep-panel-header-row">
-                  <div>
-                    <strong>Danh sách lớp</strong>
-                    <div class="vstep-help">Theo dõi lớp, lịch và số học viên.</div>
-                  </div>
-                  <button type="button" class="btn btn-sm btn-outline-primary" id="refreshVstepClassesBtn">
-                    <i class="bi bi-arrow-clockwise me-1"></i> Tải lại
-                  </button>
-                </div>
-                <div class="vstep-panel-body">
-                  <div id="vstepClassesList" class="vstep-class-list">
-                    <div class="text-secondary small">Đang tải lớp...</div>
-                  </div>
-                </div>
-              </article>
-
-              <article class="vstep-panel">
-                <div class="vstep-panel-header">
-                  <div>
-                    <strong>Giao bài / deadline</strong>
-                    <div class="vstep-help">Giao bài học cho lớp hoặc từng học viên, kèm hạn nộp.</div>
-                  </div>
-                </div>
-                <div class="vstep-panel-body">
-                  <form id="vstepAssignmentForm" class="vstep-builder-grid">
-                    <div id="vstepAssignmentAlert" class="alert alert-info small mb-0">Chọn nội dung và lớp/học viên để giao.</div>
-                    <div>
-                      <label class="form-label" for="vstep-assignment-content">Nội dung</label>
-                      <select class="form-select" id="vstep-assignment-content"></select>
-                    </div>
-                    <div class="row g-3">
-                      <div class="col-md-6">
-                        <label class="form-label" for="vstep-assignment-class">Lớp</label>
-                        <select class="form-select" id="vstep-assignment-class"></select>
-                      </div>
-                      <div class="col-md-6">
-                        <label class="form-label" for="vstep-assignment-student">Hoặc học viên</label>
-                        <select class="form-select" id="vstep-assignment-student">
-                          <option value="">Theo lớp</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div class="row g-3">
-                      <div class="col-md-6">
-                        <label class="form-label" for="vstep-assignment-available">Mở lúc</label>
-                        <input type="datetime-local" class="form-control" id="vstep-assignment-available">
-                      </div>
-                      <div class="col-md-6">
-                        <label class="form-label" for="vstep-assignment-due">Deadline</label>
-                        <input type="datetime-local" class="form-control" id="vstep-assignment-due">
-                      </div>
-                    </div>
-                    <div>
-                      <label class="form-label" for="vstep-assignment-notes">Ghi chú</label>
-                      <input class="form-control" id="vstep-assignment-notes" placeholder="VD: BTVN buổi 3">
-                    </div>
-                    <button type="submit" class="btn btn-success" id="createVstepAssignmentBtn">
-                      <i class="bi bi-send-check me-1"></i> Giao bài
-                    </button>
-                  </form>
-                </div>
-              </article>
-            </div>
-          </div>
-        </section>
-
-        <!-- Panel grid 18/24 buổi cho 1 lớp cụ thể.
-             Hiển thị sau khi createClass thành công (event 'vstep:class-created')
-             hoặc khi admin click 1 card lớp trong vstep-classes-panel. -->
-        <section class="vstep-admin-section" id="vstep-class-sessions-panel">
-          <div class="vstep-panel">
-            <div class="vstep-panel-header vstep-panel-header-row">
-              <div>
-                <strong id="vstep-class-sessions-title">Bài học cho lớp</strong>
-                <div class="vstep-help" id="vstep-class-sessions-subtitle">Click từng buổi để tạo/sửa nội dung bài học.</div>
-              </div>
-              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.__VSTEP_LOP_HOC__?.backToClasses()">
-                <i class="bi bi-arrow-left me-1"></i> Về danh sách lớp
-              </button>
-            </div>
-            <div class="vstep-panel-body">
-              <!-- Container thường (KHÔNG có class vstep-session-grid) — JS sẽ
-                   inject tabs band + inner div .vstep-session-grid riêng để
-                   tránh outer grid stretch tabs theo cột 220px gây vỡ layout. -->
-              <div id="vstep-class-sessions-grid">
-                <div class="text-secondary small">Đang tải bài học theo buổi...</div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- Panel "Bài học theo buổi" duplicate đã được gộp vào panel trên
-             (line 553-573). Phần này được xoá để tránh 2 element cùng id
-             gây render lệch + grid layout vỡ. -->
-
         <section class="vstep-admin-section" id="vstep-content-panel">
+          <div class="vstep-admin-skill-board" id="vstepPracticeSkillSwitcher" aria-label="Chọn kỹ năng bài học">
+            <button type="button" class="vstep-admin-skill-option active" data-vstep-practice-skill="reading">
+              <span><i class="bi bi-book"></i> Reading</span>
+              <small>4 parts, passage và câu hỏi</small>
+            </button>
+            <button type="button" class="vstep-admin-skill-option" data-vstep-practice-skill="listening">
+              <span><i class="bi bi-headphones"></i> Listening</span>
+              <small>3 parts, audio và câu hỏi</small>
+            </button>
+            <button type="button" class="vstep-admin-skill-option" data-vstep-practice-skill="writing">
+              <span><i class="bi bi-pencil-square"></i> Writing</span>
+              <small>2 tasks, bài viết chấm tay</small>
+            </button>
+            <button type="button" class="vstep-admin-skill-option" data-vstep-practice-skill="speaking">
+              <span><i class="bi bi-mic"></i> Speaking</span>
+              <small>3 parts, thu âm và nộp bài</small>
+            </button>
+          </div>
+
           <div class="vstep-admin-layout">
             <aside class="vstep-panel vstep-content-index">
               <div class="vstep-panel-header vstep-panel-header-row">
                 <div>
-                  <strong id="vstepSetListTitle">Danh sách bài học / buổi</strong>
-                  <div class="vstep-help" id="vstepSetListHelp">Bài published sẽ được giao cho lớp / học viên qua form Giao bài.</div>
+                  <strong id="vstepSetListTitle">Reading - Bài học</strong>
+                  <div class="vstep-help" id="vstepSetListHelp">Đặt tên theo bài (VD: Bài 1 - Reading). Giao cho nhóm ở mục Học viên → Nhóm học.</div>
                 </div>
                 <button type="button" class="btn btn-sm btn-outline-primary" id="refreshVstepSetsBtn" aria-label="Tải lại bài học">
                   <i class="bi bi-arrow-clockwise"></i>
@@ -674,11 +597,7 @@
                   <i class="bi bi-search"></i>
                   <input type="search" class="form-control" id="vstepSetSearch" placeholder="Tìm bài học">
                 </div>
-                <div class="vstep-module-stats mb-3">
-                  <div><strong id="vstepStatTotal">0</strong><span>Tổng</span></div>
-                  <div><strong id="vstepStatPublished">0</strong><span>Published</span></div>
-                  <div><strong id="vstepStatDraft">0</strong><span>Draft</span></div>
-                </div>
+                <div class="small text-secondary mb-2"><strong id="vstepStatTotal">0</strong> bài học</div>
                 <div id="vstepSetList" class="vstep-set-list">
                   <div class="text-secondary small">Đang tải dữ liệu...</div>
                 </div>
@@ -689,8 +608,8 @@
               <div class="vstep-panel-header">
                 <div class="vstep-content-toolbar">
                   <div>
-                    <strong id="vstepFormTitle">Tạo bài học VSTEP mới</strong>
-                    <div class="vstep-help" id="vstepFormSubtitle">Bài học được giao cho lớp theo buổi với deadline tự động.</div>
+                    <strong id="vstepFormTitle">Tạo bài học Reading mới</strong>
+                    <div class="vstep-help" id="vstepFormSubtitle">Upload nội dung đúng cấu trúc Reading mà học viên đang làm ở trang Học theo bộ đề.</div>
                   </div>
                   <div class="vstep-admin-actions">
                     <button type="button" class="btn btn-outline-secondary btn-sm" id="resetVstepFormBtn">
@@ -707,18 +626,7 @@
               </div>
 
               <div class="vstep-panel-body">
-                <div id="vstep-content-context-banner" class="alert alert-info small mb-3 d-none"></div>
                 <form id="vstepSetForm" class="vstep-builder-grid">
-                  <!-- Hidden inputs: gắn lớp + buổi khi soạn bài từ flow "Tạo bài cho lớp X".
-                       admin_vstep_class_lessons.js set 3 input này, admin_vstep.js
-                       đọc qua window.__VSTEP_PAYLOAD_HOOK__ và push vào data jsonb. -->
-                  <!-- Hidden inputs cho shared blueprint: band + session_number.
-                       admin_vstep_class_lessons.js set khi admin click 1 buổi trong grid.
-                       class-id giữ lại cho backward compat (luôn để trống ở shared model). -->
-                  <input type="hidden" id="vstep-content-band" value="">
-                  <input type="hidden" id="vstep-content-session-number" value="">
-                  <input type="hidden" id="vstep-content-class-id" value="">
-                  <input type="hidden" id="vstep-content-due-at" value="">
                   <div class="vstep-form-section">
                     <div class="vstep-form-section-title">
                       <i class="bi bi-sliders"></i>
@@ -727,31 +635,43 @@
                     <div class="row g-3">
                       <div class="col-xl-4">
                         <label class="form-label fw-semibold" for="vstep-title">Tên bài học</label>
-                        <input type="text" class="form-control" id="vstep-title" placeholder="VD: Buổi 7 - Listening B1" required>
+                        <input type="text" class="form-control" id="vstep-title" placeholder="VD: Bài 1 - Reading" required>
                       </div>
                       <div class="col-xl-3">
                         <label class="form-label fw-semibold" for="vstep-description">Mô tả</label>
                         <input type="text" class="form-control" id="vstep-description" placeholder="Ghi chú nội bộ">
                       </div>
+                      <!-- vstep-flow ẩn — hardcode 'lesson_exam' bởi mode='lophoc'. -->
                       <input type="hidden" id="vstep-flow" value="lesson_exam">
-                      <input type="hidden" id="vstep-practice-skill" value="full_test">
-                      <!-- Hidden inputs class-id/session-number/due-at đã được đặt ở
-                           ngay sau panel header (line 619) — KHÔNG khai báo lại ở đây. -->
-                      <div class="col-md-4 col-xl-3">
-                        <label class="form-label fw-semibold" for="vstep-content-kind">Loại</label>
-                        <select class="form-select" id="vstep-content-kind">
-                          <option value="lesson">Bài học</option>
-                          <option value="assigned_exam">Bài thi giao</option>
+                      <div class="col-md-4 col-xl-2">
+                        <label class="form-label fw-semibold" for="vstep-practice-skill">Kỹ năng đang quản lý</label>
+                        <select class="form-select" id="vstep-practice-skill">
+                          <option value="reading">Reading set</option>
+                          <option value="listening">Listening set</option>
+                          <option value="writing">Writing set</option>
+                          <option value="speaking">Speaking set</option>
                         </select>
                       </div>
-                      <div class="col-md-4 col-xl-2">
-                        <label class="form-label fw-semibold" for="vstep-status">Trạng thái</label>
-                        <select class="form-select" id="vstep-status">
-                          <option value="draft">draft</option>
-                          <option value="published">published</option>
-                        </select>
+                      <!-- vstep-content-kind cố định 'lesson' cho Lớp học. -->
+                      <input type="hidden" id="vstep-content-kind" value="lesson">
+                    </div>
+                  </div>
+
+                  <div class="vstep-form-section">
+                    <div class="vstep-form-section-title">
+                      <i class="bi bi-sort-numeric-down"></i>
+                      <span>Thứ tự bài</span>
+                    </div>
+                    <!-- Nhóm L&R / S&W tự theo kỹ năng (dùng cho thống kê trang học viên). -->
+                    <input type="hidden" id="vstep-onthi-track" value="lr">
+                    <div class="row g-3">
+                      <div class="col-md-6 col-xl-3">
+                        <label class="form-label" for="vstep-onthi-order">Thứ tự (số bài)</label>
+                        <input type="number" min="1" class="form-control" id="vstep-onthi-order" placeholder="VD: 1">
                       </div>
                     </div>
+                    <div class="vstep-help mt-2">Thứ tự sắp xếp bài trên trang học viên. Lịch mở bài, deadline và "Mở đến" giao theo từng
+                      <strong>Nhóm học</strong> (mục Học viên → Nhóm học).</div>
                   </div>
 
                   <div class="vstep-form-section">
@@ -760,19 +680,19 @@
                       <span>Thời lượng</span>
                     </div>
                     <div class="row g-3">
-                      <div class="col-6 col-lg-3">
+                      <div class="col-6 col-lg-3" data-vstep-duration-skill="listening">
                         <label class="form-label" for="vstep-duration-listening">Listening phút</label>
                         <input type="number" min="1" class="form-control" id="vstep-duration-listening" value="45">
                       </div>
-                      <div class="col-6 col-lg-3">
+                      <div class="col-6 col-lg-3" data-vstep-duration-skill="reading">
                         <label class="form-label" for="vstep-duration-reading">Reading phút</label>
                         <input type="number" min="1" class="form-control" id="vstep-duration-reading" value="60">
                       </div>
-                      <div class="col-6 col-lg-3">
+                      <div class="col-6 col-lg-3" data-vstep-duration-skill="writing">
                         <label class="form-label" for="vstep-duration-writing">Writing phút</label>
                         <input type="number" min="1" class="form-control" id="vstep-duration-writing" value="60">
                       </div>
-                      <div class="col-6 col-lg-3">
+                      <div class="col-6 col-lg-3" data-vstep-duration-skill="speaking">
                         <label class="form-label" for="vstep-duration-speaking">Speaking phút</label>
                         <input type="number" min="1" class="form-control" id="vstep-duration-speaking" value="12">
                       </div>
@@ -826,38 +746,59 @@
           </div>
         </section>
 
+        <!-- TAB: BỘ ĐỀ TỔNG HỢP (ghép 4 kỹ năng) -->
         <section class="vstep-admin-section" id="vstep-results-panel">
           <div class="vstep-panel">
-            <div class="vstep-panel-header vstep-panel-header-row">
+            <div class="vstep-panel-header">
               <div>
-                <strong>Kết quả Lớp Học VSTEP</strong>
-                <div class="vstep-help">Bài nộp ở phân khu Học tập VSTEP, lọc được theo lớp.</div>
-              </div>
-              <div class="vstep-admin-actions">
-                <div class="vstep-filter-row vstep-filter-row-compact">
-                  <i class="bi bi-search"></i>
-                  <input type="search" class="form-control form-control-sm" id="vstepResultSearch" placeholder="Tìm kết quả">
-                </div>
-                <select class="form-select form-select-sm" id="vstepResultClassFilter">
-                  <option value="">Tất cả lớp</option>
-                </select>
-                <button type="button" class="btn btn-sm btn-outline-success" id="exportVstepResultsBtn" title="Xuất kết quả theo lớp ra Excel/CSV">
-                  <i class="bi bi-file-earmark-excel me-1"></i> Xuất Excel
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-primary" id="refreshVstepResultsBtn">
-                  <i class="bi bi-arrow-clockwise me-1"></i> Tải lại
-                </button>
+                <strong>Kết quả Lớp học VSTEP</strong>
+                <div class="vstep-help">Bài nộp ở phân khu Lớp học VSTEP — lọc theo nhóm học, band, loại bài, tên.</div>
               </div>
             </div>
             <div class="vstep-panel-body">
-              <div class="table-responsive vstep-table-shell">
-                <table class="table table-hover align-middle mb-0">
+              <!-- Filter bar — class/band/type/search/refresh/export -->
+              <div class="vstep-results-filter-bar mb-3">
+                <select class="form-select form-select-sm" id="vstepResultClassFilter" title="Lọc theo nhóm học">
+                  <option value="">Tất cả nhóm học</option>
+                </select>
+                <select class="form-select form-select-sm" id="vstepResultBandFilter" title="Lọc theo band">
+                  <option value="">Tất cả band</option>
+                  <option value="B1">B1</option>
+                  <option value="B2">B2</option>
+                </select>
+                <select class="form-select form-select-sm" id="vstepResultTypeFilter" title="Lọc theo loại bài có chấm tay">
+                  <option value="">Tất cả loại</option>
+                  <option value="writing">Có Writing</option>
+                  <option value="speaking">Có Speaking</option>
+                  <option value="pending">Chờ chấm tay</option>
+                </select>
+                <div class="vstep-filter-row vstep-filter-row-compact flex-grow-1">
+                  <i class="bi bi-search"></i>
+                  <input type="search" class="form-control form-control-sm" id="vstepResultSearch" placeholder="Tìm theo mã HV / tên / email / nội dung">
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="refreshVstepResultsBtn" title="Tải lại">
+                  <i class="bi bi-arrow-clockwise"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-success" id="exportVstepResultsBtn" title="Xuất Excel/CSV">
+                  <i class="bi bi-file-earmark-spreadsheet me-1"></i> Xuất Excel
+                </button>
+              </div>
+
+              <div class="vstep-results-table-shell" id="vstepResultsTableShell">
+                <table class="table table-hover align-middle">
                   <thead>
                     <tr>
-                      <th>Thời gian</th>
-                      <th>Học viên</th>
+                      <th style="width:48px;">STT</th>
+                      <th>Ngày nộp</th>
+                      <th>Mã HV</th>
+                      <th>Email</th>
+                      <th>Họ tên</th>
+                      <th>SĐT</th>
+                      <th>Ngày KG</th>
+                      <th>Ngày KT</th>
+                      <th>Band</th>
+                      <th>Loại bài</th>
                       <th>Nội dung</th>
-                      <th>Nhóm</th>
                       <th>Điểm tự động</th>
                       <th>Chấm tay</th>
                       <th></th>
@@ -865,48 +806,57 @@
                   </thead>
                   <tbody id="vstepResultsTableBody">
                     <tr>
-                      <td colspan="7" class="text-center text-muted py-3">Đang tải kết quả...</td>
+                      <td colspan="14" class="text-center text-muted py-3">Đang tải kết quả...</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
+
+              <div id="vstepResultsEmpty" class="vstep-results-empty" style="display:none;">
+                <i class="bi bi-inboxes"></i>
+                <div>Chưa có bài nộp Lớp học VSTEP phù hợp.</div>
+              </div>
+
+              <div class="vstep-results-summary" id="vstepResultsSummary">
+                <span class="chip"><strong id="vstepResultsCountTotal">0</strong>lượt nộp</span>
+                <span class="chip"><strong id="vstepResultsCountStudents">0</strong>học viên</span>
+                <span class="chip"><strong id="vstepResultsCountGraded">0</strong>đã chấm tay</span>
+                <span class="chip"><strong id="vstepResultsCountPending">0</strong>chờ chấm tay</span>
+              </div>
             </div>
           </div>
         </section>
-      </main>
-    </div>
-  </div>
 
-  <div class="modal fade" id="vstepResultDetailModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="vstepResultModalTitle">Chi tiết bài nộp</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <div class="row g-3">
-            <div class="col-12 col-lg-7">
-              <div class="border rounded p-3 h-100 bg-white">
-                <div id="vstepResultModalMeta" class="submission-detail-meta"></div>
-                <div id="vstepResultModalContent"></div>
+        <!-- Modal chi tiết bài nộp Lớp học VSTEP — dùng cho mọi loại submission -->
+        <div class="modal fade" id="vstepResultDetailModal" tabindex="-1" aria-labelledby="vstepResultModalTitle" aria-hidden="true">
+          <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="vstepResultModalTitle">Chi tiết bài nộp</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
               </div>
-            </div>
-            <div class="col-12 col-lg-5">
-              <div class="border rounded p-3 h-100 bg-white">
-                <h6 class="mb-3">Chấm điểm admin</h6>
-                <div id="vstepResultModalGrading"></div>
+              <div class="modal-body">
+                <div id="vstepResultModalMeta" class="submission-detail-meta"></div>
+
+                <!-- Grading box — JS (buildResultGradeForm) inject input điểm + textarea feedback -->
+                <div class="vstep-modal-grading mb-3" id="vstepResultModalGrading"></div>
+
+                <!-- Save button — JS gắn handler qua refs.resultModalSaveBtn -->
+                <div class="text-end mb-3">
+                  <button type="button" class="btn btn-sm btn-success" id="saveVstepGradeBtnModal">
+                    <i class="bi bi-check2-circle me-1"></i> Lưu chấm tay
+                  </button>
+                </div>
+
+                <div id="vstepResultModalContent" class="mt-3"></div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Đóng</button>
               </div>
             </div>
           </div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Đóng</button>
-          <button type="button" class="btn btn-primary btn-sm" id="saveVstepGradeBtnModal">
-            <i class="bi bi-save me-1"></i>Lưu chấm điểm
-          </button>
-        </div>
-      </div>
+      </main>
     </div>
   </div>
 
@@ -981,9 +931,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
   <script src="js/auth.js"></script>
   <script>window.__VSTEP_ADMIN_MODE__ = 'lophoc';</script>
-  <script src="js/vstep_session_blueprints.js"></script>
   <script src="js/admin_vstep.js"></script>
-  <script src="js/admin_vstep_class_lessons.js"></script>
     <script src="js/rich_toolbar.js"></script>
 </body>
 
