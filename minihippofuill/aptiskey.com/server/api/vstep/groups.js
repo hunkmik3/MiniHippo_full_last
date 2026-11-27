@@ -4,18 +4,21 @@
 //   POST /api/vstep/groups/save               { id?, program, title, band, notes }
 //   POST /api/vstep/groups/delete             { id }
 //   POST /api/vstep/groups/members            { groupId, studentIds, action: 'add'|'remove' }
-//   POST /api/vstep/groups/assign             { groupId, contentIds, availableFrom, dueAt }
-//   POST /api/vstep/groups/unassign           { groupId, contentId }
+//   POST /api/vstep/groups/assign             { groupId, contentIds, availableFrom, dueAt, closeAt, keepEmpty? }
+//        keepEmpty = true (sửa hàng loạt): ô để trống giữ nguyên giá trị cũ của từng bài.
+//   POST /api/vstep/groups/unassign           { groupId, contentId | contentIds }
 import { parseJsonBody } from '../_utils/parseBody.js';
 import { verifyAdminRequest } from '../_utils/auth.js';
-import { deleteFrom, insertInto, selectFrom, updateTable } from '../_utils/supabase.js';
+import { deleteFrom, insertInto, selectFrom, updateTable, upsertInto } from '../_utils/supabase.js';
 import { vstepSchemaErrorResponse } from './_utils.js';
 import {
   FLOW_BY_GROUP_KIND,
   GROUP_KIND_BY_PROGRAM,
   addStudentsToGroup,
   findStudyGroup,
-  groupKindOf
+  groupKindOf,
+  isMissingCloseAtError,
+  selectGroupAssignments
 } from './_onthi_groups.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -85,8 +88,7 @@ export async function listGroups(req, res) {
           columns: 'id,class_id,student_id,user_id',
           filters: [inFilter('class_id', ids), { column: 'status', value: 'active' }]
         }),
-        selectFrom('vstep_assignments', {
-          columns: 'id,class_id,content_id,available_from,due_at',
+        selectGroupAssignments({
           filters: [inFilter('class_id', ids), { column: 'status', value: 'active' }],
           order: { column: 'due_at', asc: true }
         })
@@ -173,6 +175,19 @@ export async function updateMembers(req, res) {
   });
 }
 
+const CLOSE_AT_SQL_HINT = 'Database chưa có cột "Mở đến" (close_at). Chạy file SUPABASE_VSTEP_CLOSE_AT.sql trong Supabase SQL Editor rồi thử lại.';
+
+function checkOrder(fromIso, dueIso, closeIso) {
+  const t = (v) => (v ? Date.parse(v) : null);
+  const from = t(fromIso);
+  const due = t(dueIso);
+  const close = t(closeIso);
+  if (from !== null && due !== null && from >= due) return '"Mở từ" phải trước deadline.';
+  if (close !== null && due !== null && close < due) return '"Mở đến" phải sau (hoặc bằng) deadline.';
+  if (close !== null && from !== null && close <= from) return '"Mở đến" phải sau "Mở từ".';
+  return '';
+}
+
 export async function assignContents(req, res) {
   return withAdmin(req, res, 'POST', async (body, admin) => {
     const group = await findGroup(body.groupId);
@@ -181,10 +196,11 @@ export async function assignContents(req, res) {
     if (!contentIds) return badRequest(res, 'Chọn ít nhất 1 bộ đề.');
     const availableFrom = parseInstant(body.availableFrom);
     const dueAt = parseInstant(body.dueAt);
-    if (availableFrom === undefined || dueAt === undefined) return badRequest(res, 'Ngày giờ không hợp lệ.');
-    if (availableFrom && dueAt && Date.parse(availableFrom) >= Date.parse(dueAt)) {
-      return badRequest(res, '"Mở từ" phải trước deadline.');
+    const closeAt = parseInstant(body.closeAt);
+    if (availableFrom === undefined || dueAt === undefined || closeAt === undefined) {
+      return badRequest(res, 'Ngày giờ không hợp lệ.');
     }
+    const keepEmpty = body.keepEmpty === true;
 
     // Nhóm ôn chỉ nhận bộ đề Ôn thi, nhóm học chỉ nhận bài học Lớp học.
     const flow = FLOW_BY_GROUP_KIND[groupKindOf(group)];
@@ -197,28 +213,65 @@ export async function assignContents(req, res) {
       return badRequest(res, flow === 'practice' ? 'Bộ đề không thuộc khu Ôn thi.' : 'Bài không thuộc khu Lớp học.');
     }
 
-    const existing = await selectFrom('vstep_assignments', {
-      columns: 'id,content_id',
+    const existing = await selectGroupAssignments({
       filters: [{ column: 'class_id', value: group.id }, inFilter('content_id', practiceIds)]
     });
-    const existingByContent = new Map((existing || []).map((a) => [a.content_id, a.id]));
+    const existingByContent = new Map((existing || []).map((a) => [a.content_id, a]));
     const now = new Date().toISOString();
-    const schedule = { available_from: availableFrom, due_at: dueAt, status: 'active', updated_at: now };
 
-    const toUpdate = practiceIds.filter((id) => existingByContent.has(id)).map((id) => existingByContent.get(id));
-    if (toUpdate.length) {
-      await updateTable('vstep_assignments', [inFilter('id', toUpdate)], schedule);
+    // Lịch cuối cùng của từng bài (sửa hàng loạt: ô trống = giữ giá trị cũ của bài đó).
+    const scheduleFor = (old) => {
+      const pick = (value, key) => (keepEmpty && value === null ? (old?.[key] ?? null) : value);
+      return {
+        available_from: pick(availableFrom, 'available_from'),
+        due_at: pick(dueAt, 'due_at'),
+        close_at: pick(closeAt, 'close_at')
+      };
+    };
+    for (const id of practiceIds) {
+      const sched = scheduleFor(existingByContent.get(id));
+      const problem = checkOrder(sched.available_from, sched.due_at, sched.close_at);
+      if (problem) return badRequest(res, problem);
     }
+
+    // Bài đã giao: ghi lịch mới của TẤT CẢ trong 1 request (upsert theo id) — sửa hàng
+    // loạt nhiều bài có lịch cũ khác nhau không vượt giới hạn 50 subrequest của Cloudflare.
+    const updateRows = practiceIds.filter((cid) => existingByContent.has(cid)).map((cid) => {
+      const old = existingByContent.get(cid);
+      return { id: old.id, class_id: group.id, content_id: cid, ...scheduleFor(old), status: 'active', updated_at: now };
+    });
     const toInsert = practiceIds.filter((id) => !existingByContent.has(id));
-    if (toInsert.length) {
-      await insertInto('vstep_assignments', toInsert.map((contentId) => ({
-        ...schedule,
-        class_id: group.id,
-        content_id: contentId,
-        assigned_by: admin?.id || null
-      })));
+    const withoutCloseAt = (row) => {
+      const { close_at: _ignored, ...rest } = row;
+      return rest;
+    };
+
+    const write = async (useCloseAt) => {
+      if (updateRows.length) {
+        await upsertInto('vstep_assignments', useCloseAt ? updateRows : updateRows.map(withoutCloseAt), { onConflict: 'id' });
+      }
+      if (toInsert.length) {
+        const sched = scheduleFor(null);
+        const row = { ...sched, status: 'active', updated_at: now, class_id: group.id, assigned_by: admin?.id || null };
+        await insertInto('vstep_assignments', toInsert.map((contentId) => ({
+          ...(useCloseAt ? row : withoutCloseAt(row)),
+          content_id: contentId
+        })));
+      }
+    };
+    try {
+      await write(true);
+    } catch (error) {
+      if (!isMissingCloseAtError(error)) throw error;
+      // Chưa chạy SQL thêm cột: vẫn lưu Mở từ / Deadline; chỉ báo lỗi nếu admin có nhập "Mở đến".
+      if (closeAt) return badRequest(res, CLOSE_AT_SQL_HINT);
+      await write(false);
     }
-    return res.status(200).json({ success: true, assigned: toInsert.length, updated: toUpdate.length });
+    return res.status(200).json({
+      success: true,
+      assigned: toInsert.length,
+      updated: practiceIds.length - toInsert.length
+    });
   });
 }
 
@@ -226,11 +279,12 @@ export async function unassignContent(req, res) {
   return withAdmin(req, res, 'POST', async (body) => {
     const group = await findGroup(body.groupId);
     if (!group) return res.status(404).json({ error: 'Không tìm thấy nhóm ôn.' });
-    if (!UUID_RE.test(String(body.contentId || ''))) return badRequest(res, 'Thiếu bộ đề.');
+    const contentIds = Array.isArray(body.contentIds) ? uuidList(body.contentIds) : uuidList([body.contentId]);
+    if (!contentIds) return badRequest(res, 'Thiếu bộ đề.');
     await deleteFrom('vstep_assignments', [
       { column: 'class_id', value: group.id },
-      { column: 'content_id', value: body.contentId }
+      inFilter('content_id', contentIds)
     ]);
-    return res.status(200).json({ success: true });
+    return res.status(200).json({ success: true, removed: contentIds.length });
   });
 }

@@ -3,7 +3,7 @@
 
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>Học tập VSTEP - Mini Hippo</title>
+  <title>Tiến độ học tập VSTEP - Mini Hippo</title>
   <link rel="icon" href="images/favicon.ico" type="image/x-icon">
 
   <script src="js/home.js"></script>
@@ -12,7 +12,7 @@
   <meta name="color-scheme" content="light dark" />
   <meta name="theme-color" content="#007bff" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)" />
-  <meta name="title" content="Học tập VSTEP - Mini Hippo" />
+  <meta name="title" content="Tiến độ học tập VSTEP - Mini Hippo" />
   <meta name="author" content="Mini Hippo" />
   <meta name="description" content="Phân khu học tập VSTEP cho lớp, bài học, bài thi được giao và deadline." />
   <link rel="preload" href="css/adminlte/adminlte.css" as="style" />
@@ -70,8 +70,8 @@
             aria-label="VSTEP navigation" data-accordion="false" id="navigation">
             <li class="nav-item">
               <a href="vstep_lessons.html" class="nav-link active">
-                <i class="nav-icon bi bi-clipboard2-pulse"></i>
-                <p>Bài học được giao</p>
+                <i class="nav-icon bi bi-speedometer2"></i>
+                <p>Tiến độ học tập</p>
               </a>
             </li>
             <li class="nav-item">
@@ -112,62 +112,68 @@
       <div class="app-content">
         <div class="container-fluid">
           <div id="content-wrapper" class="d-flex flex-column">
-            <div class="container my-3 vstep-list-page">
-              <div class="vstep-bode-hero vstep-learning-hero mb-4">
-                <div>
-                  <div class="text-uppercase fw-bold small text-primary mb-1">Mini Hippo / VSTEP</div>
-                  <h1 class="text-center text-md-start mb-2">Học tập VSTEP</h1>
-                  <p class="text-secondary mb-0">Theo dõi lớp học, lịch học, bài được giao và deadline trong module VSTEP riêng.</p>
+            <section class="container my-3">
+              <section class="vstep-onthi-dashboard mb-4" aria-label="Tiến độ học tập VSTEP">
+                <div class="vstep-onthi-head">
+                  <div class="vstep-onthi-heading">
+                    <h1 class="vstep-onthi-title">TIẾN ĐỘ HỌC TẬP</h1>
+                    <p class="vstep-onthi-disclaimer mb-0">Lớp học VSTEP — Mini Hippo</p>
+                    <div class="mt-2" id="vstepLessonGroupInfo"></div>
+                  </div>
+                  <div class="vstep-onthi-head-actions">
+                    <a href="vstep_history.html" class="btn btn-outline-primary fw-semibold">
+                      <i class="bi bi-clock-history me-1"></i> Lịch sử bài học
+                    </a>
+                    <button type="button" class="btn btn-outline-primary fw-semibold" id="reloadVstepListBtn">
+                      <i class="bi bi-arrow-clockwise me-1"></i> Tải lại
+                    </button>
+                  </div>
                 </div>
-                <div class="d-flex flex-wrap gap-2">
-                  <a href="vstep_history.html" class="btn btn-outline-primary">
-                    <i class="bi bi-clock-history me-1"></i> Lịch sử bài học
-                  </a>
-                  <a href="vstep_home.html" class="btn btn-outline-secondary">
-                    <i class="bi bi-house-door me-1"></i> Trang VSTEP
-                  </a>
-                  <button type="button" class="btn btn-primary fw-semibold" id="reloadVstepListBtn">
-                    <i class="bi bi-arrow-clockwise me-1"></i> Tải lại
-                  </button>
-                </div>
-              </div>
 
-              <div class="vstep-learning-grid mb-4">
-                <div class="vstep-learning-card">
-                  <i class="bi bi-calendar2-week"></i>
-                  <div>
-                    <strong>Lịch lớp</strong>
-                    <span>Thời gian học, ngày nghỉ và thông tin giáo viên.</span>
+                <div class="vstep-progress-wrap">
+                  <div class="vstep-progress-head">
+                    <span class="vstep-progress-badge" id="vstepProgressBadge">0%</span>
+                    <span class="vstep-progress-label">Tiến độ học tập</span>
+                    <span class="vstep-progress-count" id="vstepProgressCount">0/0 bài</span>
                   </div>
+                  <div class="vstep-progress-track" id="vstepProgressTrack"></div>
                 </div>
-                <div class="vstep-learning-card">
-                  <i class="bi bi-hourglass-split"></i>
-                  <div>
-                    <strong>Deadline</strong>
-                    <span>Bài được giao có hạn nộp và trạng thái rõ ràng.</span>
-                  </div>
-                </div>
-                <div class="vstep-learning-card">
-                  <i class="bi bi-chat-square-text"></i>
-                  <div>
-                    <strong>Nhận xét</strong>
-                    <span>Giáo viên chấm và phản hồi bài Writing/Speaking.</span>
-                  </div>
-                </div>
-              </div>
 
-              <div class="mb-4">
-                <div id="vstepClassInfo" class="vstep-class-summary mb-4"></div>
-                <div class="d-flex flex-column flex-md-row justify-content-between gap-2 align-items-md-center mb-3">
-                  <h2 class="text-success fs-4 mb-0">
-                    <i class="bi bi-clipboard2-pulse me-2"></i>Bài học và bài thi được giao
-                  </h2>
-                  <span class="badge text-bg-light border">Phân khu học tập VSTEP</span>
+                <p class="text-secondary small mb-3" id="vstepLessonState">Đang tải tiến độ, deadline và điểm đã nộp...</p>
+
+                <div class="vstep-onthi-band vstep-onthi-band-lr">
+                  <i class="bi bi-headphones"></i><span>LISTENING &amp; READING</span>
                 </div>
-                <div id="vstepListState" class="alert alert-info">Đang tải danh sách học tập VSTEP...</div>
-                <div id="vstepListGrid" class="row vstep-list-grid"></div>
-              </div>
-            </div>
+                <div class="vstep-onthi-stats" id="vstepStatsLR"></div>
+
+                <div class="vstep-onthi-band vstep-onthi-band-sw">
+                  <i class="bi bi-pencil-square"></i><span>SPEAKING &amp; WRITING</span>
+                </div>
+                <div class="vstep-onthi-stats" id="vstepStatsSW"></div>
+
+                <div class="table-responsive vstep-onthi-result-shell mt-3">
+                  <table class="table vstep-onthi-table align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>STT</th>
+                        <th>BÀI HỌC</th>
+                        <th>KỸ NĂNG</th>
+                        <th>DEADLINE</th>
+                        <th>TRẠNG THÁI</th>
+                        <th>ĐIỂM</th>
+                        <th>THOÁT RA KHỎI TAB</th>
+                        <th>BẮT ĐẦU</th>
+                      </tr>
+                    </thead>
+                    <tbody id="vstepLessonResultBody">
+                      <tr>
+                        <td colspan="8" class="text-center text-secondary py-3">Đang tải dữ liệu lớp học...</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </section>
           </div>
         </div>
       </div>

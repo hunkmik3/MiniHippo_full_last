@@ -68,9 +68,9 @@
 
 	    function cacheSet(set) {
 	        if (!set || !set.id) return;
-	        // KHÔNG cache bộ đề tổng hợp: bản list chưa gộp 4 kỹ năng, cache lại sẽ
-	        // khiến trang thi hiển thị rỗng. Trang thi sẽ gọi get.js để gộp.
-	        if (set.data && set.data.combined_refs) {
+	        // KHÔNG cache bộ đề tổng hợp / bản tóm tắt (danh sách không kèm câu hỏi):
+	        // trang thi sẽ gọi get.js lấy đủ nội dung.
+	        if ((set.data && set.data.combined_refs) || set.summary) {
 	            try { sessionStorage.setItem('vstep_last_set_id', set.id); } catch (_) {}
 	            return;
 	        }
@@ -332,8 +332,12 @@
 	                }
 	            }
 
+	            // Trễ deadline nhưng còn trong "mở đến" → vẫn làm được, ghi rõ hạn đóng đề.
+	            const closeHint = access.open && overdue && meta.accessUntil
+	                ? `<div class="small text-secondary">Mở đến ${escapeHtml(formatDateTime(meta.accessUntil))}</div>`
+	                : '';
 	            const action = access.open
-	                ? `<a class="vstep-start-link" href="${escapeHtml(examUrl(set))}" data-id="${escapeHtml(set.id)}">${done ? 'Làm lại' : 'Làm bài'}</a>`
+	                ? `<a class="vstep-start-link" href="${escapeHtml(examUrl(set))}" data-id="${escapeHtml(set.id)}">${done ? 'Làm lại' : 'Làm bài'}</a>${closeHint}`
 	                : `<span class="text-secondary small">${escapeHtml(access.label)}</span>`;
 
 	            return `
@@ -427,7 +431,7 @@
 	            refs.resultBody.innerHTML = '<tr><td colspan="6" class="text-center text-secondary py-3">Đang tải dữ liệu ôn thi...</td></tr>';
 	        }
 	        try {
-	            const response = await fetch(`/api/vstep/contents/list?flow=${encodeURIComponent(FLOW)}&status=published`, {
+	            const response = await fetch(`/api/vstep/contents/list?flow=${encodeURIComponent(FLOW)}&status=published&view=summary`, {
 	                headers: authorizedHeaders()
 	            });
 	            const result = await response.json();
@@ -435,7 +439,7 @@
 	            const allSets = sortPracticeSets(result.sets || []);
 	            let results = [];
 	            if (refs.resultBody) {
-	                const resultsResponse = await fetch('/api/vstep/results/my-list?flow=practice&limit=300', {
+	                const resultsResponse = await fetch('/api/vstep/results/my-list?flow=practice&limit=300&view=summary', {
 	                    headers: authorizedHeaders()
 	                });
 	                const resultsPayload = await resultsResponse.json().catch(() => ({}));
