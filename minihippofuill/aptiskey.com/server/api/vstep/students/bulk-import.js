@@ -64,6 +64,25 @@ async function resolveUniqueUsername(baseUsername) {
   return `${baseUsername}_${Math.random().toString(36).slice(2)}`;
 }
 
+function isEmailExistsError(error) {
+  return error?.details?.error_code === 'email_exists'
+    || /already been registered/i.test(String(error?.message || ''));
+}
+
+// id tài khoản đăng nhập (auth) theo email — chỉ dùng khi tạo bị báo "email đã tồn
+// tại" mà không có hồ sơ users (tài khoản dở dang). Duyệt danh sách admin theo trang.
+async function findAuthUserIdByEmail(email) {
+  const target = String(email || '').toLowerCase();
+  for (let page = 1; page <= 10; page += 1) {
+    const data = await callSupabaseAuth(`admin/users?page=${page}&per_page=1000`, { method: 'GET' }, { useAnonKey: false });
+    const users = Array.isArray(data?.users) ? data.users : [];
+    const found = users.find((u) => String(u?.email || '').toLowerCase() === target);
+    if (found) return found.id;
+    if (users.length < 1000) break;
+  }
+  return null;
+}
+
 async function createOrUpdateStudent(row, batchId, defaultLearningProgram = 'vstep_lophoc') {
   const accountCode = clean(row.accountCode || row.account_code || row.ma || row.code);
   let email = clean(row.email);
@@ -183,26 +202,62 @@ async function createOrUpdateStudent(row, batchId, defaultLearningProgram = 'vst
   // vừa tạo (cascade dọn users) để không để lại tài khoản mồ côi gây kẹt lần import sau.
   // Username PHẢI UNIQUE trên public.users — nếu trùng (do orphan cũ, module khác đã chiếm,
   // hay case mismatch khiến diagnostic SQL không tìm thấy) → tự suffix để insert không kẹt.
+  //
+  // Tài khoản DỞ DANG (lần import trước bị ngắt giữa chừng — vd vượt giới hạn
+  // subrequest của Cloudflare): đã có auth (+ có thể có users) nhưng chưa có
+  // vstep_students → NHẬN LẠI thay vì báo "email đã đăng ký". Chỉ nhận khi hồ sơ
+  // trống hoặc là VSTEP; email đang thuộc tài khoản Aptis/Lớp học thì vẫn báo lỗi.
+  const existingProfile = await selectFrom('users', {
+    columns: 'id,course,username',
+    filters: [{ column: 'email', value: email }],
+    single: true
+  });
+  const profileCourse = String(existingProfile?.course || '').trim();
+  if (existingProfile && profileCourse && profileCourse.toLowerCase() !== 'vstep') {
+    throw new Error(`Email này đang dùng cho tài khoản ${profileCourse} — dùng email khác cho VSTEP.`);
+  }
+
   const baseUsername = clean(row.username || accountCode || email.split('@')[0]);
-  const username = await resolveUniqueUsername(baseUsername);
-  let authUser = null;
+  const username = existingProfile?.username || await resolveUniqueUsername(baseUsername);
+  let authUser = null;          // chỉ có khi VỪA TẠO MỚI (để rollback nếu lỗi)
+  let authUserId = existingProfile?.id || null;
   try {
-    authUser = await callSupabaseAuth(
-      'admin/users',
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          email,
-          password,
-          email_confirm: true,
-          user_metadata: { username }
-        })
-      },
-      { useAnonKey: false }
-    );
+    if (!authUserId) {
+      try {
+        authUser = await callSupabaseAuth(
+          'admin/users',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              email,
+              password,
+              email_confirm: true,
+              user_metadata: { username }
+            })
+          },
+          { useAnonKey: false }
+        );
+        authUserId = authUser.id;
+      } catch (createError) {
+        if (!isEmailExistsError(createError)) throw createError;
+        authUserId = await findAuthUserIdByEmail(email);
+        if (!authUserId) throw createError;
+      }
+    }
+    if (!authUser) {
+      // Nhận lại tài khoản dở dang: đặt mật khẩu theo file import để HV đăng nhập được.
+      await callSupabaseAuth(
+        `admin/users/${authUserId}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ password, email_confirm: true, user_metadata: { username } })
+        },
+        { useAnonKey: false }
+      );
+    }
 
     const publicUserPayload = {
-      id: authUser.id,
+      id: authUserId,
       email,
       username,
       role: 'user',
@@ -224,7 +279,7 @@ async function createOrUpdateStudent(row, batchId, defaultLearningProgram = 'vst
     await upsertInto('users', [publicUserPayload]);
 
     const [student] = await insertInto('vstep_students', [{
-      user_id: authUser.id,
+      user_id: authUserId,
       email,
       username,
       account_code: accountCode || null,
@@ -380,7 +435,10 @@ export default async function handler(req, res) {
     const targetGroup = body?.groupId ? await findStudyGroup(body.groupId) : null;
     if (body?.groupId && !targetGroup) return res.status(400).json({ error: 'Không tìm thấy nhóm đã chọn.' });
 
-    const batchId = `vstep-import-${Date.now()}`;
+    // Trang admin gửi file theo từng nhóm nhỏ (giới hạn 50 subrequest/lượt của
+    // Cloudflare) → rowOffset để số dòng báo lỗi vẫn khớp file gốc; batchId dùng chung.
+    const rowOffset = Math.max(0, Math.floor(Number(body?.rowOffset) || 0));
+    const batchId = String(body?.batchId || '').trim().slice(0, 60) || `vstep-import-${Date.now()}`;
     const classCache = new Map();
     const results = [];
     for (let index = 0; index < rows.length; index += 1) {
@@ -415,9 +473,9 @@ export default async function handler(req, res) {
             console.warn(`bulk-import: gán lớp fail cho row ${index + 1}:`, classError);
           }
         }
-        results.push({ row: index + 1, ok: true, ...result, classAssigned, classError });
+        results.push({ row: rowOffset + index + 1, ok: true, ...result, classAssigned, classError });
       } catch (error) {
-        results.push({ row: index + 1, ok: false, error: error?.details?.message || error.message });
+        results.push({ row: rowOffset + index + 1, ok: false, error: error?.details?.message || error.message });
       }
     }
 

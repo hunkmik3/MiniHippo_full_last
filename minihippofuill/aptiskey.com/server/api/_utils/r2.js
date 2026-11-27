@@ -1,5 +1,6 @@
-import { DeleteObjectsCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+// R2 qua S3 API bằng aws4fetch (vài KB, chỉ dùng fetch + Web Crypto) — chạy được
+// cả trên Node (máy local) lẫn Cloudflare Workers/Pages (@aws-sdk quá nặng ở đó).
+import { AwsClient } from 'aws4fetch';
 
 const REPO_PREFIX = 'minihippofuill/aptiskey.com/';
 
@@ -29,6 +30,7 @@ const CONTENT_TYPES = {
 };
 
 let cachedClient = null;
+let cachedClientKey = '';
 
 function cleanEnv(value) {
   return String(value || '').trim();
@@ -101,18 +103,30 @@ export function buildR2PublicUrl(key) {
 }
 
 function getClient() {
-  if (cachedClient) return cachedClient;
+  const accessKeyId = cleanEnv(process.env.R2_ACCESS_KEY_ID);
+  const secretAccessKey = cleanEnv(process.env.R2_SECRET_ACCESS_KEY);
+  const clientKey = `${accessKeyId}:${secretAccessKey}`;
+  if (cachedClient && cachedClientKey === clientKey) return cachedClient;
 
-  cachedClient = new S3Client({
-    endpoint: getEndpoint(),
-    region: 'auto',
-    credentials: {
-      accessKeyId: cleanEnv(process.env.R2_ACCESS_KEY_ID),
-      secretAccessKey: cleanEnv(process.env.R2_SECRET_ACCESS_KEY)
-    }
-  });
-
+  cachedClient = new AwsClient({ accessKeyId, secretAccessKey, service: 's3', region: 'auto' });
+  cachedClientKey = clientKey;
   return cachedClient;
+}
+
+function objectUrl(key) {
+  const encodedKey = key.split('/').map((segment) => encodeURIComponent(segment)).join('/');
+  return `${getEndpoint()}/${encodeURIComponent(cleanEnv(process.env.R2_BUCKET))}/${encodedKey}`;
+}
+
+async function r2Fetch(key, init, action) {
+  const response = await getClient().fetch(objectUrl(key), init);
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    const error = new Error(`R2 ${action} lỗi (HTTP ${response.status})${detail ? `: ${detail.slice(0, 200)}` : ''}`);
+    error.status = response.status === 404 ? 404 : 502;
+    throw error;
+  }
+  return response;
 }
 
 function toBody(content, encoding) {
@@ -124,20 +138,6 @@ function toBody(content, encoding) {
   }
 
   return Buffer.from(String(content || ''), encoding || 'utf8');
-}
-
-async function streamToBuffer(body) {
-  if (!body) return Buffer.alloc(0);
-  if (Buffer.isBuffer(body)) return body;
-  if (typeof body.transformToByteArray === 'function') {
-    return Buffer.from(await body.transformToByteArray());
-  }
-
-  const chunks = [];
-  for await (const chunk of body) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-  return Buffer.concat(chunks);
 }
 
 export async function putR2Object(
@@ -152,14 +152,11 @@ export async function putR2Object(
   const body = toBody(content, encoding);
   const resolvedContentType = contentType || getContentTypeForPath(key);
 
-  await getClient().send(
-    new PutObjectCommand({
-      Bucket: cleanEnv(process.env.R2_BUCKET),
-      Key: key,
-      Body: body,
-      ContentType: resolvedContentType
-    })
-  );
+  await r2Fetch(key, {
+    method: 'PUT',
+    body,
+    headers: { 'Content-Type': resolvedContentType }
+  }, 'PUT');
 
   return {
     key,
@@ -179,13 +176,16 @@ export async function createR2PutUploadUrl(
 
   const key = normalizeR2Key(filePath);
   const resolvedContentType = contentType || getContentTypeForPath(key);
-  const command = new PutObjectCommand({
-    Bucket: cleanEnv(process.env.R2_BUCKET),
-    Key: key,
-    ContentType: resolvedContentType
+  // Link PUT ký sẵn (giống getSignedUrl cũ): ký kèm Content-Type nên trình duyệt
+  // phải gửi đúng Content-Type này (admin_vstep.js đã gửi ticket.contentType).
+  const url = new URL(objectUrl(key));
+  url.searchParams.set('X-Amz-Expires', String(expiresIn));
+  const signed = await getClient().sign(url.toString(), {
+    method: 'PUT',
+    headers: { 'Content-Type': resolvedContentType },
+    aws: { signQuery: true }
   });
-
-  const uploadUrl = await getSignedUrl(getClient(), command, { expiresIn });
+  const uploadUrl = signed.url;
 
   return {
     key,
@@ -202,14 +202,8 @@ export async function getR2ObjectBuffer(filePath) {
   }
 
   const key = normalizeR2Key(filePath);
-  const result = await getClient().send(
-    new GetObjectCommand({
-      Bucket: cleanEnv(process.env.R2_BUCKET),
-      Key: key
-    })
-  );
-
-  return streamToBuffer(result.Body);
+  const response = await r2Fetch(key, { method: 'GET' }, 'GET');
+  return Buffer.from(await response.arrayBuffer());
 }
 
 export async function deleteR2Objects(filePaths = []) {
@@ -217,21 +211,10 @@ export async function deleteR2Objects(filePaths = []) {
     throw new Error('Missing R2 environment variables');
   }
 
-  const objects = filePaths
-    .map((filePath) => ({ Key: normalizeR2Key(filePath) }))
-    .filter((item) => item.Key);
+  const keys = filePaths.map((filePath) => normalizeR2Key(filePath)).filter(Boolean);
+  if (!keys.length) return { deleted: 0 };
 
-  if (!objects.length) return { deleted: 0 };
-
-  await getClient().send(
-    new DeleteObjectsCommand({
-      Bucket: cleanEnv(process.env.R2_BUCKET),
-      Delete: {
-        Objects: objects,
-        Quiet: true
-      }
-    })
-  );
-
-  return { deleted: objects.length };
+  // Xoá từng object (số lượng nhỏ: các mảnh upload tạm) — không cần DeleteObjects XML.
+  await Promise.all(keys.map((key) => r2Fetch(key, { method: 'DELETE' }, 'DELETE')));
+  return { deleted: keys.length };
 }

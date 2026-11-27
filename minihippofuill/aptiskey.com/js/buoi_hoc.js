@@ -2912,7 +2912,7 @@ SESSIONS['B2-3'] = {
 
 async function loadCustomSessionConfig(sessionKey) {
   try {
-    const res = await fetch(`/api/practice_sets/list?type=${SESSION_CONTENT_TYPE}`);
+    const res = await fetch(`/api/practice_sets/list?type=${SESSION_CONTENT_TYPE}&sessionKey=${encodeURIComponent(sessionKey)}`);
     if (!res.ok) return null;
     const data = await res.json();
     const sets = Array.isArray(data?.sets) ? data.sets : [];

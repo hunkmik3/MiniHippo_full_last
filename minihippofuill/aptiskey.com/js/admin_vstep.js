@@ -2242,17 +2242,40 @@
         refs.importBtn.disabled = true;
         setImportAlert(`Đang import ${students.length} học viên...`, 'info');
         try {
-            const result = await fetchJson('/api/vstep/students/bulk-import', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    students,
-                    // Default learning_program cho cả batch; mỗi row CSV có
-                    // thể override bằng cột learningProgram nếu cần.
-                    learningProgram: PAGE.learningProgram || 'vstep_lophoc',
-                    groupId: GROUPS_ENABLED ? (getValue('vstepImportGroup') || undefined) : undefined
-                })
-            });
+            // Gửi theo từng nhóm nhỏ: server (Cloudflare) chỉ được ~50 lượt gọi Supabase
+            // mỗi request, mỗi HV tốn ~10 lượt → 3 HV/lần. Cộng dồn kết quả các nhóm.
+            const CHUNK = 3;
+            const batchId = `vstep-import-${Date.now()}`;
+            const groupId = GROUPS_ENABLED ? (getValue('vstepImportGroup') || undefined) : undefined;
+            const result = { created: 0, updated: 0, failed: 0, classAssignedCount: 0, results: [] };
+            for (let start = 0; start < students.length; start += CHUNK) {
+                const chunk = students.slice(start, start + CHUNK);
+                setImportAlert(`Đang import ${Math.min(start + chunk.length, students.length)}/${students.length} học viên...`, 'info');
+                try {
+                    const part = await fetchJson('/api/vstep/students/bulk-import', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            students: chunk,
+                            rowOffset: start,
+                            batchId,
+                            // Default learning_program cho cả batch; mỗi row CSV có
+                            // thể override bằng cột learningProgram nếu cần.
+                            learningProgram: PAGE.learningProgram || 'vstep_lophoc',
+                            groupId
+                        })
+                    });
+                    result.created += Number(part.created || 0);
+                    result.updated += Number(part.updated || 0);
+                    result.failed += Number(part.failed || 0);
+                    result.classAssignedCount += Number(part.classAssignedCount || 0);
+                    if (Array.isArray(part.results)) result.results.push(...part.results);
+                } catch (chunkError) {
+                    // Cả nhóm lỗi (mạng/máy chủ) → ghi lỗi cho từng dòng, import tiếp nhóm sau.
+                    chunk.forEach((_, i) => result.results.push({ row: start + i + 1, ok: false, error: chunkError.message }));
+                    result.failed += chunk.length;
+                }
+            }
             const failed = Number(result.failed || 0);
             const classCount = Number(result.classAssignedCount || 0);
             let message = `Import xong: tạo mới ${result.created || 0}, cập nhật ${result.updated || 0}, lỗi ${failed}.`;

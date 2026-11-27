@@ -187,7 +187,7 @@ async function handleGithubMedia(req, res) {
   }
 
   const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${encodeURIComponent(target.branch)}/${encodePath(target.path)}`;
-  const baseHeaders = { Accept: '*/*' };
+  const baseHeaders = { Accept: '*/*', 'User-Agent': 'MiniHippo' };
   if (req.headers.range) {
     baseHeaders.Range = req.headers.range;
   }

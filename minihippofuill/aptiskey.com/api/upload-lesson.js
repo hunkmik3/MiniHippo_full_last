@@ -1,6 +1,4 @@
 import parseBody from './_utils/parseBody.js';
-import fs from 'fs';
-import path from 'path';
 import { verifyAdminRequest } from './_utils/auth.js';
 import {
   insertInto,
@@ -50,14 +48,22 @@ function normalizeLessonPaths(filePath) {
   };
 }
 
-function saveLocalCopy(publicPath, content) {
+// Chạy local (Node) thì ghi thêm bản sao file bài học vào thư mục dự án.
+// Trên Cloudflare (MINIHIPPO_RUNTIME=cloudflare) không có ổ đĩa → bỏ qua. fs/path
+// nạp động (tên biến) để bộ đóng gói của Cloudflare không kéo module Node vào.
+async function saveLocalCopy(publicPath, content) {
   const isLocalDev =
-    process.env.NODE_ENV === 'development' ||
-    !process.env.VERCEL ||
-    process.env.VERCEL_ENV === 'development';
+    process.env.MINIHIPPO_RUNTIME !== 'cloudflare' &&
+    (process.env.NODE_ENV === 'development' ||
+      !process.env.VERCEL ||
+      process.env.VERCEL_ENV === 'development');
 
   if (!isLocalDev || !publicPath) return;
 
+  const fsModule = 'fs';
+  const pathModule = 'path';
+  const { default: fs } = await import(fsModule);
+  const { default: path } = await import(pathModule);
   const cwd = process.cwd();
   const candidates = [
     path.join(cwd, publicPath),
@@ -133,7 +139,7 @@ export default async function handler(req, res) {
     });
 
     try {
-      saveLocalCopy(publicPath, content);
+      await saveLocalCopy(publicPath, content);
     } catch (err) {
       console.error('Failed to save locally:', err);
     }
