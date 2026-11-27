@@ -35,3 +35,6 @@ hts-log.txt
 
 .vercel
 .env*.local
+
+# Bản sao lưu file môi trường (chứa khoá bí mật)
+.env*.bak*
